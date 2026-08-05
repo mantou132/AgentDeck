@@ -1,0 +1,26 @@
+{
+  "name": "flowday",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build",
+    "preview": "rsbuild preview",
+    "check": "tsc --noEmit",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@mantou/gem": "^2.2.4",
+    "@mantou/tap-ui": "^0.1.1"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "^2.1.10",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^26.1.2",
+    "swc-plugin-gem": "^0.1.9",
+    "typescript": "~5.9.2",
+    "unplugin-gem": "^0.1.2"
+  }
+}
