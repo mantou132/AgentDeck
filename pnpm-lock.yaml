@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@mantou/gem':
-        specifier: ^2.2.4
-        version: 2.2.5
+        specifier: ^2.2.9
+        version: 2.2.9
       '@mantou/tap-ui':
-        specifier: ^0.1.1
-        version: 0.1.1(@mantou/gem@2.2.5)
+        specifier: ^0.1.5
+        version: 0.1.5(@mantou/gem@2.2.9)
       '@tauri-apps/api':
         specifier: ^2.11.1
         version: 2.11.1
@@ -64,11 +64,11 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mantou/gem@2.2.5':
-    resolution: {integrity: sha512-aRVZ3rSjdhgIc3OzIzpDWibHW/bVQ87kX4nrlIUuspCnrHlyGO8FjJgXJCcgNrNhJb8nI2Jccey/M3nKSiS+ew==}
+  '@mantou/gem@2.2.9':
+    resolution: {integrity: sha512-J6pjXoMc1QVrd6GccO3xfc3QN3qv2CqqL8yLbRCPmRoC8MIEQ7HAED0EFhbXdiAAw5SJ2GFLLW3boqWldKQAeg==}
 
-  '@mantou/tap-ui@0.1.1':
-    resolution: {integrity: sha512-JJc2xQo7teTRnKNUj64hlxiGkcuErlkt74vTXutR4cbdk+dfp3Yng+Mupwz8zU8kyldbLkx7Z7qYKBUxcxWjVw==}
+  '@mantou/tap-ui@0.1.5':
+    resolution: {integrity: sha512-8qBvD9hXB3a+hvnTY4feMWJ2fhqJ14ln2hzaOKHhJCrrjx9n+7HLhcAljH9DUNy2pQkP8/Urk0r5Lin/Mje8rA==}
     peerDependencies:
       '@mantou/gem': ^2.x
 
@@ -463,11 +463,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@mantou/gem@2.2.5': {}
+  '@mantou/gem@2.2.9': {}
 
-  '@mantou/tap-ui@0.1.1(@mantou/gem@2.2.5)':
+  '@mantou/tap-ui@0.1.5(@mantou/gem@2.2.9)':
     dependencies:
-      '@mantou/gem': 2.2.5
+      '@mantou/gem': 2.2.9
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)':
     dependencies:

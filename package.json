@@ -11,9 +11,9 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
-    "@mantou/gem": "^2.2.4",
-    "@mantou/tap-ui": "^0.1.1"
+    "@mantou/gem": "^2.2.9",
+    "@mantou/tap-ui": "^0.1.5",
+    "@tauri-apps/api": "^2.11.1"
   },
   "devDependencies": {
     "@rsbuild/core": "^2.1.10",

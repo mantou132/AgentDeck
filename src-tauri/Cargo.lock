@@ -3081,7 +3081,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-edge-to-edge"
 version = "0.3.3"
-source = "git+https://github.com/mantou132/tauri-plugin-edge-to-edge#e20c6f92dcf1d53369523b8a8370c58e43444c25"
+source = "git+https://github.com/mantou132/tauri-plugin-edge-to-edge?rev=a566b4adabb03c6bebff9c3b862f0672c9e26fc5#a566b4adabb03c6bebff9c3b862f0672c9e26fc5"
 dependencies = [
  "serde",
  "tauri",
