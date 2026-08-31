@@ -1,55 +1,45 @@
-# Flowday
+# AgentDeck
 
-一个使用 Tauri 2、Gem、Duoyun UI 和 Rsbuild 构建的轻量移动任务清单，前端代码同时用于 iOS、Android 和桌面端。
+AgentDeck 是一个使用 Tauri 2、Gem、Tap UI、Tailwind CSS 和 Rsbuild 构建的移动端 ACP（Agent Client Protocol）客户端。
 
-## 技术栈
+## 功能
 
-- Tauri `2.11.5`
-- Tauri CLI `2.11.4`
-- Rsbuild `2.1.10`
-- `@mantou/gem 2.2.4`
-- `duoyun-ui 2.2.3`
-- `unplugin-gem 0.1.1`
-- `swc-plugin-gem 0.1.9`
+- 打开应用后显示会话列表；点开会话后，可通过顶部菜单按钮或左边缘右滑返回列表。
+- 会话中支持用户消息、Agent 流式回复、思考过程和工具调用状态。
+- 为手机屏幕优化的时间线、输入框、安全区和手势交互。
+- 内置演示会话和模拟回复，无需连接服务端即可体验完整界面。
 
-## 本地预览
+## 开始使用
 
-只预览前端界面不需要 Android Studio：
+安装依赖并启动浏览器预览：
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-检查类型或生成前端静态资源：
+启动 Android 模拟器或连接设备后运行：
 
 ```bash
-pnpm run check
-pnpm run build
+pnpm run tauri android dev
 ```
 
-安装 Rust 和 Tauri 的系统依赖后，也可以运行桌面窗口：
+启动桌面端：
 
 ```bash
 pnpm run tauri dev
 ```
 
-## Android
-
-准备好 Android Studio、Android SDK、NDK 和 JDK 后，首次初始化并启动：
+提交改动前可运行：
 
 ```bash
-pnpm run tauri android init
-pnpm run tauri android dev
+pnpm run lint:check
+pnpm run check
+pnpm run build
 ```
 
-## iOS
+安装依赖时会自动启用 Husky；提交前只会对暂存的前端文件运行 Biome。
 
-iOS 开发和发布必须在 macOS 上安装 Xcode。首次初始化并启动：
+## 当前状态
 
-```bash
-pnpm run tauri ios init
-pnpm run tauri ios dev
-```
-
-移动端生成目录由 Tauri CLI 管理。本项目目前没有执行 Android/iOS 初始化或构建。
+当前版本使用 mock ACP 数据演示交互，尚未连接真实 ACP 服务。

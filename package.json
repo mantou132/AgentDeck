@@ -1,5 +1,5 @@
 {
-  "name": "flowday",
+  "name": "agentdeck",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,7 +7,10 @@
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "preview": "rsbuild preview",
+    "lint": "biome check --write",
+    "lint:check": "biome check",
     "check": "tsc --noEmit",
+    "prepare": "husky install",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -16,11 +19,19 @@
     "@tauri-apps/api": "^2.11.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
     "@rsbuild/core": "^2.1.10",
+    "@tailwindcss/postcss": "^4.3.0",
     "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^26.1.2",
-    "swc-plugin-gem": "^0.1.9",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.1.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
     "typescript": "~5.9.2",
-    "unplugin-gem": "^0.1.2"
+    "unplugin-gem": "^0.1.6"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,json,jsonc,css,html}": "biome check --write --no-errors-on-unmatched"
   }
 }

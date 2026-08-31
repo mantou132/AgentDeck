@@ -10,7 +10,6 @@ export default defineConfig(({ command }) => ({
     entry: {
       index: './src/main.ts',
     },
-    preEntry: '@mantou/gem/helper/hmr',
   },
   output: {
     distPath: {
@@ -27,7 +26,7 @@ export default defineConfig(({ command }) => ({
       target: ['web', 'es2022'],
       plugins: [
         unpluginGem({
-          include: path.resolve(__dirname, 'src'),
+          include: path.resolve(import.meta.dirname, 'src'),
           autoImport: {
             extends: 'gem',
             elements: {

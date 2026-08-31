@@ -1,6 +1,6 @@
 name: flowday
 options:
-  bundleIdPrefix: com.example.pockettasks
+  bundleIdPrefix: com.mantou.agentdeck
   deploymentTarget:
     iOS: 14.0
 fileGroups: [../../src]
@@ -10,8 +10,8 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Flowday
-      PRODUCT_BUNDLE_IDENTIFIER: com.example.pockettasks
+      PRODUCT_NAME: AgentDeck
+      PRODUCT_BUNDLE_IDENTIFIER: com.mantou.agentdeck
 targetTemplates:
   app:
     type: application

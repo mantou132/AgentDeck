@@ -1,9 +1,14 @@
 import { initApp } from '@mantou/tap-ui/helper/webapp';
 
-import './app';
+import { startAcpTransport } from './session-store';
+
+import './theme';
+import './menu';
+import './session';
 
 initApp({
-  template: html`
-    <flowday-app></flowday-app>
-  `,
+  // The session list is the root page. Individual sessions enter through Stack.
+  template: html`<agentdeck-menu-page class="block h-full"></agentdeck-menu-page>`,
 });
+
+startAcpTransport();

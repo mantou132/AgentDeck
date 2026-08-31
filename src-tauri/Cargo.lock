@@ -9,6 +9,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "agentdeck"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-edge-to-edge",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -757,17 +768,6 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "flowday"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-edge-to-edge",
 ]
 
 [[package]]
@@ -3081,7 +3081,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-edge-to-edge"
 version = "0.3.3"
-source = "git+https://github.com/mantou132/tauri-plugin-edge-to-edge?rev=a566b4adabb03c6bebff9c3b862f0672c9e26fc5#a566b4adabb03c6bebff9c3b862f0672c9e26fc5"
+source = "git+https://github.com/mantou132/tauri-plugin-edge-to-edge?rev=86fe04372c33d1fc0a2459d3c49ee1b5be1324d9#86fe04372c33d1fc0a2459d3c49ee1b5be1324d9"
 dependencies = [
  "serde",
  "tauri",

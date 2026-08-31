@@ -38,8 +38,8 @@
 		B56EC2704555083D0CCFB705 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		CB78E2888615170F3E0C3167 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		D44F2AA0DB822CE9FFAF1F71 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
-		D91C704601273D10F5308BC4 /* flowday_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = flowday_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F60AA5D287C5A9098744B2CF /* flowday_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = flowday_iOS.entitlements; sourceTree = "<group>"; };
+		D91C704601273D10F5308BC4 /* agentdeck_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = agentdeck_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F60AA5D287C5A9098744B2CF /* agentdeck_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = agentdeck_iOS.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,7 +79,7 @@
 		11AD79D7E0EAFDB84DF70558 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D91C704601273D10F5308BC4 /* flowday_iOS.app */,
+				D91C704601273D10F5308BC4 /* agentdeck_iOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -101,13 +101,13 @@
 			path = flowday;
 			sourceTree = "<group>";
 		};
-		B4A8C7239D7AB676FD9CAEBE /* flowday_iOS */ = {
+		B4A8C7239D7AB676FD9CAEBE /* agentdeck_iOS */ = {
 			isa = PBXGroup;
 			children = (
-				F60AA5D287C5A9098744B2CF /* flowday_iOS.entitlements */,
+				F60AA5D287C5A9098744B2CF /* agentdeck_iOS.entitlements */,
 				6D1E878518D4CF8B92BA3641 /* Info.plist */,
 			);
-			path = flowday_iOS;
+			path = agentdeck_iOS;
 			sourceTree = "<group>";
 		};
 		B9E85AD1F8D5D24A56713BA4 /* Frameworks */ = {
@@ -132,7 +132,7 @@
 				52911AED5ECA66FB78575788 /* Assets.xcassets */,
 				64EB9D082D56E76C109DABB1 /* LaunchScreen.storyboard */,
 				085EF516566B36E524909CE6 /* Externals */,
-				B4A8C7239D7AB676FD9CAEBE /* flowday_iOS */,
+				B4A8C7239D7AB676FD9CAEBE /* agentdeck_iOS */,
 				0F3B6AAB67AB3AEA55325D23 /* Sources */,
 				D1A09532409A0CEEBB60CC95 /* src */,
 				B9E85AD1F8D5D24A56713BA4 /* Frameworks */,
@@ -153,9 +153,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		593850427093B280564CAA34 /* flowday_iOS */ = {
+		593850427093B280564CAA34 /* agentdeck_iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 49F980D64DDDD03017580F01 /* Build configuration list for PBXNativeTarget "flowday_iOS" */;
+			buildConfigurationList = 49F980D64DDDD03017580F01 /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */;
 			buildPhases = (
 				9E948361D390A1A0A63897D7 /* Build Rust Code */,
 				790F1C7667E74BFA065B4887 /* Sources */,
@@ -166,11 +166,11 @@
 			);
 			dependencies = (
 			);
-			name = flowday_iOS;
+			name = agentdeck_iOS;
 			packageProductDependencies = (
 			);
-			productName = flowday_iOS;
-			productReference = D91C704601273D10F5308BC4 /* flowday_iOS.app */;
+			productName = agentdeck_iOS;
+			productReference = D91C704601273D10F5308BC4 /* agentdeck_iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -198,7 +198,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				593850427093B280564CAA34 /* flowday_iOS */,
+				593850427093B280564CAA34 /* agentdeck_iOS */,
 			);
 		};
 /* End PBXProject section */
@@ -260,7 +260,7 @@
 					arm64,
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = flowday_iOS/flowday_iOS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
@@ -268,15 +268,15 @@
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = flowday_iOS/Info.plist;
+				INFOPLIST_FILE = agentdeck_iOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.pockettasks;
-				PRODUCT_NAME = "Flowday";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck;
+				PRODUCT_NAME = "AgentDeck";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -410,7 +410,7 @@
 					arm64,
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = flowday_iOS/flowday_iOS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
@@ -418,15 +418,15 @@
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = flowday_iOS/Info.plist;
+				INFOPLIST_FILE = agentdeck_iOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.pockettasks;
-				PRODUCT_NAME = "Flowday";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck;
+				PRODUCT_NAME = "AgentDeck";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -436,7 +436,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		49F980D64DDDD03017580F01 /* Build configuration list for PBXNativeTarget "flowday_iOS" */ = {
+		49F980D64DDDD03017580F01 /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				0F3EBDCCB3C4154CCF0DA99D /* debug */,
