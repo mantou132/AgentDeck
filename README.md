@@ -1,45 +1,51 @@
 # AgentDeck
 
-AgentDeck 是一个使用 Tauri 2、Gem、Tap UI、Tailwind CSS 和 Rsbuild 构建的移动端 ACP（Agent Client Protocol）客户端。
+AgentDeck turns your coding agents (Claude Code, Codex, Cursor, pi) into remote services you can reach from your phone. It is a mobile ACP (Agent Client Protocol) client built with Tauri 2, Gem, Tap UI, Tailwind CSS, and Rsbuild.
 
-## 功能
+## How it works
 
-- 打开应用后显示会话列表；点开会话后，可通过顶部菜单按钮或左边缘右滑返回列表。
-- 会话中支持用户消息、Agent 流式回复、思考过程和工具调用状态。
-- 为手机屏幕优化的时间线、输入框、安全区和手势交互。
-- 内置演示会话和模拟回复，无需连接服务端即可体验完整界面。
+```
+AgentDeck (phone) ⇄ Relay ⇄ browser4agent (desktop) ⇄ Claude Code / Codex / Cursor / pi
+```
 
-## 开始使用
+1. Run [browser4agent][browser4agent] on the machine where your agents live. Its Agent panel talks to the same ACP agents that AgentDeck uses.
+2. Get the **Relay ID** from the browser4agent extension settings page. This UUID pairs AgentDeck with your desktop: it is the credential for a private, durable WebSocket channel.
+3. Enter the Relay ID in AgentDeck's settings page. The app connects to the relay and lists the sessions of your selected agent, grouped by working directory.
+4. Open a session to replay its history, or tap **新建会话 (New session)** in the footer and pick a working directory from the agent's machine.
 
-安装依赖并启动浏览器预览：
+The relay is protocol-agnostic and durable: if the phone goes offline, prompts sent from the other side keep their history and catch up when the app reconnects.
 
-```bash
+## Pairing AgentDeck with your agents
+
+1. Install [browser4agent][browser4agent] and register its native host.
+2. Open the extension settings page and copy the **Relay ID**.
+3. In AgentDeck, open **设置 (Settings)**, paste the Relay ID, and pick an agent.
+4. Save — the app connects to the relay (`wss://agent-deck.xianqiao.wang/ws` in production builds) and the session list appears.
+
+## Development
+
+```sh
 pnpm install
-pnpm run dev
+pnpm run dev          # browser preview
+pnpm run tauri dev    # desktop
+pnpm run tauri android dev  # Android device/emulator
 ```
 
-启动 Android 模拟器或连接设备后运行：
+### Checks before commit
 
-```bash
-pnpm run tauri android dev
+```sh
+pnpm run lint:check   # Biome
+pnpm run check        # TypeScript strict
+pnpm run build        # frontend bundle
 ```
 
-启动桌面端：
+Husky runs Biome on staged files via lint-staged; install dependencies once to enable it.
 
-```bash
-pnpm run tauri dev
-```
+## Project structure
 
-提交改动前可运行：
+- `src/` — Gem + Tap UI frontend: menu, session, settings pages, relay transport, ACP session state.
+- `src-tauri/` — Tauri 2 native shell and generated Android/iOS projects.
+- `public/` — static brand assets copied by Rsbuild.
 
-```bash
-pnpm run lint:check
-pnpm run check
-pnpm run build
-```
-
-安装依赖时会自动启用 Husky；提交前只会对暂存的前端文件运行 Biome。
-
-## 当前状态
-
-当前版本使用 mock ACP 数据演示交互，尚未连接真实 ACP 服务。
+[browser4agent]: https://github.com/mantou132/browser4agent
+[relay]: https://github.com/mantou132/relay

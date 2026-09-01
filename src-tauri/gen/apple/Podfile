@@ -1,13 +1,13 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'flowday_iOS' do
+target 'agentdeck_iOS' do
 platform :ios, '14.0'
-  # Pods for flowday_iOS
+  # Pods for agentdeck_iOS
 end
 
-target 'flowday_macOS' do
+target 'agentdeck_macOS' do
 platform :osx, '11.0'
-  # Pods for flowday_macOS
+  # Pods for agentdeck_macOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

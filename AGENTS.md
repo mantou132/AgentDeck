@@ -14,12 +14,17 @@
 
 ## 关键文件
 
-- `src/main.ts`：应用入口；挂载会话列表首页并启动 ACP transport
-- `src/menu.ts`：会话列表首页；把带 `sessionId` property 的 session 页面压入 Stack
-- `src/session.ts`：按页面 `sessionId` 渲染消息时间线、工具状态卡和 composer
-- `src/acp-client.ts`：可重连的 ACP JSON-RPC WebSocket client 与 mock socket
-- `src/session-store.ts`：共享 session 数据、按 session 操作的 actions 和 ACP update reducer
-- `src/mock-data.ts`：开发期 session / transcript 数据
+- `src/main.ts`：应用入口；挂载三页面 App shell 并启动 relay/agent transport
+- `src/app.ts`：启动路由；未配置 Relay ID 时显示 settings，否则显示 list
+- `src/menu.ts`：按 cwd 分组的远端 ACP session list；把 session/settings 页面压入 Stack
+- `src/session.ts`：按页面 `sessionId` 加载历史回放并渲染消息、工具、权限和 composer
+- `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页
+- `src/relay-client.ts`：遵守 relay durable wire protocol 的 endpoint 2 WebSocket client
+- `src/rpc.ts`：relay payload 内使用的双向流式 RPC peer
+- `src/agent-api.ts`：browser4agent 暴露的 agent/session/prompt RPC API
+- `src/session-store.ts`：共享设置、连接、session 数据、actions 和 ACP event reducer
+- `src/markdown.ts`：基于 `gem-bind-marked` 的 Markdown、Mermaid 与 LaTeX 渲染配置
+- `src/path.ts`：列表与 session 页面共用的路径显示格式化
 - `src/theme.ts`：把 Tailwind `@theme` token 注入 Tap UI `extendTheme`，是应用主题桥
 - `src/tailwind.css`：Tailwind v4 入口、AgentDeck 色彩/字体 token 和全局基础样式
 - `rsbuild.config.ts`：Rsbuild + `unplugin-gem` 自动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`
@@ -28,11 +33,11 @@
 - `patches/tailwindcss.patch`：让 Preflight 跳过 `:state(gem-element)`，避免重置 Gem 元素
 - `src-tauri/tauri.conf.json`：AgentDeck 产品名、应用标识和 bundle 图标配置
 
-运行链路：`src/main.ts` 先加载 `src/theme.ts`，挂载会话列表首页并启动 ACP transport；点击列表项时，`src/menu.ts` 把对应 `sessionId` 作为页面 property 传给 session 页面并压入 Stack。真实服务接入前，`src/session-store.ts` 给 client 注入 `MockAcpWebSocket`。
+运行链路：`src/main.ts` 先加载 `src/theme.ts`，挂载 `src/app.ts` 并启动 relay transport。`src/app.ts` 同步检查本地 Relay ID：缺少配置时显示 settings，存在配置时显示 list；点击 list 条目后，`src/menu.ts` 把对应 `sessionId` 作为页面 property 传给 session 页面并压入 Stack。
 
 样式链路：组件布局优先写 Tailwind utility；`src/tailwind.css` 的共享 token 同时供 Tailwind utility 和 `src/theme.ts` 中的 Tap UI theme 使用。不要再创建平行的应用级 CSS 变量。安全区变量由原生 edge-to-edge 插件在运行时提供，不属于视觉主题，继续在局部 CSS 中使用。
 
-真实 ACP 接入点：`src/session-store.ts` 当前给 `AcpSocketClient` 注入 `MockAcpWebSocket`。移除 `socketFactory` 后会使用浏览器原生 `WebSocket` 连接 `ws://127.0.0.1:4789/acp`；正式接入时应把 URL 和鉴权改为服务端配置。
+远端接入链路：`src/relay-client.ts` 在开发构建连接 `ws://127.0.0.1:39371/ws`，在生产构建连接 `wss://agent-deck.xianqiao.wang/ws`，App 固定使用 relay endpoint 2；browser4agent 的 `relay_client` 使用 endpoint 1。relay payload 由 `src/rpc.ts` 处理，并通过 `src/agent-api.ts` 调用 browser4agent 的 agent RPC。
 
 Android 标识必须保持一致：`src-tauri/tauri.conf.json` 的 identifier、`src-tauri/gen/android/app/build.gradle.kts` 的 namespace/applicationId，以及 `MainActivity.kt` 的 package 当前均为 `com.mantou.agentdeck`。Rust library 名为 `agentdeck_lib`。重命名这些标识后若 Android 编译仍引用旧包名，清理对应 target 的 `tauri` / `wry` 缓存和 Android `src/main/**/generated` 旧目录，让 Tauri 重新生成 Kotlin bridge。
 

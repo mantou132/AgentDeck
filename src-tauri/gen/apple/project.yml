@@ -1,4 +1,4 @@
-name: flowday
+name: agentdeck
 options:
   bundleIdPrefix: com.mantou.agentdeck
   deploymentTarget:
@@ -12,6 +12,7 @@ settingGroups:
     base:
       PRODUCT_NAME: AgentDeck
       PRODUCT_BUNDLE_IDENTIFIER: com.mantou.agentdeck
+      DEVELOPMENT_TEAM: L42P5Q9798
 targetTemplates:
   app:
     type: application
@@ -24,20 +25,20 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
-  flowday_iOS:
+  agentdeck_iOS:
     type: application
     platform: iOS
     sources:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
-      - path: flowday_iOS
+      - path: agentdeck_iOS
       - path: assets
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
     info:
-      path: flowday_iOS/Info.plist
+      path: agentdeck_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
@@ -54,7 +55,7 @@ targets:
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "0.1.0"
     entitlements:
-      path: flowday_iOS/flowday_iOS.entitlements
+      path: agentdeck_iOS/agentdeck_iOS.entitlements
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full

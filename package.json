@@ -14,6 +14,9 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@gem-bind/latex": "^0.0.1",
+    "@gem-bind/marked": "^0.0.5",
+    "@gem-bind/mermaid": "^0.0.1",
     "@mantou/gem": "^2.2.9",
     "@mantou/tap-ui": "^0.1.5",
     "@tauri-apps/api": "^2.11.1"

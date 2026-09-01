@@ -7,160 +7,160 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0DEEB9A59D9B82D779F24433 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CB78E2888615170F3E0C3167 /* MetalKit.framework */; };
-		0E3C11A7C2132A6D8DBEBBFE /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 836CC11240130F4A7A68267F /* CoreGraphics.framework */; };
-		0F0BD6132FBEC04AA5A16BEF /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6BE8C2C4F9CB9391EB363BBF /* libapp.a */; };
-		2C3A3FB1BD7AFA4622FCFA71 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 74E81C6437C80D2220C029AF /* assets */; };
-		983DF2195D361839F7737D20 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 65015E01417AD65C60773495 /* QuartzCore.framework */; };
-		A30D053CE61180FB78999146 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 64EB9D082D56E76C109DABB1 /* LaunchScreen.storyboard */; };
-		A5EE02CAD3BE2FFCE6ED474E /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 697DA332C32A10B6174E9130 /* WebKit.framework */; };
-		C93AE29330BFA20375A7927A /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = B56EC2704555083D0CCFB705 /* main.mm */; };
-		D3778AAF4E4299C517697B7E /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5638A84B340533F7635D6781 /* Metal.framework */; };
-		D3B61D39BABB7901C0D85333 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68F150E773CF5A563C2D5A79 /* Security.framework */; };
-		E662BE6A5533E5DF4E71E1DF /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0AB62F395612EDE3308972C /* UIKit.framework */; };
-		F86FD0096663F5B522AE1338 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 52911AED5ECA66FB78575788 /* Assets.xcassets */; };
+		361E2D241516AAD2769A5D20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A03567258072F49EB1E09EC /* Assets.xcassets */; };
+		39DAD3D8DBB7ACF6D2C5BF0C /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = DAB9945DE9E9EFB52CC302D4 /* main.mm */; };
+		4A8CBD01449644DCD17EE272 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F82D63050BFA082B2F66F7A8 /* Metal.framework */; };
+		4D8497A2664B350284200224 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */; };
+		5FC641B441D0B7D3E2F209B5 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B7A019AC4B744FAFFA5604F /* Security.framework */; };
+		6E3E1B4C056668E3970FE775 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 860CBE7E3FB1776357472F4D /* CoreGraphics.framework */; };
+		81928F20E7671D77D34AC039 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D7466D105FC21244370BC876 /* QuartzCore.framework */; };
+		A26CDA1E3A363364BA88ED5C /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 07FDE4F572A7A540D7796C5B /* libapp.a */; };
+		A3AA947601E86B0B7A41EF10 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 9D4F7221E2A457F89DF1019C /* assets */; };
+		B5D97BD73DBCF1438DE42274 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */; };
+		C9FAEEA58679281628E33BD4 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 78CB78DE555762C0467FFC5B /* UIKit.framework */; };
+		DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		334775B054713DC3F42D0D11 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
-		52911AED5ECA66FB78575788 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		5638A84B340533F7635D6781 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
-		64EB9D082D56E76C109DABB1 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		65015E01417AD65C60773495 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		68F150E773CF5A563C2D5A79 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		697DA332C32A10B6174E9130 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
-		6BE8C2C4F9CB9391EB363BBF /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
-		6D1E878518D4CF8B92BA3641 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		74E81C6437C80D2220C029AF /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
-		836CC11240130F4A7A68267F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		924B2D55A4C53037E53659D1 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
-		A0AB62F395612EDE3308972C /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		B56EC2704555083D0CCFB705 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		CB78E2888615170F3E0C3167 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
-		D44F2AA0DB822CE9FFAF1F71 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
-		D91C704601273D10F5308BC4 /* agentdeck_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = agentdeck_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F60AA5D287C5A9098744B2CF /* agentdeck_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = agentdeck_iOS.entitlements; sourceTree = "<group>"; };
+		049FBEF9987A0C04AA457E71 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		07FDE4F572A7A540D7796C5B /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		14FEFCCE8C4E76330EF845D8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		19EC4957519500559466C137 /* agentdeck_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = agentdeck_iOS.entitlements; sourceTree = "<group>"; };
+		28EC4CBF5CD79F3223C3A7C3 /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
+		5A03567258072F49EB1E09EC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		69F4EB1434773CED0CDD10F2 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
+		78CB78DE555762C0467FFC5B /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		860CBE7E3FB1776357472F4D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		9ADAE33DBE866A878B78F3AF /* AgentDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B7A019AC4B744FAFFA5604F /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		9D4F7221E2A457F89DF1019C /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		D7466D105FC21244370BC876 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		DAB9945DE9E9EFB52CC302D4 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		F82D63050BFA082B2F66F7A8 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		E2606C9C27A5BF83AAC048C6 /* Frameworks */ = {
+		AFDFECC1B81BCD2D3373586B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0F0BD6132FBEC04AA5A16BEF /* libapp.a in Frameworks */,
-				0E3C11A7C2132A6D8DBEBBFE /* CoreGraphics.framework in Frameworks */,
-				D3778AAF4E4299C517697B7E /* Metal.framework in Frameworks */,
-				0DEEB9A59D9B82D779F24433 /* MetalKit.framework in Frameworks */,
-				983DF2195D361839F7737D20 /* QuartzCore.framework in Frameworks */,
-				D3B61D39BABB7901C0D85333 /* Security.framework in Frameworks */,
-				E662BE6A5533E5DF4E71E1DF /* UIKit.framework in Frameworks */,
-				A5EE02CAD3BE2FFCE6ED474E /* WebKit.framework in Frameworks */,
+				A26CDA1E3A363364BA88ED5C /* libapp.a in Frameworks */,
+				6E3E1B4C056668E3970FE775 /* CoreGraphics.framework in Frameworks */,
+				4A8CBD01449644DCD17EE272 /* Metal.framework in Frameworks */,
+				B5D97BD73DBCF1438DE42274 /* MetalKit.framework in Frameworks */,
+				81928F20E7671D77D34AC039 /* QuartzCore.framework in Frameworks */,
+				5FC641B441D0B7D3E2F209B5 /* Security.framework in Frameworks */,
+				C9FAEEA58679281628E33BD4 /* UIKit.framework in Frameworks */,
+				4D8497A2664B350284200224 /* WebKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		085EF516566B36E524909CE6 /* Externals */ = {
+		34C8EE1960D0206B29FABDBC /* src */ = {
+			isa = PBXGroup;
+			children = (
+				69F4EB1434773CED0CDD10F2 /* lib.rs */,
+				28EC4CBF5CD79F3223C3A7C3 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		4B7CC197ECE79FE5486EF5A0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				860CBE7E3FB1776357472F4D /* CoreGraphics.framework */,
+				07FDE4F572A7A540D7796C5B /* libapp.a */,
+				F82D63050BFA082B2F66F7A8 /* Metal.framework */,
+				FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */,
+				D7466D105FC21244370BC876 /* QuartzCore.framework */,
+				9B7A019AC4B744FAFFA5604F /* Security.framework */,
+				78CB78DE555762C0467FFC5B /* UIKit.framework */,
+				7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		557EFCF9B73B07DCB5D56DE9 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				B00AF6376B4E1E4F66D50E16 /* agentdeck */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		637D9498452F30CCE8E8AEAA /* Externals */ = {
 			isa = PBXGroup;
 			children = (
 			);
 			path = Externals;
 			sourceTree = "<group>";
 		};
-		0F3B6AAB67AB3AEA55325D23 /* Sources */ = {
+		75EF3CEF154FD2BDDC12676D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				836B6970F538DE8859B17C28 /* flowday */,
-			);
-			path = Sources;
-			sourceTree = "<group>";
-		};
-		11AD79D7E0EAFDB84DF70558 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				D91C704601273D10F5308BC4 /* agentdeck_iOS.app */,
+				9ADAE33DBE866A878B78F3AF /* AgentDeck.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		6B31624544A32B2CA92FC1E4 /* bindings */ = {
+		7F64332A44AB37722E628EBE /* agentdeck_iOS */ = {
 			isa = PBXGroup;
 			children = (
-				334775B054713DC3F42D0D11 /* bindings.h */,
-			);
-			path = bindings;
-			sourceTree = "<group>";
-		};
-		836B6970F538DE8859B17C28 /* flowday */ = {
-			isa = PBXGroup;
-			children = (
-				B56EC2704555083D0CCFB705 /* main.mm */,
-				6B31624544A32B2CA92FC1E4 /* bindings */,
-			);
-			path = flowday;
-			sourceTree = "<group>";
-		};
-		B4A8C7239D7AB676FD9CAEBE /* agentdeck_iOS */ = {
-			isa = PBXGroup;
-			children = (
-				F60AA5D287C5A9098744B2CF /* agentdeck_iOS.entitlements */,
-				6D1E878518D4CF8B92BA3641 /* Info.plist */,
+				19EC4957519500559466C137 /* agentdeck_iOS.entitlements */,
+				14FEFCCE8C4E76330EF845D8 /* Info.plist */,
 			);
 			path = agentdeck_iOS;
 			sourceTree = "<group>";
 		};
-		B9E85AD1F8D5D24A56713BA4 /* Frameworks */ = {
+		AA675ADF24F9B8A4034F70D7 = {
 			isa = PBXGroup;
 			children = (
-				836CC11240130F4A7A68267F /* CoreGraphics.framework */,
-				6BE8C2C4F9CB9391EB363BBF /* libapp.a */,
-				5638A84B340533F7635D6781 /* Metal.framework */,
-				CB78E2888615170F3E0C3167 /* MetalKit.framework */,
-				65015E01417AD65C60773495 /* QuartzCore.framework */,
-				68F150E773CF5A563C2D5A79 /* Security.framework */,
-				A0AB62F395612EDE3308972C /* UIKit.framework */,
-				697DA332C32A10B6174E9130 /* WebKit.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		C018BBE93B05CA5588A54C21 = {
-			isa = PBXGroup;
-			children = (
-				74E81C6437C80D2220C029AF /* assets */,
-				52911AED5ECA66FB78575788 /* Assets.xcassets */,
-				64EB9D082D56E76C109DABB1 /* LaunchScreen.storyboard */,
-				085EF516566B36E524909CE6 /* Externals */,
-				B4A8C7239D7AB676FD9CAEBE /* agentdeck_iOS */,
-				0F3B6AAB67AB3AEA55325D23 /* Sources */,
-				D1A09532409A0CEEBB60CC95 /* src */,
-				B9E85AD1F8D5D24A56713BA4 /* Frameworks */,
-				11AD79D7E0EAFDB84DF70558 /* Products */,
+				9D4F7221E2A457F89DF1019C /* assets */,
+				5A03567258072F49EB1E09EC /* Assets.xcassets */,
+				80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */,
+				7F64332A44AB37722E628EBE /* agentdeck_iOS */,
+				637D9498452F30CCE8E8AEAA /* Externals */,
+				557EFCF9B73B07DCB5D56DE9 /* Sources */,
+				34C8EE1960D0206B29FABDBC /* src */,
+				4B7CC197ECE79FE5486EF5A0 /* Frameworks */,
+				75EF3CEF154FD2BDDC12676D /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		D1A09532409A0CEEBB60CC95 /* src */ = {
+		B00AF6376B4E1E4F66D50E16 /* agentdeck */ = {
 			isa = PBXGroup;
 			children = (
-				D44F2AA0DB822CE9FFAF1F71 /* lib.rs */,
-				924B2D55A4C53037E53659D1 /* main.rs */,
+				DAB9945DE9E9EFB52CC302D4 /* main.mm */,
+				F81232708DED67146E81A703 /* bindings */,
 			);
-			name = src;
-			path = ../../src;
+			path = agentdeck;
+			sourceTree = "<group>";
+		};
+		F81232708DED67146E81A703 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				049FBEF9987A0C04AA457E71 /* bindings.h */,
+			);
+			path = bindings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		593850427093B280564CAA34 /* agentdeck_iOS */ = {
+		949E988C9B1A2BCF6FAE6AB5 /* agentdeck_iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 49F980D64DDDD03017580F01 /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */;
+			buildConfigurationList = B57A3033204F1D2C2C10442F /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */;
 			buildPhases = (
-				9E948361D390A1A0A63897D7 /* Build Rust Code */,
-				790F1C7667E74BFA065B4887 /* Sources */,
-				9B1A8448A39D0790A246D3F1 /* Resources */,
-				E2606C9C27A5BF83AAC048C6 /* Frameworks */,
+				12ED8C7F8895FC89011C8F7E /* Build Rust Code */,
+				4EB8A49A9E0E0B582B3086EF /* Sources */,
+				BC748C5121DD11855B7D922F /* Resources */,
+				AFDFECC1B81BCD2D3373586B /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -170,54 +170,52 @@
 			packageProductDependencies = (
 			);
 			productName = agentdeck_iOS;
-			productReference = D91C704601273D10F5308BC4 /* agentdeck_iOS.app */;
+			productReference = 9ADAE33DBE866A878B78F3AF /* AgentDeck.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		D12266E896ED5DC857B275C3 /* Project object */ = {
+		D85E3B8E8AD5CE187049ABAA /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
 			};
-			buildConfigurationList = 90CD2D6627B79FF8F74C4986 /* Build configuration list for PBXProject "flowday" */;
+			buildConfigurationList = 20F4B391756C1675211270C0 /* Build configuration list for PBXProject "agentdeck" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = C018BBE93B05CA5588A54C21;
+			mainGroup = AA675ADF24F9B8A4034F70D7;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 11AD79D7E0EAFDB84DF70558 /* Products */;
+			productRefGroup = 75EF3CEF154FD2BDDC12676D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				593850427093B280564CAA34 /* agentdeck_iOS */,
+				949E988C9B1A2BCF6FAE6AB5 /* agentdeck_iOS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		9B1A8448A39D0790A246D3F1 /* Resources */ = {
+		BC748C5121DD11855B7D922F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F86FD0096663F5B522AE1338 /* Assets.xcassets in Resources */,
-				A30D053CE61180FB78999146 /* LaunchScreen.storyboard in Resources */,
-				2C3A3FB1BD7AFA4622FCFA71 /* assets in Resources */,
+				361E2D241516AAD2769A5D20 /* Assets.xcassets in Resources */,
+				DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */,
+				A3AA947601E86B0B7A41EF10 /* assets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		9E948361D390A1A0A63897D7 /* Build Rust Code */ = {
+		12ED8C7F8895FC89011C8F7E /* Build Rust Code */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -241,27 +239,26 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		790F1C7667E74BFA065B4887 /* Sources */ = {
+		4EB8A49A9E0E0B582B3086EF /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C93AE29330BFA20375A7927A /* main.mm in Sources */,
+				39DAD3D8DBB7ACF6D2C5BF0C /* main.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		0F3EBDCCB3C4154CCF0DA99D /* debug */ = {
+		2A82DC17B19623D9EDAAA59B /* debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = (
-					arm64,
-				);
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 862Y7Q872C;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -273,8 +270,20 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck;
 				PRODUCT_NAME = "AgentDeck";
 				SDKROOT = iphoneos;
@@ -283,7 +292,49 @@
 			};
 			name = debug;
 		};
-		228930851D494E60A85453E6 /* debug */ = {
+		87747C0FDC52EEB92DDAEBF3 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 862Y7Q872C;
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = agentdeck_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck;
+				PRODUCT_NAME = "AgentDeck";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		CD279F0ED9D82788BABCBD97 /* debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -346,7 +397,7 @@
 			};
 			name = debug;
 		};
-		471735B734D1331D71B644B9 /* release */ = {
+		E53B8B67391C0B29A028E700 /* release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -402,59 +453,28 @@
 			};
 			name = release;
 		};
-		FE4061E5C368A841D26411CD /* release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = (
-					arm64,
-				);
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				ENABLE_BITCODE = NO;
-				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"\".\"",
-				);
-				INFOPLIST_FILE = agentdeck_iOS/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck;
-				PRODUCT_NAME = "AgentDeck";
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VALID_ARCHS = arm64;
-			};
-			name = release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		49F980D64DDDD03017580F01 /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */ = {
+		20F4B391756C1675211270C0 /* Build configuration list for PBXProject "agentdeck" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				0F3EBDCCB3C4154CCF0DA99D /* debug */,
-				FE4061E5C368A841D26411CD /* release */,
+				CD279F0ED9D82788BABCBD97 /* debug */,
+				E53B8B67391C0B29A028E700 /* release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;
 		};
-		90CD2D6627B79FF8F74C4986 /* Build configuration list for PBXProject "flowday" */ = {
+		B57A3033204F1D2C2C10442F /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				228930851D494E60A85453E6 /* debug */,
-				471735B734D1331D71B644B9 /* release */,
+				2A82DC17B19623D9EDAAA59B /* debug */,
+				87747C0FDC52EEB92DDAEBF3 /* release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = D12266E896ED5DC857B275C3 /* Project object */;
+	rootObject = D85E3B8E8AD5CE187049ABAA /* Project object */;
 }
