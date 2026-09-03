@@ -19,7 +19,6 @@
 - `src/menu.ts`：按 cwd 分组的远端 ACP session list；把 session/settings 页面压入 Stack
 - `src/session.ts`：按页面 `sessionId` 加载历史回放并渲染消息、工具、权限和 composer
 - `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页
-- `src/relay-client.ts`：遵守 relay durable wire protocol 的 endpoint 2 WebSocket client
 - `src/rpc.ts`：relay payload 内使用的双向流式 RPC peer
 - `src/agent-api.ts`：browser4agent 暴露的 agent/session/prompt RPC API
 - `src/session-store.ts`：共享设置、连接、session 数据、actions 和 ACP event reducer
@@ -37,7 +36,7 @@
 
 样式链路：组件布局优先写 Tailwind utility；`src/tailwind.css` 的共享 token 同时供 Tailwind utility 和 `src/theme.ts` 中的 Tap UI theme 使用。不要再创建平行的应用级 CSS 变量。安全区变量由原生 edge-to-edge 插件在运行时提供，不属于视觉主题，继续在局部 CSS 中使用。
 
-远端接入链路：`src/relay-client.ts` 在开发构建连接 `ws://127.0.0.1:39371/ws`，在生产构建连接 `wss://agent-deck.xianqiao.wang/ws`，App 固定使用 relay endpoint 2；browser4agent 的 `relay_client` 使用 endpoint 1。relay payload 由 `src/rpc.ts` 处理，并通过 `src/agent-api.ts` 调用 browser4agent 的 agent RPC。
+远端接入链路：基于 `relay-client-ts` 在开发构建连接 `ws://127.0.0.1:39371/ws`，在生产构建连接 `wss://agent-deck.xianqiao.wang/ws`，App 固定使用 relay endpoint 2；browser4agent 的 `relay_client` 使用 endpoint 1。relay payload 由 `src/rpc.ts` 处理，并通过 `src/agent-api.ts` 调用 browser4agent 的 agent RPC。
 
 Android 标识必须保持一致：`src-tauri/tauri.conf.json` 的 identifier、`src-tauri/gen/android/app/build.gradle.kts` 的 namespace/applicationId，以及 `MainActivity.kt` 的 package 当前均为 `com.mantou.agentdeck`。Rust library 名为 `agentdeck_lib`。重命名这些标识后若 Android 编译仍引用旧包名，清理对应 target 的 `tauri` / `wry` 缓存和 Android `src/main/**/generated` 旧目录，让 Tauri 重新生成 Kotlin bridge。
 

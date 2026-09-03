@@ -1,3 +1,4 @@
+import { isRelayId, RelayClient, type RelayConnectionState } from 'relay-client-ts';
 import {
   AgentApi,
   type LoadedSession,
@@ -6,7 +7,6 @@ import {
   type RemoteSession,
   type SessionEvent,
 } from './agent-api';
-import { isRelayId, RelayClient, type RelayConnectionState } from './relay-client';
 
 export type AppSettings = {
   relayId: string;
@@ -61,6 +61,8 @@ export type ChatMessage = TextMessage | ThoughtMessage | ToolMessage;
 type SessionOptions = Pick<LoadedSession, 'modes' | 'configOptions'>;
 
 const SETTINGS_KEY = 'agentdeck.settings.v1';
+const RELAY_URL =
+  process.env.NODE_ENV === 'development' ? 'ws://192.168.77.137:39371/ws' : 'wss://agent-deck.xianqiao.wang/ws';
 
 export const fallbackAgents: RemoteAgent[] = [
   { id: 'claude', name: 'Claude Code' },
@@ -360,6 +362,8 @@ const startRelay = (relayId: string) => {
   relayClient?.close();
   relayClient = new RelayClient({
     relayId,
+    endpoint: '2',
+    relayUrl: RELAY_URL,
     onPayload: (payload) => agentApi.dispatch(payload as Parameters<AgentApi['dispatch']>[0]),
     onDisconnect: (error) => agentApi.rejectAll(error),
     onStateChange: (connection, connectionError = '') => {
