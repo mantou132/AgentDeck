@@ -119,7 +119,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
                   'size-2.5 shrink-0 rounded-full bg-disabled': true,
                   'bg-positive ring-4 ring-positive/10': connection === 'connected',
                   'animate-pulse bg-informative': connection === 'connecting' || connection === 'reconnecting',
-                  'bg-negative ring-4 ring-negative/10': connection === 'conflict',
+                  'bg-negative ring-4 ring-negative/10': connection === 'preempted',
                 })}
               ></span>
               <span class="min-w-0">

@@ -61,6 +61,12 @@ export class AgentApi {
   setSessionEndedHandler = (handler: (params: { agent: string; sessionId: string }) => void) =>
     this.#peer.onNotify('agent_session_ended', (params) => handler(params as { agent: string; sessionId: string }));
 
+  setHostReconnectedHandler = (handler: () => void) => this.#peer.onNotify('host_reconnected', () => handler());
+
+  attachPeer = async (deviceId: string) => {
+    return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId });
+  };
+
   listAgents = async () => {
     const result = await this.#peer.call<{ agents?: RemoteAgent[] }>('agent_list');
     return Array.isArray(result.agents) ? result.agents : [];
@@ -115,4 +121,7 @@ export class AgentApi {
 
   cancelPrompt = (sessionId: string, agent: string) =>
     this.#peer.call<{ cancelled?: boolean }>('agent_prompt_cancel', { agent, sessionId });
+
+  closeSession = (agent: string, sessionId: string) =>
+    this.#peer.call<{ closed?: boolean }>('agent_session_close', { agent, sessionId });
 }

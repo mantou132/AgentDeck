@@ -104,9 +104,28 @@ export const agentdeckStore = createStore({
   permissionsBySession: {} as Record<string, PermissionRequest>,
 });
 
+const DEVICE_ID_KEY = 'agentdeck.device_id.v1';
+
+const getDeviceId = (): string => {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+};
+
+let currentPeerId: number | undefined;
+const setPeerId = (id: number) => {
+  currentPeerId = id;
+};
+
 let relayClient: RelayClient | undefined;
 export const agentApi = new AgentApi((message) => {
   if (!relayClient) throw new Error('Relay 尚未配置');
+  if (currentPeerId !== undefined) {
+    (message as Record<string, unknown>).peerId = currentPeerId;
+  }
   relayClient.send(message);
 });
 let started = false;
@@ -364,11 +383,25 @@ const startRelay = (relayId: string) => {
     relayId,
     endpoint: '2',
     relayUrl: RELAY_URL,
-    onPayload: (payload) => agentApi.dispatch(payload as Parameters<AgentApi['dispatch']>[0]),
-    onDisconnect: (error) => agentApi.rejectAll(error),
+    onPayload: (payload) => {
+      const data = payload as Record<string, unknown>;
+      if (typeof data?.peerId === 'number' && currentPeerId !== undefined) {
+        if (data.peerId !== currentPeerId) {
+          // Message belongs to another device on this relay; ignore.
+          return;
+        }
+      }
+      agentApi.dispatch(payload as Parameters<AgentApi['dispatch']>[0]);
+    },
+    onDisconnect: (error) => {
+      currentPeerId = undefined;
+      agentApi.rejectAll(error);
+    },
     onStateChange: (connection, connectionError = '') => {
       agentdeckStore({ connection, connectionError });
-      if (connection === 'connected') void refreshSessions();
+      if (connection === 'connected') {
+        void syncHostConnection();
+      }
     },
   });
   relayClient.connect();
@@ -384,6 +417,9 @@ export const startApp = () => {
     setSessionFlag('pendingSessionIds', sessionId, false);
     resolvePermission(sessionId, null);
     setSessionError(sessionId, '远端会话已结束；返回列表后可重新加载历史记录');
+  });
+  agentApi.setHostReconnectedHandler(() => {
+    void syncHostConnection();
   });
   if (isRelayId(agentdeckStore.settings.relayId)) startRelay(agentdeckStore.settings.relayId);
 };
@@ -436,6 +472,18 @@ export const refreshSessions = async () => {
   }
 };
 
+export const syncHostConnection = async () => {
+  try {
+    const res = await agentApi.attachPeer(getDeviceId());
+    if (typeof res?.peerId === 'number') {
+      setPeerId(res.peerId);
+    }
+  } catch (e) {
+    console.warn('Failed to attach peer ID:', e);
+  }
+  await refreshSessions();
+};
+
 export const getSession = (sessionId: string) => {
   const remote = agentdeckStore.sessions.find((session) => session.sessionId === sessionId);
   if (remote) return remote;
@@ -482,6 +530,7 @@ export const loadSession = async (sessionId: string) => {
   setSessionError(sessionId, '');
   setMessages(sessionId, []);
   try {
+    await agentApi.closeSession(session.agent, sessionId).catch(() => {});
     const loaded = await agentApi.loadSession(session, session.agent, (event) => reduceSessionEvent(sessionId, event));
     if (sessionLoads.get(sessionId) !== token) return;
     failedSessionLoads.delete(sessionId);

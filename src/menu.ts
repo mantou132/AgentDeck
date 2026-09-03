@@ -46,7 +46,7 @@ const stateLabel = {
   connected: 'Relay 已连接',
   reconnecting: '正在重新连接',
   disconnected: '尚未连接',
-  conflict: '连接冲突',
+  preempted: '已被新会话取代',
 } as const;
 
 @customElement('agentdeck-menu-page')
@@ -87,7 +87,7 @@ export class AgentDeckMenuPageElement extends GemElement {
     const { sessions, connection, connectionError, sessionsLoading, sessionsLoaded, sessionsError, settings, agents } =
       agentdeckStore;
     const selectedAgent = agents.find((agent) => agent.id === settings.agent);
-    const loading = sessionsLoading || (!sessionsLoaded && connection !== 'conflict');
+    const loading = sessionsLoading || (!sessionsLoaded && connection !== 'preempted');
     const groups = Map.groupBy(sessions, (session) => session.cwd);
 
     return html`
@@ -107,7 +107,7 @@ export class AgentDeckMenuPageElement extends GemElement {
                   class=${classMap({
                     'size-[7px] rounded-full bg-disabled': true,
                     'bg-positive ring-4 ring-positive/10': connection === 'connected',
-                    'bg-negative ring-4 ring-negative/10': connection === 'conflict',
+                    'bg-negative ring-4 ring-negative/10': connection === 'preempted',
                     'animate-pulse bg-informative': connection === 'connecting' || connection === 'reconnecting',
                   })}
                 ></span>
