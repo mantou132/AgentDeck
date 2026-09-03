@@ -47,5 +47,10 @@ Husky runs Biome on staged files via lint-staged; install dependencies once to e
 - `src-tauri/` — Tauri 2 native shell and generated Android/iOS projects.
 - `public/` — static brand assets copied by Rsbuild.
 
+## Privacy Policy
+
+Please see [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
+
 [browser4agent]: https://github.com/mantou132/browser4agent
 [relay]: https://github.com/mantou132/relay
+
