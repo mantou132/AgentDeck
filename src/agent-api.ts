@@ -77,7 +77,7 @@ export class AgentApi {
       value?: string;
       isDirectory?: boolean;
       directories?: string[];
-    }>('agent_cwd_complete', { input, limit: 50 });
+    }>('agent_cwd_complete', { input, limit: 150 });
     return {
       value: typeof result.value === 'string' ? result.value : '',
       isDirectory: result.isDirectory === true,

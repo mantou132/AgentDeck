@@ -21,6 +21,7 @@
 - `src/session.ts`：按页面 `sessionId` 加载历史回放并渲染消息、工具、权限和 composer
 - `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页
 - `src/elements/cwd-picker.ts`：工作目录选择器
+- `src/elements/session-group.ts`：按工作目录分组展示会话列表与展开/折叠面板
 - `src/elements/icon.ts`：品牌多层卡片图标组件
 - `src/elements/tool-call.ts`：工具调用状态折叠面板
 - `src/elements/permission-request.ts`：工具调用权限授权卡片

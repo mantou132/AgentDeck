@@ -1,8 +1,6 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
-import { Time } from '@mantou/tap-ui/lib/time';
 
-import { displayPath } from './path';
 import { agentApi, agentdeckStore, createSession, refreshSessions } from './session-store';
 
 const openSession = (sessionId: string) => {
@@ -39,6 +37,10 @@ const style = css`
   .menu-scroll {
     padding-bottom: calc(28px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
+
+  tap-sheet::part(sheet) {
+    max-width: 620px;
+  }
 `;
 
 const stateLabel = {
@@ -53,7 +55,11 @@ const stateLabel = {
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
 export class AgentDeckMenuPageElement extends GemElement {
-  #state = createState({ sheetOpen: false, creatingSession: false, newSessionError: '' });
+  #state = createState({
+    sheetOpen: false,
+    creatingSession: false,
+    newSessionError: '',
+  });
 
   #openNewSession = () => {
     if (agentdeckStore.connection !== 'connected') return;
@@ -152,46 +158,11 @@ export class AgentDeckMenuPageElement extends GemElement {
           <div v-if=${!loading && groups.size} class="flex flex-col gap-5 pt-2">
             ${[...groups].map(
               ([cwd, group]) => html`
-                <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
-                  <header class="flex min-w-0 items-center gap-2.5 border-b border-border bg-bg-light/80 px-4 py-3">
-                    <span class="grid size-7 shrink-0 place-items-center rounded-[9px] bg-primary-soft text-primary-strong">
-                      <span class="font-mono text-[11px] font-bold">/</span>
-                    </span>
-                    <span class="min-w-0 flex-1 truncate font-mono text-[11px] font-semibold text-highlight" title=${cwd}>
-                      ${displayPath(cwd)}
-                    </span>
-                    <span class="rounded-lg bg-bg px-2 py-1 font-mono text-[9px] font-bold text-describe">${group.length}</span>
-                  </header>
-                  <div>
-                    ${group.map(
-                      (session) => html`
-                        <button
-                          class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 border-b border-solid border-border/70 bg-transparent px-4 py-3 text-left text-text transition-colors duration-150 last:border-b-0 active:bg-bg-hover"
-                          @click=${() => openSession(session.sessionId)}
-                        >
-                          <span class="min-w-0">
-                            <span class="block truncate text-[14px] leading-snug font-semibold text-highlight">
-                              ${session.title || '未命名会话'}
-                            </span>
-                            <span class="mt-1.5 block truncate font-mono text-[10px] text-describe">
-                              ${session.sessionId}
-                            </span>
-                          </span>
-                          <span class="flex shrink-0 items-center gap-1.5 text-[10px] text-disabled">
-                            <span>
-                              ${
-                                session.updatedAt
-                                  ? new Time().relativeTimeFormat(new Time(session.updatedAt), { lang: 'zh-CN' })
-                                  : '—'
-                              }
-                            </span>
-                            <tap-use class="size-[15px]" .element=${icons.right}></tap-use>
-                          </span>
-                        </button>
-                      `,
-                    )}
-                  </div>
-                </section>
+                <deck-session-group
+                  .cwd=${cwd}
+                  .sessions=${group}
+                  @select=${(event: CustomEvent<string>) => openSession(event.detail)}
+                ></deck-session-group>
               `,
             )}
           </div>
@@ -242,9 +213,10 @@ export class AgentDeckMenuPageElement extends GemElement {
           </div>
         </footer>
       </tap-page>
-      <tap-sheet ?open=${sheetOpen} mask-closable @close=${this.#closeNewSession}>
-        <h2 slot="header" class="m-0 px-5 pt-1 pb-3 font-display text-base font-[720] text-highlight">新建会话</h2>
+      <tap-sheet ?open=${sheetOpen} gesture mask-closable @close=${this.#closeNewSession}>
+        <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">新建会话</h2>
         <deck-cwd-picker
+          v-if=${sheetOpen}
           class="block"
           .complete=${(input: string) => agentApi.completeCwd(input)}
           .creating=${creatingSession}
