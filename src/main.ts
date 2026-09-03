@@ -4,7 +4,6 @@ import { startApp } from './session-store';
 
 import './theme';
 import './app';
-import './cwd-picker';
 import './menu';
 import './session';
 import './settings';

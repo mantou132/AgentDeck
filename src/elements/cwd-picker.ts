@@ -1,7 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { displayPath } from './path';
+import { displayPath } from '../path';
 
 export type CwdCompletion = {
   value: string;
@@ -15,9 +15,9 @@ const style = css`
   }
 `;
 
-@customElement('agentdeck-cwd-picker')
+@customElement('deck-cwd-picker')
 @adoptedStyle(style)
-export class AgentDeckCwdPickerElement extends GemElement {
+export class DeckCwdPickerElement extends GemElement {
   @property complete?: (input: string) => Promise<CwdCompletion>;
   @property creating = false;
   @property error = '';

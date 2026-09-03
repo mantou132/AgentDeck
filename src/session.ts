@@ -13,61 +13,7 @@ import {
   resolvePermission,
   retrySessionLoad,
   sendPrompt,
-  type ToolCallData,
 } from './session-store';
-import { agentDeckTheme } from './theme';
-
-const miniDeckMark = css`
-  .mini-deck {
-    position: relative;
-    width: 22px;
-    height: 22px;
-    flex: 0 0 auto;
-  }
-
-  .mini-deck::before,
-  .mini-deck::after,
-  .mini-deck span {
-    position: absolute;
-    width: 14px;
-    height: 17px;
-    border-radius: 4px;
-    content: '';
-  }
-
-  .mini-deck::before {
-    left: 1px;
-    top: 4px;
-    rotate: -12deg;
-    background: color-mix(in srgb, ${agentDeckTheme.informativeColor} 80%, ${agentDeckTheme.lightBackgroundColor});
-  }
-
-  .mini-deck::after {
-    left: 5px;
-    top: 2px;
-    rotate: -4deg;
-    background: color-mix(in srgb, ${agentDeckTheme.primaryColor} 48%, ${agentDeckTheme.lightBackgroundColor});
-  }
-
-  .mini-deck span {
-    z-index: 1;
-    right: 0;
-    top: 1px;
-    display: grid;
-    place-items: center;
-    background: ${agentDeckTheme.primaryColor};
-    box-shadow: 0 4px 10px color-mix(in srgb, ${agentDeckTheme.primaryColor} 24%, transparent);
-  }
-
-  .mini-deck span::after {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: white;
-    box-shadow: 3px 3px 0 -1px white;
-    content: '';
-  }
-`;
 
 const style = css`
   .session-header {
@@ -84,22 +30,7 @@ const style = css`
   }
 `;
 
-const toolStatusLabel = {
-  pending: '等待中',
-  in_progress: '进行中',
-  completed: '已完成',
-  failed: '失败',
-} as const;
-
-const toolStatusDotClass = {
-  pending: 'bg-informative animate-pulse',
-  in_progress: 'bg-informative animate-pulse',
-  completed: 'bg-positive',
-  failed: 'bg-negative',
-} as const;
-
 @customElement('agentdeck-session-page')
-@adoptedStyle(miniDeckMark)
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
 export class AgentDeckSessionPageElement extends GemElement {
@@ -185,37 +116,6 @@ export class AgentDeckSessionPageElement extends GemElement {
     >${text}</gem-bind-marked>
   `;
 
-  #renderTool = (message: Extract<ChatMessage, { type: 'tool' }>) => {
-    const data: ToolCallData = message.data;
-    const status = data.status ?? 'pending';
-    return html`
-      <details
-        class="mt-0.5 mb-[17px] ml-9 overflow-hidden rounded-[13px] border border-border bg-bg-light/70 text-[11px] text-describe"
-        ?open=${status === 'in_progress' || status === 'failed'}
-      >
-        <summary
-          class="grid min-h-[46px] cursor-pointer list-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 px-2.5 py-2"
-        >
-          <span class="grid size-7 place-items-center rounded-[9px] bg-primary-soft text-primary-strong">
-            <tap-use class="size-3.5" .element=${icons.tune}></tap-use>
-          </span>
-          <span class="min-w-0">
-            <span class="block truncate text-xs font-semibold text-text">${data.title}</span>
-            <span class="mt-0.5 block font-mono text-[9px]">${data.kind || 'tool'}</span>
-          </span>
-          <span class="flex items-center gap-1.5 whitespace-nowrap font-semibold text-describe">
-            <span class=${`size-[7px] rounded-full ${toolStatusDotClass[status]}`}></span>
-            ${toolStatusLabel[status]}
-          </span>
-        </summary>
-        <pre
-          v-if=${data.rawInput !== undefined}
-          class="m-0 max-h-[210px] overflow-auto whitespace-pre-wrap border-t border-border bg-bg/70 px-3 py-2.5 font-mono text-[10px] leading-normal text-describe"
-        >${JSON.stringify(data.rawInput, null, 2)}</pre>
-      </details>
-    `;
-  };
-
   #renderMessage = (message: ChatMessage) => {
     if ('type' in message && message.type === 'thought') {
       return html`
@@ -236,7 +136,9 @@ export class AgentDeckSessionPageElement extends GemElement {
         </details>
       `;
     }
-    if ('type' in message && message.type === 'tool') return this.#renderTool(message);
+    if ('type' in message && message.type === 'tool') {
+      return html`<deck-tool-call .data=${message.data}></deck-tool-call>`;
+    }
     if ('role' in message && message.role === 'user') {
       return html`
         <div class="mb-[18px] flex justify-end">
@@ -259,7 +161,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       return html`
         <article class="mb-5 grid grid-cols-[26px_minmax(0,1fr)] items-start gap-2.5">
           <div class="mt-0.5 grid size-[26px] place-items-center rounded-[9px] border border-border bg-bg-light" aria-hidden="true">
-            <span class="mini-deck"><span></span></span>
+            <deck-icon></deck-icon>
           </div>
           <div class="min-w-0 px-px pt-px text-sm leading-[1.68] text-text">
             <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap gap-2">
@@ -280,51 +182,6 @@ export class AgentDeckSessionPageElement extends GemElement {
       `;
     }
     return html``;
-  };
-
-  #renderPermission = () => {
-    const request = agentdeckStore.permissionsBySession[this.sessionId];
-    if (!request) return html``;
-    const { toolCall = {}, options = [] } = request;
-    return html`
-      <section class="mb-5 ml-9 overflow-hidden rounded-[15px] border border-notice/35 bg-bg-light shadow-card">
-        <header class="px-3.5 py-3">
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <h2 class="m-0 text-sm font-semibold text-highlight">需要你的许可</h2>
-            <span v-if=${toolCall.kind} class="truncate font-mono text-[10px] text-describe">${toolCall.kind}</span>
-          </div>
-          <p class="mt-1 mb-0 truncate font-mono text-[11px] text-describe">${toolCall.title || '工具调用'}</p>
-        </header>
-        <details v-if=${toolCall.rawInput !== undefined} class="border-t border-border text-xs">
-          <summary class="cursor-pointer px-3.5 py-2 text-describe">查看输入</summary>
-          <pre class="m-0 max-h-44 overflow-auto border-t border-border bg-bg px-3 py-2.5 font-mono text-[10px] leading-relaxed text-text"
-          >${JSON.stringify(toolCall.rawInput, null, 2)}</pre>
-        </details>
-        <footer class="flex flex-wrap justify-end gap-2 border-t border-border px-3 py-2.5">
-          <button
-            class="cursor-pointer rounded-[10px] border border-border bg-bg px-3 py-2 text-xs font-semibold text-describe active:bg-bg-hover"
-            @click=${() => resolvePermission(this.sessionId, null)}
-          >
-            取消
-          </button>
-          ${options.map((option) => {
-            const reject = option.kind?.startsWith('reject');
-            return html`
-              <button
-                class=${classMap({
-                  'cursor-pointer rounded-[10px] border px-3 py-2 text-xs font-semibold active:scale-[0.98]': true,
-                  'border-border bg-bg text-describe': reject,
-                  'border-primary bg-primary text-white': !reject,
-                })}
-                @click=${() => resolvePermission(this.sessionId, option.optionId)}
-              >
-                ${option.name}
-              </button>
-            `;
-          })}
-        </footer>
-      </section>
-    `;
   };
 
   @template()
@@ -371,7 +228,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             </div>
           </div>
           <div class="grid size-11 place-items-center" aria-hidden="true">
-            <span class="mini-deck"><span></span></span>
+            <deck-icon></deck-icon>
           </div>
         </header>
 
@@ -395,14 +252,17 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <span class="h-px flex-1 bg-border"></span>
               </div>
               ${messages.map((message) => this.#renderMessage(message))}
-              ${this.#renderPermission()}
+              <deck-permission-request
+                .request=${agentdeckStore.permissionsBySession[session.sessionId]}
+                @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
+              ></deck-permission-request>
             </div>
             <section
               v-if=${!loading && loaded && !messages.length}
               class="grid min-h-full place-items-center content-center px-5 py-8 text-center"
             >
               <div class="grid size-[54px] place-items-center rounded-[18px] border border-border bg-bg-light shadow-float">
-                <span class="mini-deck"><span></span></span>
+                <deck-icon></deck-icon>
               </div>
               <h2 class="mt-[18px] mb-2 font-display text-xl tracking-[-0.02em] text-highlight">会话已就绪</h2>
               <p class="m-0 max-w-[280px] text-[13px] leading-relaxed text-describe">
@@ -442,7 +302,7 @@ export class AgentDeckSessionPageElement extends GemElement {
               ></textarea>
               <div class="flex min-h-[43px] items-center justify-between gap-2.5 pt-1 pr-1.5 pb-1.5 pl-3">
                 <div class="flex min-w-0 items-center gap-2 text-[10px] font-semibold text-describe">
-                  <span class="mini-deck -mr-1 origin-left scale-[0.72]" aria-hidden="true"><span></span></span>
+                  <deck-icon class="-mr-1 origin-left scale-[0.72]" aria-hidden="true"></deck-icon>
                   <span class="truncate">${session.agent} · ${optionLabels.join(' · ')}</span>
                 </div>
                 <button

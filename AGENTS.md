@@ -9,6 +9,7 @@
 ## 目录职责
 
 - `src/`：Gem + Tap UI 前端；包含 Stack 页面、ACP transport、session 状态和 mock 数据
+- `src/elements/`：Gem 公共自定义元素组件
 - `src-tauri/`：Tauri 2 原生入口、应用配置以及 Android / iOS 生成工程
 - `public/`：Rsbuild 直接复制的静态品牌资源
 
@@ -19,6 +20,10 @@
 - `src/menu.ts`：按 cwd 分组的远端 ACP session list；把 session/settings 页面压入 Stack
 - `src/session.ts`：按页面 `sessionId` 加载历史回放并渲染消息、工具、权限和 composer
 - `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页
+- `src/elements/cwd-picker.ts`：工作目录选择器
+- `src/elements/icon.ts`：品牌多层卡片图标组件
+- `src/elements/tool-call.ts`：工具调用状态折叠面板
+- `src/elements/permission-request.ts`：工具调用权限授权卡片
 - `src/rpc.ts`：relay payload 内使用的双向流式 RPC peer
 - `src/agent-api.ts`：browser4agent 暴露的 agent/session/prompt RPC API
 - `src/session-store.ts`：共享设置、连接、session 数据、actions 和 ACP event reducer
@@ -26,7 +31,7 @@
 - `src/path.ts`：列表与 session 页面共用的路径显示格式化
 - `src/theme.ts`：把 Tailwind `@theme` token 注入 Tap UI `extendTheme`，是应用主题桥
 - `src/tailwind.css`：Tailwind v4 入口、AgentDeck 色彩/字体 token 和全局基础样式
-- `rsbuild.config.ts`：Rsbuild + `unplugin-gem` 自动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`
+- `rsbuild.config.ts`：Rsbuild + `unplugin-gem` 配置 Tap UI 与 `elements/*` 自定义元素自动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`
 - `postcss.config.js`：Rsbuild 的 Tailwind PostCSS 接入
 - `biome.json`：前端格式化与 lint 规则；`lint-staged` 通过 Husky pre-commit 只检查暂存文件
 - `patches/tailwindcss.patch`：让 Preflight 跳过 `:state(gem-element)`，避免重置 Gem 元素

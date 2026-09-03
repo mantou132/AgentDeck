@@ -244,13 +244,13 @@ export class AgentDeckMenuPageElement extends GemElement {
       </tap-page>
       <tap-sheet ?open=${sheetOpen} mask-closable @close=${this.#closeNewSession}>
         <h2 slot="header" class="m-0 px-5 pt-1 pb-3 font-display text-base font-[720] text-highlight">新建会话</h2>
-        <agentdeck-cwd-picker
+        <deck-cwd-picker
           class="block"
           .complete=${(input: string) => agentApi.completeCwd(input)}
           .creating=${creatingSession}
           .error=${newSessionError}
           @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
-        ></agentdeck-cwd-picker>
+        ></deck-cwd-picker>
       </tap-sheet>
     `;
   };

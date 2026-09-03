@@ -14,8 +14,8 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": "."
   },
   "include": ["src", "rsbuild.config.ts"],
   "exclude": ["dist", "node_modules"]

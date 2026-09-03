@@ -36,6 +36,9 @@ export default defineConfig(({ command }) => ({
                 'tap-(cell|input|checkbox|radio|list|collapse)-*': '/elements/$1',
                 'tap-*': '/elements/*',
               },
+              'src/elements': {
+                '^deck-*': '/*',
+              },
             },
           },
           autoImportDts: true,
