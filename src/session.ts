@@ -7,14 +7,15 @@ import {
   agentdeckStore,
   type ChatMessage,
   cancelTurn,
+  clearSessionError,
+  ensureSessionLoaded,
   getSession,
-  loadSession,
   promoteDraftSession,
   resetDraftSession,
   resolvePermission,
   retrySessionLoad,
   sendPrompt,
-} from './session-store';
+} from './store';
 
 const style = css`
   .session-header {
@@ -47,7 +48,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   #openSession = () => {
     this.#state({ draft: '' });
     this.#followMessages = true;
-    void loadSession(this.sessionId);
+    void ensureSessionLoaded(this.sessionId);
     queueMicrotask(() => this.#scrollToLatest(true));
   };
 
@@ -90,7 +91,12 @@ export class AgentDeckSessionPageElement extends GemElement {
     });
   };
 
-  #setDraft = (value: string) => this.#state({ draft: value });
+  #setDraft = (value: string) => {
+    if (agentdeckStore.errorsBySession[this.sessionId]) {
+      clearSessionError(this.sessionId);
+    }
+    this.#state({ draft: value });
+  };
 
   #send = async () => {
     const text = this.#state.draft.trim();
@@ -141,22 +147,23 @@ export class AgentDeckSessionPageElement extends GemElement {
     >${text}</gem-bind-marked>
   `;
 
-  #renderMessage = (message: ChatMessage) => {
+  #renderMessage = (message: ChatMessage, isLast = false, sessionPending = false) => {
     if ('type' in message && message.type === 'thought') {
+      const isPending = message.pending || (isLast && sessionPending);
       return html`
-        <details class="mb-4 border-s-2 border-primary/35 text-[13px] text-describe" ?open=${message.pending}>
+        <details class="mb-4 border-s-2 border-primary/35 text-[13px] text-describe" ?open=${isPending}>
           <summary class="flex cursor-pointer list-none items-center gap-2 px-2.5 py-1 text-xs font-semibold text-describe">
             <span
               class=${classMap({
                 'size-1.5 shrink-0 rounded-full': true,
-                'bg-informative ring-4 ring-informative/10': message.pending,
-                'bg-disabled': !message.pending,
+                'bg-informative ring-4 ring-informative/10': isPending,
+                'bg-disabled': !isPending,
               })}
             ></span>
-            ${message.pending ? '正在思考' : '思考过程'}
+            ${isPending ? '正在思考' : '思考过程'}
           </summary>
           <div class="mt-1 mb-0.5 min-w-0 px-3 pt-0.5 pb-2 leading-relaxed">
-            ${this.#renderMarkdown(message.text, message.pending)}
+            ${this.#renderMarkdown(message.text, isPending)}
           </div>
         </details>
       `;
@@ -271,7 +278,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <span>历史与实时事件</span>
                 <span class="h-px flex-1 bg-border"></span>
               </div>
-              ${messages.map((message) => this.#renderMessage(message))}
+              ${messages.map((message, index) => this.#renderMessage(message, index === messages.length - 1, pending))}
               <deck-permission-request
                 .request=${agentdeckStore.permissionsBySession[session.sessionId]}
                 @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
@@ -311,6 +318,13 @@ export class AgentDeckSessionPageElement extends GemElement {
               @click=${this.#retryLoad}
             >
               重试
+            </button>
+            <button
+              v-else-if=${connected}
+              class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
+              @click=${() => clearSessionError(session.sessionId)}
+            >
+              关闭
             </button>
           </div>
           <div class="composer-shell bg-bg/90 px-2.5 pt-2 backdrop-blur-xl backdrop-saturate-125">

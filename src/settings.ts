@@ -1,7 +1,7 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { agentdeckStore, saveSettings } from './session-store';
+import { agentdeckStore, hardResetApp, saveSettings } from './store';
 
 const style = css`
   .settings-header {
@@ -30,9 +30,25 @@ export class AgentDeckSettingsPageElement extends GemElement {
     try {
       saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent });
       this.#state({ error: '' });
+      if (this.canGoBack) {
+        Stack.close();
+      }
       this.onDone?.();
     } catch (error) {
       this.#state({ error: error instanceof Error ? error.message : '保存设置失败' });
+    }
+  };
+
+  #reset = () => {
+    try {
+      hardResetApp();
+      this.#state({ error: '' });
+      if (this.canGoBack) {
+        Stack.close();
+      }
+      this.onDone?.();
+    } catch (error) {
+      this.#state({ error: error instanceof Error ? error.message : '重置失败' });
     }
   };
 
@@ -143,6 +159,14 @@ export class AgentDeckSettingsPageElement extends GemElement {
               @click=${this.#save}
             >
               保存并连接
+            </button>
+            <button
+              v-if=${!!agentdeckStore.settings.relayId}
+              class="mt-3 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[15px] border border-border bg-bg-light text-sm font-semibold text-describe transition-[transform,background-color,color] duration-150 active:scale-[0.985] active:bg-bg-hover hover:text-negative"
+              @click=${this.#reset}
+            >
+              <tap-use class="size-[17px]" .element=${icons.delete}></tap-use>
+              重置会话
             </button>
           </div>
         </main>

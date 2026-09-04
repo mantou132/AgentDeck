@@ -15,11 +15,13 @@ import {
 } from './session-runtime';
 import {
   agentApi,
-  initAppTransport,
-  startRelay,
+  hardResetTransport,
+  initTransport,
+  reconnectTransport,
+  startTransport,
   syncHostConnection,
-  type TransportHandlers,
-} from './session-transport';
+  type TransportMessage,
+} from './transport';
 import {
   cancelTurnPrompt,
   declineAllPermissions,
@@ -31,7 +33,29 @@ import {
 } from './turn-controller';
 
 export * from './session-runtime';
-export { agentApi, syncHostConnection } from './session-transport';
+export { agentApi, hardResetTransport, reconnectTransport } from './transport';
+
+export type SessionGroup = {
+  cwd: string;
+  latestActivity: number;
+  sessions: DeckSession[];
+};
+
+export const getSortedSessionGroups = (sessions: DeckSession[]): SessionGroup[] => {
+  const groupsMap = Map.groupBy(sessions, (session) => session.cwd);
+  const groups: SessionGroup[] = [];
+  for (const [cwd, items] of groupsMap) {
+    const sortedItems = [...items].sort(
+      (a, b) => (Date.parse(b.updatedAt || '') || 0) - (Date.parse(a.updatedAt || '') || 0),
+    );
+    const latestActivity = sortedItems.reduce((max, s) => {
+      const time = Date.parse(s.updatedAt || '') || 0;
+      return time > max ? time : max;
+    }, 0);
+    groups.push({ cwd, latestActivity, sessions: sortedItems });
+  }
+  return groups.sort((a, b) => b.latestActivity - a.latestActivity);
+};
 
 const initialSettings = readSettings();
 
@@ -42,6 +66,7 @@ export const agentdeckStore = createStore({
   connectionError: '',
   draftSession: null as DeckSession | null,
   sessions: [] as DeckSession[],
+  sessionGroups: [] as SessionGroup[],
   sessionsLoading: false,
   sessionsLoaded: false,
   sessionsError: '',
@@ -59,6 +84,31 @@ const sessionLoads = new Map<string, number>();
 const failedSessionLoads = new Set<string>();
 const localSessions = new Map<string, DeckSession>();
 
+// App 运行生命周期内已成功打开过的 session（只要打开过一次就不再重复 close+load）
+const openedSessionIds = new Set<string>();
+
+export const isSessionOpened = (sessionId: string) => openedSessionIds.has(sessionId);
+
+export const clearSessionError = (sessionId: string) => {
+  const next = { ...agentdeckStore.errorsBySession };
+  delete next[sessionId];
+  agentdeckStore({ errorsBySession: next });
+};
+
+export const clearNetworkErrors = () => {
+  const errors = { ...agentdeckStore.errorsBySession };
+  let changed = false;
+  for (const [id, error] of Object.entries(errors)) {
+    if (error === 'Relay 连接中断' || error === 'Relay 尚未连接') {
+      delete errors[id];
+      changed = true;
+    }
+  }
+  if (changed) {
+    agentdeckStore({ errorsBySession: errors });
+  }
+};
+
 const setSessionFlag = (
   key: 'loadedSessionIds' | 'loadingSessionIds' | 'pendingSessionIds',
   sessionId: string,
@@ -75,12 +125,15 @@ const setMessages = (sessionId: string, messages: ChatMessage[]) =>
 const setSessionError = (sessionId: string, error: string) =>
   agentdeckStore({ errorsBySession: { ...agentdeckStore.errorsBySession, [sessionId]: error } });
 
-const patchSession = (sessionId: string, patch: Partial<DeckSession>) =>
+const patchSession = (sessionId: string, patch: Partial<DeckSession>) => {
+  const nextSessions = agentdeckStore.sessions.map((session) =>
+    session.sessionId === sessionId ? { ...session, ...patch } : session,
+  );
   agentdeckStore({
-    sessions: agentdeckStore.sessions.map((session) =>
-      session.sessionId === sessionId ? { ...session, ...patch } : session,
-    ),
+    sessions: nextSessions,
+    sessionGroups: getSortedSessionGroups(nextSessions),
   });
+};
 
 const updateSessionOptions = (sessionId: string, patch: Partial<SessionOptions>) => {
   const current = agentdeckStore.optionsBySession[sessionId] ?? {};
@@ -118,6 +171,7 @@ export const resetRemoteState = () => {
   sessionLoads.clear();
   failedSessionLoads.clear();
   localSessions.clear();
+  openedSessionIds.clear();
   declineAllPermissions((id) => {
     const permissionsBySession = { ...agentdeckStore.permissionsBySession };
     delete permissionsBySession[id];
@@ -126,6 +180,7 @@ export const resetRemoteState = () => {
   agentdeckStore({
     draftSession: null,
     sessions: [],
+    sessionGroups: [],
     sessionsLoading: false,
     sessionsLoaded: false,
     sessionsError: '',
@@ -139,17 +194,44 @@ export const resetRemoteState = () => {
   });
 };
 
-const transportHandlers: TransportHandlers = {
-  onStateChange: (connection, connectionError = '') => {
-    agentdeckStore({ connection, connectionError });
-  },
-  onConnected: () => {
-    void syncHostConnection(() => refreshSessions());
-  },
+/**
+ * 唯一的底层消息消费中枢：
+ * Web socket 连接与 App 状态彻底解耦，App 仅在此单一点响应状态与消息。
+ */
+const handleTransportMessage = (message: TransportMessage) => {
+  switch (message.type) {
+    case 'connection': {
+      const { connection, error } = message;
+      agentdeckStore({ connection, connectionError: error || '' });
+      if (connection === 'connected') {
+        clearNetworkErrors();
+        void syncHostConnection().then(() => refreshSessions());
+      }
+      break;
+    }
+    case 'session_event': {
+      applySessionEvent(message.sessionId, message.event);
+      break;
+    }
+    case 'session_ended': {
+      setSessionFlag('loadedSessionIds', message.sessionId, false);
+      setSessionFlag('loadingSessionIds', message.sessionId, false);
+      setSessionFlag('pendingSessionIds', message.sessionId, false);
+      openedSessionIds.delete(message.sessionId);
+      resolvePermission(message.sessionId, null);
+      setSessionError(message.sessionId, '远端会话已结束');
+      break;
+    }
+    case 'host_reconnected': {
+      clearNetworkErrors();
+      void syncHostConnection().then(() => refreshSessions());
+      break;
+    }
+  }
 };
 
 export const startApp = () => {
-  initAppTransport({
+  initTransport({
     initialRelayId: agentdeckStore.settings.relayId,
     onRequestPermission: (request) =>
       requestTurnPermission(request, (req) => {
@@ -157,17 +239,7 @@ export const startApp = () => {
           permissionsBySession: { ...agentdeckStore.permissionsBySession, [req.sessionId]: req },
         });
       }),
-    onSessionEnded: (sessionId) => {
-      setSessionFlag('loadedSessionIds', sessionId, false);
-      setSessionFlag('loadingSessionIds', sessionId, false);
-      setSessionFlag('pendingSessionIds', sessionId, false);
-      resolvePermission(sessionId, null);
-      setSessionError(sessionId, '远端会话已结束；返回列表后可重新加载历史记录');
-    },
-    onHostReconnected: () => {
-      void syncHostConnection(() => refreshSessions());
-    },
-    transportHandlers,
+    onMessage: handleTransportMessage,
   });
 };
 
@@ -177,19 +249,33 @@ export const saveSettings = (settings: AppSettings) => {
   if (!next.agent) throw new Error('请选择远端 Agent');
   const relayChanged = next.relayId !== agentdeckStore.settings.relayId;
   const agentChanged = next.agent !== agentdeckStore.settings.agent;
+  const notConnected = agentdeckStore.connection !== 'connected';
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   agentdeckStore({ settings: next, connectionError: '' });
   if (relayChanged || agentChanged) {
     localSessions.clear();
     resetRemoteState();
   }
-  if (relayChanged) startRelay(next.relayId, transportHandlers);
+  if (relayChanged || notConnected) startTransport(next.relayId);
   else if (agentChanged && agentdeckStore.connection === 'connected') void refreshSessions();
+};
+
+/**
+ * 设置页面的全局硬重置：
+ * 保留 relayId、agent 和 deviceId，其余一切清空，强制重建连接并自动回到 list 页面。
+ */
+export const hardResetApp = () => {
+  const relayId = agentdeckStore.settings.relayId;
+  resetRemoteState();
+  clearNetworkErrors();
+  if (isRelayId(relayId)) {
+    hardResetTransport(relayId);
+  }
 };
 
 export const refreshSessions = async () => {
   if (agentdeckStore.connection !== 'connected') {
-    agentdeckStore({ sessionsError: 'Relay 连接后才能读取会话' });
+    reconnectTransport(true);
     return;
   }
   const request = ++sessionsRequest;
@@ -200,11 +286,12 @@ export const refreshSessions = async () => {
     if (request !== sessionsRequest || agent !== agentdeckStore.settings.agent) return;
     const normalized = sessions
       .filter((session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string')
-      .map((session) => ({ ...session, agent }))
-      .sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''));
+      .map((session) => ({ ...session, agent }));
+    const groups = getSortedSessionGroups(normalized);
     agentdeckStore({
       ...(agents.length ? { agents } : {}),
       sessions: normalized,
+      sessionGroups: groups,
       sessionsLoaded: true,
       sessionsLoading: false,
     });
@@ -277,9 +364,17 @@ export const createSession = async ({ agent, cwd }: CreateSessionInput) => {
   return session;
 };
 
-export const loadSession = async (sessionId: string) => {
+/**
+ * 核心运行规则：
+ * session 只要打开过一次，就不用关闭了，也不用重复走 close+load session。
+ * 除非重启 app（openedSessionIds 为空），首次进入 session 才走一遍 close + load。
+ */
+export const ensureSessionLoaded = async (sessionId: string) => {
   if (sessionId === 'draft') return;
-  if (agentdeckStore.loadedSessionIds.includes(sessionId)) return;
+  if (openedSessionIds.has(sessionId)) {
+    // 已经打开过，保持在内存中直接秒开，绝不重复走 close + load
+    return;
+  }
   if (agentdeckStore.loadingSessionIds.includes(sessionId)) return;
   if (failedSessionLoads.has(sessionId)) return;
   const session = getSession(sessionId);
@@ -289,16 +384,20 @@ export const loadSession = async (sessionId: string) => {
     setSessionError(sessionId, 'Relay 尚未连接');
     return;
   }
+
   const token = (sessionLoads.get(sessionId) ?? 0) + 1;
   sessionLoads.set(sessionId, token);
   setSessionFlag('loadingSessionIds', sessionId, true);
   setSessionError(sessionId, '');
   setMessages(sessionId, []);
+
   try {
+    // 重启后首次进 session，走一遍 close + load session
     await agentApi.closeSession(session.agent, sessionId).catch(() => {});
     const loaded = await agentApi.loadSession(session, session.agent, (event) => applySessionEvent(sessionId, event));
     if (sessionLoads.get(sessionId) !== token) return;
     failedSessionLoads.delete(sessionId);
+    openedSessionIds.add(sessionId);
     setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
     setSessionFlag('loadingSessionIds', sessionId, false);
     setSessionFlag('loadedSessionIds', sessionId, true);
@@ -318,7 +417,8 @@ export const loadSession = async (sessionId: string) => {
 export const retrySessionLoad = (sessionId: string) => {
   failedSessionLoads.delete(sessionId);
   setSessionError(sessionId, '');
-  return loadSession(sessionId);
+  openedSessionIds.delete(sessionId);
+  return ensureSessionLoaded(sessionId);
 };
 
 const runPromptTurn = (session: DeckSession, text: string, turnStart: number) => {
@@ -386,10 +486,13 @@ export const promoteDraftSession = async (draft: DeckSession, text: string): Pro
   };
 
   localSessions.set(liveSession.sessionId, liveSession);
+  openedSessionIds.add(liveSession.sessionId);
   const stagedMessages = agentdeckStore.messagesBySession.draft ?? [userMessage];
+  const nextSessions = [liveSession, ...agentdeckStore.sessions.filter((s) => s.sessionId !== liveSession.sessionId)];
 
   agentdeckStore({
-    sessions: [liveSession, ...agentdeckStore.sessions.filter((s) => s.sessionId !== liveSession.sessionId)],
+    sessions: nextSessions,
+    sessionGroups: getSortedSessionGroups(nextSessions),
     messagesBySession: {
       ...agentdeckStore.messagesBySession,
       [liveSession.sessionId]: stagedMessages,

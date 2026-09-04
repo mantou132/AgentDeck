@@ -1,10 +1,10 @@
 import { initApp } from '@mantou/tap-ui/helper/webapp';
 
-import { startApp } from './session-store';
+import { startApp } from './store';
 
 import './theme';
 import './app';
-import './menu';
+import './session-list';
 import './session';
 import './settings';
 

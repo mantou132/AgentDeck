@@ -32,8 +32,8 @@ importers:
         specifier: ^2.11.1
         version: 2.11.1
       relay-client-ts:
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: ^0.1.4
+        version: 0.1.4
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.15
@@ -1196,8 +1196,8 @@ packages:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  relay-client-ts@0.1.2:
-    resolution: {integrity: sha512-rjOyVOaPSE2HEHLckwmO/hadSqccfp8ADrEIvWKJgeeO05e+WI1CcXkYG3WXsocyeko7r++TOVm4QsuBeXF0zA==}
+  relay-client-ts@0.1.4:
+    resolution: {integrity: sha512-SqTE4mPoJUw3NjEaw9ZCA0HOVnVfa7CAshhAzHmJqbRC4PJeEHnIg34DMtjiULlxuRnlR5FOd3oKTA74zQI7EA==}
 
   restore-cursor@5.1.0:
     resolution: {integrity: sha512-oMA2dcrw6u0YfxJQXm342bFKX/E4sG9rbTzO9ptUcR/e8A33cHuvStiYOwH7fszkZlZ1z/ta9AAoPk2F4qIOHA==}
@@ -2405,7 +2405,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  relay-client-ts@0.1.2: {}
+  relay-client-ts@0.1.4: {}
 
   restore-cursor@5.1.0:
     dependencies:

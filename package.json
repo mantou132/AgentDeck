@@ -20,7 +20,7 @@
     "@mantou/gem": "^2.2.9",
     "@mantou/tap-ui": "^0.1.5",
     "@tauri-apps/api": "^2.11.1",
-    "relay-client-ts": "^0.1.2"
+    "relay-client-ts": "^0.1.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

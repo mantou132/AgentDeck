@@ -1,7 +1,7 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { agentApi, agentdeckStore, createDraftSession, refreshSessions } from './session-store';
+import { agentApi, agentdeckStore, createDraftSession, refreshSessions } from './store';
 
 const openSession = (sessionId: string) => {
   Stack.push({
@@ -51,10 +51,10 @@ const stateLabel = {
   preempted: '已被新会话取代',
 } as const;
 
-@customElement('agentdeck-menu-page')
+@customElement('agentdeck-session-list-page')
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
-export class AgentDeckMenuPageElement extends GemElement {
+export class AgentDeckSessionListPageElement extends GemElement {
   #state = createState({
     sheetOpen: false,
     newSessionError: '',
@@ -76,11 +76,20 @@ export class AgentDeckMenuPageElement extends GemElement {
   @template()
   #render = () => {
     const { sheetOpen, newSessionError } = this.#state;
-    const { sessions, connection, connectionError, sessionsLoading, sessionsLoaded, sessionsError, settings, agents } =
-      agentdeckStore;
+    const {
+      sessionGroups,
+      connection,
+      connectionError,
+      sessionsLoading,
+      sessionsLoaded,
+      sessionsError,
+      settings,
+      agents,
+    } = agentdeckStore;
     const selectedAgent = agents.find((agent) => agent.id === settings.agent);
-    const loading = sessionsLoading || (!sessionsLoaded && connection !== 'preempted');
-    const groups = Map.groupBy(sessions, (session) => session.cwd);
+    const hasError = Boolean(sessionsError || connectionError);
+    const hasGroups = Boolean(sessionGroups.length);
+    const showSkeleton = !hasGroups && (sessionsLoading || !sessionsLoaded) && !hasError;
 
     return html`
       <tap-page class="bg-bg text-text">
@@ -113,13 +122,13 @@ export class AgentDeckMenuPageElement extends GemElement {
           class="menu-scroll no-scrollbar h-full overflow-auto px-4 pt-2 overscroll-y-contain min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div
-            v-if=${connectionError || sessionsError}
+            v-if=${hasError}
             class="mb-4 rounded-[15px] border border-negative/30 bg-negative/[0.07] px-3.5 py-3 text-xs leading-relaxed text-negative"
           >
             ${sessionsError || connectionError}
           </div>
 
-          <div v-if=${loading} class="flex flex-col gap-5" aria-label="正在加载会话">
+          <div v-if=${showSkeleton} class="flex flex-col gap-5" aria-label="正在加载会话">
             ${[3, 2].map(
               (rows) => html`
                 <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
@@ -141,12 +150,12 @@ export class AgentDeckMenuPageElement extends GemElement {
             )}
           </div>
 
-          <div v-if=${!loading && groups.size} class="flex flex-col gap-5 pt-2">
-            ${[...groups].map(
-              ([cwd, group]) => html`
+          <div v-if=${hasGroups} class="flex flex-col gap-5 pt-2">
+            ${sessionGroups.map(
+              (group) => html`
                 <deck-session-group
-                  .cwd=${cwd}
-                  .sessions=${group}
+                  .cwd=${group.cwd}
+                  .sessions=${group.sessions}
                   @select=${(event: CustomEvent<string>) => openSession(event.detail)}
                 ></deck-session-group>
               `,
@@ -154,7 +163,7 @@ export class AgentDeckMenuPageElement extends GemElement {
           </div>
 
           <section
-            v-if=${!loading && !groups.size}
+            v-if=${!showSkeleton && !hasGroups}
             class="mt-16 grid place-items-center px-8 py-10 text-center"
           >
             <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">

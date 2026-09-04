@@ -1,6 +1,6 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import type { ToolCallData } from '../session-store';
+import type { ToolCallData } from '../store';
 
 const toolStatusLabel = {
   pending: '等待中',

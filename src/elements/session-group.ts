@@ -3,7 +3,7 @@ import { icons } from '@mantou/tap-ui/lib/icons';
 import { Time } from '@mantou/tap-ui/lib/time';
 
 import { displayPath } from '../path';
-import type { DeckSession } from '../session-store';
+import type { DeckSession } from '../store';
 
 const style = css`
   :scope {
