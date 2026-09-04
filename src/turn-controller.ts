@@ -1,0 +1,61 @@
+import type { PermissionRequest, SessionEvent } from './agent-api';
+import type { DeckSession } from './session-runtime';
+import { agentApi } from './session-transport';
+
+const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
+
+export const requestPermission = (request: PermissionRequest, onNotify: (request: PermissionRequest) => void) => {
+  if (!request?.sessionId) return Promise.reject(new Error('权限请求缺少 sessionId'));
+  permissionResolvers.get(request.sessionId)?.reject(new Error('权限请求已被新请求替换'));
+  onNotify(request);
+  return new Promise<string>((resolve, reject) => permissionResolvers.set(request.sessionId, { resolve, reject }));
+};
+
+export const resolvePermission = (sessionId: string, optionId: string | null, onClean: (sessionId: string) => void) => {
+  const resolver = permissionResolvers.get(sessionId);
+  permissionResolvers.delete(sessionId);
+  onClean(sessionId);
+  if (!resolver) return;
+  if (optionId) resolver.resolve(optionId);
+  else resolver.reject(new Error('用户取消了权限请求'));
+};
+
+export const declineAllPermissions = (onClean: (sessionId: string) => void) => {
+  for (const sessionId of permissionResolvers.keys()) {
+    resolvePermission(sessionId, null, onClean);
+  }
+};
+
+let draftCanceled = false;
+
+export const setDraftCanceled = (canceled: boolean) => {
+  draftCanceled = canceled;
+};
+
+export const isDraftCanceled = () => draftCanceled;
+
+export const performTurn = async (
+  session: DeckSession,
+  text: string,
+  handlers: {
+    onEvent: (event: SessionEvent) => void;
+    onAnswer: (answer: string) => void;
+    onError: (error: string) => void;
+    onDone: () => void;
+  },
+) => {
+  try {
+    const result = await agentApi.prompt(session.sessionId, session.agent, text, handlers.onEvent);
+    if (result.answer) {
+      handlers.onAnswer(result.answer);
+    }
+  } catch (error) {
+    handlers.onError(error instanceof Error ? error.message : '发送消息失败');
+  } finally {
+    handlers.onDone();
+  }
+};
+
+export const cancelTurnPrompt = async (session: DeckSession) => {
+  await agentApi.cancelPrompt(session.sessionId, session.agent);
+};

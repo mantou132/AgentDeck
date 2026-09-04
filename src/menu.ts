@@ -1,7 +1,7 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { agentApi, agentdeckStore, createSession, refreshSessions } from './session-store';
+import { agentApi, agentdeckStore, createDraftSession, refreshSessions } from './session-store';
 
 const openSession = (sessionId: string) => {
   Stack.push({
@@ -57,7 +57,6 @@ const stateLabel = {
 export class AgentDeckMenuPageElement extends GemElement {
   #state = createState({
     sheetOpen: false,
-    creatingSession: false,
     newSessionError: '',
   });
 
@@ -68,28 +67,15 @@ export class AgentDeckMenuPageElement extends GemElement {
 
   #closeNewSession = () => this.#state({ sheetOpen: false, newSessionError: '' });
 
-  #confirmNewSession = async (cwd: string) => {
-    this.#state({ creatingSession: true, newSessionError: '' });
-    try {
-      const session = await createSession({ agent: agentdeckStore.settings.agent, cwd });
-      this.#state({ sheetOpen: false, creatingSession: false, newSessionError: '' });
-      Stack.push({
-        content: html`
-          <agentdeck-session-page class="block h-full" .sessionId=${session.sessionId}></agentdeck-session-page>
-        `,
-        gesture: true,
-      });
-    } catch (error) {
-      this.#state({
-        creatingSession: false,
-        newSessionError: error instanceof Error ? error.message : '新建会话失败',
-      });
-    }
+  #confirmNewSession = (cwd: string) => {
+    const session = createDraftSession({ agent: agentdeckStore.settings.agent, cwd });
+    this.#state({ sheetOpen: false, newSessionError: '' });
+    openSession(session.sessionId);
   };
 
   @template()
   #render = () => {
-    const { sheetOpen, creatingSession, newSessionError } = this.#state;
+    const { sheetOpen, newSessionError } = this.#state;
     const { sessions, connection, connectionError, sessionsLoading, sessionsLoaded, sessionsError, settings, agents } =
       agentdeckStore;
     const selectedAgent = agents.find((agent) => agent.id === settings.agent);
@@ -108,7 +94,7 @@ export class AgentDeckMenuPageElement extends GemElement {
               <h1 class="m-0 font-display text-xl font-[720] leading-none tracking-[-0.025em] text-highlight">
                 AgentDeck
               </h1>
-              <div class="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-describe">
+              <div class="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-describe">
                 <span
                   class=${classMap({
                     'size-[7px] rounded-full bg-disabled': true,
@@ -177,7 +163,7 @@ export class AgentDeckMenuPageElement extends GemElement {
             <h2 class="mt-4 mb-1.5 font-display text-lg text-highlight">
               ${sessionsError ? '会话读取失败' : '这个 Agent 还没有会话'}
             </h2>
-            <p class="m-0 max-w-[290px] text-xs leading-relaxed text-describe">
+            <p class="m-0 max-w-[320px] text-sm leading-relaxed text-describe">
               ${
                 sessionsError
                   ? '检查远端 Agent 是否在线，然后重新加载。'
@@ -186,7 +172,7 @@ export class AgentDeckMenuPageElement extends GemElement {
             </p>
             <button
               v-if=${sessionsError}
-              class="mt-4 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 py-2.5 text-xs font-semibold text-primary-strong active:scale-[0.98]"
+              class="mt-4 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 py-2.5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
               @click=${() => refreshSessions()}
             >
               重新加载
@@ -219,7 +205,6 @@ export class AgentDeckMenuPageElement extends GemElement {
           v-if=${sheetOpen}
           class="block"
           .complete=${(input: string) => agentApi.completeCwd(input)}
-          .creating=${creatingSession}
           .error=${newSessionError}
           @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
         ></deck-cwd-picker>

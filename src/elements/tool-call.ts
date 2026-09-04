@@ -37,7 +37,7 @@ export class DeckToolCallElement extends GemElement {
     const { title, kind, status = 'pending', rawInput } = this.data;
     return html`
       <details
-        class="mt-0.5 mb-[17px] ml-9 overflow-hidden rounded-[13px] border border-border bg-bg-light/70 text-[11px] text-describe"
+        class="mt-0.5 mb-[17px] overflow-hidden rounded-[13px] border border-border bg-bg-light/70 text-xs text-describe"
         ?open=${status === 'in_progress' || status === 'failed'}
       >
         <summary
@@ -47,8 +47,8 @@ export class DeckToolCallElement extends GemElement {
             <tap-use class="size-3.5" .element=${icons.tune}></tap-use>
           </span>
           <span class="min-w-0">
-            <span class="block truncate text-xs font-semibold text-text">${title}</span>
-            <span class="mt-0.5 block font-mono text-[9px]">${kind || 'tool'}</span>
+            <span class="block truncate text-sm font-semibold text-text">${title}</span>
+            <span class="mt-0.5 block font-mono text-[11px]">${kind || 'tool'}</span>
           </span>
           <span class="flex items-center gap-1.5 whitespace-nowrap font-semibold text-describe">
             <span class=${`size-[7px] rounded-full ${toolStatusDotClass[status]}`}></span>
@@ -57,7 +57,7 @@ export class DeckToolCallElement extends GemElement {
         </summary>
         <pre
           v-if=${rawInput !== undefined}
-          class="m-0 max-h-[210px] overflow-auto whitespace-pre-wrap border-t border-border bg-bg/70 px-3 py-2.5 font-mono text-[10px] leading-normal text-describe"
+          class="m-0 max-h-[210px] overflow-auto whitespace-pre-wrap border-t border-border bg-bg/70 px-3 py-2.5 font-mono text-[11px] leading-normal text-describe"
         >${JSON.stringify(rawInput, null, 2)}</pre>
       </details>
     `;

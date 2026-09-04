@@ -27,7 +27,10 @@
 - `src/elements/permission-request.ts`：工具调用权限授权卡片
 - `src/rpc.ts`：relay payload 内使用的双向流式 RPC peer
 - `src/agent-api.ts`：browser4agent 暴露的 agent/session/prompt RPC API
-- `src/session-store.ts`：共享设置、连接、session 数据、actions 和 ACP event reducer
+- `src/session-store.ts`：全局 store 实例、会话生命周期管理（Draft/Promote/Load/List）与对外统一门面
+- `src/session-runtime.ts`：消息/会话类型定义与纯函数 ACP event reducer
+- `src/turn-controller.ts`：任务 prompt 执行流式控制与权限请求决断
+- `src/session-transport.ts`：Relay 客户端连接、设备标识与 Agent API 接入
 - `src/markdown.ts`：基于 `gem-bind-marked` 的 Markdown、Mermaid 与 LaTeX 渲染配置
 - `src/path.ts`：列表与 session 页面共用的路径显示格式化
 - `src/theme.ts`：把 Tailwind `@theme` token 注入 Tap UI `extendTheme`，是应用主题桥
@@ -38,7 +41,7 @@
 - `patches/tailwindcss.patch`：让 Preflight 跳过 `:state(gem-element)`，避免重置 Gem 元素
 - `src-tauri/tauri.conf.json`：AgentDeck 产品名、应用标识和 bundle 图标配置
 
-运行链路：`src/main.ts` 先加载 `src/theme.ts`，挂载 `src/app.ts` 并启动 relay transport。`src/app.ts` 同步检查本地 Relay ID：缺少配置时显示 settings，存在配置时显示 list；点击 list 条目后，`src/menu.ts` 把对应 `sessionId` 作为页面 property 传给 session 页面并压入 Stack。
+运行链路：`src/main.ts` 先加载 `src/theme.ts`，挂载 `src/app.ts` 并启动 relay transport。`src/app.ts` 同步检查本地 Relay ID：缺少配置时显示 settings，存在配置时显示 list；点击 list 条目后，`src/menu.ts` 把对应 `sessionId` 作为页面 property 传给 session 页面并压入 Stack。新建会话采用 Draft 模式：从目录选择器确认后建立本地 draft session 压入 Stack，用户首次发送任务时才调用远端 `createSession` 并无缝转换为正式会话。
 
 样式链路：组件布局优先写 Tailwind utility；`src/tailwind.css` 的共享 token 同时供 Tailwind utility 和 `src/theme.ts` 中的 Tap UI theme 使用。不要再创建平行的应用级 CSS 变量。安全区变量由原生 edge-to-edge 插件在运行时提供，不属于视觉主题，继续在局部 CSS 中使用。
 

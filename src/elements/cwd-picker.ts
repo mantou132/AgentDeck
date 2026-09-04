@@ -154,7 +154,7 @@ export class DeckCwdPickerElement extends GemElement {
       <div class="w-full">
         <!-- Breadcrumbs bar -->
         <div class="mb-3 flex items-center gap-1.5 overflow-x-auto rounded-[12px] border border-border/70 bg-bg px-3 py-2 no-scrollbar">
-          <span class="text-[10px] font-bold tracking-wider text-describe uppercase shrink-0">位置:</span>
+          <span class="text-xs font-bold tracking-wider text-describe uppercase shrink-0">位置:</span>
           ${crumbs.map((crumb, index) => {
             const isLast = index === crumbs.length - 1;
             const isNavigatingThis = navigatingPath === crumb.path;
@@ -163,7 +163,7 @@ export class DeckCwdPickerElement extends GemElement {
               <button
                 type="button"
                 class=${classMap({
-                  'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs transition-colors border-0 inline-flex items-center gap-1': true,
+                  'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm transition-colors border-0 inline-flex items-center gap-1': true,
                   'bg-primary-soft font-bold text-primary-strong': isLast,
                   'cursor-pointer bg-transparent text-describe hover:text-highlight active:bg-bg-hover': !isLast,
                 })}
@@ -180,7 +180,7 @@ export class DeckCwdPickerElement extends GemElement {
         <!-- Browse error notification -->
         <div
           v-if=${browseError}
-          class="mb-3 flex items-center gap-2 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-xs leading-relaxed text-negative"
+          class="mb-3 flex items-center gap-2 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
         >
           <tap-use class="size-3.5 shrink-0 text-negative" .element=${icons.error}></tap-use>
           <span class="min-w-0 truncate">${browseError}</span>
@@ -188,7 +188,7 @@ export class DeckCwdPickerElement extends GemElement {
 
         <!-- Directory list -->
         <div class="max-h-[42vh] min-h-[160px] overflow-y-auto rounded-[16px] border border-border bg-bg-light/60">
-          <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-xs text-describe">
+          <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
             <tap-use class="size-4 animate-spin" .element=${icons.loading}></tap-use>
             正在读取目录…
           </div>
@@ -211,7 +211,7 @@ export class DeckCwdPickerElement extends GemElement {
                   .element=${navigatingPath === parentPath ? icons.loading : icons.back}
                 ></tap-use>
               </span>
-              <span class="font-mono text-xs font-semibold text-describe">.. (返回上一级)</span>
+              <span class="font-mono text-sm font-semibold text-describe">.. (返回上一级)</span>
             </button>
 
             <!-- Subdirectories list -->
@@ -246,7 +246,7 @@ export class DeckCwdPickerElement extends GemElement {
                     </span>
                     <span
                       class=${classMap({
-                        'truncate font-mono text-xs font-medium': true,
+                        'truncate font-mono text-sm font-medium': true,
                         'text-text': !isHidden,
                         'text-describe': isHidden,
                       })}
@@ -267,7 +267,7 @@ export class DeckCwdPickerElement extends GemElement {
             })}
 
             <!-- Empty directory notice -->
-            <div v-if=${!directories.length} class="px-4 py-8 text-center text-xs text-describe">
+            <div v-if=${!directories.length} class="px-4 py-8 text-center text-sm text-describe">
               此目录下没有子目录，可直接点击下方按钮以此为工作区
             </div>
           </div>
@@ -276,7 +276,7 @@ export class DeckCwdPickerElement extends GemElement {
         <!-- Action error message -->
         <div
           v-if=${this.error}
-          class="mt-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-xs leading-relaxed text-negative"
+          class="mt-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
         >
           ${this.error}
         </div>
