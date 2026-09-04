@@ -2,14 +2,14 @@ import { icons } from '@mantou/tap-ui/lib/icons';
 
 import type { ToolCallData } from '../store';
 
-const toolStatusLabel = {
+export const toolStatusLabel = {
   pending: '等待中',
   in_progress: '进行中',
   completed: '已完成',
   failed: '失败',
 } as const;
 
-const toolStatusDotClass = {
+export const toolStatusDotClass = {
   pending: 'bg-informative animate-pulse',
   in_progress: 'bg-informative animate-pulse',
   completed: 'bg-positive',

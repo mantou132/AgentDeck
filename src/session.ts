@@ -1,6 +1,7 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
+import { toolStatusDotClass, toolStatusLabel } from './elements/tool-call';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from './markdown';
 import { displayPath } from './path';
 import {
@@ -15,6 +16,9 @@ import {
   resolvePermission,
   retrySessionLoad,
   sendPrompt,
+  type TextMessage,
+  type ThoughtMessage,
+  type ToolMessage,
 } from './store';
 
 const style = css`
@@ -32,13 +36,62 @@ const style = css`
   }
 `;
 
+type NonFormalItem = ThoughtMessage | ToolMessage;
+
+type NonFormalGroup = {
+  id: string;
+  items: NonFormalItem[];
+  pending: boolean;
+};
+
+type TimelineItem = { type: 'message'; message: TextMessage } | { type: 'group'; group: NonFormalGroup };
+
+const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean): TimelineItem[] => {
+  const result: TimelineItem[] = [];
+  let currentGroup: NonFormalGroup | null = null;
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const isLast = i === messages.length - 1;
+
+    if ('type' in msg && (msg.type === 'thought' || msg.type === 'tool')) {
+      const isMsgPending =
+        (msg.type === 'thought' && (msg.pending || (isLast && sessionPending))) ||
+        (msg.type === 'tool' && (msg.data.status === 'pending' || msg.data.status === 'in_progress'));
+
+      if (!currentGroup) {
+        currentGroup = {
+          id: `group-${msg.id}`,
+          items: [msg],
+          pending: Boolean(isMsgPending),
+        };
+        result.push({ type: 'group', group: currentGroup });
+      } else {
+        currentGroup.items.push(msg);
+        if (isMsgPending) {
+          currentGroup.pending = true;
+        }
+      }
+    } else {
+      currentGroup = null;
+      result.push({ type: 'message', message: msg as TextMessage });
+    }
+  }
+
+  return result;
+};
+
 @customElement('agentdeck-session-page')
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState({ draft: '' });
+  #state = createState<{ draft: string; openGroupId?: string | null }>({
+    draft: '',
+    openGroupId: null,
+  });
+  #lastGroup?: NonFormalGroup;
   #messagesRef = createRef<HTMLElement>();
   #textareaRef = createRef<HTMLTextAreaElement>();
   #followMessages = true;
@@ -46,7 +99,8 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
-    this.#state({ draft: '' });
+    this.#state({ draft: '', openGroupId: null });
+    this.#lastGroup = undefined;
     this.#followMessages = true;
     void ensureSessionLoaded(this.sessionId);
     queueMicrotask(() => this.#scrollToLatest(true));
@@ -147,31 +201,45 @@ export class AgentDeckSessionPageElement extends GemElement {
     >${text}</gem-bind-marked>
   `;
 
-  #renderMessage = (message: ChatMessage, isLast = false, sessionPending = false) => {
-    if ('type' in message && message.type === 'thought') {
-      const isPending = message.pending || (isLast && sessionPending);
-      return html`
-        <details class="mb-4 border-s-2 border-primary/35 text-[13px] text-describe" ?open=${isPending}>
-          <summary class="flex cursor-pointer list-none items-center gap-2 px-2.5 py-1 text-xs font-semibold text-describe">
-            <span
-              class=${classMap({
-                'size-1.5 shrink-0 rounded-full': true,
-                'bg-informative ring-4 ring-informative/10': isPending,
-                'bg-disabled': !isPending,
-              })}
-            ></span>
-            ${isPending ? '正在思考' : '思考过程'}
-          </summary>
-          <div class="mt-1 mb-0.5 min-w-0 px-3 pt-0.5 pb-2 leading-relaxed">
-            ${this.#renderMarkdown(message.text, isPending)}
-          </div>
-        </details>
-      `;
+  #getGroupSummaryText = (group: NonFormalGroup): string => {
+    const toolCount = group.items.filter((item) => item.type === 'tool').length;
+    const thoughtCount = group.items.filter((item) => item.type === 'thought').length;
+
+    if (group.pending) {
+      const last = group.items.at(-1);
+      if (last && last.type === 'tool') {
+        return `正在调用 ${last.data.title || '工具'}…`;
+      }
+      return '正在思考…';
     }
-    if ('type' in message && message.type === 'tool') {
-      return html`<deck-tool-call .data=${message.data}></deck-tool-call>`;
+
+    if (toolCount === 0) {
+      return '思考过程';
     }
-    if ('role' in message && message.role === 'user') {
+    if (thoughtCount === 0) {
+      return `工具调用 (${toolCount})`;
+    }
+    return `思考与工具 (${group.items.length})`;
+  };
+
+  #renderProcessGroup = (group: NonFormalGroup) => {
+    return html`
+      <div class="mb-3.5 flex items-center">
+        <button
+          type="button"
+          class="group inline-flex max-w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs font-medium text-describe transition-colors hover:text-text active:opacity-75"
+          @click=${() => this.#state({ openGroupId: group.id })}
+        >
+          <tap-use class="size-3.5 shrink-0 text-describe transition-colors group-hover:text-text" .element=${icons.schedule}></tap-use>
+          <span class="truncate">${this.#getGroupSummaryText(group)}</span>
+          <tap-use class="size-3 shrink-0 text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-describe" .element=${icons.right}></tap-use>
+        </button>
+      </div>
+    `;
+  };
+
+  #renderTextMessage = (message: TextMessage) => {
+    if (message.role === 'user') {
       return html`
         <div class="mb-[18px] flex justify-end">
           <div
@@ -189,26 +257,129 @@ export class AgentDeckSessionPageElement extends GemElement {
         </div>
       `;
     }
-    if ('role' in message) {
-      return html`
-        <article class="mb-5 min-w-0 text-base leading-[1.68] text-text">
-          <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap gap-2">
-            ${message.attachments?.map(
-              (attachment) => html`
-                <img class="max-h-64 max-w-full rounded-xl border border-border" src=${attachment.previewUrl} alt=${attachment.name} />
-              `,
-            )}
+
+    return html`
+      <article class="mb-5 min-w-0 text-base leading-[1.68] text-text">
+        <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap gap-2">
+          ${message.attachments?.map(
+            (attachment) => html`
+              <img class="max-h-64 max-w-full rounded-xl border border-border" src=${attachment.previewUrl} alt=${attachment.name} />
+            `,
+          )}
+        </div>
+        ${this.#renderMarkdown(message.text, message.streaming)}
+        <span
+          v-if=${message.streaming}
+          class="ml-1 inline-block h-[1em] w-[5px] animate-pulse rounded-sm bg-primary align-[-0.12em]"
+          aria-label="正在生成"
+        ></span>
+      </article>
+    `;
+  };
+
+  #renderProcessSheet = (sheetGroup?: NonFormalGroup, open = false) => {
+    return html`
+      <tap-sheet
+        ?open=${open}
+        gesture
+        mask-closable
+        @close=${() => this.#state({ openGroupId: null })}
+      >
+        <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">
+          过程摘要
+        </h2>
+        <div class="h-[60vh] max-h-[60vh] overflow-y-auto px-1 pt-1 pb-6">
+          <div v-if=${Boolean(sheetGroup)} class="flex flex-col">
+            ${sheetGroup?.items.map((item, index) => {
+              const isLast = index === sheetGroup.items.length - 1;
+              const isThought = item.type === 'thought';
+              const isPending =
+                (isThought && item.pending) ||
+                (!isThought && (item.data.status === 'pending' || item.data.status === 'in_progress'));
+
+              let icon = icons.tune;
+              if (isThought) {
+                icon = icons.schedule;
+              } else {
+                const kind = item.data.kind?.toLowerCase() || '';
+                const title = item.data.title?.toLowerCase() || '';
+                if (
+                  kind.includes('search') ||
+                  title.includes('search') ||
+                  title.includes('find') ||
+                  title.includes('grep')
+                ) {
+                  icon = icons.search;
+                } else if (kind.includes('read') || title.includes('read')) {
+                  icon = icons.visibility;
+                }
+              }
+
+              const title = isThought ? (item.pending ? '正在思考…' : '思考过程') : item.data.title;
+              const subtitle = !isThought ? item.data.kind || 'tool' : '';
+              const status = !isThought ? item.data.status || 'pending' : item.pending ? 'in_progress' : 'completed';
+              const statusLabel = toolStatusLabel[status];
+              const statusDotClass = toolStatusDotClass[status];
+              const isOpen = sheetGroup.items.length === 1 || isPending;
+
+              return html`
+                <div class="flex gap-3">
+                  <div class="flex flex-col items-center">
+                    <span
+                      class=${classMap({
+                        'grid size-6 shrink-0 place-items-center rounded-full border text-xs z-[1]': true,
+                        'border-primary/40 bg-primary-soft text-primary-strong': isPending,
+                        'border-border bg-bg-light text-describe': !isPending,
+                      })}
+                    >
+                      <tap-use class="size-3" .element=${icon}></tap-use>
+                    </span>
+                    <span v-if=${!isLast} class="w-px flex-1 bg-border/70 my-1"></span>
+                  </div>
+
+                  <div class="min-w-0 flex-1 pb-4">
+                    <details class="group/step" ?open=${isOpen}>
+                      <summary class="flex cursor-pointer list-none items-center justify-between gap-2 py-0.5 select-none [&::-webkit-details-marker]:hidden">
+                        <div class="flex min-w-0 items-center gap-2">
+                          <span class="truncate text-sm font-semibold text-text">${title}</span>
+                          <span v-if=${subtitle} class="rounded-md bg-bg px-1.5 py-0.5 font-mono text-[10px] text-describe">
+                            ${subtitle}
+                          </span>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                          <span v-if=${statusLabel} class="flex items-center gap-1.5 text-xs text-describe">
+                            <span class=${`size-1.5 rounded-full ${statusDotClass}`}></span>
+                            <span>${statusLabel}</span>
+                          </span>
+                          <tap-use class="size-3 text-disabled transition-transform group-open/step:rotate-90" .element=${icons.right}></tap-use>
+                        </div>
+                      </summary>
+
+                      <div class="mt-2.5">
+                        ${
+                          isThought
+                            ? html`
+                              <div class="rounded-xl border border-border/70 bg-bg/50 p-3 leading-relaxed text-describe text-[13px]">
+                                ${this.#renderMarkdown(item.text, isPending)}
+                              </div>
+                            `
+                            : html`
+                              <pre
+                                v-if=${item.data.rawInput !== undefined}
+                                class="m-0 max-h-[240px] overflow-auto whitespace-pre-wrap rounded-xl border border-border/70 bg-bg/70 px-3 py-2.5 font-mono text-[11px] leading-normal text-describe"
+                              >${JSON.stringify(item.data.rawInput, null, 2)}</pre>
+                            `
+                        }
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              `;
+            })}
           </div>
-          ${this.#renderMarkdown(message.text, message.streaming)}
-          <span
-            v-if=${message.streaming}
-            class="ml-1 inline-block h-[1em] w-[5px] animate-pulse rounded-sm bg-primary align-[-0.12em]"
-            aria-label="正在生成"
-          ></span>
-        </article>
-      `;
-    }
-    return html``;
+        </div>
+      </tap-sheet>
+    `;
   };
 
   @template()
@@ -223,6 +394,15 @@ export class AgentDeckSessionPageElement extends GemElement {
     const connected = agentdeckStore.connection === 'connected';
     const canSend = Boolean(this.#state.draft.trim()) && connected && loaded && !pending;
     const agentName = agentdeckStore.agents.find((agent) => agent.id === session.agent)?.name || session.agent;
+    const timelineItems = groupTimelineMessages(messages, pending);
+    const activeGroup = timelineItems.find(
+      (item): item is { type: 'group'; group: NonFormalGroup } =>
+        item.type === 'group' && item.group.id === this.#state.openGroupId,
+    )?.group;
+    if (activeGroup) {
+      this.#lastGroup = activeGroup;
+    }
+    const sheetGroup = activeGroup || this.#lastGroup;
 
     return html`
       <tap-page class="bg-bg text-text">
@@ -230,7 +410,6 @@ export class AgentDeckSessionPageElement extends GemElement {
           slot="header"
           class="session-header relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl backdrop-saturate-125"
         >
-          <span aria-hidden="true" class="absolute inset-x-[21%] -bottom-[3px] h-[3px] rounded-b-md bg-primary/35"></span>
           <button
             class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
             aria-label="返回会话列表"
@@ -278,7 +457,9 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <span>历史与实时事件</span>
                 <span class="h-px flex-1 bg-border"></span>
               </div>
-              ${messages.map((message, index) => this.#renderMessage(message, index === messages.length - 1, pending))}
+              ${timelineItems.map((item) =>
+                item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message),
+              )}
               <deck-permission-request
                 .request=${agentdeckStore.permissionsBySession[session.sessionId]}
                 @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
@@ -331,7 +512,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             <div class="mx-auto max-w-[760px] overflow-hidden rounded-[20px] border border-primary/15 bg-bg-light shadow-card">
               <textarea
                 ${this.#textareaRef}
-                class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-0 [field-sizing:content] placeholder:text-disabled"
+                class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
                 rows="1"
                 aria-label="发送消息"
                 placeholder=${loading ? '正在回放历史…' : connected && loaded ? '交代一个任务…' : '等待 Relay 连接…'}
@@ -367,6 +548,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           </div>
         </footer>
       </tap-page>
+      ${this.#renderProcessSheet(sheetGroup, Boolean(activeGroup))}
     `;
   };
 }
