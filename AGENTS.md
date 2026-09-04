@@ -25,6 +25,7 @@
 - `src/elements/icon.ts`：品牌多层卡片图标组件
 - `src/elements/tool-call.ts`：工具调用状态折叠面板
 - `src/elements/permission-request.ts`：工具调用权限授权卡片
+- `src/elements/process-detail.ts`：思考过程与工具调用的垂直时间线过程抽屉详情组件
 - `src/rpc.ts`：relay payload 内使用的双向流式 RPC peer
 - `src/agent-api.ts`：browser4agent 暴露的 agent/session/prompt RPC API
 - `src/store.ts`：全局 store 实例、会话生命周期管理（Draft/Promote/Load/List/分组排序/常驻会话）与对外统一门面

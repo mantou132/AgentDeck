@@ -1,7 +1,7 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { toolStatusDotClass, toolStatusLabel } from './elements/tool-call';
+import type { NonFormalGroup } from './elements/process-detail';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from './markdown';
 import { displayPath } from './path';
 import {
@@ -17,8 +17,6 @@ import {
   retrySessionLoad,
   sendPrompt,
   type TextMessage,
-  type ThoughtMessage,
-  type ToolMessage,
 } from './store';
 
 const style = css`
@@ -34,15 +32,11 @@ const style = css`
   summary::-webkit-details-marker {
     display: none;
   }
+
+  tap-sheet::part(sheet) {
+    max-width: 620px;
+  }
 `;
-
-type NonFormalItem = ThoughtMessage | ToolMessage;
-
-type NonFormalGroup = {
-  id: string;
-  items: NonFormalItem[];
-  pending: boolean;
-};
 
 type TimelineItem = { type: 'message'; message: TextMessage } | { type: 'group'; group: NonFormalGroup };
 
@@ -57,7 +51,8 @@ const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean)
     if ('type' in msg && (msg.type === 'thought' || msg.type === 'tool')) {
       const isMsgPending =
         (msg.type === 'thought' && (msg.pending || (isLast && sessionPending))) ||
-        (msg.type === 'tool' && (msg.data.status === 'pending' || msg.data.status === 'in_progress'));
+        (msg.type === 'tool' &&
+          (!msg.data.status || msg.data.status === 'pending' || msg.data.status === 'in_progress'));
 
       if (!currentGroup) {
         currentGroup = {
@@ -87,9 +82,9 @@ const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState<{ draft: string; openGroupId?: string | null }>({
+  #state = createState<{ draft: string; selectedGroupId: string | null }>({
     draft: '',
-    openGroupId: null,
+    selectedGroupId: null,
   });
   #lastGroup?: NonFormalGroup;
   #messagesRef = createRef<HTMLElement>();
@@ -99,7 +94,7 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
-    this.#state({ draft: '', openGroupId: null });
+    this.#state({ draft: '', selectedGroupId: null });
     this.#lastGroup = undefined;
     this.#followMessages = true;
     void ensureSessionLoaded(this.sessionId);
@@ -222,17 +217,28 @@ export class AgentDeckSessionPageElement extends GemElement {
     return `思考与工具 (${group.items.length})`;
   };
 
+  #openProcessSheet = (group: NonFormalGroup) => {
+    this.#lastGroup = group;
+    this.#state({ selectedGroupId: group.id });
+  };
+
+  #closeProcessSheet = () => {
+    this.#state({ selectedGroupId: null });
+  };
+
   #renderProcessGroup = (group: NonFormalGroup) => {
     return html`
       <div class="mb-3.5 flex items-center">
         <button
           type="button"
-          class="group inline-flex max-w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs font-medium text-describe transition-colors hover:text-text active:opacity-75"
-          @click=${() => this.#state({ openGroupId: group.id })}
+          class=${classMap({
+            'group inline-flex max-w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs font-medium text-describe transition-colors hover:text-text active:opacity-75': true,
+            'animate-pulse': group.pending,
+          })}
+          @click=${() => this.#openProcessSheet(group)}
         >
           <tap-use class="size-3.5 shrink-0 text-describe transition-colors group-hover:text-text" .element=${icons.schedule}></tap-use>
           <span class="truncate">${this.#getGroupSummaryText(group)}</span>
-          <tap-use class="size-3 shrink-0 text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-describe" .element=${icons.right}></tap-use>
         </button>
       </div>
     `;
@@ -268,117 +274,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           )}
         </div>
         ${this.#renderMarkdown(message.text, message.streaming)}
-        <span
-          v-if=${message.streaming}
-          class="ml-1 inline-block h-[1em] w-[5px] animate-pulse rounded-sm bg-primary align-[-0.12em]"
-          aria-label="正在生成"
-        ></span>
       </article>
-    `;
-  };
-
-  #renderProcessSheet = (sheetGroup?: NonFormalGroup, open = false) => {
-    return html`
-      <tap-sheet
-        ?open=${open}
-        gesture
-        mask-closable
-        @close=${() => this.#state({ openGroupId: null })}
-      >
-        <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">
-          过程摘要
-        </h2>
-        <div class="h-[60vh] max-h-[60vh] overflow-y-auto px-1 pt-1 pb-6">
-          <div v-if=${Boolean(sheetGroup)} class="flex flex-col">
-            ${sheetGroup?.items.map((item, index) => {
-              const isLast = index === sheetGroup.items.length - 1;
-              const isThought = item.type === 'thought';
-              const isPending =
-                (isThought && item.pending) ||
-                (!isThought && (item.data.status === 'pending' || item.data.status === 'in_progress'));
-
-              let icon = icons.tune;
-              if (isThought) {
-                icon = icons.schedule;
-              } else {
-                const kind = item.data.kind?.toLowerCase() || '';
-                const title = item.data.title?.toLowerCase() || '';
-                if (
-                  kind.includes('search') ||
-                  title.includes('search') ||
-                  title.includes('find') ||
-                  title.includes('grep')
-                ) {
-                  icon = icons.search;
-                } else if (kind.includes('read') || title.includes('read')) {
-                  icon = icons.visibility;
-                }
-              }
-
-              const title = isThought ? (item.pending ? '正在思考…' : '思考过程') : item.data.title;
-              const subtitle = !isThought ? item.data.kind || 'tool' : '';
-              const status = !isThought ? item.data.status || 'pending' : item.pending ? 'in_progress' : 'completed';
-              const statusLabel = toolStatusLabel[status];
-              const statusDotClass = toolStatusDotClass[status];
-              const isOpen = sheetGroup.items.length === 1 || isPending;
-
-              return html`
-                <div class="flex gap-3">
-                  <div class="flex flex-col items-center">
-                    <span
-                      class=${classMap({
-                        'grid size-6 shrink-0 place-items-center rounded-full border text-xs z-[1]': true,
-                        'border-primary/40 bg-primary-soft text-primary-strong': isPending,
-                        'border-border bg-bg-light text-describe': !isPending,
-                      })}
-                    >
-                      <tap-use class="size-3" .element=${icon}></tap-use>
-                    </span>
-                    <span v-if=${!isLast} class="w-px flex-1 bg-border/70 my-1"></span>
-                  </div>
-
-                  <div class="min-w-0 flex-1 pb-4">
-                    <details class="group/step" ?open=${isOpen}>
-                      <summary class="flex cursor-pointer list-none items-center justify-between gap-2 py-0.5 select-none [&::-webkit-details-marker]:hidden">
-                        <div class="flex min-w-0 items-center gap-2">
-                          <span class="truncate text-sm font-semibold text-text">${title}</span>
-                          <span v-if=${subtitle} class="rounded-md bg-bg px-1.5 py-0.5 font-mono text-[10px] text-describe">
-                            ${subtitle}
-                          </span>
-                        </div>
-                        <div class="flex shrink-0 items-center gap-2">
-                          <span v-if=${statusLabel} class="flex items-center gap-1.5 text-xs text-describe">
-                            <span class=${`size-1.5 rounded-full ${statusDotClass}`}></span>
-                            <span>${statusLabel}</span>
-                          </span>
-                          <tap-use class="size-3 text-disabled transition-transform group-open/step:rotate-90" .element=${icons.right}></tap-use>
-                        </div>
-                      </summary>
-
-                      <div class="mt-2.5">
-                        ${
-                          isThought
-                            ? html`
-                              <div class="rounded-xl border border-border/70 bg-bg/50 p-3 leading-relaxed text-describe text-[13px]">
-                                ${this.#renderMarkdown(item.text, isPending)}
-                              </div>
-                            `
-                            : html`
-                              <pre
-                                v-if=${item.data.rawInput !== undefined}
-                                class="m-0 max-h-[240px] overflow-auto whitespace-pre-wrap rounded-xl border border-border/70 bg-bg/70 px-3 py-2.5 font-mono text-[11px] leading-normal text-describe"
-                              >${JSON.stringify(item.data.rawInput, null, 2)}</pre>
-                            `
-                        }
-                      </div>
-                    </details>
-                  </div>
-                </div>
-              `;
-            })}
-          </div>
-        </div>
-      </tap-sheet>
     `;
   };
 
@@ -395,14 +291,16 @@ export class AgentDeckSessionPageElement extends GemElement {
     const canSend = Boolean(this.#state.draft.trim()) && connected && loaded && !pending;
     const agentName = agentdeckStore.agents.find((agent) => agent.id === session.agent)?.name || session.agent;
     const timelineItems = groupTimelineMessages(messages, pending);
-    const activeGroup = timelineItems.find(
-      (item): item is { type: 'group'; group: NonFormalGroup } =>
-        item.type === 'group' && item.group.id === this.#state.openGroupId,
-    )?.group;
-    if (activeGroup) {
-      this.#lastGroup = activeGroup;
+    const selectedGroup = this.#state.selectedGroupId
+      ? timelineItems.find(
+          (item): item is { type: 'group'; group: NonFormalGroup } =>
+            item.type === 'group' && item.group.id === this.#state.selectedGroupId,
+        )?.group
+      : undefined;
+    if (selectedGroup) {
+      this.#lastGroup = selectedGroup;
     }
-    const sheetGroup = activeGroup || this.#lastGroup;
+    const currentGroup = selectedGroup || this.#lastGroup;
 
     return html`
       <tap-page class="bg-bg text-text">
@@ -548,7 +446,18 @@ export class AgentDeckSessionPageElement extends GemElement {
           </div>
         </footer>
       </tap-page>
-      ${this.#renderProcessSheet(sheetGroup, Boolean(activeGroup))}
+      <tap-sheet
+        ?open=${Boolean(this.#state.selectedGroupId)}
+        gesture
+        mask-closable
+        @close=${this.#closeProcessSheet}
+      >
+        <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">过程摘要</h2>
+        <deck-process-detail
+          v-if=${Boolean(this.#state.selectedGroupId)}
+          .group=${currentGroup}
+        ></deck-process-detail>
+      </tap-sheet>
     `;
   };
 }
