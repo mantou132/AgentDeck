@@ -1,6 +1,6 @@
-import type { PermissionRequest, SessionEvent } from './agent-api';
-import type { Attachment, DeckSession } from './session-runtime';
-import { agentApi } from './transport';
+import type { PermissionRequest, SessionEvent } from '../agent/api';
+import { agentApi } from '../agent/transport';
+import type { Attachment, DeckSession } from './types';
 
 const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
 

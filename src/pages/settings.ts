@@ -1,15 +1,8 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
-
-import { agentdeckStore, hardResetApp, saveSettings } from './store';
-import { connectionLabels } from './transport';
-
-export const openSettings = () => {
-  Stack.push({
-    content: html`<agentdeck-settings-page class="block h-full" .canGoBack=${true}></agentdeck-settings-page>`,
-    gesture: true,
-  });
-};
+import { connectionLabels } from '../agent/transport';
+import { hardResetApp, saveSettings } from '../state/app';
+import { agentdeckStore } from '../state/store';
 
 const style = css`
   .settings-header {

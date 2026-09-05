@@ -1,6 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 
-import type { PermissionRequest } from '../agent-api';
+import type { PermissionRequest } from '../agent/api';
 
 const style = css`
   :scope {

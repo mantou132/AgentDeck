@@ -1,18 +1,8 @@
-import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
-
-import { openSettings } from './settings';
-import { agentApi, agentdeckStore, createDraftSession, refreshSessions } from './store';
-import { connectionLabels } from './transport';
-
-const openSession = (sessionId: string) => {
-  Stack.push({
-    content: html`
-      <agentdeck-session-page class="block h-full" .sessionId=${sessionId}></agentdeck-session-page>
-    `,
-    gesture: true,
-  });
-};
+import { agentApi, connectionLabels } from '../agent/transport';
+import { openSession, openSettings } from '../navigation';
+import { createDraftSession, refreshSessions } from '../state/sessions';
+import { agentdeckStore } from '../state/store';
 
 const style = css`
   .menu-header {

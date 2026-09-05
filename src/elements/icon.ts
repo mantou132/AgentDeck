@@ -1,4 +1,4 @@
-import { agentDeckTheme } from '../theme';
+import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
   :scope {

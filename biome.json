@@ -47,7 +47,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/tailwind.css"],
+      "includes": ["src/styles/tailwind.css"],
       "linter": {
         "rules": {
           "complexity": {

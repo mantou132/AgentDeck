@@ -15,20 +15,20 @@
 关键入口：
 
 - `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Relay ID 时打开 settings，否则打开 list。
-- `src/session-list.ts`、`src/session.ts`、`src/settings.ts`：Stack 三页面；通过页面 property 传递 sessionId，settings 提供共用入口及 App 重置。
-- `src/store.ts`：全局状态、会话生命周期与统一门面；`src/session-runtime.ts`：会话类型和 ACP event reducer；`src/turn-controller.ts`：流式任务与权限决断。
-- `src/transport.ts`：Relay 连接、设备标识和 host 握手；`src/agent-api.ts`：远端 API；`src/rpc.ts`：双向流式 RPC。
-- `src/elements/`：`cwd-picker.ts` 选目录、`session-group.ts` 会话分组、`tool-call.ts` 工具状态、`permission-request.ts` 授权、`process-detail.ts` 过程详情。
-- `src/markdown.ts`：Markdown / Mermaid / LaTeX；`src/path.ts`：路径显示。
-- `src/attachments.ts`：文件附件读取与限制；`src/paste.ts`：粘贴引用与编辑范围；`src/elements/attachment.ts`：共用附件卡片。
-- `src/tailwind.css`、`src/theme.ts`：共享主题 token 和 Tap UI 主题桥。
+- `src/pages/`：session-list、session、settings 三页面；`src/navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
+- `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
+- `src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信；`src/config.ts` 保存配置读取与连接常量。
+- `src/session/`：types 为会话类型，events 为 ACP reducer，groups / timeline 为列表与消息分组，turn 控制流式任务和权限决断，modes 只适配 ACP 模式信息。
+- `src/elements/`：composer 管理输入和附件，session-timeline 展示消息与过程，attachment / attachment-preview 展示附件；其余为目录、会话分组、工具、权限和品牌组件。
+- `src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`src/lib/`：Markdown 渲染与路径显示。
+- `src/styles/`：tailwind.css 共享主题 token，theme.ts 桥接 Tap UI。
 - `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；`biome.json`：格式和 lint。
 - `patches/relay-client-ts@0.1.4.patch`：已发布 SDK 的投递拒绝与发送失败补丁；升级依赖时核对是否仍需保留。
 
 # 运行约束
 
 - 新会话先建本地 draft，首次发送才远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
-- App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `src/transport.ts`，相关源码在 `~/relay`、`~/browser-mcp`。
+- App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `src/config.ts`，相关源码在 `~/relay`、`~/browser-mcp`。
 - host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
 - 异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
 - Android identifier / namespace / applicationId / MainActivity package 保持 `com.mantou.agentdeck` 一致；对应 `src-tauri/tauri.conf.json`、`src-tauri/gen/android/app/build.gradle.kts` 和 `MainActivity.kt`。Rust library 为 `agentdeck_lib`。
@@ -39,7 +39,7 @@
 
 - `unplugin-gem` 自动导入 Gem 成员、Tap UI 和 `elements/*` 元素，无需手动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`。
 - 布局优先 Tailwind utility，Shadow DOM 内不能使用。Light DOM 样式用 `:scope`，Shadow DOM 用 `:host`；通过 `css` / `@adoptedStyle` 共享样式，避免模板内联样式。
-- 主题统一使用 `src/tailwind.css` token 和 `src/theme.ts`，不新增平行的应用级 CSS 变量。原生安全区变量继续局部使用。
+- 主题统一使用 `src/styles/tailwind.css` token 和 `src/styles/theme.ts`，不新增平行的应用级 CSS 变量。原生安全区变量继续局部使用。
 - 保留 `patches/tailwindcss.patch` 对 Gem 元素的 Preflight 排除；`icons.loading` SVG 自带动画，不加额外旋转。
 - 元素文件名为去前缀的标签名，继承 GemElement；使用 ES 装饰器，不使用已弃用的生命周期函数，也不额外声明自定义元素类型。
 - 用 `@property` / attribute 装饰器定义输入；不要在元素内部修改输入，attribute 不赋默认值。内部数据用 `createState`，CSS 状态用 `@state`；优先使用 `#` 私有字段。

@@ -6,9 +6,9 @@ import {
   type RelayConnectionState,
   type RelayStore,
 } from 'relay-client-ts';
-import { AgentApi, type PermissionRequest, type SessionEvent } from './agent-api';
+import { DEVICE_ID_KEY, RELAY_URL } from '../config';
+import { AgentApi, type PermissionRequest, type SessionEvent } from './api';
 import type { RpcId, RpcMessage } from './rpc';
-import { DEVICE_ID_KEY, RELAY_URL } from './session-runtime';
 
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
 export const connectionLabels: Record<ConnectionState, string> = {

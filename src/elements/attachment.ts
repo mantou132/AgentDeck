@@ -1,7 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import type { Attachment } from '../session-runtime';
+import type { Attachment } from '../session/types';
 
 const style = css`
   :scope {

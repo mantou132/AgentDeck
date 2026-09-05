@@ -1,16 +1,8 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { markdownExtensions, markdownStyle } from '../markdown';
-import type { ThoughtMessage, ToolMessage } from '../store';
+import { markdownExtensions, markdownStyle } from '../lib/markdown';
+import type { ProcessGroup } from '../session/timeline';
 import { toolStatusDotClass, toolStatusLabel } from './tool-call';
-
-export type NonFormalItem = ThoughtMessage | ToolMessage;
-
-export type NonFormalGroup = {
-  id: string;
-  items: NonFormalItem[];
-  pending: boolean;
-};
 
 const style = css`
   :scope {
@@ -25,7 +17,7 @@ const style = css`
 @customElement('deck-process-detail')
 @adoptedStyle(style)
 export class DeckProcessDetailElement extends GemElement {
-  @property group?: NonFormalGroup;
+  @property group?: ProcessGroup;
 
   @template()
   #render = () => {

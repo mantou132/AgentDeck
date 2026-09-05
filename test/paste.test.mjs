@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 import ts from 'typescript';
 
-const source = readFileSync(new URL('../src/paste.ts', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/composer/references.ts', import.meta.url), 'utf8');
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.CommonJS },
 });

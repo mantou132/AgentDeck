@@ -1,86 +1,24 @@
-import { isRelayId } from 'relay-client-ts';
-import type { CreatedSession, PermissionRequest, SessionEvent } from './agent-api';
-import {
-  type AppSettings,
-  type Attachment,
-  type ChatMessage,
-  completeThought,
-  type DeckSession,
-  fallbackAgents,
-  finishStreaming,
-  formatOptionLabels,
-  RESET_PENDING_KEY,
-  readSettings,
-  reduceSessionEvent,
-  SETTINGS_KEY,
-  type SessionOptions,
-  type TextMessage,
-} from './session-runtime';
-import {
-  agentApi,
-  type ConnectionState,
-  clearTransportStorage,
-  initTransport,
-  reconnectTransport,
-  startTransport,
-  type TransportMessage,
-} from './transport';
+import type { CreatedSession, SessionEvent } from '../agent/api';
+import { agentApi, reconnectTransport } from '../agent/transport';
+import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
+import { getSortedSessionGroups } from '../session/groups';
 import {
   cancelTurnPrompt,
   declineAllPermissions,
   isDraftCanceled,
   performTurn,
-  requestPermission as requestTurnPermission,
   resolvePermission as resolveTurnPermission,
   setDraftCanceled,
-} from './turn-controller';
-
-export * from './session-runtime';
-export { agentApi, reconnectTransport } from './transport';
-
-export type SessionGroup = {
-  cwd: string;
-  latestActivity: number;
-  sessions: DeckSession[];
-};
-
-export const getSortedSessionGroups = (sessions: DeckSession[]): SessionGroup[] => {
-  const groupsMap = Map.groupBy(sessions, (session) => session.cwd);
-  const groups: SessionGroup[] = [];
-  for (const [cwd, items] of groupsMap) {
-    const sortedItems = [...items].sort(
-      (a, b) => (Date.parse(b.updatedAt || '') || 0) - (Date.parse(a.updatedAt || '') || 0),
-    );
-    const latestActivity = sortedItems.reduce((max, s) => {
-      const time = Date.parse(s.updatedAt || '') || 0;
-      return Math.max(time, max);
-    }, 0);
-    groups.push({ cwd, latestActivity, sessions: sortedItems });
-  }
-  return groups.sort((a, b) => b.latestActivity - a.latestActivity);
-};
-
-const initialSettings = readSettings();
-
-export const agentdeckStore = createStore({
-  settings: initialSettings,
-  agents: fallbackAgents,
-  connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
-  connectionError: '',
-  draftSession: null as DeckSession | null,
-  sessions: [] as DeckSession[],
-  sessionGroups: [] as SessionGroup[],
-  sessionsLoading: false,
-  sessionsLoaded: false,
-  sessionsError: '',
-  messagesBySession: {} as Record<string, ChatMessage[]>,
-  loadedSessionIds: [] as string[],
-  loadingSessionIds: [] as string[],
-  pendingSessionIds: [] as string[],
-  errorsBySession: {} as Record<string, string>,
-  optionsBySession: {} as Record<string, SessionOptions>,
-  permissionsBySession: {} as Record<string, PermissionRequest>,
-});
+} from '../session/turn';
+import type { Attachment, DeckSession, TextMessage } from '../session/types';
+import {
+  agentdeckStore,
+  patchSession,
+  setMessages,
+  setSessionError,
+  setSessionFlag,
+  updateSessionOptions,
+} from './store';
 
 let sessionsRequest = 0;
 const sessionLoads = new Map<string, number>();
@@ -91,45 +29,6 @@ const localSessions = new Map<string, DeckSession>();
 const openedSessionIds = new Set<string>();
 
 export const isSessionOpened = (sessionId: string) => openedSessionIds.has(sessionId);
-
-export const clearSessionError = (sessionId: string) => {
-  const next = { ...agentdeckStore.errorsBySession };
-  delete next[sessionId];
-  agentdeckStore({ errorsBySession: next });
-};
-
-const setSessionFlag = (
-  key: 'loadedSessionIds' | 'loadingSessionIds' | 'pendingSessionIds',
-  sessionId: string,
-  enabled: boolean,
-) => {
-  const next = agentdeckStore[key].filter((id) => id !== sessionId);
-  if (enabled) next.push(sessionId);
-  agentdeckStore({ [key]: next });
-};
-
-const setMessages = (sessionId: string, messages: ChatMessage[]) =>
-  agentdeckStore({ messagesBySession: { ...agentdeckStore.messagesBySession, [sessionId]: messages } });
-
-const setSessionError = (sessionId: string, error: string) =>
-  agentdeckStore({ errorsBySession: { ...agentdeckStore.errorsBySession, [sessionId]: error } });
-
-const patchSession = (sessionId: string, patch: Partial<DeckSession>) => {
-  const nextSessions = agentdeckStore.sessions.map((session) =>
-    session.sessionId === sessionId ? { ...session, ...patch } : session,
-  );
-  agentdeckStore({
-    sessions: nextSessions,
-    sessionGroups: getSortedSessionGroups(nextSessions),
-  });
-};
-
-const updateSessionOptions = (sessionId: string, patch: Partial<SessionOptions>) => {
-  const current = agentdeckStore.optionsBySession[sessionId] ?? {};
-  agentdeckStore({
-    optionsBySession: { ...agentdeckStore.optionsBySession, [sessionId]: { ...current, ...patch } },
-  });
-};
 
 export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
   const current = agentdeckStore.messagesBySession[sessionId] ?? [];
@@ -181,102 +80,6 @@ export const resetRemoteState = () => {
     optionsBySession: {},
     permissionsBySession: {},
   });
-};
-
-/**
- * 唯一的底层消息消费中枢：
- * Web socket 连接与 App 状态彻底解耦，App 仅在此单一点响应状态与消息。
- */
-const handleTransportMessage = (message: TransportMessage) => {
-  switch (message.type) {
-    case 'delivery_error': {
-      agentdeckStore({ connectionError: message.error });
-      break;
-    }
-    case 'connection': {
-      const { connection, error } = message;
-      agentdeckStore({
-        connection,
-        connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
-      });
-      if (connection === 'connected') {
-        void refreshSessions();
-      }
-      break;
-    }
-    case 'session_event': {
-      applySessionEvent(message.sessionId, message.event);
-      break;
-    }
-    case 'session_ended': {
-      setSessionFlag('loadedSessionIds', message.sessionId, false);
-      setSessionFlag('loadingSessionIds', message.sessionId, false);
-      setSessionFlag('pendingSessionIds', message.sessionId, false);
-      openedSessionIds.delete(message.sessionId);
-      resolvePermission(message.sessionId, null);
-      setSessionError(message.sessionId, '远端会话已结束');
-      break;
-    }
-  }
-};
-
-export const startApp = () => {
-  try {
-    if (sessionStorage.getItem(RESET_PENDING_KEY)) {
-      // Clear after reload: callbacks in the old document can no longer refill the outbox.
-      clearTransportStorage();
-      sessionStorage.removeItem(RESET_PENDING_KEY);
-    }
-  } catch (error) {
-    agentdeckStore({
-      connection: 'disconnected',
-      sessionsLoaded: true,
-      sessionsError: `重置本地连接失败：${error instanceof Error ? error.message : String(error)}`,
-    });
-    return;
-  }
-
-  initTransport({
-    initialRelayId: agentdeckStore.settings.relayId,
-    onRequestPermission: (request) => {
-      const session = getSession(request.sessionId);
-      if (session?.agent !== request.agent || !agentdeckStore.pendingSessionIds.includes(request.sessionId)) {
-        return Promise.reject(new Error('权限请求对应的任务已失效'));
-      }
-      return requestTurnPermission(request, (req) => {
-        agentdeckStore({
-          permissionsBySession: { ...agentdeckStore.permissionsBySession, [req.sessionId]: req },
-        });
-      });
-    },
-    onMessage: handleTransportMessage,
-  });
-};
-
-export const saveSettings = (settings: AppSettings) => {
-  const next = { relayId: settings.relayId.trim(), agent: settings.agent.trim() };
-  if (!isRelayId(next.relayId)) throw new Error('请输入有效的 Relay UUID');
-  if (!next.agent) throw new Error('请选择远端 Agent');
-  const relayChanged = next.relayId !== agentdeckStore.settings.relayId;
-  const agentChanged = next.agent !== agentdeckStore.settings.agent;
-  const notConnected = agentdeckStore.connection !== 'connected';
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-  agentdeckStore({ settings: next, connectionError: '' });
-  if (relayChanged || agentChanged) {
-    localSessions.clear();
-    resetRemoteState();
-  }
-  if (relayChanged || notConnected) startTransport(next.relayId);
-  else if (agentChanged && agentdeckStore.connection === 'connected') void refreshSessions();
-};
-
-/**
- * 重载整个 App，结束旧文档中的连接、回调、权限等待和 Stack 页面。
- * 配对设置保留，Relay 缓存在新文档启动时清除；不等待远端取消或关闭。
- */
-export const hardResetApp = () => {
-  sessionStorage.setItem(RESET_PENDING_KEY, 'true');
-  window.location.reload();
 };
 
 export const refreshSessions = async () => {
@@ -351,23 +154,6 @@ export const resetDraftSession = () => {
   setSessionFlag('pendingSessionIds', 'draft', false);
   setSessionFlag('loadedSessionIds', 'draft', false);
   agentdeckStore({ draftSession: null });
-};
-
-export const createSession = async ({ agent, cwd }: CreateSessionInput) => {
-  if (agentdeckStore.connection !== 'connected') throw new Error('远端连接后才能新建会话');
-  const created = await agentApi.createSession({ agent, cwd });
-  if (typeof created.sessionId !== 'string' || !created.sessionId) {
-    throw new Error('远端 Agent 未返回 sessionId');
-  }
-  const session: DeckSession = {
-    agent,
-    sessionId: created.sessionId,
-    cwd,
-    ...(typeof created.title === 'string' && created.title ? { title: created.title } : {}),
-    ...(typeof created.updatedAt === 'string' && created.updatedAt ? { updatedAt: created.updatedAt } : {}),
-  };
-  localSessions.set(session.sessionId, session);
-  return session;
 };
 
 /**
@@ -570,6 +356,11 @@ export const cancelTurn = (sessionId: string) => {
   );
 };
 
-export const getOptionLabels = (sessionId: string) => {
-  return formatOptionLabels(agentdeckStore.optionsBySession[sessionId]);
+export const endSession = (sessionId: string) => {
+  setSessionFlag('loadedSessionIds', sessionId, false);
+  setSessionFlag('loadingSessionIds', sessionId, false);
+  setSessionFlag('pendingSessionIds', sessionId, false);
+  openedSessionIds.delete(sessionId);
+  resolvePermission(sessionId, null);
+  setSessionError(sessionId, '远端会话已结束');
 };

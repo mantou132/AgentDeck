@@ -1,4 +1,4 @@
-import { agentdeckStore } from './store';
+import { agentdeckStore } from './state/store';
 
 @customElement('agentdeck-app')
 @connectStore(agentdeckStore)

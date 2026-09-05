@@ -1,4 +1,4 @@
-import type { Attachment } from './session-runtime';
+import type { Attachment } from '../session/types';
 
 export const LONG_PASTE_CHAR_THRESHOLD = 2_000;
 

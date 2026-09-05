@@ -126,7 +126,18 @@ export function documentFixture(previous) {
     );
     return module.exports;
   }
-  const app = load(path.join(root, 'src/store.ts'));
+  const app = Object.assign(
+    {},
+    ...[
+      'state/store',
+      'state/sessions',
+      'state/modes',
+      'session/modes',
+      'state/app',
+      'session/events',
+      'agent/transport',
+    ].map((name) => load(path.join(root, `src/${name}.ts`))),
+  );
   const remoteSession = { sessionId: 's1', cwd: '/tmp', agent: 'codex', title: 'Reset test' };
   const processed = new Set();
   const deliver = (payload) => {
@@ -170,8 +181,8 @@ export function documentFixture(previous) {
 
   return {
     app,
-    transport: load(path.join(root, 'src/transport.ts')),
-    rpc: load(path.join(root, 'src/rpc.ts')),
+    transport: load(path.join(root, 'src/agent/transport.ts')),
+    rpc: load(path.join(root, 'src/agent/rpc.ts')),
     window,
     document,
     timers,

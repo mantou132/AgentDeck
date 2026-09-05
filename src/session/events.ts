@@ -1,84 +1,13 @@
-import { isRelayId } from 'relay-client-ts';
-import type { LoadedSession, RemoteAgent, RemoteSession, SessionEvent } from './agent-api';
-
-export type AppSettings = {
-  relayId: string;
-  agent: string;
-};
-
-export type DeckSession = RemoteSession & {
-  agent: string;
-  draft?: boolean;
-};
-
-export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
-
-export type ToolCallData = {
-  toolCallId: string;
-  title: string;
-  kind?: string;
-  status?: ToolCallStatus;
-  rawInput?: unknown;
-};
-
-export type Attachment = {
-  id: string;
-  name: string;
-  pasteReference?: number;
-  marker?: string;
-} & ({ kind: 'image'; data: string; mimeType: string; previewUrl: string } | { kind: 'text'; text: string });
-
-export type TextMessage = {
-  id: string;
-  role: 'user' | 'agent';
-  text: string;
-  attachments?: Attachment[];
-  streaming?: boolean;
-  failed?: boolean;
-};
-
-export type ThoughtMessage = {
-  id: string;
-  type: 'thought';
-  text: string;
-  pending: boolean;
-};
-
-export type ToolMessage = {
-  id: string;
-  type: 'tool';
-  data: ToolCallData;
-};
-
-export type ChatMessage = TextMessage | ThoughtMessage | ToolMessage;
-
-export type SessionOptions = Pick<LoadedSession, 'modes' | 'configOptions'>;
-
-export const SETTINGS_KEY = 'agentdeck.settings.v1';
-export const DEVICE_ID_KEY = 'agentdeck.device_id.v1';
-export const RESET_PENDING_KEY = 'agentdeck.reset_pending.v1';
-export const RELAY_URL =
-  process.env.NODE_ENV === 'development' ? 'ws://192.168.77.137:39371/ws' : 'wss://agent-deck.xianqiao.wang/ws';
-
-export const fallbackAgents: RemoteAgent[] = [
-  { id: 'claude', name: 'Claude Code' },
-  { id: 'codex', name: 'Codex' },
-  { id: 'cursor', name: 'Cursor' },
-  { id: 'pi', name: 'pi' },
-];
-
-export const readSettings = (): AppSettings => {
-  try {
-    const value = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') as Partial<AppSettings> | null;
-    const relayId = typeof value?.relayId === 'string' && isRelayId(value.relayId) ? value.relayId : '';
-    return {
-      relayId,
-      agent: typeof value?.agent === 'string' && value.agent ? value.agent : 'codex',
-    };
-  } catch {
-    return { relayId: '', agent: 'codex' };
-  }
-};
+import type { SessionEvent } from '../agent/api';
+import type {
+  Attachment,
+  ChatMessage,
+  DeckSession,
+  SessionOptions,
+  ToolCallData,
+  ToolCallStatus,
+  ToolMessage,
+} from './types';
 
 export const completeThought = (messages: ChatMessage[]) => {
   const last = messages.at(-1);
@@ -129,37 +58,6 @@ export const appendImage = (
     next.push({ id: crypto.randomUUID(), role, text: '', attachments: [attachment], streaming });
   }
   return next;
-};
-
-export const optionLabel = (option: unknown) => {
-  if (!option || typeof option !== 'object') return '';
-  const record = option as {
-    id?: unknown;
-    name?: unknown;
-    currentValue?: unknown;
-    options?: { value?: unknown; name?: unknown }[];
-  };
-  if (typeof record.currentValue !== 'string') return '';
-  const selected = record.options?.find((item) => item.value === record.currentValue);
-  const name = typeof record.name === 'string' ? record.name : typeof record.id === 'string' ? record.id : '';
-  const value = typeof selected?.name === 'string' ? selected.name : record.currentValue;
-  return name ? `${name}: ${value}` : value;
-};
-
-export const formatOptionLabels = (options?: SessionOptions) => {
-  const labels = (options?.configOptions ?? []).map(optionLabel).filter(Boolean);
-  if (labels.length) return labels;
-  if (options?.modes && typeof options.modes === 'object') {
-    const modes = options.modes as {
-      currentModeId?: unknown;
-      availableModes?: { id?: unknown; name?: unknown }[];
-    };
-    if (typeof modes.currentModeId === 'string') {
-      const selected = modes.availableModes?.find((mode) => mode.id === modes.currentModeId);
-      return [typeof selected?.name === 'string' ? selected.name : modes.currentModeId];
-    }
-  }
-  return ['ACP 默认值'];
 };
 
 export type EventReduction = {
