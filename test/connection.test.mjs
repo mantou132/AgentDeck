@@ -4,7 +4,7 @@ import { documentFixture, relayKey, tick } from './helpers/app-fixture.mjs';
 
 const outbox = (fixture) => JSON.parse(fixture.localStorage.getItem(relayKey)).outbox;
 
-test('online and foreground reconnect preserve missed prompt events and final reply', async () => {
+test('foreground and online keep a live connection; manual reconnect preserves prompt replies', async () => {
   const fixture = documentFixture();
   await fixture.connect();
   await fixture.openSession();
@@ -13,14 +13,20 @@ test('online and foreground reconnect preserve missed prompt events and final re
   const prompt = fixture.requests.find((request) => request.payload.method === 'agent_prompt');
   fixture.sockets.at(-1).frame({ type: 'stored', message_id: prompt.message_id });
   await tick();
-  for (const target of [fixture.window, fixture.document]) {
-    target.dispatchEvent(new Event(target === fixture.window ? 'online' : 'visibilitychange'));
-    await tick();
-    assert.equal(new URL(fixture.sockets.at(-1).url).searchParams.has('ack_head'), false);
-    assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
-    fixture.sockets.at(-1).open();
-    await fixture.settleHost();
-  }
+  const socket = fixture.sockets.at(-1);
+  fixture.window.dispatchEvent(new Event('online'));
+  fixture.document.dispatchEvent(new Event('visibilitychange'));
+  await tick();
+  assert.equal(fixture.sockets.length, 1);
+  assert.equal(socket.readyState, socket.constructor.OPEN);
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+
+  fixture.transport.reconnectTransport(true);
+  await tick();
+  assert.equal(new URL(fixture.sockets.at(-1).url).searchParams.has('ack_head'), false);
+  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  fixture.sockets.at(-1).open();
+  await fixture.settleHost();
   fixture.deliver({
     id: prompt.payload.id,
     event: {

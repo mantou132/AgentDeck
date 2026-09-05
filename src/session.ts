@@ -84,38 +84,35 @@ const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState<{ draft: string; selectedGroupId: string | null }>({
+  #state = createState<{ draft: string; selectedGroupId: string | null; followMessages: boolean }>({
     draft: '',
     selectedGroupId: null,
+    followMessages: true,
   });
   #lastGroup?: NonFormalGroup;
   #messagesRef = createRef<HTMLElement>();
+  #messagesContentRef = createRef<HTMLElement>();
   #textareaRef = createRef<HTMLTextAreaElement>();
-  #followMessages = true;
   #scrollFrame = 0;
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
     this.#state({ draft: '', selectedGroupId: null });
     this.#lastGroup = undefined;
-    this.#followMessages = true;
     void ensureSessionLoaded(this.sessionId);
-    queueMicrotask(() => this.#scrollToLatest(true));
+    queueMicrotask(this.#scrollToLatest);
   };
 
-  @effect((instance) => {
-    const { sessionId } = instance;
-    return [
-      sessionId,
-      agentdeckStore.messagesBySession[sessionId],
-      agentdeckStore.pendingSessionIds.includes(sessionId),
-      agentdeckStore.loadingSessionIds.includes(sessionId),
-      agentdeckStore.permissionsBySession[sessionId],
-    ];
-  })
-  #followLatest = () => {
-    const pending = agentdeckStore.pendingSessionIds.includes(this.sessionId);
-    this.#scrollToLatest(pending);
+  @effect((instance) => [instance.#messagesRef.value, instance.#messagesContentRef.value])
+  #watchMessageSize = () => {
+    const viewport = this.#messagesRef.value;
+    const content = this.#messagesContentRef.value;
+    if (!viewport || !content) return;
+    // Markdown/images can finish rendering after the session state update.
+    const observer = new ResizeObserver(this.#scrollToLatest);
+    observer.observe(viewport);
+    observer.observe(content);
+    return () => observer.disconnect();
   };
 
   @unmounted()
@@ -129,12 +126,19 @@ export class AgentDeckSessionPageElement extends GemElement {
   #onScroll = () => {
     const element = this.#messagesRef.value;
     if (!element) return;
-    this.#followMessages = element.scrollHeight - element.clientHeight - element.scrollTop <= 44;
+    const followMessages = element.scrollHeight - element.clientHeight - element.scrollTop <= 4;
+    if (followMessages === this.#state.followMessages) return;
+    if (!followMessages) cancelAnimationFrame(this.#scrollFrame);
+    this.#state({ followMessages });
   };
 
-  #scrollToLatest = (force = false) => {
-    if (force) this.#followMessages = true;
-    if (!this.#followMessages) return;
+  #resumeFollowing = () => {
+    this.#state({ followMessages: true });
+    this.#scrollToLatest();
+  };
+
+  #scrollToLatest = () => {
+    if (!this.#state.followMessages) return;
     cancelAnimationFrame(this.#scrollFrame);
     this.#scrollFrame = requestAnimationFrame(() => {
       const element = this.#messagesRef.value;
@@ -164,7 +168,6 @@ export class AgentDeckSessionPageElement extends GemElement {
         this.#state({ draft: text });
         if (this.#textareaRef.value) this.#textareaRef.value.value = text;
       }
-      this.#scrollToLatest(true);
       return;
     }
     if (!sendPrompt(this.sessionId, text)) {
@@ -172,7 +175,6 @@ export class AgentDeckSessionPageElement extends GemElement {
       if (this.#textareaRef.value) this.#textareaRef.value.value = text;
       return;
     }
-    this.#scrollToLatest(true);
   };
 
   #onKeydown = (event: KeyboardEvent) => {
@@ -186,7 +188,6 @@ export class AgentDeckSessionPageElement extends GemElement {
   #cancel = () => cancelTurn(this.sessionId);
 
   #retryLoad = () => {
-    this.#followMessages = true;
     void retrySessionLoad(this.sessionId);
   };
 
@@ -368,53 +369,66 @@ export class AgentDeckSessionPageElement extends GemElement {
       <tap-page class="bg-bg text-text">
         ${this.#renderHeader(session.title || (session.draft ? '新建会话' : '未命名会话'), session.cwd, loading, loaded)}
 
-        <main
-          ${this.#messagesRef}
-          class="no-scrollbar h-full overflow-x-hidden overflow-y-auto px-4 pt-[22px] pb-7 overscroll-y-contain sm:px-6"
-          @scroll=${this.#onScroll}
-        >
-          <div class="mx-auto min-h-full w-full max-w-[720px]">
-            <section v-if=${loading} class="grid min-h-full place-items-center content-center px-6 py-12 text-center">
-              <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
-                <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
+        <div class="relative h-full">
+          <main
+            ${this.#messagesRef}
+            class="no-scrollbar h-full overflow-x-hidden overflow-y-auto px-4 pt-[22px] pb-7 overscroll-y-contain sm:px-6"
+            tabindex="0"
+            aria-label="会话消息"
+            @scroll=${this.#onScroll}
+          >
+            <div ${this.#messagesContentRef} class="mx-auto min-h-full w-full max-w-[720px]">
+              <section v-if=${loading} class="grid min-h-full place-items-center content-center px-6 py-12 text-center">
+                <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
+                  <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
+                </div>
+                <h2 class="mt-4 mb-1.5 font-display text-lg text-highlight">正在加载会话</h2>
+                <p class="m-0 text-xs text-describe">连接远端 Agent，并回放历史事件…</p>
+              </section>
+              <div v-if=${!loading && !!messages.length} class="contents">
+                <div class="mx-0.5 mt-0.5 mb-[22px] flex items-center gap-2.5 text-xs font-bold tracking-[0.06em] text-disabled uppercase">
+                  <span class="h-px flex-1 bg-border"></span>
+                  <span>历史与实时事件</span>
+                  <span class="h-px flex-1 bg-border"></span>
+                </div>
+                ${timelineItems.map((item) =>
+                  item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message),
+                )}
+                <deck-permission-request
+                  .request=${agentdeckStore.permissionsBySession[session.sessionId]}
+                  @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
+                ></deck-permission-request>
               </div>
-              <h2 class="mt-4 mb-1.5 font-display text-lg text-highlight">正在加载会话</h2>
-              <p class="m-0 text-xs text-describe">连接远端 Agent，并回放历史事件…</p>
-            </section>
-            <div v-if=${!loading && !!messages.length} class="contents">
-              <div class="mx-0.5 mt-0.5 mb-[22px] flex items-center gap-2.5 text-xs font-bold tracking-[0.06em] text-disabled uppercase">
-                <span class="h-px flex-1 bg-border"></span>
-                <span>历史与实时事件</span>
-                <span class="h-px flex-1 bg-border"></span>
-              </div>
-              ${timelineItems.map((item) =>
-                item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message),
-              )}
-              <deck-permission-request
-                .request=${agentdeckStore.permissionsBySession[session.sessionId]}
-                @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
-              ></deck-permission-request>
+              <section
+                v-if=${!loading && loaded && !messages.length}
+                class="grid min-h-full place-items-center content-center px-5 py-8 text-center"
+              >
+                <div class="grid size-[54px] place-items-center rounded-[18px] border border-border bg-bg-light shadow-float">
+                  <deck-icon></deck-icon>
+                </div>
+                <h2 class="mt-[18px] mb-2 font-display text-xl tracking-[-0.02em] text-highlight">
+                  ${session.draft ? '新会话' : '会话已就绪'}
+                </h2>
+                <p class="m-0 max-w-[280px] text-sm leading-relaxed text-describe">
+                  ${
+                    session.draft
+                      ? '输入任务后将在此目录创建远端会话并开始执行。'
+                      : '历史记录为空。发送消息后，回复、思考与工具进度会出现在同一条时间线上。'
+                  }
+                </p>
+              </section>
             </div>
-            <section
-              v-if=${!loading && loaded && !messages.length}
-              class="grid min-h-full place-items-center content-center px-5 py-8 text-center"
-            >
-              <div class="grid size-[54px] place-items-center rounded-[18px] border border-border bg-bg-light shadow-float">
-                <deck-icon></deck-icon>
-              </div>
-              <h2 class="mt-[18px] mb-2 font-display text-xl tracking-[-0.02em] text-highlight">
-                ${session.draft ? '新会话' : '会话已就绪'}
-              </h2>
-              <p class="m-0 max-w-[280px] text-sm leading-relaxed text-describe">
-                ${
-                  session.draft
-                    ? '输入任务后将在此目录创建远端会话并开始执行。'
-                    : '历史记录为空。发送消息后，回复、思考与工具进度会出现在同一条时间线上。'
-                }
-              </p>
-            </section>
-          </div>
-        </main>
+          </main>
+          <button
+            v-if=${!this.#state.followMessages}
+            type="button"
+            class="absolute bottom-3 left-1/2 flex min-h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-bg-light px-3.5 text-xs font-semibold whitespace-nowrap text-primary-strong shadow-float active:bg-primary-soft"
+            @click=${this.#resumeFollowing}
+          >
+            <tap-use class="size-4" .element=${icons.expand}></tap-use>
+            回到最新
+          </button>
+        </div>
 
         <footer slot="footer">
           <div

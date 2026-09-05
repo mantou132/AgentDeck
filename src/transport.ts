@@ -287,9 +287,5 @@ export const initTransport = (options: {
   agentApi.setPermissionHandler(options.onRequestPermission);
   agentApi.setSessionEndedHandler(({ sessionId }) => globalMessageHandler?.({ type: 'session_ended', sessionId }));
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') reconnectTransport(true);
-  });
-  window.addEventListener('online', () => reconnectTransport(true));
   if (isRelayId(options.initialRelayId)) startTransport(options.initialRelayId);
 };
