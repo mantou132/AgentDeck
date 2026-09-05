@@ -2,6 +2,7 @@ import type { CreatedSession, SessionEvent } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
+import { getModeSelection, withCurrentMode } from '../session/modes';
 import {
   cancelTurnPrompt,
   declineAllPermissions,
@@ -10,7 +11,8 @@ import {
   resolvePermission as resolveTurnPermission,
   setDraftCanceled,
 } from '../session/turn';
-import type { Attachment, DeckSession, TextMessage } from '../session/types';
+import type { Attachment, DeckSession, SessionOptions, TextMessage } from '../session/types';
+import { applyRemoteMode } from './modes';
 import {
   agentdeckStore,
   patchSession,
@@ -76,6 +78,7 @@ export const resetRemoteState = () => {
     loadedSessionIds: [],
     loadingSessionIds: [],
     pendingSessionIds: [],
+    changingModeSessionIds: [],
     errorsBySession: {},
     optionsBySession: {},
     permissionsBySession: {},
@@ -142,7 +145,14 @@ export const createDraftSession = ({ agent, cwd }: CreateSessionInput): DeckSess
   setSessionFlag('loadingSessionIds', 'draft', false);
   setSessionFlag('pendingSessionIds', 'draft', false);
   setSessionFlag('loadedSessionIds', 'draft', true);
-  agentdeckStore({ draftSession });
+  const knownSession = agentdeckStore.sessions.find(
+    (session) => session.agent === agent && getModeSelection(agentdeckStore.optionsBySession[session.sessionId]),
+  );
+  const knownOptions = knownSession ? agentdeckStore.optionsBySession[knownSession.sessionId] : {};
+  agentdeckStore({
+    draftSession,
+    optionsBySession: { ...agentdeckStore.optionsBySession, draft: withCurrentMode(knownOptions, '') },
+  });
   return draftSession;
 };
 
@@ -261,6 +271,7 @@ export const promoteDraftSession = async (
     setSessionError('draft', '远端连接后才能新建会话');
     return null;
   }
+  const selectedMode = getModeSelection(agentdeckStore.optionsBySession.draft)?.currentValue;
   setDraftCanceled(false);
   const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
   setMessages('draft', [userMessage]);
@@ -297,6 +308,23 @@ export const promoteDraftSession = async (
     updatedAt: typeof created.updatedAt === 'string' && created.updatedAt ? created.updatedAt : now,
   };
 
+  let options: SessionOptions = { modes: created.modes, configOptions: created.configOptions };
+  let modeError = '';
+  if (selectedMode) {
+    try {
+      options = await applyRemoteMode(liveSession, options, selectedMode);
+    } catch (error) {
+      modeError = error instanceof Error ? error.message : '切换模式失败，请重试。';
+    }
+    if (isDraftCanceled()) {
+      void agentApi.closeSession(draft.agent, sessionId).catch(() => {});
+      setMessages('draft', []);
+      setSessionFlag('pendingSessionIds', 'draft', false);
+      return null;
+    }
+  }
+  updateSessionOptions(sessionId, options);
+
   localSessions.set(liveSession.sessionId, liveSession);
   openedSessionIds.add(liveSession.sessionId);
   const stagedMessages = agentdeckStore.messagesBySession.draft ?? [userMessage];
@@ -317,7 +345,12 @@ export const promoteDraftSession = async (
   setSessionFlag('pendingSessionIds', 'draft', false);
   setSessionFlag('loadedSessionIds', liveSession.sessionId, true);
 
-  runPromptTurn(liveSession, userMessage, stagedMessages.length);
+  if (modeError) {
+    setMessages(sessionId, [{ ...userMessage, failed: true }]);
+    setSessionError(sessionId, modeError);
+  } else {
+    runPromptTurn(liveSession, userMessage, stagedMessages.length);
+  }
   return liveSession;
 };
 
@@ -330,7 +363,8 @@ export const sendPrompt = (sessionId: string, prompt: string, attachments: Attac
     session.draft ||
     agentdeckStore.connection !== 'connected' ||
     !agentdeckStore.loadedSessionIds.includes(sessionId) ||
-    agentdeckStore.pendingSessionIds.includes(sessionId)
+    agentdeckStore.pendingSessionIds.includes(sessionId) ||
+    agentdeckStore.changingModeSessionIds.includes(sessionId)
   ) {
     return false;
   }

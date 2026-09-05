@@ -4,7 +4,9 @@ import { connectionLabels, reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { displayPath } from '../lib/path';
 import { openSettings } from '../navigation';
+import { getModeSelection } from '../session/modes';
 import type { Attachment, TextMessage } from '../session/types';
+import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
   ensureSessionLoaded,
@@ -169,12 +171,12 @@ export class AgentDeckSessionPageElement extends GemElement {
     const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId);
     const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
     const pending = agentdeckStore.pendingSessionIds.includes(session.sessionId);
+    const changingMode = agentdeckStore.changingModeSessionIds.includes(session.sessionId);
     const error =
       agentdeckStore.errorsBySession[session.sessionId] ||
       agentdeckStore.connectionError ||
       (!loaded && !loading ? '会话尚未加载，请重试加载' : '');
     const connected = agentdeckStore.connection === 'connected';
-    const agentName = agentdeckStore.agents.find((agent) => agent.id === session.agent)?.name || session.agent;
     return html`
       <tap-page class="bg-bg text-text">
         ${this.#renderHeader(session.title || (session.draft ? '新建会话' : '未命名会话'), session.cwd, loading, loaded)}
@@ -276,11 +278,15 @@ export class AgentDeckSessionPageElement extends GemElement {
           <deck-composer
             ${this.#composerRef}
             .sessionKey=${this.sessionId}
-            .agentName=${agentName}
+            .mode=${getModeSelection(agentdeckStore.optionsBySession[session.sessionId])}
+            ?mode-busy=${changingMode}
+            @mode-change=${(event: CustomEvent<string>) => {
+              void changeSessionMode(session, event.detail);
+            }}
             .placeholder=${loading ? '正在回放历史…' : !connected ? connectionLabels[agentdeckStore.connection] : loaded ? '交代一个任务…' : '请先加载会话…'}
             .submit=${this.#send}
             ?disabled=${!loaded}
-            ?ready=${connected && loaded && !pending}
+            ?ready=${connected && loaded && !pending && !changingMode}
             ?pending=${pending}
             @cancel=${() => cancelTurn(this.sessionId)}
             @preview=${this.#previewAttachment}

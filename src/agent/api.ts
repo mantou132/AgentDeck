@@ -17,13 +17,33 @@ export type SessionEvent =
   | { event: 'session_update'; update: Record<string, unknown> }
   | { event: 'stop'; stop_reason?: string };
 
+export type SessionModes = {
+  currentModeId: string;
+  availableModes: { id: string; name: string; description?: string | null }[];
+};
+
+export type ConfigChoice = { value: string; name: string; description?: string | null };
+export type SessionConfigOption = {
+  id: string;
+  name: string;
+  category?: string | null;
+  description?: string | null;
+} & (
+  | {
+      type: 'select';
+      currentValue: string;
+      options: (ConfigChoice | { group: string; name: string; options: ConfigChoice[] })[];
+    }
+  | { type: 'boolean'; currentValue: boolean }
+);
+
 export type LoadedSession = {
   agent: string;
   sessionId: string;
   title?: string;
   updatedAt?: string;
-  modes?: unknown;
-  configOptions?: unknown[];
+  modes?: SessionModes | null;
+  configOptions?: SessionConfigOption[] | null;
 };
 
 export type PermissionRequest = {
@@ -38,8 +58,8 @@ export type CreatedSession = {
   sessionId?: string;
   title?: string;
   updatedAt?: string;
-  modes?: unknown;
-  configOptions?: unknown[];
+  modes?: SessionModes | null;
+  configOptions?: SessionConfigOption[] | null;
 };
 
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
@@ -141,6 +161,23 @@ export class AgentApi {
       { agent, sessionId: session.sessionId, cwd: session.cwd, stream: true, timeoutSeconds: sessionTimeoutSeconds },
       (event) => onEvent(event as SessionEvent),
       { timeoutMs: 65_000, timeoutMessage: '加载会话超时，请重试；持续失败可在设置中重置 App。' },
+    );
+
+  setSessionMode = (agent: string, sessionId: string, modeId: string) =>
+    this.#peer.call('agent_session_set_mode', { agent, sessionId, modeId }, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: '切换模式超时，结果尚未确认。请重试；持续失败可在设置中重置 App。',
+    });
+
+  setSessionModeOption = (agent: string, sessionId: string, configId: string, value: string) =>
+    this.#peer.call<{ configOptions: SessionConfigOption[] }>(
+      'agent_session_set_config_option',
+      { agent, sessionId, configId, value },
+      undefined,
+      {
+        timeoutMs: 15_000,
+        timeoutMessage: '切换模式超时，结果尚未确认。请重试；持续失败可在设置中重置 App。',
+      },
     );
 
   prompt = (

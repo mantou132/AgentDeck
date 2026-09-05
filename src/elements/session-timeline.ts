@@ -6,7 +6,6 @@ import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 
 const style = css`
   :scope { display: block; }
-  tap-sheet::part(sheet) { max-width: 620px; }
 `;
 @customElement('deck-session-timeline')
 @adoptedStyle(style)
@@ -141,19 +140,22 @@ export class DeckSessionTimelineElement extends GemElement {
     const currentGroup = selectedGroup || this.#lastGroup;
     return html`
       ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
-      <tap-sheet
-        ?open=${Boolean(this.#state.selectedGroupId)}
-        header="过程摘要"
-        gesture
-        mask-closable
-        @close=${this.#closeProcessSheet}
-      >
-        <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">过程摘要</h2>
-        <deck-process-detail
-          v-if=${Boolean(this.#state.selectedGroupId)}
-          .group=${currentGroup}
-        ></deck-process-detail>
-      </tap-sheet>
+      <tap-reflect .target=${document.body}>
+        <tap-sheet
+          class="[&::part(sheet)]:max-w-[620px]"
+          ?open=${Boolean(this.#state.selectedGroupId)}
+          header="过程摘要"
+          gesture
+          mask-closable
+          @close=${this.#closeProcessSheet}
+        >
+          <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">过程摘要</h2>
+          <deck-process-detail
+            v-if=${Boolean(this.#state.selectedGroupId)}
+            .group=${currentGroup}
+          ></deck-process-detail>
+        </tap-sheet>
+      </tap-reflect>
     `;
   };
 }

@@ -7,6 +7,7 @@ import {
   LONG_PASTE_CHAR_THRESHOLD,
   syncPasteReferences,
 } from '../composer/references';
+import type { ModeSelection } from '../session/modes';
 import type { Attachment, TextMessage } from '../session/types';
 
 export type ComposerInput = { text: string; attachments: Attachment[] };
@@ -20,7 +21,9 @@ const style = css`
 @adoptedStyle(style)
 export class DeckComposerElement extends GemElement {
   @property sessionKey = '';
-  @property agentName = '';
+  @property mode?: ModeSelection;
+  @boolattribute modeBusy: boolean;
+  @emitter modeChange: Emitter<string>;
   @property placeholder = '';
   @property submit?: (input: ComposerInput) => boolean | Promise<boolean>;
   @boolattribute disabled: boolean;
@@ -291,7 +294,27 @@ export class DeckComposerElement extends GemElement {
                   >
                     <tap-use class="size-5" .element=${this.#state.readingAttachments ? icons.loading : icons.add}></tap-use>
                   </button>
-                  <span class="truncate">${this.#state.readingAttachments ? '正在读取附件…' : this.#state.submitting ? '正在创建会话…' : this.agentName}</span>
+                  <span v-if=${this.#state.readingAttachments || this.#state.submitting} class="truncate">
+                    ${this.#state.readingAttachments ? '正在读取附件…' : '正在准备会话…'}
+                  </span>
+                  <div v-if=${this.mode} class="relative flex min-w-0 items-center gap-1">
+                    <select
+                      class="min-h-9 max-w-32 min-w-0 cursor-pointer truncate rounded-lg border-0 bg-transparent pr-4 pl-1 text-xs font-semibold text-describe outline-none focus:outline-none disabled:cursor-default disabled:opacity-50"
+                      aria-label="会话模式"
+                      title=${this.pending ? '任务结束后可切换模式' : this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || '会话模式'}
+                      ?disabled=${!this.ready || this.#state.submitting}
+                      @change=${(event: Event) => {
+                        const select = event.target as HTMLSelectElement;
+                        const value = select.value;
+                        select.value = this.mode?.currentValue ?? '';
+                        this.modeChange(value);
+                      }}
+                    >
+                      <option v-if=${this.sessionKey === 'draft'} value="" .selected=${!this.mode?.currentValue}>默认模式</option>
+                      ${this.mode?.choices.map((choice) => html`<option value=${choice.value} .selected=${choice.value === this.mode?.currentValue}>${choice.name}</option>`)}
+                    </select>
+                    <tap-use v-if=${this.modeBusy} class="size-3.5 shrink-0" .element=${icons.loading}></tap-use>
+                  </div>
                 </div>
                 <button
                   v-if=${this.pending}

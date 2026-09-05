@@ -1,4 +1,5 @@
-import type { SessionEvent } from '../agent/api';
+import type { SessionConfigOption, SessionEvent } from '../agent/api';
+import { withCurrentMode } from './modes';
 import type {
   Attachment,
   ChatMessage,
@@ -163,19 +164,11 @@ export const reduceSessionEvent = (
   }
 
   if (sessionUpdate === 'current_mode_update' && typeof update.currentModeId === 'string') {
-    const configOptions = options?.configOptions ?? [];
-    return {
-      optionsPatch: {
-        configOptions: configOptions.map((option) => {
-          if (!option || typeof option !== 'object' || (option as { id?: unknown }).id !== 'mode') return option;
-          return { ...(option as object), currentValue: update.currentModeId };
-        }),
-      },
-    };
+    return { optionsPatch: withCurrentMode(options ?? {}, update.currentModeId) };
   }
 
   if (sessionUpdate === 'config_option_update' && Array.isArray(update.configOptions)) {
-    return { optionsPatch: { configOptions: update.configOptions } };
+    return { optionsPatch: { configOptions: update.configOptions as SessionConfigOption[] } };
   }
 
   return null;

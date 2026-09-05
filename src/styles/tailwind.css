@@ -50,11 +50,6 @@ input {
   font: inherit;
 }
 
-:where(button, summary):focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-focus) 36%, transparent);
-  outline-offset: 2px;
-}
-
 .no-scrollbar {
   scrollbar-width: none;
 }

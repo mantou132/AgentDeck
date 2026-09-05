@@ -21,6 +21,7 @@ export const agentdeckStore = createStore({
   loadedSessionIds: [] as string[],
   loadingSessionIds: [] as string[],
   pendingSessionIds: [] as string[],
+  changingModeSessionIds: [] as string[],
   errorsBySession: {} as Record<string, string>,
   optionsBySession: {} as Record<string, SessionOptions>,
   permissionsBySession: {} as Record<string, PermissionRequest>,
@@ -33,7 +34,7 @@ export const clearSessionError = (sessionId: string) => {
 };
 
 export const setSessionFlag = (
-  key: 'loadedSessionIds' | 'loadingSessionIds' | 'pendingSessionIds',
+  key: 'loadedSessionIds' | 'loadingSessionIds' | 'pendingSessionIds' | 'changingModeSessionIds',
   sessionId: string,
   enabled: boolean,
 ) => {
