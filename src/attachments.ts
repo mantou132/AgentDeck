@@ -3,7 +3,7 @@ import { compressionImage } from '@mantou/tap-ui/lib/image';
 import type { Attachment } from './session-runtime';
 
 export const MAX_ATTACHMENTS = 10;
-const MAX_TEXT_BYTES = 256 * 1024;
+export const MAX_TEXT_BYTES = 256 * 1024;
 const TEXT_EXTENSION =
   /\.(txt|md|markdown|json|jsonl|ndjson|csv|tsv|log|xml|svg|yaml|yml|toml|ini|cfg|conf|env|html?|css|scss|less|[jt]sx?|mjs|cjs|graphql|proto|py|rb|rs|go|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|fish|ps1|sql|r)$/i;
 

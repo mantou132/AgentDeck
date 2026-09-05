@@ -20,7 +20,7 @@
 - `src/transport.ts`：Relay 连接、设备标识和 host 握手；`src/agent-api.ts`：远端 API；`src/rpc.ts`：双向流式 RPC。
 - `src/elements/`：`cwd-picker.ts` 选目录、`session-group.ts` 会话分组、`tool-call.ts` 工具状态、`permission-request.ts` 授权、`process-detail.ts` 过程详情。
 - `src/markdown.ts`：Markdown / Mermaid / LaTeX；`src/path.ts`：路径显示。
-- `src/attachments.ts`：文件附件读取与限制；`src/elements/attachment.ts`：composer 与消息共用的附件卡片。
+- `src/attachments.ts`：文件附件读取与限制；`src/paste.ts`：粘贴引用与编辑范围；`src/elements/attachment.ts`：共用附件卡片。
 - `src/tailwind.css`、`src/theme.ts`：共享主题 token 和 Tap UI 主题桥。
 - `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；`biome.json`：格式和 lint。
 - `patches/relay-client-ts@0.1.4.patch`：已发布 SDK 的投递拒绝与发送失败补丁；升级依赖时核对是否仍需保留。

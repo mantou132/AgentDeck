@@ -24,6 +24,8 @@ export type ToolCallData = {
 export type Attachment = {
   id: string;
   name: string;
+  pasteReference?: number;
+  marker?: string;
 } & ({ kind: 'image'; data: string; mimeType: string; previewUrl: string } | { kind: 'text'; text: string });
 
 export type TextMessage = {

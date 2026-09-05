@@ -1,9 +1,10 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
-import { MAX_ATTACHMENTS, readAttachment } from './attachments';
+import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from './attachments';
 import type { NonFormalGroup } from './elements/process-detail';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from './markdown';
+import { createPasteReference, expandReferenceRange, LONG_PASTE_CHAR_THRESHOLD, syncPasteReferences } from './paste';
 import { displayPath } from './path';
 import { openSettings } from './settings';
 import {
@@ -43,6 +44,7 @@ const style = css`
 `;
 
 type TimelineItem = { type: 'message'; message: TextMessage } | { type: 'group'; group: NonFormalGroup };
+type InputSelection = { input: string; start: number; end: number };
 
 const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean): TimelineItem[] => {
   const result: TimelineItem[] = [];
@@ -102,10 +104,13 @@ export class AgentDeckSessionPageElement extends GemElement {
   #textareaRef = createRef<HTMLTextAreaElement>();
   #fileInputRef = createRef<HTMLInputElement>();
   #scrollFrame = 0;
+  #nextPasteReference = 1;
+  #pastedAttachments = new Map<string, Attachment>();
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
-    this.#state({ draft: '', attachments: [], attachmentError: '', previewAttachment: null, selectedGroupId: null });
+    this.#clearInput();
+    this.#state({ previewAttachment: null, selectedGroupId: null });
     this.#lastGroup = undefined;
     void ensureSessionLoaded(this.sessionId);
     queueMicrotask(this.#scrollToLatest);
@@ -158,13 +163,17 @@ export class AgentDeckSessionPageElement extends GemElement {
     if (agentdeckStore.errorsBySession[this.sessionId]) {
       clearSessionError(this.sessionId);
     }
-    this.#state({ draft: value });
+    this.#state({
+      draft: value,
+      attachments: syncPasteReferences(value, this.#state.attachments, this.#pastedAttachments.values()),
+    });
   };
 
   #send = async () => {
     const text = this.#state.draft.trim();
     const attachments = this.#state.attachments;
     if ((!text && !attachments.length) || this.#state.readingAttachments || this.#state.creatingSession) return;
+    if (attachments.length > MAX_ATTACHMENTS) return;
     if (agentdeckStore.pendingSessionIds.includes(this.sessionId)) return;
     const session = getSession(this.sessionId);
     if (!session) return;
@@ -185,6 +194,8 @@ export class AgentDeckSessionPageElement extends GemElement {
   };
 
   #clearInput = () => {
+    this.#nextPasteReference = 1;
+    this.#pastedAttachments.clear();
     this.#state({ draft: '', attachments: [], attachmentError: '' });
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
   };
@@ -200,6 +211,11 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   #restoreInput = (message: TextMessage) => {
     if (!this.#canRestoreInput) return;
+    this.#pastedAttachments.clear();
+    for (const attachment of message.attachments ?? []) {
+      if (attachment.marker) this.#pastedAttachments.set(attachment.id, attachment);
+    }
+    this.#nextPasteReference = Math.max(0, ...(message.attachments ?? []).map((item) => item.pasteReference ?? 0)) + 1;
     this.#setDraft(message.text);
     this.#state({ attachments: message.attachments ?? [], attachmentError: '' });
     if (this.#textareaRef.value) {
@@ -208,11 +224,19 @@ export class AgentDeckSessionPageElement extends GemElement {
     }
   };
 
-  #readFiles = async (event: Event) => {
+  #readFiles = (event: Event) => {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
+    void this.#addFiles(files);
+  };
+
+  #addFiles = async (files: File[], selection?: InputSelection) => {
     if (!files.length) return;
+    if (this.#state.readingAttachments) {
+      this.#state({ attachmentError: '正在读取附件，请稍后再粘贴或选择文件。' });
+      return;
+    }
     if (files.length + this.#state.attachments.length > MAX_ATTACHMENTS) {
       this.#state({ attachmentError: '最多添加 10 个附件，请减少选择的文件数量。' });
       return;
@@ -225,9 +249,10 @@ export class AgentDeckSessionPageElement extends GemElement {
       if (result.status === 'fulfilled') attachments.push(result.value);
       else errors.push(result.reason.message);
     }
+    if (selection) this.#insertPastedAttachments(attachments, selection);
+    else this.#state({ attachments: [...this.#state.attachments, ...attachments] });
     this.#state({
-      attachments: [...this.#state.attachments, ...attachments],
-      attachmentError: errors.join('\n'),
+      attachmentError: errors.length ? errors.join('\n') : this.#state.attachmentError,
       readingAttachments: false,
     });
   };
@@ -237,7 +262,83 @@ export class AgentDeckSessionPageElement extends GemElement {
   };
 
   #removeAttachment = (event: CustomEvent<string>) => {
+    const attachment = this.#state.attachments.find((item) => item.id === event.detail);
+    const textarea = this.#textareaRef.value;
+    if (attachment?.marker && textarea) {
+      const input = this.#state.draft;
+      const caret = input.slice(0, textarea.selectionStart).replaceAll(attachment.marker, '').length;
+      this.#replaceInputRange(0, input.length, input.replaceAll(attachment.marker, ''));
+      textarea.setSelectionRange(caret, caret);
+      return;
+    }
     this.#state({ attachments: this.#state.attachments.filter((item) => item.id !== event.detail) });
+  };
+
+  #replaceInputRange = (start: number, end: number, replacement: string) => {
+    const textarea = this.#textareaRef.value;
+    if (!textarea) return;
+    const next = this.#state.draft.slice(0, start) + replacement + this.#state.draft.slice(end);
+    textarea.focus();
+    textarea.setSelectionRange(start, end);
+    // Keep native undo/redo for both marker insertion and removal.
+    document.execCommand(replacement ? 'insertText' : 'delete', false, replacement);
+    if (textarea.value !== next) textarea.value = next;
+    this.#setDraft(next);
+    textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+  };
+
+  #insertPastedAttachments = (attachments: Attachment[], selection: InputSelection) => {
+    if (!attachments.length) return;
+    const textarea = this.#textareaRef.value;
+    if (!textarea) return;
+    const { start, end } =
+      selection.input === this.#state.draft
+        ? selection
+        : { start: textarea.selectionStart, end: textarea.selectionEnd };
+    const range = expandReferenceRange(this.#state.draft, this.#state.attachments, start, end, true);
+    const references = attachments.map((attachment) => createPasteReference(attachment, this.#nextPasteReference++));
+    for (const attachment of references) this.#pastedAttachments.set(attachment.id, attachment);
+    this.#replaceInputRange(range.start, range.end, references.map((item) => item.marker).join(' '));
+  };
+
+  #onBeforeInput = (event: InputEvent) => {
+    const textarea = event.target as HTMLTextAreaElement;
+    let { selectionStart: start, selectionEnd: end } = textarea;
+    const inserting = event.inputType.startsWith('insert');
+    if (!inserting) {
+      if (!event.inputType.startsWith('delete')) return;
+      if (start === end) {
+        if (event.inputType === 'deleteWordBackward') {
+          start = this.#state.draft.slice(0, start).replace(/[ \t]+$/, '').length;
+        } else if (event.inputType === 'deleteWordForward') {
+          end += this.#state.draft.slice(end).match(/^[ \t]*/)?.[0].length ?? 0;
+        }
+        if (event.inputType.endsWith('Backward')) start = Math.max(0, start - 1);
+        else if (event.inputType.endsWith('Forward')) end = Math.min(this.#state.draft.length, end + 1);
+        else return;
+      }
+    }
+    const range = expandReferenceRange(this.#state.draft, this.#state.attachments, start, end, inserting);
+    if (range.start !== start || range.end !== end) textarea.setSelectionRange(range.start, range.end);
+  };
+
+  #onPaste = (event: ClipboardEvent) => {
+    const textarea = event.target as HTMLTextAreaElement;
+    const selection = { input: textarea.value, start: textarea.selectionStart, end: textarea.selectionEnd };
+    const images = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'));
+    if (images.length) {
+      event.preventDefault();
+      void this.#addFiles(images, selection);
+      return;
+    }
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    if (text.length < LONG_PASTE_CHAR_THRESHOLD) return;
+    event.preventDefault();
+    if (new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) {
+      this.#state({ attachmentError: '粘贴的文本超过 256 KB，请缩小内容后重试。' });
+      return;
+    }
+    void this.#addFiles([new File([text], 'Pasted text.txt', { type: 'text/plain' })], selection);
   };
 
   #onKeydown = (event: KeyboardEvent) => {
@@ -429,6 +530,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       connected &&
       loaded &&
       !pending &&
+      this.#state.attachments.length <= MAX_ATTACHMENTS &&
       !this.#state.readingAttachments &&
       !this.#state.creatingSession;
     const agentName = agentdeckStore.agents.find((agent) => agent.id === session.agent)?.name || session.agent;
@@ -443,6 +545,10 @@ export class AgentDeckSessionPageElement extends GemElement {
       this.#lastGroup = selectedGroup;
     }
     const currentGroup = selectedGroup || this.#lastGroup;
+    const attachmentError =
+      this.#state.attachments.length > MAX_ATTACHMENTS
+        ? '附件超过 10 个，请删除多余附件后发送。'
+        : this.#state.attachmentError;
 
     return html`
       <tap-page class="bg-bg text-text">
@@ -552,12 +658,13 @@ export class AgentDeckSessionPageElement extends GemElement {
                   `,
                 )}
               </div>
-              <div v-if=${this.#state.attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-xs text-negative">
-                <span class="min-w-0 flex-1 whitespace-pre-line">${this.#state.attachmentError}</span>
+              <div v-if=${attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-xs text-negative">
+                <span class="min-w-0 flex-1 whitespace-pre-line">${attachmentError}</span>
                 <button
                   type="button"
                   class="grid size-6 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-negative"
                   aria-label="关闭附件提示"
+                  v-if=${this.#state.attachments.length <= MAX_ATTACHMENTS}
                   @click=${() => this.#state({ attachmentError: '' })}
                 >
                   <tap-use class="size-4" .element=${icons.close}></tap-use>
@@ -571,6 +678,8 @@ export class AgentDeckSessionPageElement extends GemElement {
                 placeholder=${loading ? '正在回放历史…' : !connected ? connectionLabels[agentdeckStore.connection] : loaded ? '交代一个任务…' : '请先加载会话…'}
                 .value=${this.#state.draft}
                 @input=${(event: InputEvent) => this.#setDraft((event.target as HTMLTextAreaElement).value)}
+                @beforeinput=${this.#onBeforeInput}
+                @paste=${this.#onPaste}
                 @keydown=${this.#onKeydown}
                 ?disabled=${!loaded || this.#state.creatingSession}
               ></textarea>
