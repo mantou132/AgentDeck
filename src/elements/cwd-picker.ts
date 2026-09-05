@@ -170,7 +170,7 @@ export class DeckCwdPickerElement extends GemElement {
                 ?disabled=${this.creating || Boolean(navigatingPath) || isLast}
                 @click=${() => this.#navigateTo(crumb.path)}
               >
-                <tap-use v-if=${isNavigatingThis} class="size-2.5 animate-spin text-primary" .element=${icons.loading}></tap-use>
+                <tap-use v-if=${isNavigatingThis} class="size-2.5 text-primary" .element=${icons.loading}></tap-use>
                 ${crumb.name}
               </button>
             `;
@@ -183,13 +183,20 @@ export class DeckCwdPickerElement extends GemElement {
           class="mb-3 flex items-center gap-2 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
         >
           <tap-use class="size-3.5 shrink-0 text-negative" .element=${icons.error}></tap-use>
-          <span class="min-w-0 truncate">${browseError}</span>
+          <span class="min-w-0 flex-1">${browseError}</span>
+          <button
+            class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold disabled:opacity-45"
+            ?disabled=${loading || Boolean(navigatingPath)}
+            @click=${() => this.#navigateTo(currentPath)}
+          >
+            重试
+          </button>
         </div>
 
         <!-- Directory list -->
         <div class="max-h-[42vh] min-h-[160px] overflow-y-auto rounded-[16px] border border-border bg-bg-light/60">
           <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
-            <tap-use class="size-4 animate-spin" .element=${icons.loading}></tap-use>
+            <tap-use class="size-4" .element=${icons.loading}></tap-use>
             正在读取目录…
           </div>
 
@@ -206,7 +213,7 @@ export class DeckCwdPickerElement extends GemElement {
                 <tap-use
                   class=${classMap({
                     'size-3.5': true,
-                    'animate-spin text-primary': navigatingPath === parentPath,
+                    'text-primary': navigatingPath === parentPath,
                   })}
                   .element=${navigatingPath === parentPath ? icons.loading : icons.back}
                 ></tap-use>
@@ -257,7 +264,7 @@ export class DeckCwdPickerElement extends GemElement {
                   <tap-use
                     class=${classMap({
                       'size-3.5 shrink-0': true,
-                      'animate-spin text-primary': isNavigatingThis,
+                      'text-primary': isNavigatingThis,
                       'text-disabled': !isNavigatingThis,
                     })}
                     .element=${isNavigatingThis ? icons.loading : icons.right}
@@ -267,7 +274,7 @@ export class DeckCwdPickerElement extends GemElement {
             })}
 
             <!-- Empty directory notice -->
-            <div v-if=${!directories.length} class="px-4 py-8 text-center text-sm text-describe">
+            <div v-if=${!directories.length && !browseError} class="px-4 py-8 text-center text-sm text-describe">
               此目录下没有子目录，可直接点击下方按钮以此为工作区
             </div>
           </div>
@@ -288,7 +295,7 @@ export class DeckCwdPickerElement extends GemElement {
           ?disabled=${this.creating || Boolean(navigatingPath) || !currentPath}
           @click=${this.#confirm}
         >
-          <tap-use v-if=${this.creating} class="size-4 animate-spin" .element=${icons.loading}></tap-use>
+          <tap-use v-if=${this.creating} class="size-4" .element=${icons.loading}></tap-use>
           <span>${this.creating ? '正在创建会话…' : `在「${currentName}」新建会话`}</span>
         </button>
       </div>

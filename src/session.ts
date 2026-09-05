@@ -19,6 +19,7 @@ import {
   sendPrompt,
   type TextMessage,
 } from './store';
+import { connectionLabels, reconnectTransport } from './transport';
 
 const style = css`
   .session-header {
@@ -344,7 +345,10 @@ export class AgentDeckSessionPageElement extends GemElement {
     const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId);
     const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
     const pending = agentdeckStore.pendingSessionIds.includes(session.sessionId);
-    const error = agentdeckStore.errorsBySession[session.sessionId];
+    const error =
+      agentdeckStore.errorsBySession[session.sessionId] ||
+      agentdeckStore.connectionError ||
+      (!loaded && !loading ? '会话尚未加载，请重试加载' : '');
     const connected = agentdeckStore.connection === 'connected';
     const canSend = Boolean(this.#state.draft.trim()) && connected && loaded && !pending;
     const agentName = agentdeckStore.agents.find((agent) => agent.id === session.agent)?.name || session.agent;
@@ -419,12 +423,11 @@ export class AgentDeckSessionPageElement extends GemElement {
           >
             <span class="min-w-0 flex-1">${error}</span>
             <button
-              v-if=${!loaded && !loading}
+              v-if=${!connected || (!loaded && !loading)}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"
-              ?disabled=${!connected}
-              @click=${this.#retryLoad}
+              @click=${() => (connected ? this.#retryLoad() : reconnectTransport(true))}
             >
-              重试
+              ${connected ? '重试加载' : '重新连接'}
             </button>
             <button
               v-else-if=${connected}
@@ -441,7 +444,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
                 rows="1"
                 aria-label="发送消息"
-                placeholder=${loading ? '正在回放历史…' : connected && loaded ? '交代一个任务…' : '等待 Relay 连接…'}
+                placeholder=${loading ? '正在回放历史…' : !connected ? connectionLabels[agentdeckStore.connection] : loaded ? '交代一个任务…' : '请先加载会话…'}
                 .value=${this.#state.draft}
                 @input=${(event: InputEvent) => this.#setDraft((event.target as HTMLTextAreaElement).value)}
                 @keydown=${this.#onKeydown}

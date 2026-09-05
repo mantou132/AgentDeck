@@ -1,4 +1,4 @@
-import { isRelayId, type RelayConnectionState } from 'relay-client-ts';
+import { isRelayId } from 'relay-client-ts';
 import type { CreatedSession, PermissionRequest, SessionEvent } from './agent-api';
 import {
   type AppSettings,
@@ -16,11 +16,11 @@ import {
 } from './session-runtime';
 import {
   agentApi,
+  type ConnectionState,
   clearTransportStorage,
   initTransport,
   reconnectTransport,
   startTransport,
-  syncHostConnection,
   type TransportMessage,
 } from './transport';
 import {
@@ -51,7 +51,7 @@ export const getSortedSessionGroups = (sessions: DeckSession[]): SessionGroup[] 
     );
     const latestActivity = sortedItems.reduce((max, s) => {
       const time = Date.parse(s.updatedAt || '') || 0;
-      return time > max ? time : max;
+      return Math.max(time, max);
     }, 0);
     groups.push({ cwd, latestActivity, sessions: sortedItems });
   }
@@ -63,7 +63,7 @@ const initialSettings = readSettings();
 export const agentdeckStore = createStore({
   settings: initialSettings,
   agents: fallbackAgents,
-  connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as RelayConnectionState,
+  connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
   draftSession: null as DeckSession | null,
   sessions: [] as DeckSession[],
@@ -94,20 +94,6 @@ export const clearSessionError = (sessionId: string) => {
   const next = { ...agentdeckStore.errorsBySession };
   delete next[sessionId];
   agentdeckStore({ errorsBySession: next });
-};
-
-export const clearNetworkErrors = () => {
-  const errors = { ...agentdeckStore.errorsBySession };
-  let changed = false;
-  for (const [id, error] of Object.entries(errors)) {
-    if (error === 'Relay 连接中断' || error === 'Relay 尚未连接') {
-      delete errors[id];
-      changed = true;
-    }
-  }
-  if (changed) {
-    agentdeckStore({ errorsBySession: errors });
-  }
 };
 
 const setSessionFlag = (
@@ -203,10 +189,12 @@ const handleTransportMessage = (message: TransportMessage) => {
   switch (message.type) {
     case 'connection': {
       const { connection, error } = message;
-      agentdeckStore({ connection, connectionError: error || '' });
+      agentdeckStore({
+        connection,
+        connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
+      });
       if (connection === 'connected') {
-        clearNetworkErrors();
-        void syncHostConnection().then(() => refreshSessions());
+        void refreshSessions();
       }
       break;
     }
@@ -221,11 +209,6 @@ const handleTransportMessage = (message: TransportMessage) => {
       openedSessionIds.delete(message.sessionId);
       resolvePermission(message.sessionId, null);
       setSessionError(message.sessionId, '远端会话已结束');
-      break;
-    }
-    case 'host_reconnected': {
-      clearNetworkErrors();
-      void syncHostConnection().then(() => refreshSessions());
       break;
     }
   }
@@ -365,7 +348,7 @@ export const resetDraftSession = () => {
 };
 
 export const createSession = async ({ agent, cwd }: CreateSessionInput) => {
-  if (agentdeckStore.connection !== 'connected') throw new Error('Relay 连接后才能新建会话');
+  if (agentdeckStore.connection !== 'connected') throw new Error('远端连接后才能新建会话');
   const created = await agentApi.createSession({ agent, cwd });
   if (typeof created.sessionId !== 'string' || !created.sessionId) {
     throw new Error('远端 Agent 未返回 sessionId');
@@ -398,7 +381,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
   if (!session) return;
   if (agentdeckStore.connection !== 'connected') {
     failedSessionLoads.add(sessionId);
-    setSessionError(sessionId, 'Relay 尚未连接');
+    setSessionError(sessionId, '远端尚未连接，连接后请重试加载');
     return;
   }
 
@@ -410,7 +393,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
 
   try {
     // 重启后首次进 session，走一遍 close + load session
-    await agentApi.closeSession(session.agent, sessionId).catch(() => {});
+    await agentApi.closeSession(session.agent, sessionId);
     const loaded = await agentApi.loadSession(session, session.agent, (event) => applySessionEvent(sessionId, event));
     if (sessionLoads.get(sessionId) !== token) return;
     failedSessionLoads.delete(sessionId);
@@ -432,6 +415,10 @@ export const ensureSessionLoaded = async (sessionId: string) => {
 };
 
 export const retrySessionLoad = (sessionId: string) => {
+  if (agentdeckStore.connection !== 'connected') {
+    reconnectTransport(true);
+    return;
+  }
   failedSessionLoads.delete(sessionId);
   setSessionError(sessionId, '');
   openedSessionIds.delete(sessionId);
@@ -463,7 +450,7 @@ const runPromptTurn = (session: DeckSession, text: string, turnStart: number) =>
 
 export const promoteDraftSession = async (draft: DeckSession, text: string): Promise<DeckSession | null> => {
   if (agentdeckStore.connection !== 'connected') {
-    setSessionError('draft', 'Relay 连接后才能新建会话');
+    setSessionError('draft', '远端连接后才能新建会话');
     return null;
   }
   setDraftCanceled(false);

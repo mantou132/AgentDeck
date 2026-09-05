@@ -1,6 +1,25 @@
-import { DEFAULT_STORAGE_KEY, isRelayId, RelayClient, type RelayConnectionState } from 'relay-client-ts';
+import {
+  DEFAULT_STORAGE_KEY,
+  isRelayId,
+  localStorageStore,
+  RelayClient,
+  type RelayConnectionState,
+  type RelayStore,
+} from 'relay-client-ts';
 import { AgentApi, type PermissionRequest, type SessionEvent } from './agent-api';
+import type { RpcId, RpcMessage } from './rpc';
 import { DEVICE_ID_KEY, RELAY_URL } from './session-runtime';
+
+export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
+export const connectionLabels: Record<ConnectionState, string> = {
+  connecting: '正在连接 Relay',
+  connected: '远端已连接',
+  attaching: 'Relay 已连接，正在连接远端',
+  unavailable: '远端未响应',
+  reconnecting: '正在重新连接',
+  disconnected: '尚未连接',
+  preempted: '连接已被取代',
+};
 
 export const getDeviceId = (): string => {
   let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -12,118 +31,206 @@ export const getDeviceId = (): string => {
 };
 
 let currentPeerId: number | undefined;
-export const setPeerId = (id: number | undefined) => {
-  currentPeerId = id;
-};
 export const getPeerId = () => currentPeerId;
-
 let relayClient: RelayClient | undefined;
+let relayStore: RelayStore | undefined;
 let currentRelayId = '';
+let connectionState: ConnectionState = 'disconnected';
+let relayConnected = false;
+let attachVersion = 0;
+let attachId: RpcId | undefined;
+let attaching: Promise<void> | undefined;
+let connectTimer: ReturnType<typeof setTimeout> | undefined;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-export const agentApi = new AgentApi((message) => {
-  if (!relayClient) throw new Error('Relay 尚未配置');
-  if (currentPeerId !== undefined) {
-    (message as Record<string, unknown>).peerId = currentPeerId;
-  }
-  relayClient.send(message);
-});
+export const agentApi = new AgentApi(
+  (message) => {
+    if (!relayClient) throw new Error('Relay 尚未配置');
+    if (message.method && message.method !== 'peer_attach' && connectionState !== 'connected') {
+      throw new Error('远端尚未连接，请重新连接后重试');
+    }
+    if (message.method === 'peer_attach') attachId = message.id;
+    if (currentPeerId !== undefined) (message as Record<string, unknown>).peerId = currentPeerId;
+    return relayClient.send(message);
+  },
+  async (id) => {
+    // Withdraw an expired request still in our outbox. Delivery already accepted
+    // by Relay cannot be undone; never automatically retry a prompt/create.
+    const store = relayStore;
+    if (!store) return;
+    for (const message of await store.outbox()) {
+      if (store !== relayStore) return;
+      const payload = message.payload as RpcMessage;
+      if (payload?.id === id && payload.method) await store.removeFromOutbox(message.messageId);
+    }
+  },
+);
 
 export type TransportMessage =
-  | { type: 'connection'; connection: RelayConnectionState; error?: string }
+  | { type: 'connection'; connection: ConnectionState; error?: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
-  | { type: 'session_ended'; sessionId: string }
-  | { type: 'host_reconnected' };
+  | { type: 'session_ended'; sessionId: string };
 
 type MessageHandler = (message: TransportMessage) => void;
 let globalMessageHandler: MessageHandler | undefined;
+const emitConnection = (connection: ConnectionState, error = '') => {
+  connectionState = connection;
+  globalMessageHandler?.({ type: 'connection', connection, error });
+};
+
+const invalidateAttach = () => {
+  attachVersion++;
+  attaching = undefined;
+  attachId = undefined;
+};
+
+export const syncHostConnection = () => {
+  if (!relayConnected) return Promise.resolve();
+  if (attaching) return attaching;
+  const version = ++attachVersion;
+  emitConnection('attaching');
+  attaching = agentApi
+    .attachPeer(getDeviceId())
+    .then((result) => {
+      if (version !== attachVersion) return;
+      if (!Number.isSafeInteger(result?.peerId) || result.peerId <= 0) {
+        throw new Error('远端未返回有效的设备标识，请重新连接');
+      }
+      currentPeerId = result.peerId;
+      emitConnection('connected');
+    })
+    .catch((error) => {
+      if (version === attachVersion)
+        emitConnection('unavailable', error instanceof Error ? error.message : String(error));
+    })
+    .finally(() => {
+      if (version === attachVersion) {
+        attaching = undefined;
+        attachId = undefined;
+      }
+    });
+  return attaching;
+};
 
 export const startTransport = (relayId: string) => {
   if (!isRelayId(relayId)) return;
+  if (relayClient && currentRelayId === relayId) {
+    reconnectTransport(true);
+    return;
+  }
+  closeTransport();
   currentRelayId = relayId;
-  relayClient?.close();
-
+  const store = localStorageStore(relayId);
+  relayStore = store;
   const client = new RelayClient({
     relayId,
     endpoint: '2',
     deviceId: getDeviceId(),
     relayUrl: RELAY_URL,
+    // Only a fresh document/pairing abandons the old server backlog.
     ackHead: true,
+    store: {
+      ...store,
+      outbox: () => (relayStore === store ? store.outbox() : []),
+      enqueue: (message) => {
+        if (relayStore === store) return store.enqueue(message);
+      },
+      markReceived: (sequence) => {
+        if (relayStore === store) return store.markReceived(sequence);
+      },
+      removeFromOutbox: (id) => {
+        if (relayStore === store) return store.removeFromOutbox(id);
+      },
+    },
     onPayload: (payload) => {
+      if (relayClient !== client) return;
       const data = payload as Record<string, unknown>;
-      if (typeof data?.peerId === 'number' && currentPeerId !== undefined) {
-        if (data.peerId !== currentPeerId) {
-          // Message belongs to another device on this relay; ignore.
-          return;
-        }
+      // An attach response may assign a new peer ID after host recovery.
+      const attachResponse = attachId !== undefined && data?.id === attachId;
+      if (
+        !attachResponse &&
+        typeof data?.peerId === 'number' &&
+        currentPeerId !== undefined &&
+        data.peerId !== currentPeerId
+      )
+        return;
+      agentApi.dispatch(payload as RpcMessage);
+    },
+    onStateChange: (connection, error = '') => {
+      if (relayClient !== client) return;
+      clearTimeout(connectTimer);
+      if (connection === 'connected') {
+        relayConnected = true;
+        void syncHostConnection();
+        return;
       }
-      agentApi.dispatch(payload as Parameters<AgentApi['dispatch']>[0]);
-    },
-    onDisconnect: (_error) => {
-      // 临时断线由 RelayClient 自动重连与消息序列恢复，不销毁正在执行的 Turn 与 peerId
-    },
-    onStateChange: (connection, connectionError = '') => {
+      relayConnected = false;
+      invalidateAttach();
       if (connection === 'preempted') {
+        clearTimeout(retryTimer);
         currentPeerId = undefined;
-        agentApi.rejectAll(new Error('Relay 连接已被抢占'));
+        agentApi.rejectAll(new Error('Relay 连接已被抢占，请重新连接或重置 App'));
       }
-      globalMessageHandler?.({ type: 'connection', connection, error: connectionError });
+      emitConnection(connection, error);
+      if (connection === 'connecting') {
+        connectTimer = setTimeout(() => {
+          if (relayClient !== client || relayConnected) return;
+          client.close();
+          emitConnection('reconnecting', '连接 Relay 超时，请检查网络或重新连接。');
+          scheduleRetry();
+        }, 10_000);
+      }
     },
   });
-
-  // Guard against unhandled connect errors breaking the reconnection loop
+  const scheduleRetry = () => {
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      if (relayClient === client) void client.connect({ ackHead: false });
+    }, 3000);
+  };
   const rawConnect = client.connect.bind(client);
   client.connect = async (options?: { ackHead?: boolean }) => {
+    if (relayClient !== client) return;
+    clearTimeout(retryTimer);
     try {
       await rawConnect(options);
     } catch (error) {
-      globalMessageHandler?.({
-        type: 'connection',
-        connection: 'reconnecting',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      setTimeout(() => {
-        void client.connect();
-      }, 3000);
+      if (relayClient !== client) return;
+      clearTimeout(connectTimer);
+      emitConnection('reconnecting', error instanceof Error ? error.message : String(error));
+      scheduleRetry();
     }
   };
-
   relayClient = client;
-  void relayClient.connect();
+  void client.connect();
 };
 
 export const reconnectTransport = (force = false) => {
-  if (force && currentRelayId && isRelayId(currentRelayId)) {
-    startTransport(currentRelayId);
-    return;
-  }
   if (!relayClient) {
-    if (currentRelayId && isRelayId(currentRelayId)) {
-      startTransport(currentRelayId);
-    }
+    if (isRelayId(currentRelayId)) startTransport(currentRelayId);
     return;
   }
-  void relayClient.connect();
+  // Reuse the SDK's receive chain, outbox and peer. Replacing only the socket
+  // also repairs half-open connections without dropping missed replies.
+  if (force) relayClient.close();
+  void relayClient.connect({ ackHead: false });
 };
 
 // Called in a fresh document, before any RelayClient can read or write its store.
 export const clearTransportStorage = () => localStorage.removeItem(DEFAULT_STORAGE_KEY);
 
 export const closeTransport = () => {
-  relayClient?.close();
+  const previous = relayClient;
   relayClient = undefined;
+  relayStore = undefined;
+  relayConnected = false;
   currentPeerId = undefined;
+  invalidateAttach();
+  clearTimeout(connectTimer);
+  clearTimeout(retryTimer);
+  previous?.close();
   agentApi.rejectAll(new Error('Relay 连接已关闭'));
-};
-
-export const syncHostConnection = async () => {
-  try {
-    const res = await agentApi.attachPeer(getDeviceId());
-    if (typeof res?.peerId === 'number') {
-      setPeerId(res.peerId);
-    }
-  } catch (e) {
-    console.warn('Failed to attach peer ID:', e);
-  }
+  emitConnection('disconnected');
 };
 
 let transportInitialized = false;
@@ -135,30 +242,12 @@ export const initTransport = (options: {
   globalMessageHandler = options.onMessage;
   if (transportInitialized) return;
   transportInitialized = true;
-
   agentApi.setPermissionHandler(options.onRequestPermission);
-  agentApi.setSessionEndedHandler(({ sessionId }) => {
-    globalMessageHandler?.({ type: 'session_ended', sessionId });
+  agentApi.setSessionEndedHandler(({ sessionId }) => globalMessageHandler?.({ type: 'session_ended', sessionId }));
+  agentApi.setHostReconnectedHandler(() => syncHostConnection());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') reconnectTransport(true);
   });
-  agentApi.setHostReconnectedHandler(() => {
-    globalMessageHandler?.({ type: 'host_reconnected' });
-  });
-
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        reconnectTransport();
-      }
-    });
-  }
-
-  if (typeof window !== 'undefined') {
-    window.addEventListener('online', () => {
-      reconnectTransport(true);
-    });
-  }
-
-  if (isRelayId(options.initialRelayId)) {
-    startTransport(options.initialRelayId);
-  }
+  window.addEventListener('online', () => reconnectTransport(true));
+  if (isRelayId(options.initialRelayId)) startTransport(options.initialRelayId);
 };

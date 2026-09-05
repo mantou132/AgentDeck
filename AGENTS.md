@@ -1,84 +1,47 @@
 # Agent Rules
 
-1. 遇到没有明确的事情不要自由发挥，应该询问确定
-2. 始终根据目的考虑代码，如果有更简洁的方案应该提出来
-3. 项目结构或入口有变化时，要同步更新本文件，避免后续 Agent 重新摸索
+1. 遇到没有明确的事情不要自由发挥，应该询问确定。
+2. 始终根据目的考虑代码，如果有更简洁的方案应该提出来。
+3. 结构、入口或构建方式变化时同步更新本文件；只保留导航和必要约束，不记录实现细节。
 
-# 项目结构
+# 项目导航
 
-## 目录职责
+- `src/`：Gem + Tap UI 前端；`elements/` 为公共自定义元素。
+- `src-tauri/`：Tauri 2 原生入口、配置和 Android / iOS 工程。
+- `public/`：静态品牌资源。
+- `test/`：Node 回归测试；`helpers/app-fixture.mjs` 提供使用实际 Relay SDK 的隔离环境。
 
-- `src/`：Gem + Tap UI 前端；包含 Stack 页面、ACP transport、session 状态和 mock 数据
-- `src/elements/`：Gem 公共自定义元素组件
-- `src-tauri/`：Tauri 2 原生入口、应用配置以及 Android / iOS 生成工程
-- `public/`：Rsbuild 直接复制的静态品牌资源
-- `test/`：Node 内置 test runner 的隔离回归测试，使用 App 源码和实际 Relay SDK 模拟重置后的连接与会话恢复
+关键入口：
 
-## 关键文件
+- `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Relay ID 时打开 settings，否则打开 list。
+- `src/session-list.ts`、`src/session.ts`、`src/settings.ts`：Stack 三页面；通过页面 property 传递 sessionId，settings 提供共用入口及 App 重置。
+- `src/store.ts`：全局状态、会话生命周期与统一门面；`src/session-runtime.ts`：会话类型和 ACP event reducer；`src/turn-controller.ts`：流式任务与权限决断。
+- `src/transport.ts`：Relay 连接、设备标识和 host 握手；`src/agent-api.ts`：远端 API；`src/rpc.ts`：双向流式 RPC。
+- `src/elements/`：`cwd-picker.ts` 选目录、`session-group.ts` 会话分组、`tool-call.ts` 工具状态、`permission-request.ts` 授权、`process-detail.ts` 过程详情。
+- `src/markdown.ts`：Markdown / Mermaid / LaTeX；`src/path.ts`：路径显示。
+- `src/tailwind.css`、`src/theme.ts`：共享主题 token 和 Tap UI 主题桥。
+- `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；`biome.json`：格式和 lint。
 
-- `src/main.ts`：应用入口；挂载三页面 App shell 并启动 relay/agent transport
-- `src/app.ts`：启动路由；未配置 Relay ID 时显示 settings，否则显示 list
-- `src/session-list.ts`：按 cwd 分组的远端 ACP session list；把 session/settings 页面压入 Stack
-- `src/session.ts`：按页面 `sessionId` 加载历史回放并渲染消息、工具、权限和 composer
-- `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页，以及 list/session 共用的设置入口
-- `src/elements/cwd-picker.ts`：工作目录选择器
-- `src/elements/session-group.ts`：按工作目录分组展示会话列表与展开/折叠面板
-- `src/elements/icon.ts`：品牌多层卡片图标组件
-- `src/elements/tool-call.ts`：工具调用状态折叠面板
-- `src/elements/permission-request.ts`：工具调用权限授权卡片
-- `src/elements/process-detail.ts`：思考过程与工具调用的垂直时间线过程抽屉详情组件
-- `src/rpc.ts`：relay payload 内使用的双向流式 RPC peer
-- `src/agent-api.ts`：browser4agent 暴露的 agent/session/prompt RPC API
-- `src/store.ts`：全局 store 实例、会话生命周期管理（Draft/Promote/Load/List/分组排序/常驻会话）与对外统一门面
-- `src/session-runtime.ts`：消息/会话类型定义与纯函数 ACP event reducer
-- `src/turn-controller.ts`：任务 prompt 执行流式控制与权限请求决断
-- `src/transport.ts`：Relay 客户端连接、设备标识与单一消息总线，负责与 Agent API 接入解耦
-- `src/markdown.ts`：基于 `gem-bind-marked` 的 Markdown、Mermaid 与 LaTeX 渲染配置
-- `src/path.ts`：列表与 session 页面共用的路径显示格式化
-- `src/theme.ts`：把 Tailwind `@theme` token 注入 Tap UI `extendTheme`，是应用主题桥
-- `src/tailwind.css`：Tailwind v4 入口、AgentDeck 色彩/字体 token 和全局基础样式
-- `rsbuild.config.ts`：Rsbuild + `unplugin-gem` 配置 Tap UI 与 `elements/*` 自定义元素自动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`
-- `postcss.config.js`：Rsbuild 的 Tailwind PostCSS 接入
-- `biome.json`：前端格式化与 lint 规则；`lint-staged` 通过 Husky pre-commit 只检查暂存文件
-- `patches/tailwindcss.patch`：让 Preflight 跳过 `:state(gem-element)`，避免重置 Gem 元素
-- `src-tauri/tauri.conf.json`：AgentDeck 产品名、应用标识和 bundle 图标配置
+# 运行约束
 
-运行链路：`src/main.ts` 先加载 `src/theme.ts`，挂载 `src/app.ts` 并启动 relay transport。`src/app.ts` 同步检查本地 Relay ID：缺少配置时显示 settings，存在配置时显示 list；点击 list 条目后，`src/session-list.ts` 把对应 `sessionId` 作为页面 property 传给 session 页面并压入 Stack。新建会话采用 Draft 模式：从目录选择器确认后建立本地 draft session 压入 Stack，用户首次发送任务时才调用远端 `createSession` 并无缝转换为正式会话。
-
-重置链路：list 与 session 均可打开 settings 执行“重置 App”。`hardResetApp` 在 sessionStorage 标记重置后重新加载整个文档；`startApp` 在新文档连接 Relay 前清除 Relay outbox/接收游标，再消费标记。配对设置和 deviceId 保留，旧页面的 RPC/权限/Stack 状态随重载结束；RPC 使用唯一请求 ID，避免旧回复匹配新调用。首次重新打开 session 仍采用 close → load，不依赖手机卸载页面时关闭会话。重置不删除远端历史，也不保证停止已提交的任务。
-
-样式链路：组件布局优先写 Tailwind utility；`src/tailwind.css` 的共享 token 同时供 Tailwind utility 和 `src/theme.ts` 中的 Tap UI theme 使用。不要再创建平行的应用级 CSS 变量。安全区变量由原生 edge-to-edge 插件在运行时提供，不属于视觉主题，继续在局部 CSS 中使用。
-
-远端接入链路：基于 `relay-client-ts` 在开发构建连接 `ws://127.0.0.1:39371/ws`，在生产构建连接 `wss://agent-deck.xianqiao.wang/ws`，App 固定使用 relay endpoint 2；browser4agent 的 `relay_client` 使用 endpoint 1。relay payload 由 `src/rpc.ts` 处理，并通过 `src/agent-api.ts` 调用 browser4agent 的 agent RPC。
-
-Android 标识必须保持一致：`src-tauri/tauri.conf.json` 的 identifier、`src-tauri/gen/android/app/build.gradle.kts` 的 namespace/applicationId，以及 `MainActivity.kt` 的 package 当前均为 `com.mantou.agentdeck`。Rust library 名为 `agentdeck_lib`。重命名这些标识后若 Android 编译仍引用旧包名，清理对应 target 的 `tauri` / `wry` 缓存和 Android `src/main/**/generated` 旧目录，让 Tauri 重新生成 Kotlin bridge。
-
-## 常用命令
-
-- `pnpm run dev`：启动 Rsbuild 预览
-- `pnpm run check`：TypeScript 严格类型检查
-- `pnpm test`：运行隔离的重置与会话恢复回归测试
-- `pnpm run lint`：使用 Biome 检查并修复整个项目
-- `pnpm run lint:check`：只检查 Biome 问题，不修改文件
-- `pnpm run build`：生成前端静态资源
-- `pnpm run tauri dev`：启动桌面端 Tauri 开发模式
-- `pnpm run tauri android dev`：在已连接的 Android 设备或模拟器上启动开发模式
-- `cargo check --manifest-path src-tauri/Cargo.toml`：检查 Tauri Rust 入口
-- `pnpm tauri icon public/agentdeck-icon.png`：从品牌原图重建各平台图标
-
-## 维护要求
-
-- 改入口、目录职责、运行链路、构建方式时，优先同步更新这里
-- 如果新增页面、模块或目录，先判断是否需要补到“目录职责”和“关键文件”
-- 这里不写细节实现，只写后续 Agent 需要的导航信息
+- 新会话先建本地 draft，首次发送才远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
+- App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `src/transport.ts`，相关源码在 `~/relay`、`~/browser-mcp`。
+- host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
+- 异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
+- Android identifier / namespace / applicationId / MainActivity package 保持 `com.mantou.agentdeck` 一致；对应 `src-tauri/tauri.conf.json`、`src-tauri/gen/android/app/build.gradle.kts` 和 `MainActivity.kt`。Rust library 为 `agentdeck_lib`。
 
 # 前端开发
 
-使用 [`@mantou/gem`](https://gemjs.org/) 框架，[`tap-ui`](https://tap-ui.gemjs.org/) UI 库，使用了自动导入插件，不需要再导入 `@mantou/gem` 成员和 `tap-ui` 元素。用 ECMAScript 最新的规范写，样式尽量使用 TailwindCSS（注意：ShadowDOM 元素内不能使用；Preflight 已启用，`patches/tailwindcss.patch` 用 `:not(:state(gem-element))` 把 gem 元素排除在重置之外）。
+使用 Gem、Tap UI 和最新 ECMAScript；优先参考现有组件。
 
-## Gem Element Development
-
-Files in `elements` folder are for Gem elements. One file contains one or more elements. Filename is the prefix-less element name. Gem elements extend GemElement or its derived classes.
+- `unplugin-gem` 自动导入 Gem 成员、Tap UI 和 `elements/*` 元素，无需手动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`。
+- 布局优先 Tailwind utility，Shadow DOM 内不能使用。Light DOM 样式用 `:scope`，Shadow DOM 用 `:host`；通过 `css` / `@adoptedStyle` 共享样式，避免模板内联样式。
+- 主题统一使用 `src/tailwind.css` token 和 `src/theme.ts`，不新增平行的应用级 CSS 变量。原生安全区变量继续局部使用。
+- 保留 `patches/tailwindcss.patch` 对 Gem 元素的 Preflight 排除；`icons.loading` SVG 自带动画，不加额外旋转。
+- 元素文件名为去前缀的标签名，继承 GemElement；使用 ES 装饰器，不使用已弃用的生命周期函数，也不额外声明自定义元素类型。
+- 用 `@property` / attribute 装饰器定义输入；不要在元素内部修改输入，attribute 不赋默认值。内部数据用 `createState`，CSS 状态用 `@state`；优先使用 `#` 私有字段。
+- `@memo` / `@effect` 用依赖数组控制执行，effect 返回清理函数；`@template` 定义模板，支持 `v-if`、ref 和属性展开。
+- 全局状态用 `createStore` / `@connectStore`；事件用 `@emitter`，跨 Shadow DOM 冒泡用 `@globalemitter`；part / slot 用静态装饰字段。
 
 ### Gem Syntax Example
 
@@ -223,6 +186,11 @@ class DuoyunTestElement extends GemElement {
 
 ```
 
-### Gem Best Practices
+# 常用命令
 
-- [other](packages/gem/docs/en/004-blog/001-create-standard-element.md)
+- `pnpm run dev`：开发预览；`pnpm run build`：前端构建。
+- `pnpm run check`：类型检查；`pnpm test`：回归测试。
+- `pnpm run lint:check`：只检查；`pnpm run lint`：检查并修复。Husky pre-commit 的 lint-staged 仅检查暂存文件。
+- `pnpm run tauri dev` / `pnpm run tauri android dev`：原生开发。
+- `cargo check --manifest-path src-tauri/Cargo.toml`：Rust 检查。
+- `pnpm tauri icon public/agentdeck-icon.png`：重建平台图标。

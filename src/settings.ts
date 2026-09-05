@@ -2,6 +2,7 @@ import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
 import { agentdeckStore, hardResetApp, saveSettings } from './store';
+import { connectionLabels } from './transport';
 
 export const openSettings = () => {
   Stack.push({
@@ -134,15 +135,16 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 class=${classMap({
                   'size-2.5 shrink-0 rounded-full bg-disabled': true,
                   'bg-positive ring-4 ring-positive/10': connection === 'connected',
-                  'animate-pulse bg-informative': connection === 'connecting' || connection === 'reconnecting',
+                  'animate-pulse bg-informative':
+                    connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching',
                   'bg-negative ring-4 ring-negative/10': connection === 'preempted',
                 })}
               ></span>
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-highlight">
-                  ${connection === 'connected' ? 'Relay 已连接' : '保存后自动连接'}
+                  ${connectionLabels[connection]}
                 </span>
-                <span v-if=${connectionError} class="mt-0.5 block truncate text-xs text-negative">
+                <span v-if=${connectionError} class="mt-0.5 block text-xs leading-relaxed text-negative">
                   ${connectionError}
                 </span>
               </span>

@@ -1,4 +1,6 @@
-type RpcId = string | number;
+export type RpcId = string | number;
+
+export type CallOptions = { timeoutMs: number; timeoutMessage: string };
 
 export type RpcMessage = {
   id?: RpcId;
@@ -13,30 +15,45 @@ type PendingCall = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   onEvent?: (event: unknown) => void;
+  timer?: ReturnType<typeof setTimeout>;
 };
 
 type Handler = (params: unknown) => unknown | Promise<unknown>;
 
 export class RpcPeer {
-  #send: (message: RpcMessage) => void;
+  #send: (message: RpcMessage) => void | Promise<void>;
+  #onTimeout?: (id: RpcId) => void | Promise<void>;
   #pending = new Map<RpcId, PendingCall>();
   #handlers = new Map<string, Handler>();
   #notifyHandlers = new Map<string, Handler>();
 
-  constructor(send: (message: RpcMessage) => void) {
+  constructor(send: (message: RpcMessage) => void | Promise<void>, onTimeout?: (id: RpcId) => void | Promise<void>) {
     this.#send = send;
+    this.#onTimeout = onTimeout;
   }
 
-  call = <T>(method: string, params: unknown = {}, onEvent?: (event: unknown) => void) => {
+  call = <T>(method: string, params: unknown = {}, onEvent?: (event: unknown) => void, options?: CallOptions) => {
     // Replies from before an App reload must never match a new call.
     const id = crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
-      this.#pending.set(id, { resolve: resolve as (value: unknown) => void, reject, onEvent });
+      const pending: PendingCall = { resolve: resolve as (value: unknown) => void, reject, onEvent };
+      this.#pending.set(id, pending);
+      if (options) {
+        pending.timer = setTimeout(() => {
+          if (!this.#takePending(id)) return;
+          reject(new Error(options.timeoutMessage));
+          void Promise.resolve()
+            .then(() => this.#onTimeout?.(id))
+            .catch(console.error);
+        }, options.timeoutMs);
+      }
+      const failed = (error: unknown) => {
+        this.#takePending(id)?.reject(error instanceof Error ? error : new Error(String(error)));
+      };
       try {
-        this.#send({ id, method, params });
+        void Promise.resolve(this.#send({ id, method, params })).catch(failed);
       } catch (error) {
-        this.#pending.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
+        failed(error);
       }
     });
   };
@@ -75,12 +92,12 @@ export class RpcPeer {
         try {
           pending.onEvent?.(message.event);
         } catch (error) {
-          this.#pending.delete(id);
+          this.#takePending(id);
           pending.reject(error instanceof Error ? error : new Error(String(error)));
         }
         return;
       }
-      this.#pending.delete(id);
+      this.#takePending(id);
       if (typeof message.error === 'string') pending.reject(new Error(message.error));
       else pending.resolve(message.result);
       return;
@@ -100,11 +117,19 @@ export class RpcPeer {
   };
 
   rejectAll = (error: Error) => {
-    for (const pending of this.#pending.values()) pending.reject(error);
-    this.#pending.clear();
+    for (const id of this.#pending.keys()) this.#takePending(id)?.reject(error);
+  };
+
+  #takePending = (id: RpcId) => {
+    const pending = this.#pending.get(id);
+    this.#pending.delete(id);
+    clearTimeout(pending?.timer);
+    return pending;
   };
 
   #post = (message: RpcMessage) => {
-    this.#send(message);
+    void Promise.resolve()
+      .then(() => this.#send(message))
+      .catch(console.error);
   };
 }

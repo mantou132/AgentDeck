@@ -3,6 +3,7 @@ import { icons } from '@mantou/tap-ui/lib/icons';
 
 import { openSettings } from './settings';
 import { agentApi, agentdeckStore, createDraftSession, refreshSessions } from './store';
+import { connectionLabels } from './transport';
 
 const openSession = (sessionId: string) => {
   Stack.push({
@@ -30,14 +31,6 @@ const style = css`
     max-width: 620px;
   }
 `;
-
-const stateLabel = {
-  connecting: '正在连接 Relay',
-  connected: 'Relay 已连接',
-  reconnecting: '正在重新连接',
-  disconnected: '尚未连接',
-  preempted: '已被新会话取代',
-} as const;
 
 @customElement('agentdeck-session-list-page')
 @adoptedStyle(style)
@@ -97,10 +90,11 @@ export class AgentDeckSessionListPageElement extends GemElement {
                     'size-[7px] rounded-full bg-disabled': true,
                     'bg-positive ring-4 ring-positive/10': connection === 'connected',
                     'bg-negative ring-4 ring-negative/10': connection === 'preempted',
-                    'animate-pulse bg-informative': connection === 'connecting' || connection === 'reconnecting',
+                    'animate-pulse bg-informative':
+                      connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching',
                   })}
                 ></span>
-                <span>${stateLabel[connection]} · ${selectedAgent?.name || settings.agent}</span>
+                <span>${connectionLabels[connection]} · ${selectedAgent?.name || settings.agent}</span>
               </div>
             </div>
           </div>
@@ -114,6 +108,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
             class="mb-4 rounded-[15px] border border-negative/30 bg-negative/[0.07] px-3.5 py-3 text-xs leading-relaxed text-negative"
           >
             ${sessionsError || connectionError}
+            <button
+              class="mt-2 block cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-3 py-1.5 font-semibold text-negative"
+              @click=${() => refreshSessions()}
+            >
+              ${connection === 'connected' ? '重新加载' : '重新连接'}
+            </button>
           </div>
 
           <div v-if=${showSkeleton} class="flex flex-col gap-5" aria-label="正在加载会话">
@@ -158,29 +158,23 @@ export class AgentDeckSessionListPageElement extends GemElement {
               <tap-use class="size-6 text-describe" .element=${sessionsError ? icons.error : icons.menu}></tap-use>
             </div>
             <h2 class="mt-4 mb-1.5 font-display text-lg text-highlight">
-              ${sessionsError ? '会话读取失败' : '这个 Agent 还没有会话'}
+              ${hasError ? '暂时无法读取会话' : '这个 Agent 还没有会话'}
             </h2>
             <p class="m-0 max-w-[320px] text-sm leading-relaxed text-describe">
               ${
-                sessionsError
+                hasError
                   ? '检查远端 Agent 是否在线，然后重新加载。'
                   : '会话由远端 ACP Agent 管理，出现后会按工作目录归到这里。'
               }
             </p>
-            <button
-              v-if=${sessionsError}
-              class="mt-4 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 py-2.5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
-              @click=${() => refreshSessions()}
-            >
-              重新加载
-            </button>
           </section>
         </main>
 
         <footer slot="footer" class="menu-footer bg-bg/90 px-4 pt-2.5 backdrop-blur-xl backdrop-saturate-125 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]">
           <div class="flex items-center justify-between gap-3">
             <button
-              class="flex h-12 min-w-0 px-4 cursor-pointer items-center justify-center gap-2 rounded-[15px] border-0 bg-primary text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985]"
+              class="flex h-12 min-w-0 px-4 cursor-pointer items-center justify-center gap-2 rounded-[15px] border-0 bg-primary text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985] disabled:cursor-default disabled:opacity-45"
+              ?disabled=${connection !== 'connected'}
               @click=${this.#openNewSession}
             >
               <tap-use class="size-[18px]" .element=${icons.add}></tap-use>
