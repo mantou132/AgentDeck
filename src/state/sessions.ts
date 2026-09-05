@@ -254,6 +254,7 @@ const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: num
         );
       },
       onDone: () => {
+        resolvePermission(session.sessionId, null);
         setMessages(session.sessionId, finishStreaming(agentdeckStore.messagesBySession[session.sessionId] ?? []));
         setSessionFlag('pendingSessionIds', session.sessionId, false);
       },

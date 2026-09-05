@@ -19,23 +19,20 @@ export class DeckPermissionRequestElement extends GemElement {
     if (!this.request) return html``;
     const { toolCall = {}, options = [] } = this.request;
     return html`
-      <section class="mb-5 overflow-hidden rounded-[15px] border border-notice/35 bg-bg-light shadow-card">
-        <header class="px-3.5 py-3">
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <h2 class="m-0 text-base font-semibold text-highlight">需要你的许可</h2>
-            <span v-if=${toolCall.kind} class="truncate font-mono text-xs text-describe">${toolCall.kind}</span>
-          </div>
-          <p class="mt-1 mb-0 truncate font-mono text-xs text-describe">${toolCall.title || '工具调用'}</p>
+      <section class="max-h-[45dvh] overflow-y-auto rounded-2xl border border-notice/35 bg-bg-light overscroll-y-contain">
+        <header class="px-4 pt-3.5 pb-3">
+          <h2 class="m-0 text-base font-semibold text-highlight">需要你的许可</h2>
+          <p class="mt-2 mb-0 break-words font-mono text-sm leading-relaxed text-text">${toolCall.title || '工具调用'}</p>
         </header>
         <details v-if=${toolCall.rawInput !== undefined} class="border-t border-border text-sm">
-          <summary class="cursor-pointer px-3.5 py-2 text-describe">查看输入</summary>
+          <summary class="cursor-pointer px-4 py-3 text-describe">查看输入参数</summary>
           <pre
-            class="m-0 max-h-44 overflow-auto border-t border-border bg-bg px-3 py-2.5 font-mono text-xs leading-relaxed text-text"
+            class="m-0 max-h-44 overflow-auto whitespace-pre-wrap break-words border-t border-border bg-bg px-4 py-3 font-mono text-sm leading-relaxed text-text"
           >${JSON.stringify(toolCall.rawInput, null, 2)}</pre>
         </details>
-        <footer class="flex flex-wrap justify-end gap-2 border-t border-border px-3 py-2.5">
+        <footer class="flex flex-wrap justify-end gap-2 border-t border-border px-3 py-3">
           <button
-            class="cursor-pointer rounded-[10px] border border-border bg-bg px-3.5 py-2 text-sm font-semibold text-describe active:bg-bg-hover"
+            class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-4 py-2 text-sm font-medium text-describe active:bg-bg-hover"
             @click=${() => this.resolve(null)}
           >
             取消
@@ -45,8 +42,8 @@ export class DeckPermissionRequestElement extends GemElement {
             return html`
               <button
                 class=${classMap({
-                  'cursor-pointer rounded-[10px] border px-3.5 py-2 text-sm font-semibold active:scale-[0.98]': true,
-                  'border-border bg-bg text-describe': reject,
+                  'min-h-11 cursor-pointer rounded-xl border px-4 py-2 text-sm font-medium active:scale-[0.98]': true,
+                  'border-border bg-bg-light text-describe': reject,
                   'border-primary bg-primary text-white': !reject,
                 })}
                 @click=${() => this.resolve(option.optionId)}

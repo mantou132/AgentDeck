@@ -1,6 +1,5 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
-import { connectionLabels } from '../agent/transport';
 import { hardResetApp, saveSettings } from '../state/app';
 import { agentdeckStore } from '../state/store';
 
@@ -48,7 +47,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { agents, connection, connectionError } = agentdeckStore;
+    const { agents } = agentdeckStore;
     return html`
       <tap-page class="bg-bg text-text">
         <header
@@ -64,7 +63,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
             <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
           </button>
           <div class="text-center">
-            <h1 class="m-0 font-display text-base font-[720] text-highlight">设置</h1>
+            <h1 class="m-0 font-display text-base font-semibold text-highlight">设置</h1>
             <p class="mt-0.5 mb-0 text-xs text-describe">Relay 与远端 Agent</p>
           </div>
           <span></span>
@@ -72,23 +71,18 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
         <main class="settings-scroll no-scrollbar h-full overflow-auto px-4 pt-6">
           <div class="mx-auto w-full max-w-[560px]">
-            <section class="mb-5 rounded-[22px] border border-border bg-bg-light p-5 shadow-card">
-              <div class="mb-5 flex items-start gap-3.5">
-                <div class="grid size-11 shrink-0 place-items-center rounded-[14px] bg-primary-soft text-primary-strong">
-                  <tap-use class="size-5" .element=${icons.outward}></tap-use>
-                </div>
-                <div>
-                  <h2 class="m-0 font-display text-base font-[720] text-highlight">连接远端</h2>
-                  <p class="mt-1 mb-0 text-sm leading-relaxed text-describe">
-                    Relay ID 是这台 App 与 browser4agent 的配对凭据。保存后会自动建立 WebSocket 连接。
-                  </p>
-                </div>
+            <section class="mb-5 rounded-2xl border border-border bg-bg-light p-5">
+              <div class="mb-4">
+                <h2 class="m-0 font-display text-base font-semibold text-highlight">连接远端</h2>
+                <p class="mt-1.5 mb-0 text-sm leading-relaxed text-describe">
+                  填入 browser4agent 的 Relay ID，保存后自动连接。
+                </p>
               </div>
 
               <label class="block">
-                <span class="mb-2 block text-xs font-bold tracking-[0.06em] text-describe uppercase">Relay ID</span>
+                <span class="mb-2 block text-sm font-medium text-text">Relay ID</span>
                 <input
-                  class="box-border h-12 w-full rounded-[14px] border border-border bg-bg px-3.5 font-mono text-sm text-highlight outline-0 placeholder:text-disabled focus:border-primary"
+                  class="box-border h-12 w-full rounded-xl border border-border bg-bg px-3.5 font-mono text-base text-highlight outline-none placeholder:text-disabled"
                   autocomplete="off"
                   autocapitalize="none"
                   spellcheck="false"
@@ -100,47 +94,30 @@ export class AgentDeckSettingsPageElement extends GemElement {
               </label>
             </section>
 
-            <section class="mb-5 rounded-[22px] border border-border bg-bg-light p-5 shadow-card">
+            <section class="mb-5 rounded-2xl border border-border bg-bg-light p-5">
               <div class="mb-4">
-                <h2 class="m-0 font-display text-base font-[720] text-highlight">远端 Agent</h2>
-                <p class="mt-1 mb-0 text-sm leading-relaxed text-describe">
-                  会话列表与新消息都交给这个 ACP Agent。Mode、model 和其他 option 暂时沿用 ACP 默认值。
+                <h2 class="m-0 font-display text-base font-semibold text-highlight">远端 Agent</h2>
+                <p class="mt-1.5 mb-0 text-sm leading-relaxed text-describe">
+                  用于加载会话和执行任务。模式可在会话输入区切换。
                 </p>
               </div>
               <label class="block">
-                <span class="mb-2 block text-xs font-bold tracking-[0.06em] text-describe uppercase">Agent</span>
-                <select
-                  class="box-border h-12 w-full appearance-none rounded-[14px] border border-border bg-bg px-3.5 text-sm font-semibold text-highlight outline-0 focus:border-primary"
-                  .value=${this.#state.agent}
-                  @change=${(event: Event) =>
-                    this.#state({ agent: (event.target as HTMLSelectElement).value, error: '' })}
-                >
-                  ${agents.map(
-                    (agent) =>
-                      html`<option value=${agent.id} ?selected=${agent.id === this.#state.agent}>${agent.name}</option>`,
-                  )}
-                </select>
+                <span class="mb-2 block text-sm font-medium text-text">Agent</span>
+                <span class="relative block">
+                  <select
+                    class="box-border h-12 w-full appearance-none rounded-xl border border-border bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
+                    .value=${this.#state.agent}
+                    @change=${(event: Event) =>
+                      this.#state({ agent: (event.target as HTMLSelectElement).value, error: '' })}
+                  >
+                    ${agents.map(
+                      (agent) =>
+                        html`<option value=${agent.id} ?selected=${agent.id === this.#state.agent}>${agent.name}</option>`,
+                    )}
+                  </select>
+                  <tap-use class="pointer-events-none absolute top-4 right-3.5 size-4 text-describe" .element=${icons.expand}></tap-use>
+                </span>
               </label>
-            </section>
-
-            <section class="mb-5 flex items-center gap-3 rounded-[17px] border border-border bg-bg-light/70 px-4 py-3.5">
-              <span
-                class=${classMap({
-                  'size-2.5 shrink-0 rounded-full bg-disabled': true,
-                  'bg-positive ring-4 ring-positive/10': connection === 'connected',
-                  'animate-pulse bg-informative':
-                    connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching',
-                  'bg-negative ring-4 ring-negative/10': connection === 'preempted',
-                })}
-              ></span>
-              <span class="min-w-0">
-                <span class="block text-sm font-semibold text-highlight">
-                  ${connectionLabels[connection]}
-                </span>
-                <span v-if=${connectionError} class="mt-0.5 block text-xs leading-relaxed text-negative">
-                  ${connectionError}
-                </span>
-              </span>
             </section>
 
             <div
@@ -150,20 +127,19 @@ export class AgentDeckSettingsPageElement extends GemElement {
               ${this.#state.error}
             </div>
             <button
-              class="h-12 w-full cursor-pointer rounded-[15px] border-0 bg-primary text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985]"
+              class="h-12 w-full cursor-pointer rounded-xl border-0 bg-primary text-sm font-semibold text-white transition-transform active:scale-[0.985]"
               @click=${this.#save}
             >
               保存并连接
             </button>
             <button
               v-if=${!!agentdeckStore.settings.relayId}
-              class="mt-3 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[15px] border border-border bg-bg-light text-sm font-semibold text-describe transition-[transform,background-color,color] duration-150 active:scale-[0.985] active:bg-bg-hover hover:text-negative"
+              class="mt-3 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-bg-light text-sm font-semibold text-describe transition-colors active:bg-bg-hover"
               @click=${this.#reset}
             >
-              <tap-use class="size-[17px]" .element=${icons.delete}></tap-use>
               重置 App
             </button>
-            <p v-if=${!!agentdeckStore.settings.relayId} class="mt-2 mb-0 text-xs leading-relaxed text-describe">
+            <p v-if=${!!agentdeckStore.settings.relayId} class="mt-2 mb-0 text-sm leading-relaxed text-describe">
               重新加载 App，清空本地会话缓存和未发送内容。保留配对设置与远端历史，远端任务可能仍在运行。
             </p>
           </div>

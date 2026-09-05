@@ -16,10 +16,6 @@ const style = css`
   .menu-scroll {
     padding-bottom: calc(28px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
-
-  tap-sheet::part(sheet) {
-    max-width: 620px;
-  }
 `;
 
 @customElement('agentdeck-session-list-page')
@@ -71,7 +67,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
           <div class="flex min-w-0 items-center gap-3">
             <img class="size-11 shrink-0 rounded-[13px] shadow-card" src="/agentdeck-icon.png" alt="" />
             <div class="min-w-0">
-              <h1 class="m-0 font-display text-xl font-[720] leading-none tracking-[-0.025em] text-highlight">
+              <h1 class="m-0 font-display text-xl font-bold leading-none tracking-[-0.025em] text-highlight">
                 AgentDeck
               </h1>
               <div class="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-describe">
@@ -95,7 +91,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
         >
           <div
             v-if=${hasError}
-            class="mb-4 rounded-[15px] border border-negative/30 bg-negative/[0.07] px-3.5 py-3 text-xs leading-relaxed text-negative"
+            class="mb-4 rounded-[15px] border border-negative/30 bg-negative/[0.07] px-3.5 py-3 text-sm leading-relaxed text-negative"
           >
             ${sessionsError || connectionError}
             <button
@@ -147,7 +143,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
             <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
               <tap-use class="size-6 text-describe" .element=${sessionsError ? icons.error : icons.menu}></tap-use>
             </div>
-            <h2 class="mt-4 mb-1.5 font-display text-lg text-highlight">
+            <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">
               ${hasError ? '暂时无法读取会话' : '这个 Agent 还没有会话'}
             </h2>
             <p class="m-0 max-w-[320px] text-sm leading-relaxed text-describe">
@@ -180,16 +176,22 @@ export class AgentDeckSessionListPageElement extends GemElement {
           </div>
         </footer>
       </tap-page>
-      <tap-sheet ?open=${sheetOpen} gesture mask-closable @close=${this.#closeNewSession}>
-        <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">新建会话</h2>
-        <deck-cwd-picker
-          v-if=${sheetOpen}
-          class="block"
-          .complete=${(input: string) => agentApi.completeCwd(input)}
-          .error=${newSessionError}
-          @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
-        ></deck-cwd-picker>
-      </tap-sheet>
+      <tap-reflect .target=${document.body}>
+        <deck-sheet
+          ?open=${sheetOpen}
+          .heading=${'新建会话'}
+          .description=${'选择这个会话的工作目录'}
+          @close=${this.#closeNewSession}
+          .content=${html`
+            <deck-cwd-picker
+              v-if=${sheetOpen}
+              .complete=${(input: string) => agentApi.completeCwd(input)}
+              .error=${newSessionError}
+              @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
+            ></deck-cwd-picker>
+          `}
+        ></deck-sheet>
+      </tap-reflect>
     `;
   };
 }

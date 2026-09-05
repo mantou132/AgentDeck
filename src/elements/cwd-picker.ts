@@ -67,19 +67,6 @@ const sortDirectories = (dirs: string[]) => {
   });
 };
 
-const getFolderName = (currentPath: string, homePath: string) => {
-  const normCurrent = currentPath.replace(/[\\/]+$/, '') || '/';
-  const normHome = homePath.replace(/[\\/]+$/, '') || '/';
-  if (normCurrent === normHome) return '~';
-  if (normCurrent === '/') return '/';
-  return (
-    normCurrent
-      .split(/[\\/]+/)
-      .filter(Boolean)
-      .pop() || normCurrent
-  );
-};
-
 const style = css`
   :scope {
     display: block;
@@ -148,13 +135,10 @@ export class DeckCwdPickerElement extends GemElement {
     const { homePath, currentPath, directories, loading, navigatingPath, browseError } = this.#state;
     const crumbs = getBreadcrumbs(currentPath, homePath);
     const parentPath = getParentPath(currentPath);
-    const currentName = getFolderName(currentPath, homePath);
 
     return html`
       <div class="w-full">
-        <!-- Breadcrumbs bar -->
-        <div class="mb-3 flex items-center gap-1.5 overflow-x-auto rounded-[12px] border border-border/70 bg-bg px-3 py-2 no-scrollbar">
-          <span class="text-xs font-bold tracking-wider text-describe uppercase shrink-0">位置:</span>
+        <div class="mb-4 flex min-h-11 items-center gap-1 overflow-x-auto rounded-xl bg-bg px-2 py-1.5 no-scrollbar">
           ${crumbs.map((crumb, index) => {
             const isLast = index === crumbs.length - 1;
             const isNavigatingThis = navigatingPath === crumb.path;
@@ -163,8 +147,8 @@ export class DeckCwdPickerElement extends GemElement {
               <button
                 type="button"
                 class=${classMap({
-                  'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm transition-colors border-0 inline-flex items-center gap-1': true,
-                  'bg-primary-soft font-bold text-primary-strong': isLast,
+                  'inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border-0 px-2 py-1 font-mono text-sm outline-none transition-colors': true,
+                  'bg-transparent font-medium text-highlight': isLast,
                   'cursor-pointer bg-transparent text-describe hover:text-highlight active:bg-bg-hover': !isLast,
                 })}
                 ?disabled=${this.creating || Boolean(navigatingPath) || isLast}
@@ -177,7 +161,6 @@ export class DeckCwdPickerElement extends GemElement {
           })}
         </div>
 
-        <!-- Browse error notification -->
         <div
           v-if=${browseError}
           class="mb-3 flex items-center gap-2 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
@@ -193,23 +176,21 @@ export class DeckCwdPickerElement extends GemElement {
           </button>
         </div>
 
-        <!-- Directory list -->
-        <div class="max-h-[42vh] min-h-[160px] overflow-y-auto rounded-[16px] border border-border bg-bg-light/60">
+        <div class="max-h-[42dvh] min-h-40 overflow-y-auto overscroll-y-contain">
           <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
             <tap-use class="size-4" .element=${icons.loading}></tap-use>
             正在读取目录…
           </div>
 
           <div v-else class="divide-y divide-border/60">
-            <!-- Parent directory row -->
             <button
               v-if=${parentPath !== null}
               type="button"
-              class="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-4 py-2.5 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+              class="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-1 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
               ?disabled=${this.creating || Boolean(navigatingPath)}
               @click=${() => parentPath && this.#navigateTo(parentPath)}
             >
-              <span class="grid size-7 shrink-0 place-items-center rounded-[8px] border border-border/60 bg-bg text-describe">
+              <span class="grid size-6 shrink-0 place-items-center text-describe">
                 <tap-use
                   class=${classMap({
                     'size-3.5': true,
@@ -218,10 +199,9 @@ export class DeckCwdPickerElement extends GemElement {
                   .element=${navigatingPath === parentPath ? icons.loading : icons.back}
                 ></tap-use>
               </span>
-              <span class="font-mono text-sm font-semibold text-describe">.. (返回上一级)</span>
+              <span class="text-sm text-describe">上一级目录</span>
             </button>
 
-            <!-- Subdirectories list -->
             ${directories.map((directory) => {
               const name =
                 directory
@@ -233,7 +213,7 @@ export class DeckCwdPickerElement extends GemElement {
               return html`
                 <button
                   type="button"
-                  class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-4 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                  class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-1 py-3.5 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
                   title=${directory}
                   ?disabled=${this.creating || Boolean(navigatingPath)}
                   @click=${() => this.#navigateTo(directory)}
@@ -241,12 +221,12 @@ export class DeckCwdPickerElement extends GemElement {
                   <div class="flex min-w-0 items-center gap-3">
                     <span
                       class=${classMap({
-                        'grid size-7 shrink-0 place-items-center rounded-[8px]': true,
-                        'bg-primary-soft text-primary-strong': !isHidden,
-                        'border border-border/50 bg-bg text-disabled': isHidden,
+                        'grid size-6 shrink-0 place-items-center': true,
+                        'text-describe': !isHidden,
+                        'text-disabled': isHidden,
                       })}
                     >
-                      <svg class="size-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <svg class="size-[18px]" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-1.5V9a3 3 0 0 0-3-3h-4.5a3 3 0 0 0-2.12.88L6.88 8.38A3 3 0 0 0 4.76 9.25H4.5A3 3 0 0 0 1.5 12.25V18a3 3 0 0 0 3 3h15Z" opacity="0.4"/>
                         <path d="M4.5 9.25h10.5a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H4.5A3 3 0 0 1 1.5 18v-5.75a3 3 0 0 1 3-3Z"/>
                       </svg>
@@ -273,14 +253,12 @@ export class DeckCwdPickerElement extends GemElement {
               `;
             })}
 
-            <!-- Empty directory notice -->
             <div v-if=${!directories.length && !browseError} class="px-4 py-8 text-center text-sm text-describe">
-              此目录下没有子目录，可直接点击下方按钮以此为工作区
+              没有子目录，可以直接在此新建会话。
             </div>
           </div>
         </div>
 
-        <!-- Action error message -->
         <div
           v-if=${this.error}
           class="mt-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
@@ -288,15 +266,14 @@ export class DeckCwdPickerElement extends GemElement {
           ${this.error}
         </div>
 
-        <!-- Confirm button -->
         <button
           type="button"
-          class="mt-3 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[15px] border-0 bg-primary px-4 text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:shadow-none disabled:active:scale-100"
+          class="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-0 bg-primary px-4 text-sm font-semibold text-white transition-transform active:scale-[0.985] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:shadow-none disabled:active:scale-100"
           ?disabled=${this.creating || Boolean(navigatingPath) || !currentPath}
           @click=${this.#confirm}
         >
           <tap-use v-if=${this.creating} class="size-4" .element=${icons.loading}></tap-use>
-          <span>${this.creating ? '正在创建会话…' : `在「${currentName}」新建会话`}</span>
+          <span>${this.creating ? '正在创建会话…' : '在此新建会话'}</span>
         </button>
       </div>
     `;

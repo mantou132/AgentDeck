@@ -1,7 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
-import { groupTimelineMessages, type ProcessGroup } from '../session/timeline';
+import { getProcessSummary, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 
 const style = css`
@@ -33,27 +33,6 @@ export class DeckSessionTimelineElement extends GemElement {
     >${text}</gem-bind-marked>
   `;
 
-  #getGroupSummaryText = (group: ProcessGroup): string => {
-    const toolCount = group.items.filter((item) => item.type === 'tool').length;
-    const thoughtCount = group.items.filter((item) => item.type === 'thought').length;
-
-    if (group.pending) {
-      const last = group.items.at(-1);
-      if (last && last.type === 'tool') {
-        return `正在调用 ${last.data.title || '工具'}…`;
-      }
-      return '正在思考…';
-    }
-
-    if (toolCount === 0) {
-      return '思考过程';
-    }
-    if (thoughtCount === 0) {
-      return `工具调用 (${toolCount})`;
-    }
-    return `思考与工具 (${group.items.length})`;
-  };
-
   #openProcessSheet = (group: ProcessGroup) => {
     this.#lastGroup = group;
     this.#state({ selectedGroupId: group.id });
@@ -64,18 +43,18 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderProcessGroup = (group: ProcessGroup) => {
+    const summary = getProcessSummary(group);
     return html`
-      <div class="mb-3.5 flex items-center">
+      <div class="mb-3 flex min-w-0 items-center">
         <button
           type="button"
-          class=${classMap({
-            'group inline-flex max-w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs font-medium text-describe transition-colors hover:text-text active:opacity-75': true,
-            'animate-pulse': group.pending,
-          })}
+          class="inline-flex min-h-11 max-w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border-0 bg-transparent py-2 pr-2 text-left text-sm text-describe outline-none transition-colors active:bg-bg-hover"
+          title=${summary}
           @click=${() => this.#openProcessSheet(group)}
         >
-          <tap-use class="size-3.5 shrink-0 text-describe transition-colors group-hover:text-text" .element=${icons.schedule}></tap-use>
-          <span class="truncate">${this.#getGroupSummaryText(group)}</span>
+          <tap-use class="size-4 shrink-0" .element=${group.pending ? icons.loading : icons.schedule}></tap-use>
+          <span class="min-w-0 truncate">${summary}</span>
+          <tap-use class="size-3.5 shrink-0 text-disabled" .element=${icons.right}></tap-use>
         </button>
       </div>
     `;
@@ -99,7 +78,7 @@ export class DeckSessionTimelineElement extends GemElement {
             <button
               v-if=${message.failed}
               type="button"
-              class="mt-1.5 ml-auto block cursor-pointer border-0 bg-transparent py-1 text-xs font-medium text-primary-strong disabled:cursor-default disabled:text-disabled"
+              class="mt-1.5 ml-auto block cursor-pointer border-0 bg-transparent py-1 text-sm font-medium text-primary-strong disabled:cursor-default disabled:text-disabled"
               ?disabled=${!this.canRestoreInput}
               title=${this.canRestoreInput ? '将这条消息和附件恢复到输入框' : '请先清空当前输入'}
               @click=${() => this.restore(message)}
@@ -141,20 +120,17 @@ export class DeckSessionTimelineElement extends GemElement {
     return html`
       ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
       <tap-reflect .target=${document.body}>
-        <tap-sheet
-          class="[&::part(sheet)]:max-w-[620px]"
+        <deck-sheet
           ?open=${Boolean(this.#state.selectedGroupId)}
-          header="过程摘要"
-          gesture
-          mask-closable
+          .heading=${'过程摘要'}
           @close=${this.#closeProcessSheet}
-        >
-          <h2 slot="header" class="m-0 font-display text-base font-[720] text-highlight">过程摘要</h2>
-          <deck-process-detail
-            v-if=${Boolean(this.#state.selectedGroupId)}
-            .group=${currentGroup}
-          ></deck-process-detail>
-        </tap-sheet>
+          .content=${html`
+            <deck-process-detail
+              v-if=${Boolean(this.#state.selectedGroupId)}
+              .group=${currentGroup}
+            ></deck-process-detail>
+          `}
+        ></deck-sheet>
       </tap-reflect>
     `;
   };

@@ -135,6 +135,7 @@ export function documentFixture(previous) {
       'session/modes',
       'state/app',
       'session/events',
+      'session/timeline',
       'agent/transport',
     ].map((name) => load(path.join(root, `src/${name}.ts`))),
   );

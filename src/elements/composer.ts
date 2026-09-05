@@ -15,6 +15,13 @@ type InputSelection = { input: string; start: number; end: number };
 const style = css`
   :scope { display: block; }
   .composer-shell { padding-bottom: calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
+  .composer-surface { border-radius: 26px; }
+  @supports (corner-shape: squircle) {
+    .composer-surface {
+      border-radius: 32px;
+      corner-shape: squircle;
+    }
+  }
 `;
 
 @customElement('deck-composer')
@@ -242,7 +249,7 @@ export class DeckComposerElement extends GemElement {
         : this.#state.attachmentError;
     return html`
           <div class="composer-shell bg-bg/90 px-2.5 pt-2 backdrop-blur-xl backdrop-saturate-125">
-            <div class="mx-auto max-w-[760px] overflow-hidden rounded-[20px] border border-primary/15 bg-bg-light shadow-card">
+            <div class="composer-surface mx-auto max-w-[760px] overflow-hidden border border-primary/15 bg-bg-light shadow-card">
               <div v-if=${this.#state.attachments.length} class="flex max-h-40 flex-wrap gap-3 overflow-y-auto px-3.5 pt-3.5 pb-1.5">
                 ${this.#state.attachments.map(
                   (attachment) => html`
@@ -256,7 +263,7 @@ export class DeckComposerElement extends GemElement {
                   `,
                 )}
               </div>
-              <div v-if=${attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-xs text-negative">
+              <div v-if=${attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-sm leading-relaxed text-negative">
                 <span class="min-w-0 flex-1 whitespace-pre-line">${attachmentError}</span>
                 <button
                   type="button"
@@ -281,12 +288,12 @@ export class DeckComposerElement extends GemElement {
                 @keydown=${this.#onKeydown}
                 ?disabled=${this.disabled || this.#state.submitting}
               ></textarea>
-              <div class="flex min-h-[43px] items-center justify-between gap-2.5 pt-1 pr-1.5 pb-1.5 pl-3">
-                <div class="flex min-w-0 items-center gap-2 text-xs font-semibold text-describe">
+              <div class="flex min-h-11 items-center justify-between gap-2.5 px-2 pt-1 pb-2">
+                <div class="flex min-w-0 items-center gap-2 text-sm font-medium text-describe">
                   <input ${this.#fileInputRef} type="file" multiple hidden aria-label="附件文件" @change=${this.#readFiles} />
                   <button
                     type="button"
-                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl border-0 bg-transparent text-describe active:bg-bg-hover disabled:cursor-default disabled:opacity-45"
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-describe active:bg-bg-hover disabled:cursor-default disabled:opacity-45"
                     aria-label="添加附件"
                     title="添加图片或文本文件，最多 10 个附件"
                     ?disabled=${this.#state.readingAttachments || this.#state.submitting || this.#state.attachments.length >= MAX_ATTACHMENTS}
@@ -299,7 +306,7 @@ export class DeckComposerElement extends GemElement {
                   </span>
                   <div v-if=${this.mode} class="relative flex min-w-0 items-center gap-1">
                     <select
-                      class="min-h-9 max-w-32 min-w-0 cursor-pointer truncate rounded-lg border-0 bg-transparent pr-4 pl-1 text-xs font-semibold text-describe outline-none focus:outline-none disabled:cursor-default disabled:opacity-50"
+                      class="min-h-9 max-w-32 min-w-0 cursor-pointer truncate rounded-lg border-0 bg-transparent pr-4 pl-1 text-sm font-medium text-describe outline-none focus:outline-none disabled:cursor-default disabled:opacity-50"
                       aria-label="会话模式"
                       title=${this.pending ? '任务结束后可切换模式' : this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || '会话模式'}
                       ?disabled=${!this.ready || this.#state.submitting}
@@ -318,7 +325,7 @@ export class DeckComposerElement extends GemElement {
                 </div>
                 <button
                   v-if=${this.pending}
-                  class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-[13px] border-0 bg-primary text-white transition-transform duration-150 active:scale-[0.92]"
+                  class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-transform duration-150 active:scale-[0.92]"
                   aria-label="停止生成"
                   @click=${() => this.cancel()}
                 >
@@ -326,7 +333,7 @@ export class DeckComposerElement extends GemElement {
                 </button>
                 <button
                   v-else
-                  class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-[13px] border-0 bg-primary text-white transition-[transform,background-color] duration-150 active:scale-[0.92] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:active:scale-100"
+                  class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-[transform,background-color] duration-150 active:scale-[0.92] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:active:scale-100"
                   ?disabled=${!canSend}
                   aria-label="发送"
                   @click=${this.#send}

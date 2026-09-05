@@ -133,10 +133,7 @@ markdownStyle.replaceSync(`
     line-height: 1.55;
   }
   pre code { background: none; padding: 0; }
-  pre:focus-visible, .table-scroll:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
-  }
+  pre, .table-scroll { outline: none; }
   .table-scroll {
     max-width: 100%;
     margin: .7rem 0;

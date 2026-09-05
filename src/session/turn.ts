@@ -70,5 +70,8 @@ export const performTurn = async (
 };
 
 export const cancelTurnPrompt = async (session: DeckSession) => {
-  await agentApi.cancelPrompt(session.sessionId, session.agent);
+  const result = await agentApi.cancelPrompt(session.sessionId, session.agent);
+  if (result.cancelled === false) {
+    throw new Error('远端已无法停止这个任务，请在设置中重置 App 后重新加载会话。');
+  }
 };

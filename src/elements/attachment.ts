@@ -44,11 +44,11 @@ export class DeckAttachmentElement extends GemElement {
           />
           <span
             v-else
-            class="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-[10px] font-bold text-primary-strong"
+            class="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-xs font-bold text-primary-strong"
           >TXT</span>
           <span class=${this.compact || attachment.kind === 'text' ? 'min-w-0 flex-1' : 'block px-1.5 py-1'}>
-            <span class="block truncate text-xs font-medium">${attachment.name}</span>
-            <span v-if=${this.compact || attachment.kind === 'text'} class="block text-[10px] text-describe">
+            <span class="block truncate text-sm font-medium">${attachment.name}</span>
+            <span v-if=${this.compact || attachment.kind === 'text'} class="block text-xs text-describe">
               ${attachment.kind === 'image' ? '图片' : '文本'}
             </span>
           </span>

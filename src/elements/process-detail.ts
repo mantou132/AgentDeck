@@ -1,17 +1,11 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
 
 import { markdownExtensions, markdownStyle } from '../lib/markdown';
-import type { ProcessGroup } from '../session/timeline';
-import { toolStatusDotClass, toolStatusLabel } from './tool-call';
+import { getToolCommand, getToolStatus, type ProcessGroup, toolStatusLabels } from '../session/timeline';
 
 const style = css`
-  :scope {
-    display: block;
-  }
-
-  summary::-webkit-details-marker {
-    display: none;
-  }
+  :scope { display: block; }
+  summary::-webkit-details-marker { display: none; }
 `;
 
 @customElement('deck-process-detail')
@@ -23,105 +17,84 @@ export class DeckProcessDetailElement extends GemElement {
   #render = () => {
     const { group } = this;
     if (!group?.items.length) {
-      return html`
-        <div class="py-8 text-center text-xs text-describe">暂无过程记录</div>
-      `;
+      return html`<div class="py-10 text-center text-sm text-describe">暂无过程记录</div>`;
     }
 
     return html`
-      <div class="px-1 pt-1 pb-6">
-        <div class="flex flex-col">
-          ${group.items.map((item, index) => {
-            const isLast = index === group.items.length - 1;
-            const isThought = item.type === 'thought';
-            const isPending =
-              (isThought && item.pending) ||
-              (!isThought && (item.data.status === 'pending' || item.data.status === 'in_progress'));
-
-            let icon = icons.tune;
-            if (isThought) {
-              icon = icons.schedule;
-            } else {
-              const kind = item.data.kind?.toLowerCase() || '';
-              const title = item.data.title?.toLowerCase() || '';
-              if (
-                kind.includes('search') ||
-                title.includes('search') ||
-                title.includes('find') ||
-                title.includes('grep')
-              ) {
-                icon = icons.search;
-              } else if (kind.includes('read') || title.includes('read')) {
-                icon = icons.visibility;
-              }
-            }
-
-            const title = isThought ? (item.pending ? '正在思考…' : '思考过程') : item.data.title;
-            const subtitle = !isThought ? item.data.kind || 'tool' : '';
-            const status = !isThought ? item.data.status || 'pending' : item.pending ? 'in_progress' : 'completed';
-            const statusLabel = toolStatusLabel[status];
-            const statusDotClass = toolStatusDotClass[status];
-
-            return html`
-              <div class="flex gap-3">
-                <div class="flex flex-col items-center">
-                  <span
-                    class=${classMap({
-                      'grid size-6 shrink-0 place-items-center rounded-full border text-xs z-[1]': true,
-                      'border-primary/40 bg-primary-soft text-primary-strong': isPending,
-                      'border-border bg-bg-light text-describe': !isPending,
-                    })}
-                  >
-                    <tap-use class="size-3" .element=${icon}></tap-use>
-                  </span>
-                  <span v-if=${!isLast} class="w-px flex-1 bg-border/70 my-1"></span>
-                </div>
-
-                <div class="min-w-0 flex-1 pb-4">
-                  <details class="group/step">
-                    <summary class="flex cursor-pointer list-none items-center justify-between gap-2 py-0.5 select-none [&::-webkit-details-marker]:hidden">
-                      <div class="flex min-w-0 items-center gap-2">
-                        <span class="truncate text-sm font-semibold text-text">${title}</span>
-                        <span v-if=${subtitle} class="rounded-md bg-bg px-1.5 py-0.5 font-mono text-[10px] text-describe">
-                          ${subtitle}
-                        </span>
-                      </div>
-                      <div class="flex shrink-0 items-center gap-2">
-                        <span v-if=${statusLabel} class="flex items-center gap-1.5 text-xs text-describe">
-                          <span class=${`size-1.5 rounded-full ${statusDotClass}`}></span>
-                          <span>${statusLabel}</span>
-                        </span>
-                        <tap-use class="size-3 text-disabled transition-transform group-open/step:rotate-90" .element=${icons.right}></tap-use>
-                      </div>
-                    </summary>
-
-                    <div class="mt-2.5">
+      <ol class="m-0 list-none p-0">
+        ${group.items.map((item, index) => {
+          const isThought = item.type === 'thought';
+          const status = isThought
+            ? group.pending && item.pending
+              ? 'in_progress'
+              : 'completed'
+            : getToolStatus(item.data, group.pending);
+          const isPending = status === 'pending' || status === 'in_progress';
+          const hasDetail = isThought ? Boolean(item.text) : item.data.rawInput !== undefined;
+          const heading = html`
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5">
+                <span class="font-medium text-describe">${isThought ? '思考过程' : '工具调用'}</span>
+                <span class=${classMap({
+                  'text-describe': !isPending && status !== 'failed',
+                  'text-primary-strong': isPending,
+                  'text-negative': status === 'failed',
+                })}>${toolStatusLabels[status]}</span>
+              </span>
+              <span v-if=${!isThought} class="mt-1.5 block whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-text">${!isThought ? getToolCommand(item.data) : ''}</span>
+            </span>
+            <tap-use
+              v-if=${hasDetail}
+              class="mt-1 size-3.5 shrink-0 text-disabled transition-transform group-open/step:rotate-90"
+              .element=${icons.right}
+            ></tap-use>
+          `;
+          return html`
+            <li class="flex gap-3">
+              <div class="flex w-5 shrink-0 flex-col items-center">
+                <tap-use
+                  class=${classMap({
+                    'mt-0.5 size-4 shrink-0': true,
+                    'text-describe': !isPending && status !== 'failed',
+                    'text-primary-strong': isPending,
+                    'text-negative': status === 'failed',
+                  })}
+                  .element=${isPending ? icons.loading : status === 'failed' ? icons.error : isThought ? icons.schedule : icons.tune}
+                ></tap-use>
+                <span v-if=${index < group.items.length - 1} class="my-2 w-px flex-1 bg-border"></span>
+              </div>
+              <div class="min-w-0 flex-1 pb-6">
+                ${
+                  hasDetail
+                    ? html`
+                  <details class="group/step" ?open=${status === 'in_progress'}>
+                    <summary class="flex min-h-11 cursor-pointer list-none items-start gap-3 outline-none select-none group-open/step:min-h-0">${heading}</summary>
+                    <div class="pt-1.5">
                       ${
                         isThought
                           ? html`
-                            <div class="rounded-xl border border-border/70 bg-bg/50 p-3 leading-relaxed text-describe text-[13px]">
-                              <gem-bind-marked
-                                ?streaming=${isPending}
-                                .mdStyle=${markdownStyle}
-                                .extensions=${markdownExtensions}
-                              >${item.text || (isPending ? '正在思考中…' : '')}</gem-bind-marked>
-                            </div>
-                          `
+                        <gem-bind-marked
+                          class="text-base leading-relaxed text-text"
+                          ?streaming=${isPending}
+                          .mdStyle=${markdownStyle}
+                          .extensions=${markdownExtensions}
+                        >${item.text}</gem-bind-marked>
+                      `
                           : html`
-                            <pre
-                              v-if=${item.data.rawInput !== undefined}
-                              class="m-0 max-h-[240px] overflow-auto whitespace-pre-wrap rounded-xl border border-border/70 bg-bg/70 px-3 py-2.5 font-mono text-[11px] leading-normal text-describe"
-                            >${JSON.stringify(item.data.rawInput, null, 2)}</pre>
-                          `
+                        <p class="mt-0 mb-2 text-xs text-describe">输入参数</p>
+                        <pre class="m-0 overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-bg p-3.5 font-mono text-sm leading-relaxed text-text">${JSON.stringify(item.data.rawInput, null, 2)}</pre>
+                      `
                       }
                     </div>
                   </details>
-                </div>
+                `
+                    : html`<div class="flex min-h-11 items-start gap-3">${heading}</div>`
+                }
               </div>
-            `;
-          })}
-        </div>
-      </div>
+            </li>
+          `;
+        })}
+      </ol>
     `;
   };
 }

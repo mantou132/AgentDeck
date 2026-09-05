@@ -121,8 +121,8 @@ export class AgentDeckSessionPageElement extends GemElement {
           <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
         </button>
         <div class="min-w-0 text-center">
-          <div class="truncate font-display text-base leading-tight font-[720] text-highlight">${title}</div>
-          <div v-if=${cwd} class="mt-1 flex min-w-0 items-center justify-center gap-1.5 text-xs font-medium text-describe">
+          <div class="truncate font-display text-base leading-tight font-semibold text-highlight">${title}</div>
+          <div v-if=${cwd} class="mt-1 flex min-w-0 items-center justify-center gap-1.5 text-sm font-medium text-describe">
             <span
               class=${classMap({
                 'size-1.5 shrink-0 rounded-full': true,
@@ -153,7 +153,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         <tap-page class="bg-bg text-text">
           ${this.#renderHeader('会话不可用')}
           <main class="grid h-full place-items-center content-center px-6 text-center">
-            <h2 class="m-0 font-display text-lg text-highlight">无法找到这个会话</h2>
+            <h2 class="m-0 font-display text-lg font-semibold text-highlight">无法找到这个会话</h2>
             <p class="mt-2 mb-4 max-w-[320px] text-sm leading-relaxed text-describe">
               可以返回列表选择其他会话，或在设置中重置 App 后重新加载。
             </p>
@@ -194,15 +194,10 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
                   <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
                 </div>
-                <h2 class="mt-4 mb-1.5 font-display text-lg text-highlight">正在加载会话</h2>
-                <p class="m-0 text-xs text-describe">连接远端 Agent，并回放历史事件…</p>
+                <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">正在加载会话</h2>
+                <p class="m-0 text-sm text-describe">连接远端 Agent，并回放历史事件…</p>
               </section>
               <div v-if=${!loading && !!messages.length} class="contents">
-                <div class="mx-0.5 mt-0.5 mb-[22px] flex items-center gap-2.5 text-xs font-bold tracking-[0.06em] text-disabled uppercase">
-                  <span class="h-px flex-1 bg-border"></span>
-                  <span>历史与实时事件</span>
-                  <span class="h-px flex-1 bg-border"></span>
-                </div>
                 <deck-session-timeline
                   .sessionKey=${this.sessionId}
                   .messages=${messages}
@@ -211,10 +206,6 @@ export class AgentDeckSessionPageElement extends GemElement {
                   @restore=${(event: CustomEvent<TextMessage>) => this.#composerRef.value?.restore(event.detail)}
                   @preview=${this.#previewAttachment}
                 ></deck-session-timeline>
-                <deck-permission-request
-                  .request=${agentdeckStore.permissionsBySession[session.sessionId]}
-                  @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
-                ></deck-permission-request>
               </div>
               <section
                 v-if=${!loading && loaded && !messages.length}
@@ -223,7 +214,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <div class="grid size-[54px] place-items-center rounded-[18px] border border-border bg-bg-light shadow-float">
                   <deck-icon></deck-icon>
                 </div>
-                <h2 class="mt-[18px] mb-2 font-display text-xl tracking-[-0.02em] text-highlight">
+                <h2 class="mt-[18px] mb-2 font-display text-lg font-semibold tracking-[-0.02em] text-highlight">
                   ${session.draft ? '新会话' : '会话已就绪'}
                 </h2>
                 <p class="m-0 max-w-[280px] text-sm leading-relaxed text-describe">
@@ -239,7 +230,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           <button
             v-if=${!this.#state.followMessages}
             type="button"
-            class="absolute bottom-3 left-1/2 flex min-h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-bg-light px-3.5 text-xs font-semibold whitespace-nowrap text-primary-strong shadow-float active:bg-primary-soft"
+            class="absolute bottom-3 left-1/2 flex min-h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-bg-light px-3.5 text-sm font-semibold whitespace-nowrap text-primary-strong shadow-float active:bg-primary-soft"
             @click=${this.#resumeFollowing}
           >
             <tap-use class="size-4" .element=${icons.expand}></tap-use>
@@ -250,7 +241,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         <footer slot="footer">
           <div
             v-if=${error}
-            class="mx-3 mb-2 flex items-center gap-2 rounded-[11px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2 text-xs text-negative"
+            class="mx-3 mb-2 flex items-center gap-2 rounded-[11px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2 text-sm leading-relaxed text-negative"
           >
             <span class="min-w-0 flex-1">${error}</span>
             <button
@@ -261,7 +252,7 @@ export class AgentDeckSessionPageElement extends GemElement {
               ${connected ? '重试加载' : '重新连接'}
             </button>
             <button
-              v-else-if=${agentdeckStore.connectionError}
+              v-else-if=${agentdeckStore.connectionError || pending}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
               @click=${openSettings}
             >
@@ -274,6 +265,13 @@ export class AgentDeckSessionPageElement extends GemElement {
             >
               关闭
             </button>
+          </div>
+          <div v-if=${agentdeckStore.permissionsBySession[session.sessionId]} class="px-2.5 pt-2">
+            <deck-permission-request
+              class="mx-auto max-w-[760px]"
+              .request=${agentdeckStore.permissionsBySession[session.sessionId]}
+              @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
+            ></deck-permission-request>
           </div>
           <deck-composer
             ${this.#composerRef}
