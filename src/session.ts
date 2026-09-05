@@ -1,11 +1,13 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
+import { MAX_ATTACHMENTS, readAttachment } from './attachments';
 import type { NonFormalGroup } from './elements/process-detail';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from './markdown';
 import { displayPath } from './path';
 import { openSettings } from './settings';
 import {
+  type Attachment,
   agentdeckStore,
   type ChatMessage,
   cancelTurn,
@@ -84,20 +86,26 @@ const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState<{ draft: string; selectedGroupId: string | null; followMessages: boolean }>({
+  #state = createState({
     draft: '',
-    selectedGroupId: null,
+    attachments: [] as Attachment[],
+    attachmentError: '',
+    readingAttachments: false,
+    creatingSession: false,
+    previewAttachment: null as Attachment | null,
+    selectedGroupId: null as string | null,
     followMessages: true,
   });
   #lastGroup?: NonFormalGroup;
   #messagesRef = createRef<HTMLElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #textareaRef = createRef<HTMLTextAreaElement>();
+  #fileInputRef = createRef<HTMLInputElement>();
   #scrollFrame = 0;
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
-    this.#state({ draft: '', selectedGroupId: null });
+    this.#state({ draft: '', attachments: [], attachmentError: '', previewAttachment: null, selectedGroupId: null });
     this.#lastGroup = undefined;
     void ensureSessionLoaded(this.sessionId);
     queueMicrotask(this.#scrollToLatest);
@@ -155,26 +163,81 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   #send = async () => {
     const text = this.#state.draft.trim();
-    if (!text) return;
+    const attachments = this.#state.attachments;
+    if ((!text && !attachments.length) || this.#state.readingAttachments || this.#state.creatingSession) return;
+    if (agentdeckStore.pendingSessionIds.includes(this.sessionId)) return;
     const session = getSession(this.sessionId);
     if (!session) return;
-    this.#state({ draft: '' });
-    if (this.#textareaRef.value) this.#textareaRef.value.value = '';
     if (session.draft) {
-      const liveSession = await promoteDraftSession(session, text);
-      if (liveSession) {
-        this.sessionId = liveSession.sessionId;
-      } else {
-        this.#state({ draft: text });
-        if (this.#textareaRef.value) this.#textareaRef.value.value = text;
+      this.#state({ creatingSession: true });
+      try {
+        const liveSession = await promoteDraftSession(session, text, attachments);
+        if (liveSession) {
+          this.#clearInput();
+          this.sessionId = liveSession.sessionId;
+        }
+      } finally {
+        this.#state({ creatingSession: false });
       }
       return;
     }
-    if (!sendPrompt(this.sessionId, text)) {
-      this.#state({ draft: text });
-      if (this.#textareaRef.value) this.#textareaRef.value.value = text;
+    if (sendPrompt(this.sessionId, text, attachments)) this.#clearInput();
+  };
+
+  #clearInput = () => {
+    this.#state({ draft: '', attachments: [], attachmentError: '' });
+    if (this.#textareaRef.value) this.#textareaRef.value.value = '';
+  };
+
+  get #canRestoreInput() {
+    return (
+      !this.#state.draft.trim() &&
+      !this.#state.attachments.length &&
+      !this.#state.readingAttachments &&
+      !this.#state.creatingSession
+    );
+  }
+
+  #restoreInput = (message: TextMessage) => {
+    if (!this.#canRestoreInput) return;
+    this.#setDraft(message.text);
+    this.#state({ attachments: message.attachments ?? [], attachmentError: '' });
+    if (this.#textareaRef.value) {
+      this.#textareaRef.value.value = message.text;
+      this.#textareaRef.value.focus();
+    }
+  };
+
+  #readFiles = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) return;
+    if (files.length + this.#state.attachments.length > MAX_ATTACHMENTS) {
+      this.#state({ attachmentError: '最多添加 10 个附件，请减少选择的文件数量。' });
       return;
     }
+    this.#state({ readingAttachments: true, attachmentError: '' });
+    const results = await Promise.allSettled(files.map(readAttachment));
+    const attachments: Attachment[] = [];
+    const errors: string[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') attachments.push(result.value);
+      else errors.push(result.reason.message);
+    }
+    this.#state({
+      attachments: [...this.#state.attachments, ...attachments],
+      attachmentError: errors.join('\n'),
+      readingAttachments: false,
+    });
+  };
+
+  #previewAttachment = (event: CustomEvent<Attachment>) => {
+    this.#state({ previewAttachment: event.detail });
+  };
+
+  #removeAttachment = (event: CustomEvent<string>) => {
+    this.#state({ attachments: this.#state.attachments.filter((item) => item.id !== event.detail) });
   };
 
   #onKeydown = (event: KeyboardEvent) => {
@@ -251,17 +314,27 @@ export class AgentDeckSessionPageElement extends GemElement {
     if (message.role === 'user') {
       return html`
         <div class="mb-[18px] flex justify-end">
-          <div
-            class="max-w-[min(86%,560px)] overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary"
-          >
-            <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap justify-end gap-2">
-              ${message.attachments?.map(
-                (attachment) => html`
-                  <img class="max-h-52 max-w-full rounded-xl" src=${attachment.previewUrl} alt=${attachment.name} />
-                `,
-              )}
+          <div class="max-w-[min(86%,560px)]">
+            <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary">
+              <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap justify-end gap-2">
+                ${message.attachments?.map(
+                  (attachment) => html`
+                    <deck-attachment .attachment=${attachment} @preview=${this.#previewAttachment}></deck-attachment>
+                  `,
+                )}
+              </div>
+              ${this.#renderMarkdown(message.text, message.streaming, true)}
             </div>
-            ${this.#renderMarkdown(message.text, message.streaming, true)}
+            <button
+              v-if=${message.failed}
+              type="button"
+              class="mt-1.5 ml-auto block cursor-pointer border-0 bg-transparent py-1 text-xs font-medium text-primary-strong disabled:cursor-default disabled:text-disabled"
+              ?disabled=${!this.#canRestoreInput}
+              title=${this.#canRestoreInput ? '将这条消息和附件恢复到输入框' : '请先清空当前输入'}
+              @click=${() => this.#restoreInput(message)}
+            >
+              恢复输入
+            </button>
           </div>
         </div>
       `;
@@ -272,7 +345,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap gap-2">
           ${message.attachments?.map(
             (attachment) => html`
-              <img class="max-h-64 max-w-full rounded-xl border border-border" src=${attachment.previewUrl} alt=${attachment.name} />
+              <deck-attachment .attachment=${attachment} @preview=${this.#previewAttachment}></deck-attachment>
             `,
           )}
         </div>
@@ -351,7 +424,13 @@ export class AgentDeckSessionPageElement extends GemElement {
       agentdeckStore.connectionError ||
       (!loaded && !loading ? '会话尚未加载，请重试加载' : '');
     const connected = agentdeckStore.connection === 'connected';
-    const canSend = Boolean(this.#state.draft.trim()) && connected && loaded && !pending;
+    const canSend =
+      Boolean(this.#state.draft.trim() || this.#state.attachments.length) &&
+      connected &&
+      loaded &&
+      !pending &&
+      !this.#state.readingAttachments &&
+      !this.#state.creatingSession;
     const agentName = agentdeckStore.agents.find((agent) => agent.id === session.agent)?.name || session.agent;
     const timelineItems = groupTimelineMessages(messages, pending);
     const selectedGroup = this.#state.selectedGroupId
@@ -460,6 +539,30 @@ export class AgentDeckSessionPageElement extends GemElement {
           </div>
           <div class="composer-shell bg-bg/90 px-2.5 pt-2 backdrop-blur-xl backdrop-saturate-125">
             <div class="mx-auto max-w-[760px] overflow-hidden rounded-[20px] border border-primary/15 bg-bg-light shadow-card">
+              <div v-if=${this.#state.attachments.length} class="flex max-h-40 flex-wrap gap-3 overflow-y-auto px-3.5 pt-3.5 pb-1.5">
+                ${this.#state.attachments.map(
+                  (attachment) => html`
+                    <deck-attachment
+                      compact
+                      ?removable=${!this.#state.creatingSession}
+                      .attachment=${attachment}
+                      @preview=${this.#previewAttachment}
+                      @request-remove=${this.#removeAttachment}
+                    ></deck-attachment>
+                  `,
+                )}
+              </div>
+              <div v-if=${this.#state.attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-xs text-negative">
+                <span class="min-w-0 flex-1 whitespace-pre-line">${this.#state.attachmentError}</span>
+                <button
+                  type="button"
+                  class="grid size-6 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-negative"
+                  aria-label="关闭附件提示"
+                  @click=${() => this.#state({ attachmentError: '' })}
+                >
+                  <tap-use class="size-4" .element=${icons.close}></tap-use>
+                </button>
+              </div>
               <textarea
                 ${this.#textareaRef}
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
@@ -469,12 +572,22 @@ export class AgentDeckSessionPageElement extends GemElement {
                 .value=${this.#state.draft}
                 @input=${(event: InputEvent) => this.#setDraft((event.target as HTMLTextAreaElement).value)}
                 @keydown=${this.#onKeydown}
-                ?disabled=${!loaded}
+                ?disabled=${!loaded || this.#state.creatingSession}
               ></textarea>
               <div class="flex min-h-[43px] items-center justify-between gap-2.5 pt-1 pr-1.5 pb-1.5 pl-3">
                 <div class="flex min-w-0 items-center gap-2 text-xs font-semibold text-describe">
-                  <deck-icon class="-mr-1 origin-left scale-[0.72]" aria-hidden="true"></deck-icon>
-                  <span class="truncate">${agentName}</span>
+                  <input ${this.#fileInputRef} type="file" multiple hidden aria-label="附件文件" @change=${this.#readFiles} />
+                  <button
+                    type="button"
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl border-0 bg-transparent text-describe active:bg-bg-hover disabled:cursor-default disabled:opacity-45"
+                    aria-label="添加附件"
+                    title="添加图片或文本文件，最多 10 个附件"
+                    ?disabled=${this.#state.readingAttachments || this.#state.creatingSession || this.#state.attachments.length >= MAX_ATTACHMENTS}
+                    @click=${() => this.#fileInputRef.value?.click()}
+                  >
+                    <tap-use class="size-5" .element=${this.#state.readingAttachments ? icons.loading : icons.add}></tap-use>
+                  </button>
+                  <span class="truncate">${this.#state.readingAttachments ? '正在读取附件…' : this.#state.creatingSession ? '正在创建会话…' : agentName}</span>
                 </div>
                 <button
                   v-if=${pending}
@@ -509,6 +622,36 @@ export class AgentDeckSessionPageElement extends GemElement {
           v-if=${Boolean(this.#state.selectedGroupId)}
           .group=${currentGroup}
         ></deck-process-detail>
+      </tap-sheet>
+      <tap-sheet
+        ?open=${Boolean(this.#state.previewAttachment)}
+        header="附件预览"
+        gesture
+        mask-closable
+        @close=${() => this.#state({ previewAttachment: null })}
+      >
+        <div slot="header" class="flex min-w-0 items-center gap-3">
+          <h2 class="m-0 min-w-0 flex-1 truncate font-display text-base font-[720] text-highlight">${this.#state.previewAttachment?.name}</h2>
+          <button
+            type="button"
+            class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl border-0 bg-bg text-describe active:bg-bg-hover"
+            aria-label="关闭附件预览"
+            @click=${() => this.#state({ previewAttachment: null })}
+          >
+            <tap-use class="size-4" .element=${icons.close}></tap-use>
+          </button>
+        </div>
+        <div class="max-h-[70dvh] overflow-auto px-4 pb-5">
+          ${
+            this.#state.previewAttachment?.kind === 'image'
+              ? html`
+                  <img class="mx-auto max-h-[65dvh] max-w-full rounded-xl object-contain" src=${this.#state.previewAttachment.previewUrl} alt=${this.#state.previewAttachment.name} />
+                `
+              : html`
+                  <pre class="m-0 whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-text">${this.#state.previewAttachment?.text}</pre>
+                `
+          }
+        </div>
       </tap-sheet>
     `;
   };

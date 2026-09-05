@@ -23,11 +23,8 @@ export type ToolCallData = {
 
 export type Attachment = {
   id: string;
-  kind: 'image';
   name: string;
-  mimeType: string;
-  previewUrl: string;
-};
+} & ({ kind: 'image'; data: string; mimeType: string; previewUrl: string } | { kind: 'text'; text: string });
 
 export type TextMessage = {
   id: string;
@@ -35,6 +32,7 @@ export type TextMessage = {
   text: string;
   attachments?: Attachment[];
   streaming?: boolean;
+  failed?: boolean;
 };
 
 export type ThoughtMessage = {
@@ -117,6 +115,7 @@ export const appendImage = (
     id: crypto.randomUUID(),
     kind: 'image',
     name: '图片',
+    data,
     mimeType,
     previewUrl: `data:${mimeType};base64,${data}`,
   };

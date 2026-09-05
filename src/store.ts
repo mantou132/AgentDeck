@@ -2,6 +2,7 @@ import { isRelayId } from 'relay-client-ts';
 import type { CreatedSession, PermissionRequest, SessionEvent } from './agent-api';
 import {
   type AppSettings,
+  type Attachment,
   type ChatMessage,
   completeThought,
   type DeckSession,
@@ -13,6 +14,7 @@ import {
   reduceSessionEvent,
   SETTINGS_KEY,
   type SessionOptions,
+  type TextMessage,
 } from './session-runtime';
 import {
   agentApi,
@@ -429,36 +431,52 @@ export const retrySessionLoad = (sessionId: string) => {
   return ensureSessionLoaded(sessionId);
 };
 
-const runPromptTurn = (session: DeckSession, text: string, turnStart: number) => {
+const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: number) => {
   setSessionFlag('pendingSessionIds', session.sessionId, true);
   setSessionError(session.sessionId, '');
   patchSession(session.sessionId, { updatedAt: new Date().toISOString() });
-  void performTurn(session, text, {
-    onEvent: (event) => applySessionEvent(session.sessionId, event),
-    onAnswer: (answer) => {
-      const current = agentdeckStore.messagesBySession[session.sessionId] ?? [];
-      const receivedAgentText = current
-        .slice(turnStart)
-        .some((message) => 'role' in message && message.role === 'agent' && message.text);
-      if (!receivedAgentText) {
-        setMessages(session.sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: answer }]);
-      }
+  void performTurn(
+    session,
+    prompt.text,
+    {
+      onEvent: (event) => applySessionEvent(session.sessionId, event),
+      onAnswer: (answer) => {
+        const current = agentdeckStore.messagesBySession[session.sessionId] ?? [];
+        const receivedAgentText = current
+          .slice(turnStart)
+          .some((message) => 'role' in message && message.role === 'agent' && message.text);
+        if (!receivedAgentText) {
+          setMessages(session.sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: answer }]);
+        }
+      },
+      onError: (error) => {
+        setSessionError(session.sessionId, error);
+        const messages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
+        setMessages(
+          session.sessionId,
+          messages.map((message) => (message.id === prompt.id ? { ...message, failed: true } : message)),
+        );
+      },
+      onDone: () => {
+        setMessages(session.sessionId, finishStreaming(agentdeckStore.messagesBySession[session.sessionId] ?? []));
+        setSessionFlag('pendingSessionIds', session.sessionId, false);
+      },
     },
-    onError: (error) => setSessionError(session.sessionId, error),
-    onDone: () => {
-      setMessages(session.sessionId, finishStreaming(agentdeckStore.messagesBySession[session.sessionId] ?? []));
-      setSessionFlag('pendingSessionIds', session.sessionId, false);
-    },
-  });
+    prompt.attachments,
+  );
 };
 
-export const promoteDraftSession = async (draft: DeckSession, text: string): Promise<DeckSession | null> => {
+export const promoteDraftSession = async (
+  draft: DeckSession,
+  text: string,
+  attachments: Attachment[] = [],
+): Promise<DeckSession | null> => {
   if (agentdeckStore.connection !== 'connected') {
     setSessionError('draft', '远端连接后才能新建会话');
     return null;
   }
   setDraftCanceled(false);
-  const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', text };
+  const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
   setMessages('draft', [userMessage]);
   setSessionFlag('pendingSessionIds', 'draft', true);
   setSessionError('draft', '');
@@ -489,7 +507,7 @@ export const promoteDraftSession = async (draft: DeckSession, text: string): Pro
     agent: draft.agent,
     sessionId,
     cwd: draft.cwd,
-    title: created.title || text.slice(0, 30),
+    title: created.title || text.slice(0, 30) || attachments[0]?.name,
     updatedAt: typeof created.updatedAt === 'string' && created.updatedAt ? created.updatedAt : now,
   };
 
@@ -513,15 +531,15 @@ export const promoteDraftSession = async (draft: DeckSession, text: string): Pro
   setSessionFlag('pendingSessionIds', 'draft', false);
   setSessionFlag('loadedSessionIds', liveSession.sessionId, true);
 
-  runPromptTurn(liveSession, text, stagedMessages.length);
+  runPromptTurn(liveSession, userMessage, stagedMessages.length);
   return liveSession;
 };
 
-export const sendPrompt = (sessionId: string, prompt: string) => {
+export const sendPrompt = (sessionId: string, prompt: string, attachments: Attachment[] = []) => {
   const text = prompt.trim();
   const session = getSession(sessionId);
   if (
-    !text ||
+    (!text && !attachments.length) ||
     !session ||
     session.draft ||
     agentdeckStore.connection !== 'connected' ||
@@ -531,9 +549,10 @@ export const sendPrompt = (sessionId: string, prompt: string) => {
     return false;
   }
   const messages = completeThought(agentdeckStore.messagesBySession[sessionId] ?? []);
-  setMessages(sessionId, [...messages, { id: crypto.randomUUID(), role: 'user', text }]);
+  const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
+  setMessages(sessionId, [...messages, userMessage]);
   const turnStart = messages.length + 1;
-  runPromptTurn(session, text, turnStart);
+  runPromptTurn(session, userMessage, turnStart);
   return true;
 };
 

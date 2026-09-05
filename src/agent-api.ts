@@ -3,6 +3,8 @@ import { RpcPeer } from './rpc';
 
 export type RemoteAgent = { id: string; name: string };
 
+export type PromptAttachment = { type: 'image'; data: string; mimeType: string } | { type: 'text'; text: string };
+
 export type RemoteSession = {
   sessionId: string;
   cwd: string;
@@ -141,9 +143,17 @@ export class AgentApi {
       { timeoutMs: 65_000, timeoutMessage: '加载会话超时，请重试；持续失败可在设置中重置 App。' },
     );
 
-  prompt = (sessionId: string, agent: string, prompt: string, onEvent: (event: SessionEvent) => void) =>
-    this.#peer.call<{ answer?: string }>('agent_prompt', { agent, sessionId, prompt, stream: true }, (event) =>
-      onEvent(event as SessionEvent),
+  prompt = (
+    sessionId: string,
+    agent: string,
+    prompt: string,
+    onEvent: (event: SessionEvent) => void,
+    attachments: PromptAttachment[] = [],
+  ) =>
+    this.#peer.call<{ answer?: string }>(
+      'agent_prompt',
+      { agent, sessionId, prompt, attachments, stream: true },
+      (event) => onEvent(event as SessionEvent),
     );
 
   cancelPrompt = (sessionId: string, agent: string) =>

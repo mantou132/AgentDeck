@@ -1,5 +1,5 @@
 import type { PermissionRequest, SessionEvent } from './agent-api';
-import type { DeckSession } from './session-runtime';
+import type { Attachment, DeckSession } from './session-runtime';
 import { agentApi } from './transport';
 
 const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
@@ -43,9 +43,22 @@ export const performTurn = async (
     onError: (error: string) => void;
     onDone: () => void;
   },
+  attachments: Attachment[] = [],
 ) => {
   try {
-    const result = await agentApi.prompt(session.sessionId, session.agent, text, handlers.onEvent);
+    const result = await agentApi.prompt(
+      session.sessionId,
+      session.agent,
+      text,
+      handlers.onEvent,
+      attachments.map((attachment) => {
+        if (attachment.kind === 'image') {
+          return { type: 'image', data: attachment.data, mimeType: attachment.mimeType };
+        }
+        const name = attachment.name.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+        return { type: 'text', text: `<attachment name="${name}">\n${attachment.text}\n</attachment>` };
+      }),
+    );
     if (result.answer) {
       handlers.onAnswer(result.answer);
     }
