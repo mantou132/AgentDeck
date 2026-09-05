@@ -187,6 +187,10 @@ export const resetRemoteState = () => {
  */
 const handleTransportMessage = (message: TransportMessage) => {
   switch (message.type) {
+    case 'delivery_error': {
+      agentdeckStore({ connectionError: message.error });
+      break;
+    }
     case 'connection': {
       const { connection, error } = message;
       agentdeckStore({

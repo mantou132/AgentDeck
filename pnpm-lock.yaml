@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  relay-client-ts@0.1.4:
+    hash: a23a0efac16adba1ead0266b97efdcc296e35f4f9b43db062fa475d26ac5a37a
+    path: patches/relay-client-ts@0.1.4.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
     path: patches/tailwindcss.patch
@@ -33,7 +36,7 @@ importers:
         version: 2.11.1
       relay-client-ts:
         specifier: ^0.1.4
-        version: 0.1.4
+        version: 0.1.4(patch_hash=a23a0efac16adba1ead0266b97efdcc296e35f4f9b43db062fa475d26ac5a37a)
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.15
@@ -2405,7 +2408,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  relay-client-ts@0.1.4: {}
+  relay-client-ts@0.1.4(patch_hash=a23a0efac16adba1ead0266b97efdcc296e35f4f9b43db062fa475d26ac5a37a): {}
 
   restore-cursor@5.1.0:
     dependencies:

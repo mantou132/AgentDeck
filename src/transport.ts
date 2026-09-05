@@ -44,14 +44,20 @@ let connectTimer: ReturnType<typeof setTimeout> | undefined;
 let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const agentApi = new AgentApi(
-  (message) => {
+  async (message) => {
     if (!relayClient) throw new Error('Relay 尚未配置');
     if (message.method && message.method !== 'peer_attach' && connectionState !== 'connected') {
       throw new Error('远端尚未连接，请重新连接后重试');
     }
     if (message.method === 'peer_attach') attachId = message.id;
     if (currentPeerId !== undefined) (message as Record<string, unknown>).peerId = currentPeerId;
-    return relayClient.send(message);
+    const client = relayClient;
+    try {
+      await client.send(message);
+    } catch (error) {
+      if (!message.method && relayClient === client) reportReplyFailure();
+      throw error;
+    }
   },
   async (id) => {
     // Withdraw an expired request still in our outbox. Delivery already accepted
@@ -68,11 +74,17 @@ export const agentApi = new AgentApi(
 
 export type TransportMessage =
   | { type: 'connection'; connection: ConnectionState; error?: string }
+  | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
   | { type: 'session_ended'; sessionId: string };
 
 type MessageHandler = (message: TransportMessage) => void;
 let globalMessageHandler: MessageHandler | undefined;
+const reportReplyFailure = () =>
+  globalMessageHandler?.({
+    type: 'delivery_error',
+    error: '操作回复未能送达远端，请在设置中重置 App 后重新加载会话。',
+  });
 const emitConnection = (connection: ConnectionState, error = '') => {
   connectionState = connection;
   globalMessageHandler?.({ type: 'connection', connection, error });
@@ -120,7 +132,36 @@ export const startTransport = (relayId: string) => {
   }
   closeTransport();
   currentRelayId = relayId;
-  const store = localStorageStore(relayId);
+  const persistedStore = localStorageStore(relayId);
+  const deliveries = new Map<string, Pick<RpcMessage, 'id' | 'method'>>();
+  const store: RelayStore = {
+    ...persistedStore,
+    outbox: () => (relayStore === store ? persistedStore.outbox() : []),
+    enqueue: async (message) => {
+      if (relayStore !== store) return;
+      // Match Relay's full WebSocket message limit, including the envelope.
+      const frame = JSON.stringify({ type: 'message', message_id: message.messageId, payload: message.payload });
+      if (new TextEncoder().encode(frame).byteLength > 10 * 1024 * 1024) {
+        throw new Error('消息过大，未发送。请减少文字或附件后重试。');
+      }
+      try {
+        await persistedStore.enqueue(message);
+      } catch {
+        throw new Error('无法保存待发送消息，未发送。请释放本地存储空间后重试。');
+      }
+      if (relayStore !== store) return;
+      const { id, method } = message.payload as RpcMessage;
+      deliveries.set(message.messageId, { id, method });
+    },
+    markReceived: (sequence) => {
+      if (relayStore === store) return persistedStore.markReceived(sequence);
+    },
+    removeFromOutbox: async (id) => {
+      if (relayStore !== store) return;
+      await persistedStore.removeFromOutbox(id);
+      deliveries.delete(id);
+    },
+  };
   relayStore = store;
   const client = new RelayClient({
     relayId,
@@ -129,18 +170,19 @@ export const startTransport = (relayId: string) => {
     relayUrl: RELAY_URL,
     // Only a fresh document/pairing abandons the old server backlog.
     ackHead: true,
-    store: {
-      ...store,
-      outbox: () => (relayStore === store ? store.outbox() : []),
-      enqueue: (message) => {
-        if (relayStore === store) return store.enqueue(message);
-      },
-      markReceived: (sequence) => {
-        if (relayStore === store) return store.markReceived(sequence);
-      },
-      removeFromOutbox: (id) => {
-        if (relayStore === store) return store.removeFromOutbox(id);
-      },
+    store,
+    onMessageRejected: (messageId, reason) => {
+      if (relayClient !== client) return;
+      const delivery = deliveries.get(messageId);
+      if (!delivery) return;
+      if (delivery.id !== undefined && delivery.method) {
+        const error = reason.startsWith('queue_full:')
+          ? 'Relay 待投递队列已满，消息未发送。请稍后重试。'
+          : 'Relay 拒绝了这条消息，未发送。请稍后重试；持续失败可在设置中重置 App。';
+        agentApi.dispatch({ id: delivery.id, error });
+      } else {
+        reportReplyFailure();
+      }
     },
     onPayload: (payload) => {
       if (relayClient !== client) return;

@@ -430,6 +430,13 @@ export class AgentDeckSessionPageElement extends GemElement {
               ${connected ? '重试加载' : '重新连接'}
             </button>
             <button
+              v-else-if=${agentdeckStore.connectionError}
+              class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
+              @click=${openSettings}
+            >
+              打开设置
+            </button>
+            <button
               v-else-if=${connected}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
               @click=${() => clearSessionError(session.sessionId)}

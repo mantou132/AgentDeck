@@ -1,0 +1,96 @@
+diff --git a/src/relay-client.ts b/src/relay-client.ts
+index 8c4699077c8296fa19bf000c07d13436a9dee61f..7c181a15902ed1487aa1e14190701a3a2f4d4686 100644
+--- a/src/relay-client.ts
++++ b/src/relay-client.ts
+@@ -27,6 +27,7 @@ export type OutboundMessage = {
+ export type ServerFrame =
+   | { type: 'ready'; endpoint: '1' | '2' }
+   | { type: 'stored'; message_id: string }
++  | { type: 'rejected'; message_id: string; reason: string }
+   | { type: 'message'; message_id: string; sequence: number; payload: unknown }
+   | { type: 'error'; message: string };
+ 
+@@ -64,6 +65,8 @@ export type RelayClientOptions = {
+   onPayload: (payload: unknown) => void | Promise<void>;
+   onStateChange?: (state: RelayConnectionState, error?: string) => void;
+   onDisconnect?: (error: Error) => void;
++  /** Called before removing a rejected message from the outbox. */
++  onMessageRejected?: (messageId: string, reason: string) => void;
+   /** Storage key in localStorage if default store is used. Defaults to 'relay-client.v1'. */
+   storageKey?: string;
+   /** Defaults to a localStorage-backed store. */
+@@ -123,11 +126,7 @@ export const localStorageStore = (relayId: string, storageKey = DEFAULT_STORAGE_
+   };
+ 
+   const save = (state: StoredState) => {
+-    try {
+-      localStorage.setItem(key, JSON.stringify(state));
+-    } catch {
+-      // Quota exceeded or private browsing restrictions
+-    }
++    localStorage.setItem(key, JSON.stringify(state));
+   };
+ 
+   return {
+@@ -162,6 +161,7 @@ export class RelayClient {
+   #onPayload: RelayClientOptions['onPayload'];
+   #onStateChange?: RelayClientOptions['onStateChange'];
+   #onDisconnect?: RelayClientOptions['onDisconnect'];
++  #onMessageRejected?: RelayClientOptions['onMessageRejected'];
+   #socket?: WebSocket;
+   #sent = new Set<string>();
+   #relayReady = false;
+@@ -180,6 +180,7 @@ export class RelayClient {
+     onPayload,
+     onStateChange,
+     onDisconnect,
++    onMessageRejected,
+     storageKey,
+     store,
+   }: RelayClientOptions) {
+@@ -193,6 +194,7 @@ export class RelayClient {
+     this.#onPayload = onPayload;
+     this.#onStateChange = onStateChange;
+     this.#onDisconnect = onDisconnect;
++    this.#onMessageRejected = onMessageRejected;
+   }
+ 
+   connect = async (options?: { ackHead?: boolean }) => {
+@@ -236,7 +238,12 @@ export class RelayClient {
+   send = async (payload: unknown) => {
+     const message: OutboundMessage = { messageId: crypto.randomUUID(), payload };
+     await this.#store.enqueue(message);
+-    this.#flushOutbox();
++    try {
++      await this.#flushOutbox();
++    } catch (error) {
++      await this.#store.removeFromOutbox(message.messageId);
++      throw error;
++    }
+   };
+ 
+   #handleOpen = () => {
+@@ -282,13 +289,22 @@ export class RelayClient {
+         this.#relayReady = true;
+         this.#reconnectDelay = MIN_RECONNECT_DELAY;
+         this.#emitState('connected');
+-        this.#flushOutbox();
++        await this.#flushOutbox();
+         return;
+       case 'stored': {
+         this.#sent.delete(frame.message_id);
+         await this.#store.removeFromOutbox(frame.message_id);
+         return;
+       }
++      case 'rejected': {
++        this.#sent.delete(frame.message_id);
++        try {
++          this.#onMessageRejected?.(frame.message_id, frame.reason);
++        } finally {
++          await this.#store.removeFromOutbox(frame.message_id);
++        }
++        return;
++      }
+       case 'message': {
+         const lastReceived = await this.#store.lastReceived();
+         if (!isNewSequence(lastReceived, frame.sequence)) {

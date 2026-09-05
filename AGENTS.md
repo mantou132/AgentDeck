@@ -21,6 +21,7 @@
 - `src/markdown.ts`：Markdown / Mermaid / LaTeX；`src/path.ts`：路径显示。
 - `src/tailwind.css`、`src/theme.ts`：共享主题 token 和 Tap UI 主题桥。
 - `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；`biome.json`：格式和 lint。
+- `patches/relay-client-ts@0.1.4.patch`：已发布 SDK 的投递拒绝与发送失败补丁；升级依赖时核对是否仍需保留。
 
 # 运行约束
 

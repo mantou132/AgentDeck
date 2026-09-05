@@ -2,4 +2,5 @@ packages:
   - .
 
 patchedDependencies:
+  relay-client-ts@0.1.4: patches/relay-client-ts@0.1.4.patch
   tailwindcss: patches/tailwindcss.patch
