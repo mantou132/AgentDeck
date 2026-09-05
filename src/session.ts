@@ -4,6 +4,7 @@ import { icons } from '@mantou/tap-ui/lib/icons';
 import type { NonFormalGroup } from './elements/process-detail';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from './markdown';
 import { displayPath } from './path';
+import { openSettings } from './settings';
 import {
   agentdeckStore,
   type ChatMessage,
@@ -278,10 +279,67 @@ export class AgentDeckSessionPageElement extends GemElement {
     `;
   };
 
+  #renderHeader = (title: string, cwd?: string, loading = false, loaded = false) => {
+    const connected = agentdeckStore.connection === 'connected';
+    return html`
+      <header
+        slot="header"
+        class="session-header relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl backdrop-saturate-125"
+      >
+        <button
+          class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
+          aria-label="返回会话列表"
+          @click=${() => Stack.close()}
+        >
+          <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
+        </button>
+        <div class="min-w-0 text-center">
+          <div class="truncate font-display text-base leading-tight font-[720] text-highlight">${title}</div>
+          <div v-if=${cwd} class="mt-1 flex min-w-0 items-center justify-center gap-1.5 text-xs font-medium text-describe">
+            <span
+              class=${classMap({
+                'size-1.5 shrink-0 rounded-full': true,
+                'bg-positive': connected && loaded,
+                'animate-pulse bg-informative': loading,
+                'bg-disabled': !connected || (!loaded && !loading),
+              })}
+            ></span>
+            <span class="truncate font-mono">${displayPath(cwd || '')}</span>
+          </div>
+        </div>
+        <button
+          class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft"
+          aria-label="打开设置"
+          @click=${openSettings}
+        >
+          <tap-use class="size-[20px]" .element=${icons.tune}></tap-use>
+        </button>
+      </header>
+    `;
+  };
+
   @template()
   #render = () => {
     const session = getSession(this.sessionId);
-    if (!session) return html``;
+    if (!session) {
+      return html`
+        <tap-page class="bg-bg text-text">
+          ${this.#renderHeader('会话不可用')}
+          <main class="grid h-full place-items-center content-center px-6 text-center">
+            <h2 class="m-0 font-display text-lg text-highlight">无法找到这个会话</h2>
+            <p class="mt-2 mb-4 max-w-[320px] text-sm leading-relaxed text-describe">
+              可以返回列表选择其他会话，或在设置中重置 App 后重新加载。
+            </p>
+            <button
+              class="cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 py-2.5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
+              @click=${openSettings}
+            >
+              打开设置
+            </button>
+          </main>
+        </tap-page>
+      `;
+    }
     const messages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
     const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId);
     const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
@@ -304,37 +362,7 @@ export class AgentDeckSessionPageElement extends GemElement {
 
     return html`
       <tap-page class="bg-bg text-text">
-        <header
-          slot="header"
-          class="session-header relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl backdrop-saturate-125"
-        >
-          <button
-            class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
-            aria-label="返回会话列表"
-            @click=${() => Stack.close()}
-          >
-            <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
-          </button>
-          <div class="min-w-0 text-center">
-            <div class="truncate font-display text-base leading-tight font-[720] text-highlight">
-              ${session.title || (session.draft ? '新建会话' : '未命名会话')}
-            </div>
-            <div class="mt-1 flex min-w-0 items-center justify-center gap-1.5 text-xs font-medium text-describe">
-              <span
-                class=${classMap({
-                  'size-1.5 shrink-0 rounded-full': true,
-                  'bg-positive': connected && loaded,
-                  'animate-pulse bg-informative': loading,
-                  'bg-disabled': !connected || (!loaded && !loading),
-                })}
-              ></span>
-              <span class="truncate font-mono">${displayPath(session.cwd)}</span>
-            </div>
-          </div>
-          <div class="grid size-11 place-items-center" aria-hidden="true">
-            <deck-icon></deck-icon>
-          </div>
-        </header>
+        ${this.#renderHeader(session.title || (session.draft ? '新建会话' : '未命名会话'), session.cwd, loading, loaded)}
 
         <main
           ${this.#messagesRef}

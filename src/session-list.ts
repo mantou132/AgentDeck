@@ -1,25 +1,13 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
+import { openSettings } from './settings';
 import { agentApi, agentdeckStore, createDraftSession, refreshSessions } from './store';
 
 const openSession = (sessionId: string) => {
   Stack.push({
     content: html`
       <agentdeck-session-page class="block h-full" .sessionId=${sessionId}></agentdeck-session-page>
-    `,
-    gesture: true,
-  });
-};
-
-const openSettings = () => {
-  Stack.push({
-    content: html`
-      <agentdeck-settings-page
-        class="block h-full"
-        .canGoBack=${true}
-        .onDone=${() => Stack.close()}
-      ></agentdeck-settings-page>
     `,
     gesture: true,
   });

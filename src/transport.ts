@@ -105,19 +105,8 @@ export const reconnectTransport = (force = false) => {
   void relayClient.connect();
 };
 
-export const hardResetTransport = (relayId?: string) => {
-  const targetId = relayId || currentRelayId;
-  relayClient?.close();
-  relayClient = undefined;
-  currentPeerId = undefined;
-  agentApi.rejectAll(new Error('Relay 连接已重置'));
-  try {
-    localStorage.removeItem(DEFAULT_STORAGE_KEY);
-  } catch {}
-  if (targetId && isRelayId(targetId)) {
-    startTransport(targetId);
-  }
-};
+// Called in a fresh document, before any RelayClient can read or write its store.
+export const clearTransportStorage = () => localStorage.removeItem(DEFAULT_STORAGE_KEY);
 
 export const closeTransport = () => {
   relayClient?.close();

@@ -56,6 +56,7 @@ export type SessionOptions = Pick<LoadedSession, 'modes' | 'configOptions'>;
 
 export const SETTINGS_KEY = 'agentdeck.settings.v1';
 export const DEVICE_ID_KEY = 'agentdeck.device_id.v1';
+export const RESET_PENDING_KEY = 'agentdeck.reset_pending.v1';
 export const RELAY_URL =
   process.env.NODE_ENV === 'development' ? 'ws://192.168.77.137:39371/ws' : 'wss://agent-deck.xianqiao.wang/ws';
 

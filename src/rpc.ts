@@ -18,7 +18,6 @@ type PendingCall = {
 type Handler = (params: unknown) => unknown | Promise<unknown>;
 
 export class RpcPeer {
-  #nextId = 0;
   #send: (message: RpcMessage) => void;
   #pending = new Map<RpcId, PendingCall>();
   #handlers = new Map<string, Handler>();
@@ -29,7 +28,8 @@ export class RpcPeer {
   }
 
   call = <T>(method: string, params: unknown = {}, onEvent?: (event: unknown) => void) => {
-    const id = `a${++this.#nextId}`;
+    // Replies from before an App reload must never match a new call.
+    const id = crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
       this.#pending.set(id, { resolve: resolve as (value: unknown) => void, reject, onEvent });
       try {

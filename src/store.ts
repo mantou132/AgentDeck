@@ -8,6 +8,7 @@ import {
   fallbackAgents,
   finishStreaming,
   formatOptionLabels,
+  RESET_PENDING_KEY,
   readSettings,
   reduceSessionEvent,
   SETTINGS_KEY,
@@ -15,7 +16,7 @@ import {
 } from './session-runtime';
 import {
   agentApi,
-  hardResetTransport,
+  clearTransportStorage,
   initTransport,
   reconnectTransport,
   startTransport,
@@ -33,7 +34,7 @@ import {
 } from './turn-controller';
 
 export * from './session-runtime';
-export { agentApi, hardResetTransport, reconnectTransport } from './transport';
+export { agentApi, reconnectTransport } from './transport';
 
 export type SessionGroup = {
   cwd: string;
@@ -231,14 +232,34 @@ const handleTransportMessage = (message: TransportMessage) => {
 };
 
 export const startApp = () => {
+  try {
+    if (sessionStorage.getItem(RESET_PENDING_KEY)) {
+      // Clear after reload: callbacks in the old document can no longer refill the outbox.
+      clearTransportStorage();
+      sessionStorage.removeItem(RESET_PENDING_KEY);
+    }
+  } catch (error) {
+    agentdeckStore({
+      connection: 'disconnected',
+      sessionsLoaded: true,
+      sessionsError: `重置本地连接失败：${error instanceof Error ? error.message : String(error)}`,
+    });
+    return;
+  }
+
   initTransport({
     initialRelayId: agentdeckStore.settings.relayId,
-    onRequestPermission: (request) =>
-      requestTurnPermission(request, (req) => {
+    onRequestPermission: (request) => {
+      const session = getSession(request.sessionId);
+      if (session?.agent !== request.agent || !agentdeckStore.pendingSessionIds.includes(request.sessionId)) {
+        return Promise.reject(new Error('权限请求对应的任务已失效'));
+      }
+      return requestTurnPermission(request, (req) => {
         agentdeckStore({
           permissionsBySession: { ...agentdeckStore.permissionsBySession, [req.sessionId]: req },
         });
-      }),
+      });
+    },
     onMessage: handleTransportMessage,
   });
 };
@@ -261,16 +282,12 @@ export const saveSettings = (settings: AppSettings) => {
 };
 
 /**
- * 设置页面的全局硬重置：
- * 保留 relayId、agent 和 deviceId，其余一切清空，强制重建连接并自动回到 list 页面。
+ * 重载整个 App，结束旧文档中的连接、回调、权限等待和 Stack 页面。
+ * 配对设置保留，Relay 缓存在新文档启动时清除；不等待远端取消或关闭。
  */
 export const hardResetApp = () => {
-  const relayId = agentdeckStore.settings.relayId;
-  resetRemoteState();
-  clearNetworkErrors();
-  if (isRelayId(relayId)) {
-    hardResetTransport(relayId);
-  }
+  sessionStorage.setItem(RESET_PENDING_KEY, 'true');
+  window.location.reload();
 };
 
 export const refreshSessions = async () => {

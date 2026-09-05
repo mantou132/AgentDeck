@@ -12,6 +12,7 @@
 - `src/elements/`：Gem 公共自定义元素组件
 - `src-tauri/`：Tauri 2 原生入口、应用配置以及 Android / iOS 生成工程
 - `public/`：Rsbuild 直接复制的静态品牌资源
+- `test/`：Node 内置 test runner 的隔离回归测试，使用 App 源码和实际 Relay SDK 模拟重置后的连接与会话恢复
 
 ## 关键文件
 
@@ -19,7 +20,7 @@
 - `src/app.ts`：启动路由；未配置 Relay ID 时显示 settings，否则显示 list
 - `src/session-list.ts`：按 cwd 分组的远端 ACP session list；把 session/settings 页面压入 Stack
 - `src/session.ts`：按页面 `sessionId` 加载历史回放并渲染消息、工具、权限和 composer
-- `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页
+- `src/settings.ts`：Relay ID 与远端 ACP Agent 设置页，以及 list/session 共用的设置入口
 - `src/elements/cwd-picker.ts`：工作目录选择器
 - `src/elements/session-group.ts`：按工作目录分组展示会话列表与展开/折叠面板
 - `src/elements/icon.ts`：品牌多层卡片图标组件
@@ -44,6 +45,8 @@
 
 运行链路：`src/main.ts` 先加载 `src/theme.ts`，挂载 `src/app.ts` 并启动 relay transport。`src/app.ts` 同步检查本地 Relay ID：缺少配置时显示 settings，存在配置时显示 list；点击 list 条目后，`src/session-list.ts` 把对应 `sessionId` 作为页面 property 传给 session 页面并压入 Stack。新建会话采用 Draft 模式：从目录选择器确认后建立本地 draft session 压入 Stack，用户首次发送任务时才调用远端 `createSession` 并无缝转换为正式会话。
 
+重置链路：list 与 session 均可打开 settings 执行“重置 App”。`hardResetApp` 在 sessionStorage 标记重置后重新加载整个文档；`startApp` 在新文档连接 Relay 前清除 Relay outbox/接收游标，再消费标记。配对设置和 deviceId 保留，旧页面的 RPC/权限/Stack 状态随重载结束；RPC 使用唯一请求 ID，避免旧回复匹配新调用。首次重新打开 session 仍采用 close → load，不依赖手机卸载页面时关闭会话。重置不删除远端历史，也不保证停止已提交的任务。
+
 样式链路：组件布局优先写 Tailwind utility；`src/tailwind.css` 的共享 token 同时供 Tailwind utility 和 `src/theme.ts` 中的 Tap UI theme 使用。不要再创建平行的应用级 CSS 变量。安全区变量由原生 edge-to-edge 插件在运行时提供，不属于视觉主题，继续在局部 CSS 中使用。
 
 远端接入链路：基于 `relay-client-ts` 在开发构建连接 `ws://127.0.0.1:39371/ws`，在生产构建连接 `wss://agent-deck.xianqiao.wang/ws`，App 固定使用 relay endpoint 2；browser4agent 的 `relay_client` 使用 endpoint 1。relay payload 由 `src/rpc.ts` 处理，并通过 `src/agent-api.ts` 调用 browser4agent 的 agent RPC。
@@ -54,6 +57,7 @@ Android 标识必须保持一致：`src-tauri/tauri.conf.json` 的 identifier、
 
 - `pnpm run dev`：启动 Rsbuild 预览
 - `pnpm run check`：TypeScript 严格类型检查
+- `pnpm test`：运行隔离的重置与会话恢复回归测试
 - `pnpm run lint`：使用 Biome 检查并修复整个项目
 - `pnpm run lint:check`：只检查 Biome 问题，不修改文件
 - `pnpm run build`：生成前端静态资源

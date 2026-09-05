@@ -10,6 +10,7 @@
     "lint": "biome check --write",
     "lint:check": "biome check",
     "check": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
     "prepare": "husky install",
     "tauri": "tauri"
   },

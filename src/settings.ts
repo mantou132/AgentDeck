@@ -3,6 +3,13 @@ import { icons } from '@mantou/tap-ui/lib/icons';
 
 import { agentdeckStore, hardResetApp, saveSettings } from './store';
 
+export const openSettings = () => {
+  Stack.push({
+    content: html`<agentdeck-settings-page class="block h-full" .canGoBack=${true}></agentdeck-settings-page>`,
+    gesture: true,
+  });
+};
+
 const style = css`
   .settings-header {
     padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
@@ -18,7 +25,6 @@ const style = css`
 @connectStore(agentdeckStore)
 export class AgentDeckSettingsPageElement extends GemElement {
   @property canGoBack = false;
-  @property onDone?: () => void;
 
   #state = createState({
     relayId: agentdeckStore.settings.relayId,
@@ -33,7 +39,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
       if (this.canGoBack) {
         Stack.close();
       }
-      this.onDone?.();
     } catch (error) {
       this.#state({ error: error instanceof Error ? error.message : '保存设置失败' });
     }
@@ -42,11 +47,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
   #reset = () => {
     try {
       hardResetApp();
-      this.#state({ error: '' });
-      if (this.canGoBack) {
-        Stack.close();
-      }
-      this.onDone?.();
     } catch (error) {
       this.#state({ error: error instanceof Error ? error.message : '重置失败' });
     }
@@ -166,8 +166,11 @@ export class AgentDeckSettingsPageElement extends GemElement {
               @click=${this.#reset}
             >
               <tap-use class="size-[17px]" .element=${icons.delete}></tap-use>
-              重置会话
+              重置 App
             </button>
+            <p v-if=${!!agentdeckStore.settings.relayId} class="mt-2 mb-0 text-xs leading-relaxed text-describe">
+              重新加载 App，清空本地会话缓存和未发送内容。保留配对设置与远端历史，远端任务可能仍在运行。
+            </p>
           </div>
         </main>
       </tap-page>
