@@ -1,5 +1,6 @@
 import type { CreatedSession, SessionEvent } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
+import { i18n } from '../i18n';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
 import { getModeSelection, withCurrentMode } from '../session/modes';
@@ -113,7 +114,7 @@ export const refreshSessions = async () => {
     agentdeckStore({
       sessionsLoading: false,
       sessionsLoaded: true,
-      sessionsError: error instanceof Error ? error.message : '读取会话失败',
+      sessionsError: error instanceof Error ? error.message : i18n.get('error.fetchSessionsFailed'),
     });
   }
 };
@@ -136,7 +137,7 @@ export const createDraftSession = ({ agent, cwd }: CreateSessionInput): DeckSess
     agent,
     sessionId: 'draft',
     cwd,
-    title: '新建会话',
+    title: i18n.get('session.newSession'),
     draft: true,
     updatedAt: new Date().toISOString(),
   };
@@ -184,7 +185,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
   if (!session) return;
   if (agentdeckStore.connection !== 'connected') {
     failedSessionLoads.add(sessionId);
-    setSessionError(sessionId, '远端尚未连接，连接后请重试加载');
+    setSessionError(sessionId, i18n.get('error.remoteNotConnected'));
     return;
   }
 
@@ -213,7 +214,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
     if (sessionLoads.get(sessionId) !== token) return;
     failedSessionLoads.add(sessionId);
     setSessionFlag('loadingSessionIds', sessionId, false);
-    setSessionError(sessionId, error instanceof Error ? error.message : '加载会话失败');
+    setSessionError(sessionId, error instanceof Error ? error.message : i18n.get('error.loadSessionFailed'));
   }
 };
 
@@ -274,7 +275,7 @@ export const promoteDraftSession = async (
   attachments: Attachment[] = [],
 ): Promise<DeckSession | null> => {
   if (agentdeckStore.connection !== 'connected') {
-    setSessionError('draft', '远端连接后才能新建会话');
+    setSessionError('draft', i18n.get('error.remoteNotConnectedCreate'));
     return null;
   }
   const selectedMode = getModeSelection(agentdeckStore.optionsBySession.draft)?.currentValue;
@@ -288,12 +289,12 @@ export const promoteDraftSession = async (
   try {
     created = await agentApi.createSession({ agent: draft.agent, cwd: draft.cwd });
     if (typeof created.sessionId !== 'string' || !created.sessionId) {
-      throw new Error('远端 Agent 未返回 sessionId');
+      throw new Error(i18n.get('error.missingSessionId'));
     }
   } catch (error) {
     setMessages('draft', []);
     setSessionFlag('pendingSessionIds', 'draft', false);
-    setSessionError('draft', error instanceof Error ? error.message : '创建会话失败');
+    setSessionError('draft', error instanceof Error ? error.message : i18n.get('error.createSessionFailed'));
     return null;
   }
 
@@ -320,7 +321,7 @@ export const promoteDraftSession = async (
     try {
       options = await applyRemoteMode(liveSession, options, selectedMode);
     } catch (error) {
-      modeError = error instanceof Error ? error.message : '切换模式失败，请重试。';
+      modeError = error instanceof Error ? error.message : i18n.get('error.switchModeFailed');
     }
     if (isDraftCanceled()) {
       void agentApi.closeSession(draft.agent, sessionId).catch(() => {});
@@ -392,7 +393,7 @@ export const cancelTurn = (sessionId: string) => {
     return;
   }
   void cancelTurnPrompt(session).catch((error) =>
-    setSessionError(sessionId, error instanceof Error ? error.message : '停止任务失败'),
+    setSessionError(sessionId, error instanceof Error ? error.message : i18n.get('error.cancelTaskFailed')),
   );
 };
 
@@ -402,5 +403,5 @@ export const endSession = (sessionId: string) => {
   setSessionFlag('pendingSessionIds', sessionId, false);
   openedSessionIds.delete(sessionId);
   resolvePermission(sessionId, null);
-  setSessionError(sessionId, '远端会话已结束');
+  setSessionError(sessionId, i18n.get('error.remoteSessionEnded'));
 };

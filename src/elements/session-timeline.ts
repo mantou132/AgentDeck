@@ -2,23 +2,12 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { i18n } from '../i18n';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
-import { getToolCommand, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
+import { getProcessSummary, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 
 const style = css`
   :scope { display: block; }
 `;
-
-const getTimelineProcessSummary = (group: ProcessGroup) => {
-  const tools = group.items.filter((item) => item.type === 'tool');
-  if (!group.pending) {
-    return tools.length ? i18n.get('timeline.toolCalls', String(tools.length)) : i18n.get('timeline.thought');
-  }
-  const active = tools.findLast(
-    (tool) => !tool.data.status || tool.data.status === 'pending' || tool.data.status === 'in_progress',
-  );
-  return active ? getToolCommand(active.data) : i18n.get('timeline.thinking');
-};
 
 @customElement('deck-session-timeline')
 @adoptedStyle(style)
@@ -56,7 +45,7 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderProcessGroup = (group: ProcessGroup) => {
-    const summary = getTimelineProcessSummary(group);
+    const summary = getProcessSummary(group);
     return html`
       <div class="mb-3 flex min-w-0 items-center">
         <button

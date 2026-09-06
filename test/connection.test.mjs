@@ -78,7 +78,7 @@ test('Relay ready does not enable App until host attach succeeds; timeout can be
   );
   await fixture.advance(10_000);
   assert.equal(fixture.app.agentdeckStore.connection, 'unavailable');
-  assert.match(fixture.app.agentdeckStore.connectionError, /连接远端超时/);
+  assert.match(fixture.app.agentdeckStore.connectionError, /Connecting to host timed out/);
   assert.equal(outbox(fixture).length, 0, 'expired unacknowledged attach is withdrawn');
   fixture.heldMethods.clear();
   await fixture.app.refreshSessions();
@@ -92,7 +92,7 @@ test('Relay handshake watchdog recovers a socket stuck before ready', async () =
   const fixture = documentFixture();
   fixture.app.startApp();
   await fixture.advance(10_000);
-  assert.match(fixture.app.agentdeckStore.connectionError, /连接 Relay 超时/);
+  assert.match(fixture.app.agentdeckStore.connectionError, /Connecting to Relay timed out/);
   assert.equal(fixture.sockets[0].readyState, 3);
   await fixture.advance(3000);
   assert.equal(fixture.sockets.length, 2);
@@ -106,12 +106,12 @@ test('offline session load error and retry survive a successful reconnection', a
   await fixture.connect();
   fixture.sockets.at(-1).close();
   await fixture.app.ensureSessionLoaded('s1');
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /远端尚未连接/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Host is not connected/);
   fixture.app.retrySessionLoad('s1');
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /远端尚未连接/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Host is not connected/);
   const retry = fixture.app.retrySessionLoad('s1');
   await fixture.settleHost();
   await retry;
@@ -127,7 +127,7 @@ test('a timed-out close does not proceed to load; a timed-out load can be retrie
   await fixture.settleHost();
   await fixture.advance(10_000);
   await first;
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /关闭会话超时/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Closing session timed out/);
   assert.equal(
     fixture.requests.some((request) => request.payload.method === 'agent_session_load'),
     false,
@@ -139,7 +139,7 @@ test('a timed-out close does not proceed to load; a timed-out load can be retrie
   const oldLoad = fixture.requests.find((request) => request.payload.method === 'agent_session_load');
   await fixture.advance(65_000);
   await second;
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /加载会话超时/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Loading session timed out/);
   assert.equal(fixture.app.agentdeckStore.loadingSessionIds.length, 0);
   assert.equal(
     outbox(fixture).some((request) => request.payload.id === oldLoad.payload.id),
@@ -158,7 +158,7 @@ test('directory and session-list requests end at their deadlines, but prompt has
   await fixture.connect();
   await fixture.openSession();
   const cwd = fixture.app.agentApi.completeCwd('');
-  const cwdRejected = assert.rejects(cwd, /读取目录超时/);
+  const cwdRejected = assert.rejects(cwd, /Reading directory timed out/);
   await fixture.advance(15_000);
   await cwdRejected;
   fixture.heldMethods.add('agent_session_list');
@@ -167,7 +167,7 @@ test('directory and session-list requests end at their deadlines, but prompt has
   await fixture.advance(65_000);
   await list;
   assert.equal(fixture.app.agentdeckStore.sessionsLoading, false);
-  assert.match(fixture.app.agentdeckStore.sessionsError, /读取会话列表超时/);
+  assert.match(fixture.app.agentdeckStore.sessionsError, /Reading session list timed out/);
   fixture.app.sendPrompt('s1', 'long task');
   await tick();
   await fixture.advance(120_000);

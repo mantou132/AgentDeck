@@ -49,7 +49,7 @@ test('cancelling an unknown remote task shows the reset recovery path', async ()
   assert.equal(cancel.payload.method, 'agent_prompt_cancel');
   f.reply(cancel, { cancelled: false });
   await tick();
-  assert.match(f.app.agentdeckStore.errorsBySession.s1, /重置 App/);
+  assert.match(f.app.agentdeckStore.errorsBySession.s1, /reset the app/i);
   f.app.hardResetApp();
   const fresh = documentFixture(f);
   await fresh.connect();

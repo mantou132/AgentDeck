@@ -1,4 +1,5 @@
 import type { SessionConfigOption, SessionEvent } from '../agent/api';
+import { i18n } from '../i18n';
 import { withCurrentMode } from './modes';
 import type {
   Attachment,
@@ -46,7 +47,7 @@ export const appendImage = (
   const attachment: Attachment = {
     id: crypto.randomUUID(),
     kind: 'image',
-    name: '图片',
+    name: i18n.get('attachment.imageDefaultName'),
     data,
     mimeType,
     previewUrl: `data:${mimeType};base64,${data}`,
@@ -121,7 +122,7 @@ export const reduceSessionEvent = (
           type: 'tool',
           data: {
             toolCallId: update.toolCallId,
-            title: typeof update.title === 'string' ? update.title : '工具调用',
+            title: typeof update.title === 'string' ? update.title : i18n.get('timeline.toolCall'),
             ...(typeof update.kind === 'string' ? { kind: update.kind } : {}),
             ...(typeof update.status === 'string' ? { status: update.status as ToolCallStatus } : {}),
             ...('rawInput' in update ? { rawInput: update.rawInput } : {}),
@@ -146,7 +147,7 @@ export const reduceSessionEvent = (
       next.push({
         id: crypto.randomUUID(),
         type: 'tool',
-        data: { toolCallId: update.toolCallId, title: patch.title ?? '工具调用', ...patch },
+        data: { toolCallId: update.toolCallId, title: patch.title ?? i18n.get('timeline.toolCall'), ...patch },
       });
     } else {
       const message = next[index] as ToolMessage;

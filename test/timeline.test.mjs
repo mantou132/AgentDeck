@@ -45,7 +45,7 @@ test('live summaries select an unfinished tool even after another tool or though
   apply({ sessionUpdate: 'tool_call_update', toolCallId: 'check', rawInput: { command: 'pnpm run check --verbose' } });
   assert.equal(getProcessSummary(group()), 'pnpm run check --verbose');
   apply({ sessionUpdate: 'tool_call_update', toolCallId: 'check', status: 'completed' });
-  assert.equal(getProcessSummary(group()), '正在思考…');
+  assert.equal(getProcessSummary(group()), 'Thinking…');
 });
 
 test('finished history uses a general summary instead of an old command', () => {
@@ -59,9 +59,9 @@ test('finished history uses a general summary instead of an old command', () => 
       thought,
     ],
   };
-  assert.equal(getProcessSummary(group), '2 次工具调用');
-  assert.equal(getProcessSummary({ ...group, items: [thought] }), '思考过程');
-  assert.equal(getProcessSummary({ ...group, pending: true, items: [thought] }), '正在思考…');
+  assert.equal(getProcessSummary(group), '2 tool calls');
+  assert.equal(getProcessSummary({ ...group, items: [thought] }), 'Thought process');
+  assert.equal(getProcessSummary({ ...group, pending: true, items: [thought] }), 'Thinking…');
 });
 
 test('starting another task does not revive unfinished tools from an earlier turn', () => {
@@ -78,7 +78,7 @@ test('starting another task does not revive unfinished tools from an earlier tur
     .map((item) => item.group);
   assert.equal(groups[0].pending, false);
   assert.equal(getToolStatus(oldTool, groups[0].pending), 'ended');
-  assert.equal(getProcessSummary(groups[0]), '1 次工具调用');
+  assert.equal(getProcessSummary(groups[0]), '1 tool calls');
   assert.equal(groups[1].pending, true);
   assert.equal(getToolStatus(newTool, groups[1].pending), 'in_progress');
   assert.equal(getProcessSummary(groups[1]), 'New command');

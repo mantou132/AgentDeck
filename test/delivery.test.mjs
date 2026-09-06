@@ -19,7 +19,7 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
   const directory = fixture.requests.at(-1);
   await reject(fixture, prompt);
   assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /队列已满/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /queue is full/i);
   assert.equal(
     outbox(fixture).some((message) => message.messageId === prompt.message_id),
     false,
@@ -49,7 +49,7 @@ test('rejected handshake can reconnect without waiting for its deadline', async 
   await fixture.connect();
   await reject(fixture, fixture.requests.at(-1));
   assert.equal(fixture.app.agentdeckStore.connection, 'unavailable');
-  assert.match(fixture.app.agentdeckStore.connectionError, /队列已满/);
+  assert.match(fixture.app.agentdeckStore.connectionError, /queue is full/i);
   assert.equal(outbox(fixture).length, 0);
   fixture.heldMethods.clear();
   await fixture.app.refreshSessions();
@@ -68,7 +68,7 @@ test('rejected session list and draft creation both leave a usable retry path', 
   await reject(fixture, list, 'database temporarily unavailable');
   await refresh;
   assert.equal(fixture.app.agentdeckStore.sessionsLoading, false);
-  assert.match(fixture.app.agentdeckStore.sessionsError, /Relay 拒绝/);
+  assert.match(fixture.app.agentdeckStore.sessionsError, /Relay rejected/i);
   fixture.heldMethods.clear();
   const retry = fixture.app.refreshSessions();
   await fixture.settleHost();
@@ -83,7 +83,7 @@ test('rejected session list and draft creation both leave a usable retry path', 
   assert.equal(await creation, null);
   assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
   assert.ok(fixture.app.agentdeckStore.draftSession);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.draft, /队列已满/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.draft, /queue is full/i);
   fixture.heldMethods.clear();
   const created = fixture.app.promoteDraftSession(draft, 'draft task');
   await fixture.settleHost();
@@ -104,7 +104,7 @@ test('oversized UTF-8 frames fail before enqueue or send and a smaller prompt wo
   assert.equal(fixture.requests.length, requestCount);
   assert.equal(outbox(fixture).length, 0);
   assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /消息过大，未发送/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /too large/i);
   assert.equal(fixture.app.sendPrompt('s1', 'smaller prompt'), true);
   await tick();
   fixture.reply(fixture.requests.at(-1), { answer: 'done' });
@@ -126,7 +126,7 @@ test('local storage failure does not silently strand a prompt', async () => {
   await tick();
   assert.equal(fixture.requests.length, requestCount);
   assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /无法保存待发送消息/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Failed to store pending message/);
   fixture.localStorage.setItem = save;
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
@@ -174,7 +174,7 @@ test('rejected permission reply is visible and reset restores the normal session
   await tick();
   const reply = fixture.requests.find((request) => request.payload.id === 'permission');
   await reject(fixture, reply);
-  assert.match(fixture.app.agentdeckStore.connectionError, /回复未能送达远端/);
+  assert.match(fixture.app.agentdeckStore.connectionError, /Failed to deliver reply/);
   assert.equal(
     outbox(fixture).some((message) => message.messageId === reply.message_id),
     false,
@@ -206,7 +206,7 @@ test('late rejection after stored or pairing change cannot fail another call', a
   await tick();
   const oldSocket = fixture.sockets.at(-1);
   const cwd = fixture.app.agentApi.completeCwd('/tmp');
-  const closed = assert.rejects(cwd, /连接已关闭/);
+  const closed = assert.rejects(cwd, /connection closed/i);
   await tick();
   oldSocket.frame({ type: 'rejected', message_id: fixture.requests.at(-1).message_id, reason: 'queue_full:' });
   fixture.app.saveSettings({ relayId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', agent: 'codex' });

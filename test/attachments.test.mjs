@@ -77,7 +77,7 @@ test('an oversized image stays recoverable without being enqueued', async () => 
   fixture.app.sendPrompt('s1', '', [largeImage]);
   await tick();
   assert.equal(fixture.requests.length, count);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /消息过大，未发送/);
+  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /too large/i);
   const message = fixture.app.agentdeckStore.messagesBySession.s1.at(-1);
   assert.equal(message.failed, true);
   assert.equal(message.attachments[0], largeImage);

@@ -1,4 +1,5 @@
 import { agentApi } from '../agent/transport';
+import { i18n } from '../i18n';
 import { getModeSelection, withCurrentMode } from '../session/modes';
 import type { DeckSession, SessionOptions } from '../session/types';
 import { agentdeckStore, setSessionError, setSessionFlag, updateSessionOptions } from './store';
@@ -10,7 +11,7 @@ export const applyRemoteMode = async (
 ): Promise<SessionOptions> => {
   const mode = getModeSelection(options);
   if (!mode?.choices.some((choice) => choice.value === modeId)) {
-    throw new Error('远端会话不支持所选模式，请重新选择后发送。');
+    throw new Error(i18n.get('error.unsupportedMode'));
   }
   if (mode.currentValue === modeId) return options;
   if (mode.configId) {
@@ -36,7 +37,7 @@ export const changeSessionMode = async (session: DeckSession, modeId: string) =>
     updateSessionOptions(sessionId, patch);
     return true;
   } catch (error) {
-    setSessionError(sessionId, error instanceof Error ? error.message : '切换模式失败，请重试。');
+    setSessionError(sessionId, error instanceof Error ? error.message : i18n.get('error.switchModeFailed'));
     return false;
   } finally {
     setSessionFlag('changingModeSessionIds', sessionId, false);

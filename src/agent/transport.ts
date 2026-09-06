@@ -7,19 +7,14 @@ import {
   type RelayStore,
 } from 'relay-client-ts';
 import { DEVICE_ID_KEY, RELAY_URL } from '../config';
+import { getConnectionLabel, i18n } from '../i18n';
 import { AgentApi, type PermissionRequest, type SessionEvent } from './api';
 import type { RpcId, RpcMessage } from './rpc';
 
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
-export const connectionLabels: Record<ConnectionState, string> = {
-  connecting: '正在连接 Relay',
-  connected: '远端已连接',
-  attaching: 'Relay 已连接，正在连接远端',
-  unavailable: '远端未响应',
-  reconnecting: '正在重新连接',
-  disconnected: '尚未连接',
-  preempted: '连接已被取代',
-};
+export const connectionLabels = new Proxy({} as Record<ConnectionState, string>, {
+  get: (_, prop: ConnectionState) => getConnectionLabel(prop),
+});
 
 export const getDeviceId = (): string => {
   let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -45,9 +40,9 @@ let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const agentApi = new AgentApi(
   async (message) => {
-    if (!relayClient) throw new Error('Relay 尚未配置');
+    if (!relayClient) throw new Error(i18n.get('error.relayNotConfigured'));
     if (message.method && message.method !== 'peer_attach' && connectionState !== 'connected') {
-      throw new Error('远端尚未连接，请重新连接后重试');
+      throw new Error(i18n.get('error.remoteNotConnectedRetry'));
     }
     if (message.method === 'peer_attach') attachId = message.id;
     if (currentPeerId !== undefined) (message as Record<string, unknown>).peerId = currentPeerId;
@@ -83,7 +78,7 @@ let globalMessageHandler: MessageHandler | undefined;
 const reportReplyFailure = () =>
   globalMessageHandler?.({
     type: 'delivery_error',
-    error: '操作回复未能送达远端，请在设置中重置 App 后重新加载会话。',
+    error: i18n.get('error.deliveryReplyFailed'),
   });
 const emitConnection = (connection: ConnectionState, error = '') => {
   connectionState = connection;
@@ -106,7 +101,7 @@ export const syncHostConnection = () => {
     .then((result) => {
       if (version !== attachVersion) return;
       if (!Number.isSafeInteger(result?.peerId) || result.peerId <= 0) {
-        throw new Error('远端未返回有效的设备标识，请重新连接');
+        throw new Error(i18n.get('error.invalidDeviceId'));
       }
       currentPeerId = result.peerId;
       emitConnection('connected');
@@ -142,12 +137,12 @@ export const startTransport = (relayId: string) => {
       // Match Relay's full WebSocket message limit, including the envelope.
       const frame = JSON.stringify({ type: 'message', message_id: message.messageId, payload: message.payload });
       if (new TextEncoder().encode(frame).byteLength > 10 * 1024 * 1024) {
-        throw new Error('消息过大，未发送。请减少文字或附件后重试。');
+        throw new Error(i18n.get('error.messageTooLarge'));
       }
       try {
         await persistedStore.enqueue(message);
       } catch {
-        throw new Error('无法保存待发送消息，未发送。请释放本地存储空间后重试。');
+        throw new Error(i18n.get('error.storageFailed'));
       }
       if (relayStore !== store) return;
       const { id, method } = message.payload as RpcMessage;
@@ -177,8 +172,8 @@ export const startTransport = (relayId: string) => {
       if (!delivery) return;
       if (delivery.id !== undefined && delivery.method) {
         const error = reason.startsWith('queue_full:')
-          ? 'Relay 待投递队列已满，消息未发送。请稍后重试。'
-          : 'Relay 拒绝了这条消息，未发送。请稍后重试；持续失败可在设置中重置 App。';
+          ? i18n.get('error.relayQueueFull')
+          : i18n.get('error.relayRejected');
         agentApi.dispatch({ id: delivery.id, error });
       } else {
         reportReplyFailure();
@@ -211,14 +206,14 @@ export const startTransport = (relayId: string) => {
       if (connection === 'preempted') {
         clearTimeout(retryTimer);
         currentPeerId = undefined;
-        agentApi.rejectAll(new Error('Relay 连接已被抢占，请重新连接或重置 App'));
+        agentApi.rejectAll(new Error(i18n.get('error.relayPreempted')));
       }
       emitConnection(connection, error);
       if (connection === 'connecting') {
         connectTimer = setTimeout(() => {
           if (relayClient !== client || relayConnected) return;
           client.close();
-          emitConnection('reconnecting', '连接 Relay 超时，请检查网络或重新连接。');
+          emitConnection('reconnecting', i18n.get('error.relayTimeout'));
           scheduleRetry();
         }, 10_000);
       }
@@ -271,7 +266,7 @@ export const closeTransport = () => {
   clearTimeout(connectTimer);
   clearTimeout(retryTimer);
   previous?.close();
-  agentApi.rejectAll(new Error('Relay 连接已关闭'));
+  agentApi.rejectAll(new Error(i18n.get('error.relayClosed')));
   emitConnection('disconnected');
 };
 

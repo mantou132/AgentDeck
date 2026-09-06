@@ -1,6 +1,7 @@
 import { isRelayId } from 'relay-client-ts';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
+import { i18n } from '../i18n';
 import { requestPermission as requestTurnPermission } from '../session/turn';
 import { applySessionEvent, endSession, getSession, refreshSessions, resetRemoteState } from './sessions';
 import { agentdeckStore } from './store';
@@ -48,7 +49,10 @@ export const startApp = () => {
     agentdeckStore({
       connection: 'disconnected',
       sessionsLoaded: true,
-      sessionsError: `重置本地连接失败：${error instanceof Error ? error.message : String(error)}`,
+      sessionsError: i18n.get(
+        'error.resetLocalFailed',
+        error instanceof Error ? error.message : String(error),
+      ) as unknown as string,
     });
     return;
   }
@@ -58,7 +62,7 @@ export const startApp = () => {
     onRequestPermission: (request) => {
       const session = getSession(request.sessionId);
       if (session?.agent !== request.agent || !agentdeckStore.pendingSessionIds.includes(request.sessionId)) {
-        return Promise.reject(new Error('权限请求对应的任务已失效'));
+        return Promise.reject(new Error(i18n.get('error.permissionTaskExpired')));
       }
       return requestTurnPermission(request, (req) => {
         agentdeckStore({
@@ -72,8 +76,8 @@ export const startApp = () => {
 
 export const saveSettings = (settings: AppSettings) => {
   const next = { relayId: settings.relayId.trim(), agent: settings.agent.trim() };
-  if (!isRelayId(next.relayId)) throw new Error('请输入有效的 Relay UUID');
-  if (!next.agent) throw new Error('请选择远端 Agent');
+  if (!isRelayId(next.relayId)) throw new Error(i18n.get('error.invalidRelayId'));
+  if (!next.agent) throw new Error(i18n.get('error.selectRemoteAgent'));
   const relayChanged = next.relayId !== agentdeckStore.settings.relayId;
   const agentChanged = next.agent !== agentdeckStore.settings.agent;
   const notConnected = agentdeckStore.connection !== 'connected';

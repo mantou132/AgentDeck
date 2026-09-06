@@ -1,31 +1,28 @@
+import { i18n } from '../i18n';
 import type { ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
 
 export type ProcessGroup = { id: string; items: (ThoughtMessage | ToolMessage)[]; pending: boolean };
 
 type TimelineItem = { type: 'message'; message: TextMessage } | { type: 'group'; group: ProcessGroup };
 
-export const toolStatusLabels = {
-  pending: '等待中',
-  in_progress: '进行中',
-  completed: '已完成',
-  failed: '失败',
-  ended: '已结束',
-} as const;
-
-export type ToolStatus = keyof typeof toolStatusLabels;
+export type ToolStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'ended';
 
 export const getToolStatus = (tool: ToolCallData, live: boolean) => {
   const status = tool.status || 'pending';
   return !live && (status === 'pending' || status === 'in_progress') ? 'ended' : status;
 };
 
-export const getProcessSummary = (group: ProcessGroup) => {
+export const getProcessSummary = (group: ProcessGroup): string => {
   const tools = group.items.filter((item) => item.type === 'tool');
-  if (!group.pending) return tools.length ? `${tools.length} 次工具调用` : '思考过程';
+  if (!group.pending) {
+    return tools.length
+      ? (i18n.get('timeline.toolCalls', String(tools.length)) as unknown as string)
+      : i18n.get('timeline.thought');
+  }
   const active = tools.findLast(
     (tool) => !tool.data.status || tool.data.status === 'pending' || tool.data.status === 'in_progress',
   );
-  return active ? getToolCommand(active.data) : '正在思考…';
+  return active ? getToolCommand(active.data) : i18n.get('timeline.thinking');
 };
 
 export const getToolCommand = ({ rawInput, title }: ToolCallData) => {
@@ -35,7 +32,7 @@ export const getToolCommand = ({ rawInput, title }: ToolCallData) => {
     const command = input.command ?? input.cmd;
     if (typeof command === 'string' && command.trim()) return command;
   }
-  return title || '工具调用';
+  return title || i18n.get('timeline.toolCall');
 };
 
 export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean): TimelineItem[] => {

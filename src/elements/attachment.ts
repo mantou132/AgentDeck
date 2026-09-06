@@ -25,6 +25,7 @@ export class DeckAttachmentElement extends GemElement {
   #render = () => {
     const attachment = this.attachment;
     if (!attachment) return html``;
+
     return html`
       <div class="relative max-w-full">
         <button
@@ -34,7 +35,7 @@ export class DeckAttachmentElement extends GemElement {
             'flex w-44 items-center gap-2 p-2': this.compact || attachment.kind === 'text',
             'block p-1': !this.compact && attachment.kind === 'image',
           })}
-          aria-label=${i18n.get('attachment.viewAria', attachment.name)}
+          aria-label=${i18n.get('attachment.viewAria', attachment.name) as unknown as string}
           @click=${() => this.preview(attachment)}
         >
           <img
@@ -58,7 +59,7 @@ export class DeckAttachmentElement extends GemElement {
           v-if=${this.removable}
           type="button"
           class="absolute -top-2 -right-2 grid size-7 cursor-pointer place-items-center rounded-full border border-border bg-bg-light text-describe shadow-card active:bg-bg-hover"
-          aria-label=${i18n.get('attachment.removeAria', attachment.name)}
+          aria-label=${i18n.get('attachment.removeAria', attachment.name) as unknown as string}
           @click=${() => this.requestRemove(attachment.id)}
         >
           <tap-use class="size-3.5" .element=${icons.close}></tap-use>

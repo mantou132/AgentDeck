@@ -1,3 +1,4 @@
+import { i18n } from '../i18n';
 import type { RpcId, RpcMessage } from './rpc';
 import { RpcPeer } from './rpc';
 
@@ -91,14 +92,14 @@ export class AgentApi {
   attachPeer = async (deviceId: string) => {
     return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId }, undefined, {
       timeoutMs: 10_000,
-      timeoutMessage: '连接远端超时，请重试；持续失败可在设置中重置 App。',
+      timeoutMessage: i18n.get('error.connectHostTimeout'),
     });
   };
 
   listAgents = async () => {
     const result = await this.#peer.call<{ agents?: RemoteAgent[] }>('agent_list', {}, undefined, {
       timeoutMs: 15_000,
-      timeoutMessage: '读取 Agent超时，请重试；持续失败可在设置中重置 App。',
+      timeoutMessage: i18n.get('error.readAgentTimeout'),
     });
     return Array.isArray(result.agents) ? result.agents : [];
   };
@@ -110,7 +111,7 @@ export class AgentApi {
       directories?: string[];
     }>('agent_cwd_complete', { input, limit: 150 }, undefined, {
       timeoutMs: 15_000,
-      timeoutMessage: '读取目录超时，请重试；持续失败可在设置中重置 App。',
+      timeoutMessage: i18n.get('error.readCwdTimeout'),
     });
     return {
       value: typeof result.value === 'string' ? result.value : '',
@@ -128,7 +129,7 @@ export class AgentApi {
       undefined,
       {
         timeoutMs: 65_000,
-        timeoutMessage: '创建会话超时，结果尚未确认。请先刷新列表检查，或在设置中重置 App。',
+        timeoutMessage: i18n.get('error.createSessionTimeout'),
       },
     );
 
@@ -145,11 +146,11 @@ export class AgentApi {
           ...(cursor ? { cursor } : {}),
         },
         undefined,
-        { timeoutMs: 65_000, timeoutMessage: '读取会话列表超时，请重试；持续失败可在设置中重置 App。' },
+        { timeoutMs: 65_000, timeoutMessage: i18n.get('error.readSessionListTimeout') },
       );
       if (Array.isArray(result.sessions)) sessions.push(...result.sessions);
       cursor = typeof result.nextCursor === 'string' && result.nextCursor ? result.nextCursor : undefined;
-      if (cursor && cursors.has(cursor)) throw new Error('远端 Agent 返回了重复的 session cursor');
+      if (cursor && cursors.has(cursor)) throw new Error(i18n.get('error.duplicateSessionCursor'));
       if (cursor) cursors.add(cursor);
     } while (cursor);
     return sessions;
@@ -160,13 +161,13 @@ export class AgentApi {
       'agent_session_load',
       { agent, sessionId: session.sessionId, cwd: session.cwd, stream: true, timeoutSeconds: sessionTimeoutSeconds },
       (event) => onEvent(event as SessionEvent),
-      { timeoutMs: 65_000, timeoutMessage: '加载会话超时，请重试；持续失败可在设置中重置 App。' },
+      { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
     );
 
   setSessionMode = (agent: string, sessionId: string, modeId: string) =>
     this.#peer.call('agent_session_set_mode', { agent, sessionId, modeId }, undefined, {
       timeoutMs: 15_000,
-      timeoutMessage: '切换模式超时，结果尚未确认。请重试；持续失败可在设置中重置 App。',
+      timeoutMessage: i18n.get('error.switchModeTimeout'),
     });
 
   setSessionModeOption = (agent: string, sessionId: string, configId: string, value: string) =>
@@ -176,7 +177,7 @@ export class AgentApi {
       undefined,
       {
         timeoutMs: 15_000,
-        timeoutMessage: '切换模式超时，结果尚未确认。请重试；持续失败可在设置中重置 App。',
+        timeoutMessage: i18n.get('error.switchModeTimeout'),
       },
     );
 
@@ -196,12 +197,12 @@ export class AgentApi {
   cancelPrompt = (sessionId: string, agent: string) =>
     this.#peer.call<{ cancelled?: boolean }>('agent_prompt_cancel', { agent, sessionId }, undefined, {
       timeoutMs: 10_000,
-      timeoutMessage: '停止任务超时，请重试；持续失败可在设置中重置 App。',
+      timeoutMessage: i18n.get('error.cancelTaskTimeout'),
     });
 
   closeSession = (agent: string, sessionId: string) =>
     this.#peer.call<{ closed?: boolean }>('agent_session_close', { agent, sessionId }, undefined, {
       timeoutMs: 10_000,
-      timeoutMessage: '关闭会话超时，请重试；持续失败可在设置中重置 App。',
+      timeoutMessage: i18n.get('error.closeSessionTimeout'),
     });
 }

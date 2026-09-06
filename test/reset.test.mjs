@@ -126,7 +126,7 @@ test('failed cleanup keeps the reset marker and does not replay the old outbox',
   const boot = documentFixture(failed);
   boot.app.startApp();
   assert.equal(boot.sockets.length, 0);
-  assert.match(boot.app.agentdeckStore.sessionsError, /重置本地连接失败/);
+  assert.match(boot.app.agentdeckStore.sessionsError, /Failed to reset local connection/);
   assert.equal(boot.sessionStorage.getItem(resetKey), 'true');
   boot.localStorage.removeItem = remove;
   boot.app.hardResetApp();

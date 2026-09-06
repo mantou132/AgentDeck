@@ -82,6 +82,7 @@ export function documentFixture(previous) {
     Set,
     URL,
     TextEncoder,
+    queueMicrotask,
     localStorage,
     sessionStorage,
     WebSocket: Socket,
@@ -98,8 +99,32 @@ export function documentFixture(previous) {
       return Object.assign(state, initial);
     },
   });
+  class MockI18n {
+    constructor(options) {
+      this.fallbackLanguage = options.fallbackLanguage || 'en';
+      this.resources = options.resources || {};
+      this.currentLanguage = options.currentLanguage || 'en';
+      this.onChange = options.onChange;
+    }
+    setLanguage(lang) {
+      this.currentLanguage = lang;
+      this.onChange?.(lang);
+    }
+    get(key, ...rest) {
+      const pack = this.resources[this.currentLanguage] || this.resources[this.fallbackLanguage] || {};
+      const raw = pack[key] ?? key;
+      if (!rest.length) return raw;
+      return raw.replace(/\$(\d+)/g, (_, i) => rest[Number(i) - 1] ?? '');
+    }
+  }
+
   const cache = new Map();
   function load(file) {
+    if (file.endsWith('.json')) {
+      const data = JSON.parse(readFileSync(file, 'utf8'));
+      data.default = data;
+      return data;
+    }
     if (cache.has(file)) return cache.get(file).exports;
     const module = { exports: {} };
     cache.set(file, module);
@@ -115,12 +140,21 @@ export function documentFixture(previous) {
       filename: file,
     });
     run(
-      (name) =>
-        load(
-          name === 'relay-client-ts'
-            ? path.join(root, 'node_modules/relay-client-ts/src/relay-client.ts')
-            : path.resolve(path.dirname(file), `${name}.ts`),
-        ),
+      (name) => {
+        if (name === 'relay-client-ts') {
+          return load(path.join(root, 'node_modules/relay-client-ts/src/relay-client.ts'));
+        }
+        if (name === '@mantou/gem/helper/i18n') {
+          return { I18n: MockI18n };
+        }
+        if (name === '@mantou/tap-ui/lib/locale') {
+          return { loadLocale: () => Promise.resolve() };
+        }
+        if (name.endsWith('.json')) {
+          return load(path.resolve(path.dirname(file), name));
+        }
+        return load(path.resolve(path.dirname(file), `${name}.ts`));
+      },
       module,
       module.exports,
     );

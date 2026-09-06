@@ -97,7 +97,7 @@ test('mode change confirms the value before sending; rejection and timeout permi
   change = f.app.changeSessionMode(session, 'plan');
   await f.advance(15_000);
   assert.equal(await change, false);
-  assert.match(f.app.agentdeckStore.errorsBySession.s1, /切换模式超时/);
+  assert.match(f.app.agentdeckStore.errorsBySession.s1, /Switching mode timed out/);
   change = f.app.changeSessionMode(session, 'plan');
   await tick();
   f.reply(request(f, 'agent_session_set_mode'), {});

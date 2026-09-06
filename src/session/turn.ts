@@ -1,12 +1,13 @@
 import type { PermissionRequest, SessionEvent } from '../agent/api';
 import { agentApi } from '../agent/transport';
+import { i18n } from '../i18n';
 import type { Attachment, DeckSession } from './types';
 
 const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
 
 export const requestPermission = (request: PermissionRequest, onNotify: (request: PermissionRequest) => void) => {
-  if (!request?.sessionId) return Promise.reject(new Error('权限请求缺少 sessionId'));
-  permissionResolvers.get(request.sessionId)?.reject(new Error('权限请求已被新请求替换'));
+  if (!request?.sessionId) return Promise.reject(new Error(i18n.get('error.permissionMissingSessionId')));
+  permissionResolvers.get(request.sessionId)?.reject(new Error(i18n.get('error.permissionReplaced')));
   onNotify(request);
   return new Promise<string>((resolve, reject) => permissionResolvers.set(request.sessionId, { resolve, reject }));
 };
@@ -17,7 +18,7 @@ export const resolvePermission = (sessionId: string, optionId: string | null, on
   onClean(sessionId);
   if (!resolver) return;
   if (optionId) resolver.resolve(optionId);
-  else resolver.reject(new Error('用户取消了权限请求'));
+  else resolver.reject(new Error(i18n.get('error.permissionUserCancelled')));
 };
 
 export const declineAllPermissions = (onClean: (sessionId: string) => void) => {
@@ -69,7 +70,7 @@ export const performTurn = async (
     }
     completed = !cancelled;
   } catch (error) {
-    handlers.onError(error instanceof Error ? error.message : '发送消息失败');
+    handlers.onError(error instanceof Error ? error.message : i18n.get('error.sendMessageFailed'));
   } finally {
     handlers.onDone(completed);
   }
@@ -78,6 +79,6 @@ export const performTurn = async (
 export const cancelTurnPrompt = async (session: DeckSession) => {
   const result = await agentApi.cancelPrompt(session.sessionId, session.agent);
   if (result.cancelled === false) {
-    throw new Error('远端已无法停止这个任务，请在设置中重置 App 后重新加载会话。');
+    throw new Error(i18n.get('error.cannotStopTask'));
   }
 };
