@@ -2,6 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { Time } from '@mantou/tap-ui/lib/time';
 
+import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import type { DeckSession } from '../session/types';
 
@@ -52,15 +53,15 @@ export class DeckSessionGroupElement extends GemElement {
                 <span class="min-w-0">
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-base leading-snug font-semibold text-highlight">
-                      ${session.title || '未命名会话'}
+                      ${session.title || i18n.get('session.untitled')}
                     </span>
                     <span
                       v-if=${this.unreadSessionIds.includes(session.sessionId)}
                       class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 text-xs font-semibold text-positive"
-                      title="响应已完成，尚未查看"
+                      title=${i18n.get('session.completedUnreadTip')}
                     >
                       <span class="size-1.5 rounded-full bg-positive"></span>
-                      已完成
+                      ${i18n.get('session.completed')}
                     </span>
                   </span>
                   <span class="mt-1.5 block truncate font-mono text-xs text-describe">
@@ -71,7 +72,7 @@ export class DeckSessionGroupElement extends GemElement {
                   <span>
                     ${
                       session.updatedAt
-                        ? new Time().relativeTimeFormat(new Time(session.updatedAt), { lang: 'zh-CN' })
+                        ? new Time().relativeTimeFormat(new Time(session.updatedAt), { lang: i18n.currentLanguage })
                         : '—'
                     }
                   </span>
@@ -87,7 +88,7 @@ export class DeckSessionGroupElement extends GemElement {
             class="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 border-0 bg-transparent text-sm font-semibold text-describe transition-colors hover:text-highlight active:bg-bg-hover"
             @click=${this.#toggleExpand}
           >
-            <span>${expanded ? '收起会话' : `展开其余 ${sessions.length - 5} 个会话`}</span>
+            <span>${expanded ? i18n.get('session.collapse') : i18n.get('session.expandMore', String(sessions.length - 5))}</span>
             <tap-use class="size-3.5" .element=${expanded ? icons.rollup : icons.expand}></tap-use>
           </button>
         </footer>

@@ -1,6 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
+import { i18n } from '../i18n';
 import type { Attachment } from '../session/types';
 
 const style = css`
@@ -33,7 +34,7 @@ export class DeckAttachmentElement extends GemElement {
             'flex w-44 items-center gap-2 p-2': this.compact || attachment.kind === 'text',
             'block p-1': !this.compact && attachment.kind === 'image',
           })}
-          aria-label=${`查看附件“${attachment.name}”`}
+          aria-label=${i18n.get('attachment.viewAria', attachment.name)}
           @click=${() => this.preview(attachment)}
         >
           <img
@@ -49,7 +50,7 @@ export class DeckAttachmentElement extends GemElement {
           <span class=${this.compact || attachment.kind === 'text' ? 'min-w-0 flex-1' : 'block px-1.5 py-1'}>
             <span class="block truncate text-sm font-medium">${attachment.name}</span>
             <span v-if=${this.compact || attachment.kind === 'text'} class="block text-xs text-describe">
-              ${attachment.kind === 'image' ? '图片' : '文本'}
+              ${attachment.kind === 'image' ? i18n.get('attachment.image') : i18n.get('attachment.text')}
             </span>
           </span>
         </button>
@@ -57,7 +58,7 @@ export class DeckAttachmentElement extends GemElement {
           v-if=${this.removable}
           type="button"
           class="absolute -top-2 -right-2 grid size-7 cursor-pointer place-items-center rounded-full border border-border bg-bg-light text-describe shadow-card active:bg-bg-hover"
-          aria-label=${`删除附件“${attachment.name}”`}
+          aria-label=${i18n.get('attachment.removeAria', attachment.name)}
           @click=${() => this.requestRemove(attachment.id)}
         >
           <tap-use class="size-3.5" .element=${icons.close}></tap-use>

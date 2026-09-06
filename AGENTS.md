@@ -7,7 +7,7 @@
 
 # 项目导航
 
-- `src/`：Gem + Tap UI 前端；`elements/` 为公共自定义元素。
+- `src/`：Gem + Tap UI 前端；`elements/` 为公共自定义元素；`i18n.ts` 与 `locales/` 提供基于 `@mantou/gem` 的多语言。
 - `src-tauri/`：Tauri 2 原生入口、配置和 Android / iOS 工程。
 - `public/`：静态品牌资源；`relay-guide/` 为三步 Relay 指南插图。
 - `test/`：Node 回归测试；`helpers/app-fixture.mjs` 提供使用实际 Relay SDK 的隔离环境。

@@ -1,6 +1,8 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 
+import { i18n } from '../i18n';
+
 export type CwdCompletion = {
   value: string;
   isDirectory: boolean;
@@ -119,7 +121,7 @@ export class DeckCwdPickerElement extends GemElement {
       this.#state({
         loading: false,
         navigatingPath: '',
-        browseError: error instanceof Error ? error.message : '读取目录失败',
+        browseError: error instanceof Error ? error.message : i18n.get('cwdPicker.browseError'),
       });
     }
   };
@@ -172,14 +174,14 @@ export class DeckCwdPickerElement extends GemElement {
             ?disabled=${loading || Boolean(navigatingPath)}
             @click=${() => this.#navigateTo(currentPath)}
           >
-            重试
+            ${i18n.get('cwdPicker.retry')}
           </button>
         </div>
 
         <div class="max-h-[42dvh] min-h-40 overflow-y-auto overscroll-y-contain">
           <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
             <tap-use class="size-4" .element=${icons.loading}></tap-use>
-            正在读取目录…
+            ${i18n.get('cwdPicker.reading')}
           </div>
 
           <div v-else class="divide-y divide-border/60">
@@ -199,7 +201,7 @@ export class DeckCwdPickerElement extends GemElement {
                   .element=${navigatingPath === parentPath ? icons.loading : icons.back}
                 ></tap-use>
               </span>
-              <span class="text-sm text-describe">上一级目录</span>
+              <span class="text-sm text-describe">${i18n.get('cwdPicker.parentDir')}</span>
             </button>
 
             ${directories.map((directory) => {
@@ -254,7 +256,7 @@ export class DeckCwdPickerElement extends GemElement {
             })}
 
             <div v-if=${!directories.length && !browseError} class="px-4 py-8 text-center text-sm text-describe">
-              没有子目录，可以直接在此新建会话。
+              ${i18n.get('cwdPicker.emptyDir')}
             </div>
           </div>
         </div>
@@ -273,7 +275,7 @@ export class DeckCwdPickerElement extends GemElement {
           @click=${this.#confirm}
         >
           <tap-use v-if=${this.creating} class="size-4" .element=${icons.loading}></tap-use>
-          <span>${this.creating ? '正在创建会话…' : '在此新建会话'}</span>
+          <span>${this.creating ? i18n.get('cwdPicker.creating') : i18n.get('cwdPicker.createHere')}</span>
         </button>
       </div>
     `;

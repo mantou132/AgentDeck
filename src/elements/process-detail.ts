@@ -1,7 +1,8 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
 
+import { getToolStatusLabel, i18n } from '../i18n';
 import { markdownExtensions, markdownStyle } from '../lib/markdown';
-import { getToolCommand, getToolStatus, type ProcessGroup, toolStatusLabels } from '../session/timeline';
+import { getToolCommand, getToolStatus, type ProcessGroup } from '../session/timeline';
 
 const style = css`
   :scope { display: block; }
@@ -17,7 +18,7 @@ export class DeckProcessDetailElement extends GemElement {
   #render = () => {
     const { group } = this;
     if (!group?.items.length) {
-      return html`<div class="py-10 text-center text-sm text-describe">暂无过程记录</div>`;
+      return html`<div class="py-10 text-center text-sm text-describe">${i18n.get('timeline.noProcess')}</div>`;
     }
 
     return html`
@@ -34,12 +35,12 @@ export class DeckProcessDetailElement extends GemElement {
           const heading = html`
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5">
-                <span class="font-medium text-describe">${isThought ? '思考过程' : '工具调用'}</span>
+                <span class="font-medium text-describe">${isThought ? i18n.get('timeline.thought') : i18n.get('timeline.toolCall')}</span>
                 <span class=${classMap({
                   'text-describe': !isPending && status !== 'failed',
                   'text-primary-strong': isPending,
                   'text-negative': status === 'failed',
-                })}>${toolStatusLabels[status]}</span>
+                })}>${getToolStatusLabel(status)}</span>
               </span>
               <span v-if=${!isThought} class="mt-1.5 block whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-text">${!isThought ? getToolCommand(item.data) : ''}</span>
             </span>
@@ -81,7 +82,7 @@ export class DeckProcessDetailElement extends GemElement {
                         >${item.text}</gem-bind-marked>
                       `
                           : html`
-                        <p class="mt-0 mb-2 text-xs text-describe">输入参数</p>
+                        <p class="mt-0 mb-2 text-xs text-describe">${i18n.get('timeline.inputParams')}</p>
                         <pre class="m-0 overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-bg p-3.5 font-mono text-sm leading-relaxed text-text">${JSON.stringify(item.data.rawInput, null, 2)}</pre>
                       `
                       }

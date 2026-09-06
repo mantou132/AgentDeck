@@ -1,12 +1,25 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
+import { i18n } from '../i18n';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
-import { getProcessSummary, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
+import { getToolCommand, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 
 const style = css`
   :scope { display: block; }
 `;
+
+const getTimelineProcessSummary = (group: ProcessGroup) => {
+  const tools = group.items.filter((item) => item.type === 'tool');
+  if (!group.pending) {
+    return tools.length ? i18n.get('timeline.toolCalls', String(tools.length)) : i18n.get('timeline.thought');
+  }
+  const active = tools.findLast(
+    (tool) => !tool.data.status || tool.data.status === 'pending' || tool.data.status === 'in_progress',
+  );
+  return active ? getToolCommand(active.data) : i18n.get('timeline.thinking');
+};
+
 @customElement('deck-session-timeline')
 @adoptedStyle(style)
 export class DeckSessionTimelineElement extends GemElement {
@@ -43,7 +56,7 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderProcessGroup = (group: ProcessGroup) => {
-    const summary = getProcessSummary(group);
+    const summary = getTimelineProcessSummary(group);
     return html`
       <div class="mb-3 flex min-w-0 items-center">
         <button
@@ -80,10 +93,10 @@ export class DeckSessionTimelineElement extends GemElement {
               type="button"
               class="mt-1.5 ml-auto block cursor-pointer border-0 bg-transparent py-1 text-sm font-medium text-primary-strong disabled:cursor-default disabled:text-disabled"
               ?disabled=${!this.canRestoreInput}
-              title=${this.canRestoreInput ? '将这条消息和附件恢复到输入框' : '请先清空当前输入'}
+              title=${this.canRestoreInput ? i18n.get('timeline.restoreInputTitle') : i18n.get('timeline.clearInputFirst')}
               @click=${() => this.restore(message)}
             >
-              恢复输入
+              ${i18n.get('timeline.restoreInput')}
             </button>
           </div>
         </div>
@@ -121,7 +134,7 @@ export class DeckSessionTimelineElement extends GemElement {
       ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
       <deck-sheet
         ?open=${Boolean(this.#state.selectedGroupId)}
-        .heading=${'过程摘要'}
+        .heading=${i18n.get('timeline.processSummary')}
         @close=${this.#closeProcessSheet}
         .content=${html`
           <deck-process-detail

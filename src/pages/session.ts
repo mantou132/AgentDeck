@@ -1,7 +1,8 @@
 import { Stack, stackStore } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
-import { connectionLabels, reconnectTransport } from '../agent/transport';
+import { reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
+import { getConnectionLabel, i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import { openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
@@ -136,7 +137,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       >
         <button
           class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
-          aria-label="返回会话列表"
+          aria-label=${i18n.get('session.backAria')}
           @click=${() => Stack.close()}
         >
           <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
@@ -157,7 +158,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         </div>
         <button
           class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft"
-          aria-label="打开设置"
+          aria-label=${i18n.get('session.openSettingsAria')}
           @click=${openSettings}
         >
           <tap-use class="size-[20px]" .element=${icons.tune}></tap-use>
@@ -172,17 +173,17 @@ export class AgentDeckSessionPageElement extends GemElement {
     if (!session) {
       return html`
         <tap-page class="bg-bg text-text">
-          ${this.#renderHeader('会话不可用')}
+          ${this.#renderHeader(i18n.get('session.unavailableTitle'))}
           <main class="grid h-full place-items-center content-center px-6 text-center">
-            <h2 class="m-0 font-display text-lg font-semibold text-highlight">无法找到这个会话</h2>
+            <h2 class="m-0 font-display text-lg font-semibold text-highlight">${i18n.get('session.notFound')}</h2>
             <p class="mt-2 mb-4 max-w-[320px] text-sm leading-relaxed text-describe">
-              可以返回列表选择其他会话，或在设置中重置 App 后重新加载。
+              ${i18n.get('session.notFoundDesc')}
             </p>
             <button
               class="cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 py-2.5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
               @click=${openSettings}
             >
-              打开设置
+              ${i18n.get('global.openSettings')}
             </button>
           </main>
         </tap-page>
@@ -196,18 +197,18 @@ export class AgentDeckSessionPageElement extends GemElement {
     const error =
       agentdeckStore.errorsBySession[session.sessionId] ||
       agentdeckStore.connectionError ||
-      (!loaded && !loading ? '会话尚未加载，请重试加载' : '');
+      (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
     return html`
       <tap-page class="bg-bg text-text">
-        ${this.#renderHeader(session.title || (session.draft ? '新建会话' : '未命名会话'), session.cwd, loading, loaded)}
+        ${this.#renderHeader(session.title || (session.draft ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd, loading, loaded)}
 
         <div class="relative h-full">
           <main
             ${this.#messagesRef}
             class="no-scrollbar h-full overflow-x-hidden overflow-y-auto px-4 pt-[22px] pb-7 overscroll-y-contain sm:px-6"
             tabindex="0"
-            aria-label="会话消息"
+            aria-label=${i18n.get('session.messagesAria')}
             @scroll=${this.#onScroll}
           >
             <div ${this.#messagesContentRef} class="mx-auto min-h-full w-full max-w-[720px]">
@@ -215,8 +216,8 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
                   <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
                 </div>
-                <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">正在加载会话</h2>
-                <p class="m-0 text-sm text-describe">连接远端 Agent，并回放历史事件…</p>
+                <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">${i18n.get('session.loadingTitle')}</h2>
+                <p class="m-0 text-sm text-describe">${i18n.get('session.loadingDesc')}</p>
               </section>
               <div v-if=${!loading && !!messages.length} class="contents">
                 <deck-session-timeline
@@ -236,14 +237,10 @@ export class AgentDeckSessionPageElement extends GemElement {
                   <deck-icon></deck-icon>
                 </div>
                 <h2 class="mt-[18px] mb-2 font-display text-lg font-semibold tracking-[-0.02em] text-highlight">
-                  ${session.draft ? '新会话' : '会话已就绪'}
+                  ${session.draft ? i18n.get('session.newSession') : i18n.get('session.ready')}
                 </h2>
                 <p class="m-0 max-w-[280px] text-sm leading-relaxed text-describe">
-                  ${
-                    session.draft
-                      ? '输入任务后将在此目录创建远端会话并开始执行。'
-                      : '历史记录为空。发送消息后，回复、思考与工具进度会出现在同一条时间线上。'
-                  }
+                  ${session.draft ? i18n.get('session.newSessionHint') : i18n.get('session.emptyHistoryHint')}
                 </p>
               </section>
             </div>
@@ -255,7 +252,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             @click=${this.#resumeFollowing}
           >
             <tap-use class="size-4" .element=${icons.expand}></tap-use>
-            回到最新
+            ${i18n.get('session.scrollToLatest')}
           </button>
         </div>
 
@@ -270,21 +267,21 @@ export class AgentDeckSessionPageElement extends GemElement {
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"
               @click=${() => (connected ? this.#retryLoad() : reconnectTransport(true))}
             >
-              ${connected ? '重试加载' : '重新连接'}
+              ${connected ? i18n.get('global.retryLoad') : i18n.get('global.reconnect')}
             </button>
             <button
               v-else-if=${agentdeckStore.connectionError || pending}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
               @click=${openSettings}
             >
-              打开设置
+              ${i18n.get('global.openSettings')}
             </button>
             <button
               v-else-if=${connected}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
               @click=${() => clearSessionError(session.sessionId)}
             >
-              关闭
+              ${i18n.get('global.close')}
             </button>
           </div>
           <div v-if=${agentdeckStore.permissionsBySession[session.sessionId]} class="px-2.5 pt-2">
@@ -302,7 +299,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             @mode-change=${(event: CustomEvent<string>) => {
               void changeSessionMode(session, event.detail);
             }}
-            .placeholder=${loading ? '正在回放历史…' : !connected ? connectionLabels[agentdeckStore.connection] : loaded ? '交代一个任务…' : '请先加载会话…'}
+            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get('session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
             .submit=${this.#send}
             ?disabled=${!loaded}
             ?ready=${connected && loaded}

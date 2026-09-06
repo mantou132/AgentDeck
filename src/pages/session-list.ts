@@ -1,5 +1,6 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
-import { agentApi, connectionLabels } from '../agent/transport';
+import { agentApi } from '../agent/transport';
+import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { createDraftSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
@@ -80,7 +81,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                       connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching',
                   })}
                 ></span>
-                <span>${connectionLabels[connection]} · ${selectedAgent?.name || settings.agent}</span>
+                <span>${getConnectionLabel(connection)} · ${selectedAgent?.name || settings.agent}</span>
               </div>
             </div>
           </div>
@@ -98,11 +99,11 @@ export class AgentDeckSessionListPageElement extends GemElement {
               class="mt-2 block cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-3 py-1.5 font-semibold text-negative"
               @click=${() => refreshSessions()}
             >
-              ${connection === 'connected' ? '重新加载' : '重新连接'}
+              ${connection === 'connected' ? i18n.get('global.reload') : i18n.get('global.reconnect')}
             </button>
           </div>
 
-          <div v-if=${showSkeleton} class="flex flex-col gap-5" aria-label="正在加载会话">
+          <div v-if=${showSkeleton} class="flex flex-col gap-5" aria-label=${i18n.get('sessionList.loading')}>
             ${[3, 2].map(
               (rows) => html`
                 <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
@@ -145,14 +146,10 @@ export class AgentDeckSessionListPageElement extends GemElement {
               <tap-use class="size-6 text-describe" .element=${sessionsError ? icons.error : icons.menu}></tap-use>
             </div>
             <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">
-              ${hasError ? '暂时无法读取会话' : '这个 Agent 还没有会话'}
+              ${hasError ? i18n.get('sessionList.errorTitle') : i18n.get('sessionList.emptyTitle')}
             </h2>
             <p class="m-0 max-w-[320px] text-sm leading-relaxed text-describe">
-              ${
-                hasError
-                  ? '检查远端 Agent 是否在线，然后重新加载。'
-                  : '会话由远端 ACP Agent 管理，出现后会按工作目录归到这里。'
-              }
+              ${hasError ? i18n.get('sessionList.errorDesc') : i18n.get('sessionList.emptyDesc')}
             </p>
           </section>
         </main>
@@ -165,11 +162,11 @@ export class AgentDeckSessionListPageElement extends GemElement {
               @click=${this.#openNewSession}
             >
               <tap-use class="size-[18px]" .element=${icons.add}></tap-use>
-              新建会话
+              ${i18n.get('sessionList.newSession')}
             </button>
             <button
               class="grid size-12 shrink-0 cursor-pointer place-items-center rounded-[15px] border border-border bg-bg-light text-highlight shadow-card transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-bg-hover"
-              aria-label="打开设置"
+              aria-label=${i18n.get('sessionList.openSettingsAria')}
               @click=${openSettings}
             >
               <tap-use class="size-[20px]" .element=${icons.tune}></tap-use>
@@ -179,8 +176,8 @@ export class AgentDeckSessionListPageElement extends GemElement {
       </tap-page>
       <deck-sheet
         ?open=${sheetOpen}
-        .heading=${'新建会话'}
-        .description=${'选择这个会话的工作目录'}
+        .heading=${i18n.get('sessionList.newSessionHeading')}
+        .description=${i18n.get('sessionList.newSessionDesc')}
         @close=${this.#closeNewSession}
         .content=${html`
           <deck-cwd-picker

@@ -7,6 +7,7 @@ import {
   LONG_PASTE_CHAR_THRESHOLD,
   syncPasteReferences,
 } from '../composer/references';
+import { i18n } from '../i18n';
 import type { ModeSelection } from '../session/modes';
 import type { Attachment, TextMessage } from '../session/types';
 
@@ -131,11 +132,11 @@ export class DeckComposerElement extends GemElement {
   #addFiles = async (files: File[], selection?: InputSelection) => {
     if (!files.length) return;
     if (this.#state.readingAttachments) {
-      this.#state({ attachmentError: '正在读取附件，请稍后再粘贴或选择文件。' });
+      this.#state({ attachmentError: i18n.get('composer.readingAttachments') });
       return;
     }
     if (files.length + this.#state.attachments.length > MAX_ATTACHMENTS) {
-      this.#state({ attachmentError: '最多添加 10 个附件，请减少选择的文件数量。' });
+      this.#state({ attachmentError: i18n.get('composer.maxAttachments') });
       return;
     }
     this.#state({ readingAttachments: true, attachmentError: '' });
@@ -228,7 +229,7 @@ export class DeckComposerElement extends GemElement {
     if (text.length < LONG_PASTE_CHAR_THRESHOLD) return;
     event.preventDefault();
     if (new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) {
-      this.#state({ attachmentError: '粘贴的文本超过 256 KB，请缩小内容后重试。' });
+      this.#state({ attachmentError: i18n.get('composer.pasteTooLarge') });
       return;
     }
     void this.#addFiles([new File([text], 'Pasted text.txt', { type: 'text/plain' })], selection);
@@ -247,7 +248,7 @@ export class DeckComposerElement extends GemElement {
     const canSend = this.#canSend;
     const attachmentError =
       this.#state.attachments.length > MAX_ATTACHMENTS
-        ? '附件超过 10 个，请删除多余附件后发送。'
+        ? i18n.get('composer.tooManyAttachments')
         : this.#state.attachmentError;
     return html`
           <div class="composer-shell bg-bg/90 px-2.5 pt-2 backdrop-blur-xl backdrop-saturate-125">
@@ -270,7 +271,7 @@ export class DeckComposerElement extends GemElement {
                 <button
                   type="button"
                   class="grid size-6 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-negative"
-                  aria-label="关闭附件提示"
+                  aria-label=${i18n.get('composer.closeAlertAria')}
                   v-if=${this.#state.attachments.length <= MAX_ATTACHMENTS}
                   @click=${() => this.#state({ attachmentError: '' })}
                 >
@@ -281,7 +282,7 @@ export class DeckComposerElement extends GemElement {
                 ${this.#textareaRef}
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
                 rows="1"
-                aria-label="发送消息"
+                aria-label=${i18n.get('composer.sendMessageAria')}
                 placeholder=${this.placeholder}
                 .value=${this.#state.draft}
                 @input=${(event: InputEvent) => this.#setDraft((event.target as HTMLTextAreaElement).value)}
@@ -292,25 +293,25 @@ export class DeckComposerElement extends GemElement {
               ></textarea>
               <div class="flex min-h-11 items-center justify-between gap-2.5 px-2 pt-1 pb-2">
                 <div class="flex min-w-0 items-center gap-2 text-sm font-medium text-describe">
-                  <input ${this.#fileInputRef} type="file" multiple hidden aria-label="附件文件" @change=${this.#readFiles} />
+                  <input ${this.#fileInputRef} type="file" multiple hidden aria-label=${i18n.get('composer.inputFileAria')} @change=${this.#readFiles} />
                   <button
                     type="button"
                     class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-describe active:bg-bg-hover disabled:cursor-default disabled:opacity-45"
-                    aria-label="添加附件"
-                    title="添加图片或文本文件，最多 10 个附件"
+                    aria-label=${i18n.get('composer.addAttachmentAria')}
+                    title=${i18n.get('composer.addAttachmentTitle')}
                     ?disabled=${this.#state.readingAttachments || this.#state.submitting || this.#state.attachments.length >= MAX_ATTACHMENTS}
                     @click=${() => this.#fileInputRef.value?.click()}
                   >
                     <tap-use class="size-5" .element=${this.#state.readingAttachments ? icons.loading : icons.add}></tap-use>
                   </button>
                   <span v-if=${this.#state.readingAttachments || this.#state.submitting} class="truncate">
-                    ${this.#state.readingAttachments ? '正在读取附件…' : '正在准备会话…'}
+                    ${this.#state.readingAttachments ? i18n.get('composer.readingState') : i18n.get('composer.preparingSession')}
                   </span>
                   <div v-if=${this.mode} class="relative flex min-w-0 items-center gap-1">
                     <select
                       class="min-h-9 max-w-32 min-w-0 cursor-pointer truncate rounded-lg border-0 bg-transparent pr-4 pl-1 text-sm font-medium text-describe outline-none focus:outline-none disabled:cursor-default disabled:opacity-50"
-                      aria-label="会话模式"
-                      title=${this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || '会话模式'}
+                      aria-label=${i18n.get('composer.modeAria')}
+                      title=${this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || i18n.get('composer.modeAria')}
                       ?disabled=${!this.ready || this.modeBusy || this.#state.submitting}
                       @change=${(event: Event) => {
                         const select = event.target as HTMLSelectElement;
@@ -319,7 +320,7 @@ export class DeckComposerElement extends GemElement {
                         this.modeChange(value);
                       }}
                     >
-                      <option v-if=${this.sessionKey === 'draft'} value="" .selected=${!this.mode?.currentValue}>默认模式</option>
+                      <option v-if=${this.sessionKey === 'draft'} value="" .selected=${!this.mode?.currentValue}>${i18n.get('composer.defaultMode')}</option>
                       ${this.mode?.choices.map((choice) => html`<option value=${choice.value} .selected=${choice.value === this.mode?.currentValue}>${choice.name}</option>`)}
                     </select>
                     <tap-use v-if=${this.modeBusy} class="size-3.5 shrink-0" .element=${icons.loading}></tap-use>
@@ -328,7 +329,7 @@ export class DeckComposerElement extends GemElement {
                 <button
                   v-if=${this.pending}
                   class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-transform duration-150 active:scale-[0.92]"
-                  aria-label="停止生成"
+                  aria-label=${i18n.get('composer.stopAria')}
                   @click=${() => this.cancel()}
                 >
                   <span class="size-2.5 rounded-[3px] bg-current"></span>
@@ -337,7 +338,7 @@ export class DeckComposerElement extends GemElement {
                   v-else
                   class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-[transform,background-color] duration-150 active:scale-[0.92] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:active:scale-100"
                   ?disabled=${!canSend}
-                  aria-label="发送"
+                  aria-label=${i18n.get('composer.sendAria')}
                   @click=${this.#send}
                 >
                   <tap-use class="size-[17px]" .element=${icons.outward}></tap-use>

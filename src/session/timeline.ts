@@ -12,6 +12,8 @@ export const toolStatusLabels = {
   ended: '已结束',
 } as const;
 
+export type ToolStatus = keyof typeof toolStatusLabels;
+
 export const getToolStatus = (tool: ToolCallData, live: boolean) => {
   const status = tool.status || 'pending';
   return !live && (status === 'pending' || status === 'in_progress') ? 'ended' : status;

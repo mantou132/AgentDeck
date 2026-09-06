@@ -1,4 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { i18n } from '../i18n';
 import type { Attachment } from '../session/types';
 
 @customElement('deck-attachment-preview')
@@ -10,8 +11,8 @@ export class DeckAttachmentPreviewElement extends GemElement {
   #render = () => html`
     <deck-sheet
       ?open=${Boolean(this.attachment)}
-      .heading=${this.attachment?.name || '附件预览'}
-      .description=${this.attachment?.kind === 'image' ? '图片附件' : '文本附件'}
+      .heading=${this.attachment?.name || i18n.get('attachment.previewHeading')}
+      .description=${this.attachment?.kind === 'image' ? i18n.get('attachment.imageDesc') : i18n.get('attachment.textDesc')}
       @close=${() => this.close()}
       .content=${html`
         ${

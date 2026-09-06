@@ -1,6 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 
 import type { PermissionRequest } from '../agent/api';
+import { i18n } from '../i18n';
 
 const style = css`
   :scope {
@@ -21,11 +22,11 @@ export class DeckPermissionRequestElement extends GemElement {
     return html`
       <section class="max-h-[45dvh] overflow-y-auto rounded-2xl border border-notice/35 bg-bg-light overscroll-y-contain">
         <header class="px-4 pt-3.5 pb-3">
-          <h2 class="m-0 text-base font-semibold text-highlight">需要你的许可</h2>
-          <p class="mt-2 mb-0 break-words font-mono text-sm leading-relaxed text-text">${toolCall.title || '工具调用'}</p>
+          <h2 class="m-0 text-base font-semibold text-highlight">${i18n.get('permission.title')}</h2>
+          <p class="mt-2 mb-0 break-words font-mono text-sm leading-relaxed text-text">${toolCall.title || i18n.get('permission.toolCall')}</p>
         </header>
         <details v-if=${toolCall.rawInput !== undefined} class="border-t border-border text-sm">
-          <summary class="cursor-pointer px-4 py-3 text-describe">查看输入参数</summary>
+          <summary class="cursor-pointer px-4 py-3 text-describe">${i18n.get('permission.viewParams')}</summary>
           <pre
             class="m-0 max-h-44 overflow-auto whitespace-pre-wrap break-words border-t border-border bg-bg px-4 py-3 font-mono text-sm leading-relaxed text-text"
           >${JSON.stringify(toolCall.rawInput, null, 2)}</pre>
@@ -35,7 +36,7 @@ export class DeckPermissionRequestElement extends GemElement {
             class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-4 py-2 text-sm font-medium text-describe active:bg-bg-hover"
             @click=${() => this.resolve(null)}
           >
-            取消
+            ${i18n.get('permission.cancel')}
           </button>
           ${options.map((option) => {
             const reject = option.kind?.startsWith('reject');
