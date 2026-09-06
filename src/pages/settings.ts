@@ -159,50 +159,10 @@ export class AgentDeckSettingsPageElement extends GemElement {
       <deck-sheet
         ?open=${this.#state.relayGuideOpen}
         .heading=${'获取 Relay ID'}
-        .description=${'在运行 Agent 的电脑上完成以下三步，即可连接 AgentDeck。'}
+        .description=${'在运行 Agent 的电脑上完成以下三步。'}
         @close=${this.#closeRelayGuide}
         .content=${html`
-          <ol class="m-0 grid list-none gap-5 p-0">
-            <li class="flex items-start gap-3">
-              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary-strong" aria-hidden="true">1</span>
-              <div class="min-w-0 flex-1 pt-1">
-                <h3 class="m-0 text-sm font-semibold text-highlight">下载浏览器扩展</h3>
-                <p class="mt-1.5 mb-0 text-sm leading-relaxed text-describe">
-                  在电脑浏览器中安装
-                  <a
-                    class="text-primary-strong no-underline active:opacity-70"
-                    href="https://github.com/mantou132/browser4agent"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >Browser for AI Agent</a>，并按扩展欢迎页的指引安装 Native Host。
-                </p>
-              </div>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary-strong" aria-hidden="true">2</span>
-              <div class="min-w-0 flex-1 pt-1">
-                <h3 class="m-0 text-sm font-semibold text-highlight">复制 Relay ID</h3>
-                <p class="mt-1.5 mb-0 text-sm leading-relaxed text-describe">
-                  右键点击浏览器工具栏中的扩展图标（Browser Action），选择「复制 relay id」，然后粘贴到 AgentDeck 的 Relay ID 输入框，保存并连接。
-                </p>
-              </div>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary-strong" aria-hidden="true">3</span>
-              <div class="min-w-0 flex-1 pt-1">
-                <h3 class="m-0 text-sm font-semibold text-highlight">保持电脑浏览器开启</h3>
-                <p class="mt-1.5 mb-0 text-sm leading-relaxed text-describe">
-                  使用 AgentDeck 时不要关闭电脑上的浏览器。连接依赖浏览器启动的 Native Host，关闭浏览器会中断远端连接。
-                </p>
-              </div>
-            </li>
-          </ol>
-          <button
-            class="mt-6 h-12 w-full cursor-pointer rounded-xl border-0 bg-primary text-sm font-semibold text-white transition-transform active:scale-[0.985]"
-            @click=${this.#closeRelayGuide}
-          >
-            知道了
-          </button>
+          <deck-relay-guide v-if=${this.#state.relayGuideOpen} @close=${this.#closeRelayGuide}></deck-relay-guide>
         `}
       ></deck-sheet>
     `;
