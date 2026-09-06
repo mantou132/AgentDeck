@@ -1,6 +1,5 @@
 import type { TemplateResult } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { icons } from '@mantou/tap-ui/lib/icons';
 
 const style = css`
   :scope { display: contents; }
@@ -42,14 +41,6 @@ export class DeckSheetElement extends GemElement {
           <h2 class="m-0 break-words font-display text-lg leading-snug font-semibold tracking-tight text-highlight">${this.heading}</h2>
           <p v-if=${this.description} class="mt-1.5 mb-0 text-sm leading-relaxed font-normal text-describe">${this.description}</p>
         </div>
-        <button
-          type="button"
-          class="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-bg text-describe outline-none transition-colors active:bg-bg-hover"
-          aria-label="关闭"
-          @click=${() => this.close()}
-        >
-          <tap-use class="size-[18px]" .element=${icons.close}></tap-use>
-        </button>
       </div>
       ${this.content}
     </tap-sheet>

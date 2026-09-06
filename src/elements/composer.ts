@@ -62,6 +62,8 @@ export class DeckComposerElement extends GemElement {
   get #canSend() {
     return (
       this.ready &&
+      !this.pending &&
+      !this.modeBusy &&
       Boolean(this.#state.draft.trim() || this.#state.attachments.length) &&
       this.#state.attachments.length <= MAX_ATTACHMENTS &&
       !this.#state.readingAttachments &&
@@ -308,8 +310,8 @@ export class DeckComposerElement extends GemElement {
                     <select
                       class="min-h-9 max-w-32 min-w-0 cursor-pointer truncate rounded-lg border-0 bg-transparent pr-4 pl-1 text-sm font-medium text-describe outline-none focus:outline-none disabled:cursor-default disabled:opacity-50"
                       aria-label="会话模式"
-                      title=${this.pending ? '任务结束后可切换模式' : this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || '会话模式'}
-                      ?disabled=${!this.ready || this.#state.submitting}
+                      title=${this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || '会话模式'}
+                      ?disabled=${!this.ready || this.modeBusy || this.#state.submitting}
                       @change=${(event: Event) => {
                         const select = event.target as HTMLSelectElement;
                         const value = select.value;

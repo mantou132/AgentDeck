@@ -284,7 +284,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             .placeholder=${loading ? '正在回放历史…' : !connected ? connectionLabels[agentdeckStore.connection] : loaded ? '交代一个任务…' : '请先加载会话…'}
             .submit=${this.#send}
             ?disabled=${!loaded}
-            ?ready=${connected && loaded && !pending && !changingMode}
+            ?ready=${connected && loaded}
             ?pending=${pending}
             @cancel=${() => cancelTurn(this.sessionId)}
             @preview=${this.#previewAttachment}

@@ -23,12 +23,7 @@ export const applyRemoteMode = async (
 export const changeSessionMode = async (session: DeckSession, modeId: string) => {
   const { sessionId } = session;
   const options = agentdeckStore.optionsBySession[sessionId];
-  if (
-    !options ||
-    agentdeckStore.changingModeSessionIds.includes(sessionId) ||
-    agentdeckStore.pendingSessionIds.includes(sessionId)
-  )
-    return false;
+  if (!options || agentdeckStore.changingModeSessionIds.includes(sessionId)) return false;
   if (session.draft) {
     updateSessionOptions(sessionId, withCurrentMode(options, modeId));
     return true;

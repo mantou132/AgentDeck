@@ -105,9 +105,84 @@ test('mode change confirms the value before sending; rejection and timeout permi
   assert.equal(selection(f).currentValue, 'plan');
   assert.equal(f.app.sendPrompt('s1', 'now ready'), true);
   await tick();
-  assert.equal(await f.app.changeSessionMode(session, 'default'), false);
   f.reply(request(f, 'agent_prompt'), { answer: 'done' });
   await tick();
+});
+
+for (const options of [{ modes }, { configOptions }]) {
+  for (const finishesFirst of ['mode', 'prompt']) {
+    test(`mode changes during a prompt using ${options.modes ? 'modes' : 'config'}; ${finishesFirst} finishes first`, async () => {
+      const fixture = await opened(options);
+      const session = fixture.app.getSession('s1');
+      assert.equal(fixture.app.sendPrompt('s1', 'First task'), true);
+      await tick();
+      const prompt = request(fixture, 'agent_prompt');
+      const change = fixture.app.changeSessionMode(session, 'plan');
+      await tick();
+      const method = options.modes ? 'agent_session_set_mode' : 'agent_session_set_config_option';
+      const modeRequest = request(fixture, method);
+      assert.ok(modeRequest);
+      assert.equal(selection(fixture).currentValue, 'default');
+      assert.equal(await fixture.app.changeSessionMode(session, 'plan'), false);
+      assert.equal(fixture.app.sendPrompt('s1', 'Too early'), false);
+
+      const finishMode = async () => {
+        fixture.reply(
+          modeRequest,
+          options.modes
+            ? {}
+            : {
+                configOptions: [{ ...configOptions[0], currentValue: 'plan' }, configOptions[1]],
+              },
+        );
+        assert.equal(await change, true);
+        assert.equal(selection(fixture).currentValue, 'plan');
+      };
+      const finishPrompt = async () => {
+        fixture.reply(prompt, { answer: 'Done' });
+        await tick();
+        assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+      };
+      if (finishesFirst === 'mode') await finishMode();
+      else await finishPrompt();
+      assert.equal(fixture.app.sendPrompt('s1', 'Still too early'), false);
+      if (finishesFirst === 'mode') await finishPrompt();
+      else await finishMode();
+
+      const attachments = [{ id: 'notes', name: 'notes.txt', kind: 'text', text: 'Next task notes' }];
+      assert.equal(fixture.app.sendPrompt('s1', 'Next task', attachments), true);
+      await tick();
+      const nextPrompt = request(fixture, 'agent_prompt');
+      assert.equal(nextPrompt.payload.params.prompt, 'Next task');
+      assert.deepEqual(nextPrompt.payload.params.attachments, [
+        { type: 'text', text: '<attachment name="notes.txt">\nNext task notes\n</attachment>' },
+      ]);
+      fixture.reply(nextPrompt, { answer: 'Next answer' });
+      await tick();
+    });
+  }
+}
+
+test('rejected mode changes during a prompt leave the running task intact and permit retry', async () => {
+  const fixture = await opened();
+  const session = fixture.app.getSession('s1');
+  assert.equal(fixture.app.sendPrompt('s1', 'Running task'), true);
+  await tick();
+  const prompt = request(fixture, 'agent_prompt');
+  let change = fixture.app.changeSessionMode(session, 'plan');
+  await tick();
+  failed(fixture, request(fixture, 'agent_session_set_mode'));
+  assert.equal(await change, false);
+  assert.equal(selection(fixture).currentValue, 'default');
+  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(fixture.app.agentdeckStore.messagesBySession.s1[0].failed, undefined);
+  change = fixture.app.changeSessionMode(session, 'plan');
+  await tick();
+  fixture.reply(request(fixture, 'agent_session_set_mode'), {});
+  assert.equal(await change, true);
+  fixture.reply(prompt, { answer: 'Done' });
+  await tick();
+  assert.equal(fixture.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'Done');
 });
 
 test('config-only mode uses its reported ID and the server response; unrelated options are preserved', async () => {
