@@ -41,16 +41,21 @@ export const performTurn = async (
     onEvent: (event: SessionEvent) => void;
     onAnswer: (answer: string) => void;
     onError: (error: string) => void;
-    onDone: () => void;
+    onDone: (completed: boolean) => void;
   },
   attachments: Attachment[] = [],
 ) => {
+  let completed = false;
+  let cancelled = false;
   try {
     const result = await agentApi.prompt(
       session.sessionId,
       session.agent,
       text,
-      handlers.onEvent,
+      (event) => {
+        if (event.event === 'stop') cancelled = event.stop_reason === 'cancelled';
+        handlers.onEvent(event);
+      },
       attachments.map((attachment) => {
         if (attachment.kind === 'image') {
           return { type: 'image', data: attachment.data, mimeType: attachment.mimeType };
@@ -62,10 +67,11 @@ export const performTurn = async (
     if (result.answer) {
       handlers.onAnswer(result.answer);
     }
+    completed = !cancelled;
   } catch (error) {
     handlers.onError(error instanceof Error ? error.message : '发送消息失败');
   } finally {
-    handlers.onDone();
+    handlers.onDone(completed);
   }
 };
 

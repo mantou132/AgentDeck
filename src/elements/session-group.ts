@@ -16,6 +16,7 @@ const style = css`
 export class DeckSessionGroupElement extends GemElement {
   @property cwd = '';
   @property sessions: DeckSession[] = [];
+  @property unreadSessionIds: string[] = [];
   @emitter select: Emitter<string>;
 
   #state = createState({ expanded: false });
@@ -49,8 +50,18 @@ export class DeckSessionGroupElement extends GemElement {
                 @click=${() => this.select(session.sessionId)}
               >
                 <span class="min-w-0">
-                  <span class="block truncate text-base leading-snug font-semibold text-highlight">
-                    ${session.title || '未命名会话'}
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="truncate text-base leading-snug font-semibold text-highlight">
+                      ${session.title || '未命名会话'}
+                    </span>
+                    <span
+                      v-if=${this.unreadSessionIds.includes(session.sessionId)}
+                      class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 text-xs font-semibold text-positive"
+                      title="响应已完成，尚未查看"
+                    >
+                      <span class="size-1.5 rounded-full bg-positive"></span>
+                      已完成
+                    </span>
                   </span>
                   <span class="mt-1.5 block truncate font-mono text-xs text-describe">
                     ${session.sessionId}

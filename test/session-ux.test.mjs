@@ -60,3 +60,63 @@ test('cancelling an unknown remote task shows the reset recovery path', async ()
   await tick();
   assert.equal(fresh.app.agentdeckStore.pendingSessionIds.length, 0);
 });
+
+test('completed responses stay unread across list refreshes until read or a new prompt starts', async () => {
+  const f = await running();
+  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  f.reply(f.requests.at(-1), { answer: 'Done' });
+  await tick();
+  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes('s1'));
+
+  const refresh = f.app.refreshSessions();
+  await f.settleHost();
+  await refresh;
+  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes('s1'));
+
+  f.app.setSessionFlag('unreadSessionIds', 's1', false);
+  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  assert.equal(f.app.sendPrompt('s1', 'Next task'), true);
+  await tick();
+  f.reply(f.requests.at(-1), { answer: 'Next answer' });
+  await tick();
+  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes('s1'));
+  assert.equal(f.app.sendPrompt('s1', 'One more task'), true);
+  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+});
+
+for (const outcome of ['failed', 'cancelled', 'ended']) {
+  test(`${outcome} responses do not create an unread completion reminder`, async () => {
+    const f = await running();
+    const prompt = f.requests.at(-1);
+    if (outcome === 'failed') {
+      f.deliver({ id: prompt.payload.id, peerId: 1, error: 'Agent stopped' });
+    } else {
+      if (outcome === 'cancelled') {
+        f.app.cancelTurn('s1');
+        await tick();
+        f.reply(f.requests.at(-1), { cancelled: true });
+        f.deliver({ id: prompt.payload.id, peerId: 1, event: { event: 'stop', stop_reason: 'cancelled' } });
+      } else {
+        f.deliver({ method: 'agent_session_ended', params: { agent: 'codex', sessionId: 's1' } });
+      }
+      f.reply(prompt, { answer: 'Partial response' });
+    }
+    await tick();
+    assert.equal(f.app.agentdeckStore.pendingSessionIds.length, 0);
+    assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  });
+}
+
+test('newly created sessions receive completion reminders and resetting clears them', async () => {
+  const f = documentFixture();
+  await f.connect();
+  const draft = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
+  const creating = f.app.promoteDraftSession(draft, 'First task');
+  await f.settleHost();
+  const session = await creating;
+  f.reply(f.requests.at(-1), { answer: 'Done' });
+  await tick();
+  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes(session.sessionId));
+  f.app.resetRemoteState();
+  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+});

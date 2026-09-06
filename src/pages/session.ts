@@ -1,4 +1,4 @@
-import { Stack } from '@mantou/tap-ui/elements/stack';
+import { Stack, stackStore } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { connectionLabels, reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
@@ -17,7 +17,7 @@ import {
   retrySessionLoad,
   sendPrompt,
 } from '../state/sessions';
-import { agentdeckStore, clearSessionError } from '../state/store';
+import { agentdeckStore, clearSessionError, setSessionFlag } from '../state/store';
 
 const style = css`
   .session-header {
@@ -29,6 +29,7 @@ const style = css`
 @customElement('agentdeck-session-page')
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
+@connectStore(stackStore)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
@@ -37,6 +38,26 @@ export class AgentDeckSessionPageElement extends GemElement {
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
   #scrollFrame = 0;
+
+  #markRead = () => {
+    if (
+      this.isConnected &&
+      document.visibilityState === 'visible' &&
+      Stack.inCurrentStack(this) &&
+      agentdeckStore.unreadSessionIds.includes(this.sessionId)
+    ) {
+      setSessionFlag('unreadSessionIds', this.sessionId, false);
+    }
+  };
+
+  @effect((instance) => [instance.sessionId, agentdeckStore.unreadSessionIds, stackStore.pages])
+  #readCompletedResponse = () => queueMicrotask(this.#markRead);
+
+  @effect(() => [])
+  #watchVisibility = () => {
+    document.addEventListener('visibilitychange', this.#markRead);
+    return () => document.removeEventListener('visibilitychange', this.#markRead);
+  };
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {

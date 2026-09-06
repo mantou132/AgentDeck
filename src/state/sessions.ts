@@ -78,6 +78,7 @@ export const resetRemoteState = () => {
     loadedSessionIds: [],
     loadingSessionIds: [],
     pendingSessionIds: [],
+    unreadSessionIds: [],
     changingModeSessionIds: [],
     errorsBySession: {},
     optionsBySession: {},
@@ -228,6 +229,7 @@ export const retrySessionLoad = (sessionId: string) => {
 };
 
 const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: number) => {
+  setSessionFlag('unreadSessionIds', session.sessionId, false);
   setSessionFlag('pendingSessionIds', session.sessionId, true);
   setSessionError(session.sessionId, '');
   patchSession(session.sessionId, { updatedAt: new Date().toISOString() });
@@ -253,9 +255,12 @@ const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: num
           messages.map((message) => (message.id === prompt.id ? { ...message, failed: true } : message)),
         );
       },
-      onDone: () => {
+      onDone: (completed) => {
         resolvePermission(session.sessionId, null);
         setMessages(session.sessionId, finishStreaming(agentdeckStore.messagesBySession[session.sessionId] ?? []));
+        if (completed && agentdeckStore.pendingSessionIds.includes(session.sessionId)) {
+          setSessionFlag('unreadSessionIds', session.sessionId, true);
+        }
         setSessionFlag('pendingSessionIds', session.sessionId, false);
       },
     },
