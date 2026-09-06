@@ -119,19 +119,17 @@ export class DeckSessionTimelineElement extends GemElement {
     const currentGroup = selectedGroup || this.#lastGroup;
     return html`
       ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
-      <tap-reflect .target=${document.body}>
-        <deck-sheet
-          ?open=${Boolean(this.#state.selectedGroupId)}
-          .heading=${'过程摘要'}
-          @close=${this.#closeProcessSheet}
-          .content=${html`
-            <deck-process-detail
-              v-if=${Boolean(this.#state.selectedGroupId)}
-              .group=${currentGroup}
-            ></deck-process-detail>
-          `}
-        ></deck-sheet>
-      </tap-reflect>
+      <deck-sheet
+        ?open=${Boolean(this.#state.selectedGroupId)}
+        .heading=${'过程摘要'}
+        @close=${this.#closeProcessSheet}
+        .content=${html`
+          <deck-process-detail
+            v-if=${Boolean(this.#state.selectedGroupId)}
+            .group=${currentGroup}
+          ></deck-process-detail>
+        `}
+      ></deck-sheet>
     `;
   };
 }

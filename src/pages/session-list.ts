@@ -177,22 +177,20 @@ export class AgentDeckSessionListPageElement extends GemElement {
           </div>
         </footer>
       </tap-page>
-      <tap-reflect .target=${document.body}>
-        <deck-sheet
-          ?open=${sheetOpen}
-          .heading=${'新建会话'}
-          .description=${'选择这个会话的工作目录'}
-          @close=${this.#closeNewSession}
-          .content=${html`
-            <deck-cwd-picker
-              v-if=${sheetOpen}
-              .complete=${(input: string) => agentApi.completeCwd(input)}
-              .error=${newSessionError}
-              @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
-            ></deck-cwd-picker>
-          `}
-        ></deck-sheet>
-      </tap-reflect>
+      <deck-sheet
+        ?open=${sheetOpen}
+        .heading=${'新建会话'}
+        .description=${'选择这个会话的工作目录'}
+        @close=${this.#closeNewSession}
+        .content=${html`
+          <deck-cwd-picker
+            v-if=${sheetOpen}
+            .complete=${(input: string) => agentApi.completeCwd(input)}
+            .error=${newSessionError}
+            @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
+          ></deck-cwd-picker>
+        `}
+      ></deck-sheet>
     `;
   };
 }

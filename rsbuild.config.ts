@@ -37,7 +37,8 @@ export default defineConfig(({ command }) => ({
                 'tap-*': '/elements/*',
               },
               'src/elements': {
-                '^deck-*': '/*',
+                'deck-(sheet)-*': '/$1',
+                'deck-*': '/*',
               },
             },
           },

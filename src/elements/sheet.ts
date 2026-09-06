@@ -1,9 +1,8 @@
 import type { TemplateResult } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { contentsContainer } from '@mantou/tap-ui/lib/styles';
 
-const style = css`
-  :scope { display: contents; }
-
+const layerStyle = css`
   tap-sheet::part(sheet) {
     max-width: 620px;
     border: 1px solid var(--color-border);
@@ -18,8 +17,19 @@ const style = css`
   }
 `;
 
+// Keep the scoped styles attached to the content reflected into document.body.
+@customElement('deck-sheet-layer')
+@adoptedStyle(contentsContainer)
+@adoptedStyle(layerStyle)
+class DeckSheetLayerElement extends GemElement {
+  @property content?: TemplateResult;
+
+  @template()
+  #render = () => this.content;
+}
+
 @customElement('deck-sheet')
-@adoptedStyle(style)
+@adoptedStyle(contentsContainer)
 export class DeckSheetElement extends GemElement {
   @boolattribute open: boolean;
   @property heading = '';
@@ -29,20 +39,24 @@ export class DeckSheetElement extends GemElement {
 
   @template()
   #render = () => html`
-    <tap-sheet
-      ?open=${this.open}
-      header=${this.heading}
-      gesture
-      mask-closable
-      @close=${() => this.close()}
-    >
-      <div slot="header" class="flex items-start gap-4 text-left">
-        <div class="min-w-0 flex-1 pt-1.5">
-          <h2 class="m-0 break-words font-display text-lg leading-snug font-semibold tracking-tight text-highlight">${this.heading}</h2>
-          <p v-if=${this.description} class="mt-1.5 mb-0 text-sm leading-relaxed font-normal text-describe">${this.description}</p>
-        </div>
-      </div>
-      ${this.content}
-    </tap-sheet>
+    <tap-reflect .target=${document.body}>
+      <deck-sheet-layer .content=${html`
+        <tap-sheet
+          ?open=${this.open}
+          header=${this.heading}
+          gesture
+          mask-closable
+          @close=${() => this.close()}
+        >
+          <div slot="header" class="flex items-start gap-4 text-left">
+            <div class="min-w-0 flex-1 pt-1.5">
+              <h2 class="m-0 break-words font-display text-lg leading-snug font-semibold tracking-tight text-highlight">${this.heading}</h2>
+              <p v-if=${this.description} class="mt-1.5 mb-0 text-sm leading-relaxed font-normal text-describe">${this.description}</p>
+            </div>
+          </div>
+          ${this.content}
+        </tap-sheet>
+      `}></deck-sheet-layer>
+    </tap-reflect>
   `;
 }
