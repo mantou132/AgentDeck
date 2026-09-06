@@ -23,7 +23,6 @@
 - `src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`src/lib/`：Markdown 渲染与路径显示。
 - `src/styles/`：tailwind.css 共享主题 token，theme.ts 桥接 Tap UI。
 - `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；内部 `deck-sheet-layer` 标签映射到 `sheet.ts`；`biome.json`：格式和 lint。
-- `patches/relay-client-ts@0.1.4.patch`：已发布 SDK 的投递拒绝与发送失败补丁；升级依赖时核对是否仍需保留。
 
 # 运行约束
 

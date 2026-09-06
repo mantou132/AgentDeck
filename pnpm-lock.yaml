@@ -5,9 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  relay-client-ts@0.1.4:
-    hash: a23a0efac16adba1ead0266b97efdcc296e35f4f9b43db062fa475d26ac5a37a
-    path: patches/relay-client-ts@0.1.4.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
     path: patches/tailwindcss.patch
@@ -35,8 +32,8 @@ importers:
         specifier: ^2.11.1
         version: 2.11.1
       relay-client-ts:
-        specifier: ^0.1.4
-        version: 0.1.4(patch_hash=a23a0efac16adba1ead0266b97efdcc296e35f4f9b43db062fa475d26ac5a37a)
+        specifier: ^0.1.6
+        version: 0.1.6
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.15
@@ -1199,8 +1196,8 @@ packages:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  relay-client-ts@0.1.4:
-    resolution: {integrity: sha512-SqTE4mPoJUw3NjEaw9ZCA0HOVnVfa7CAshhAzHmJqbRC4PJeEHnIg34DMtjiULlxuRnlR5FOd3oKTA74zQI7EA==}
+  relay-client-ts@0.1.6:
+    resolution: {integrity: sha512-LRpJdZjAFpzSfD8agE5h9pvtVRhsf5YDA+ChqCNY3agoOog+zDX5TVQjdnuMvjXpJp1PigNDltt2MmqtJltgow==}
 
   restore-cursor@5.1.0:
     resolution: {integrity: sha512-oMA2dcrw6u0YfxJQXm342bFKX/E4sG9rbTzO9ptUcR/e8A33cHuvStiYOwH7fszkZlZ1z/ta9AAoPk2F4qIOHA==}
@@ -2408,7 +2405,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  relay-client-ts@0.1.4(patch_hash=a23a0efac16adba1ead0266b97efdcc296e35f4f9b43db062fa475d26ac5a37a): {}
+  relay-client-ts@0.1.6: {}
 
   restore-cursor@5.1.0:
     dependencies:
