@@ -3,7 +3,12 @@ import { icons } from '@mantou/tap-ui/lib/icons';
 import { i18n } from '../i18n';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
-import { getProcessSummary, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
+import {
+  extractDataImageAttachments,
+  getProcessSummary,
+  groupTimelineMessages,
+  type ProcessGroup,
+} from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 
 const style = css`
@@ -66,19 +71,21 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderTextMessage = (message: TextMessage) => {
+    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(message.text);
+    const attachments = [...(message.attachments ?? []), ...linkedAttachments];
     if (message.role === 'user') {
       return html`
         <div class="mb-[18px] flex justify-end">
           <div class="max-w-[min(86%,560px)]">
             <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary">
-              <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap justify-end gap-2">
-                ${message.attachments?.map(
+              <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
+                ${attachments.map(
                   (attachment) => html`
                     <deck-attachment .attachment=${attachment} @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}></deck-attachment>
                   `,
                 )}
               </div>
-              ${this.#renderMarkdown(message.text, message.streaming, true)}
+              ${this.#renderMarkdown(markdown, message.streaming, true)}
             </div>
             <button
               v-if=${message.failed}
@@ -97,14 +104,14 @@ export class DeckSessionTimelineElement extends GemElement {
 
     return html`
       <article class="mb-5 min-w-0 text-base leading-[1.68] text-text">
-        <div v-if=${message.attachments?.length} class="mb-2 flex flex-wrap gap-2">
-          ${message.attachments?.map(
+        <div v-if=${attachments.length} class="mb-2 flex flex-wrap gap-2">
+          ${attachments.map(
             (attachment) => html`
               <deck-attachment .attachment=${attachment} @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}></deck-attachment>
             `,
           )}
         </div>
-        ${this.#renderMarkdown(message.text, message.streaming)}
+        ${this.#renderMarkdown(markdown, message.streaming)}
       </article>
     `;
   };

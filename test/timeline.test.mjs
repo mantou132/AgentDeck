@@ -2,8 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { documentFixture } from './helpers/app-fixture.mjs';
 
-const { getProcessSummary, getToolCommand, getToolStatus, groupTimelineMessages, reduceSessionEvent } =
-  documentFixture().app;
+const {
+  getProcessSummary,
+  getToolCommand,
+  getToolStatus,
+  groupTimelineMessages,
+  reduceSessionEvent,
+  extractDataImageAttachments,
+} = documentFixture().app;
 
 test('tool summaries show shell commands and fall back to the reported tool title', () => {
   const tool = { toolCallId: 'tool', title: 'Execute command' };
@@ -98,4 +104,22 @@ test('starting another task does not revive unfinished tools from an earlier tur
       .every((item) => !item.group.pending),
   );
   assert.equal(getToolStatus({ ...oldTool, status: 'failed' }, false), 'failed');
+});
+
+test('inline base64 images in message text become attachments instead of links', () => {
+  const markdown = 'before\n![shot](data:image/png;base64,QUJD) after\n[titled](data:image/jpeg;base64,REVG)';
+  const plain = (value) => JSON.parse(JSON.stringify(value));
+  const { attachments, markdown: rest } = extractDataImageAttachments(markdown);
+  assert.equal(rest, 'before\n after\n');
+  assert.equal(attachments.length, 2);
+  assert.deepEqual(plain(attachments.map(({ name, mimeType, data }) => ({ name, mimeType, data }))), [
+    { name: 'shot', mimeType: 'image/png', data: 'QUJD' },
+    { name: 'titled', mimeType: 'image/jpeg', data: 'REVG' },
+  ]);
+  assert.deepEqual(plain(attachments.map(({ previewUrl }) => previewUrl)), [
+    'data:image/png;base64,QUJD',
+    'data:image/jpeg;base64,REVG',
+  ]);
+  assert.equal(extractDataImageAttachments('no images here').attachments.length, 0);
+  assert.equal(extractDataImageAttachments('no images here').markdown, 'no images here');
 });

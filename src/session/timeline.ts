@@ -1,5 +1,5 @@
 import { i18n } from '../i18n';
-import type { ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
+import type { Attachment, ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
 
 export type ProcessGroup = { id: string; items: (ThoughtMessage | ToolMessage)[]; pending: boolean };
 
@@ -33,6 +33,26 @@ export const getToolCommand = ({ rawInput, title }: ToolCallData) => {
     if (typeof command === 'string' && command.trim()) return command;
   }
   return title || i18n.get('timeline.toolCall');
+};
+
+// 历史消息里的内联 base64 图片不再渲染为链接，还原成消息附件展示
+const dataImageLinkPattern = /!?\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
+
+export const extractDataImageAttachments = (text: string): { attachments: Attachment[]; markdown: string } => {
+  const attachments: Attachment[] = [];
+  const markdown = text.replace(dataImageLinkPattern, (_, name: string, previewUrl: string) => {
+    const [header, data = ''] = previewUrl.split(',');
+    attachments.push({
+      id: crypto.randomUUID(),
+      kind: 'image',
+      name: name || i18n.get('attachment.imageDefaultName'),
+      mimeType: /^data:([^;]+);/.exec(header)?.[1] || 'image/png',
+      data,
+      previewUrl,
+    });
+    return '';
+  });
+  return { attachments, markdown };
 };
 
 export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean): TimelineItem[] => {
