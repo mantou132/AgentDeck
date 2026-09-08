@@ -14,9 +14,15 @@ import type { Attachment, TextMessage } from '../session/types';
 export type ComposerInput = { text: string; attachments: Attachment[] };
 type InputSelection = { input: string; start: number; end: number };
 const style = css`
-  :scope { display: block; }
-  .composer-shell { padding-bottom: calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
-  .composer-surface { border-radius: 26px; }
+  :scope {
+    display: block;
+  }
+  .composer-shell {
+    padding-bottom: calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  }
+  .composer-surface {
+    border-radius: 26px;
+  }
   @supports (corner-shape: squircle) {
     .composer-surface {
       border-radius: 32px;

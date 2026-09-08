@@ -2,4 +2,5 @@ packages:
   - .
 
 patchedDependencies:
+  '@mantou/tap-ui': patches/@mantou__tap-ui.patch
   tailwindcss: patches/tailwindcss.patch

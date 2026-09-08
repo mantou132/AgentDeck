@@ -1,0 +1,13 @@
+diff --git a/elements/stack.js b/elements/stack.js
+index 4e6dcbe69df6b2e873fbe95c21351e08dc7bd889..38bff26c690d922c4a803a49b4a0995f681477e3 100644
+--- a/elements/stack.js
++++ b/elements/stack.js
+@@ -211,7 +211,7 @@ let TapStackElement = (() => {
+             stackStore({ offset });
+         };
+         #onPageSwipe = (page, evt) => {
+-            if (page !== stackStore.pages.at(-1))
++            if (page !== stackStore.pages.at(-1) || page.gesture === false)
+                 return;
+             if (evt.detail.direction === 'right' && evt.detail.speed > 0.5) {
+                 this.#closeSpeed = evt.detail.speed;

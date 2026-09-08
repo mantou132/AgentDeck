@@ -19,6 +19,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-edge-to-edge = { git = "https://github.com/mantou132/tauri-plugin-edge-to-edge", rev = "86fe04372c33d1fc0a2459d3c49ee1b5be1324d9" }
+tauri-plugin-edge-to-edge = { git = "https://github.com/mantou132/tauri-plugin-edge-to-edge" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
