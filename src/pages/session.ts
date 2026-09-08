@@ -222,6 +222,7 @@ export class AgentDeckSessionPageElement extends GemElement {
               <div v-if=${!loading && !!messages.length} class="contents">
                 <deck-session-timeline
                   .sessionKey=${this.sessionId}
+                  .cwd=${session.cwd}
                   .messages=${messages}
                   ?pending=${pending}
                   ?can-restore-input=${this.#state.canRestoreInput}

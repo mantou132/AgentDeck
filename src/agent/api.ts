@@ -4,6 +4,11 @@ import { RpcPeer } from './rpc';
 
 export type RemoteAgent = { id: string; name: string };
 
+export type RemoteFile = { path: string } & (
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string }
+);
+
 export type PromptAttachment = { type: 'image'; data: string; mimeType: string } | { type: 'text'; text: string };
 
 export type RemoteSession = {
@@ -103,6 +108,12 @@ export class AgentApi {
     });
     return Array.isArray(result.agents) ? result.agents : [];
   };
+
+  readFile = (path: string, cwd: string) =>
+    this.#peer.call<RemoteFile>('file_read', { path, cwd }, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: i18n.get('error.readFileTimeout'),
+    });
 
   completeCwd = async (input: string) => {
     const result = await this.#peer.call<{

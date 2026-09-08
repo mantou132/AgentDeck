@@ -2,6 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { i18n } from '../i18n';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
+import { openMessageLink } from '../navigation';
 import { getProcessSummary, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 
@@ -13,6 +14,7 @@ const style = css`
 @adoptedStyle(style)
 export class DeckSessionTimelineElement extends GemElement {
   @property sessionKey = '';
+  @property cwd = '';
   @property messages: ChatMessage[] = [];
   @boolattribute pending: boolean;
   @boolattribute canRestoreInput: boolean;
@@ -32,6 +34,7 @@ export class DeckSessionTimelineElement extends GemElement {
       ?streaming=${streaming}
       .mdStyle=${user ? userMarkdownStyle : markdownStyle}
       .extensions=${markdownExtensions}
+      @click=${(event: MouseEvent) => openMessageLink(event, this.cwd)}
     >${text}</gem-bind-marked>
   `;
 
@@ -129,6 +132,8 @@ export class DeckSessionTimelineElement extends GemElement {
           <deck-process-detail
             v-if=${Boolean(this.#state.selectedGroupId)}
             .group=${currentGroup}
+            .cwd=${this.cwd}
+            @navigate=${this.#closeProcessSheet}
           ></deck-process-detail>
         `}
       ></deck-sheet>

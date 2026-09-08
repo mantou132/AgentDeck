@@ -1,7 +1,9 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { getToolStatusLabel, i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
 import { diffColorScheme, markdownExtensions, markdownStyle } from '../lib/markdown';
+import { openMessageLink } from '../navigation';
 import { getToolCommand, getToolStatus, type ProcessGroup } from '../session/timeline';
 
 // 工具标题已含文件路径，仅在过程详情中隐藏 diff 文件头。
@@ -30,6 +32,12 @@ const style = css`
 @adoptedStyle(style)
 export class DeckProcessDetailElement extends GemElement {
   @property group?: ProcessGroup;
+  @property cwd = '';
+  @emitter navigate: Emitter;
+
+  #openLink = (event: MouseEvent) => {
+    if (openMessageLink(event, this.cwd)) this.navigate();
+  };
 
   @template()
   #render = () => {
@@ -97,6 +105,7 @@ export class DeckProcessDetailElement extends GemElement {
                           ?streaming=${isPending}
                           .mdStyle=${markdownStyle}
                           .extensions=${markdownExtensions}
+                          @click=${this.#openLink}
                         >${item.text}</gem-bind-marked>
                       `
                           : html`
