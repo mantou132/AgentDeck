@@ -55,7 +55,7 @@ Configure these repository Actions Secrets once:
 | `ANDROID_STORE_PASSWORD` | Keystore password |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | JSON credentials for a service account authorized to release AgentDeck in Play Console |
 
-For a release, increase `version` in `src-tauri/tauri.conf.json`, commit it, and push the matching `vX.Y.Z` tag. Tauri derives Android's version code from this version, so each upload needs a new version. The workflow attaches APK/AAB files to a GitHub Release and creates a **production draft** in Google Play. Add localized release notes and submit the draft from Play Console.
+For a release, increase `version` in `src-tauri/tauri.conf.json`, update `distribution/whatsnew/whatsnew-en-US` (at most 500 characters), commit the changes, and push the matching `vX.Y.Z` tag. Tauri derives Android's version code from this version, so each upload needs a new version. The workflow attaches APK/AAB files to a GitHub Release and **submits the production release for Google Play review**, including the release notes. Google review still applies; if managed publishing is enabled in Play Console, publish the approved changes there when ready.
 
 The GitHub APK uses the upload key; Google Play may use a different app signing key, so test updates to a Play-installed app through a Play testing track.
 

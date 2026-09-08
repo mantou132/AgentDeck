@@ -119,7 +119,7 @@ jobs:
           fi
           gh release upload "$GITHUB_REF_NAME" release/* --clobber
 
-      - name: Upload Google Play production draft
+      - name: Submit Google Play production release for review
         if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: r0adkll/upload-google-play@eb49699984a39f23558439581660aa6f088acfd6 # v1
         with:
@@ -127,8 +127,10 @@ jobs:
           packageName: com.mantou.agentdeck
           releaseFiles: release/*.aab
           tracks: production
-          status: draft
+          status: completed
+          changesNotSentForReview: false
           releaseName: v${{ steps.version.outputs.version }}
+          whatsNewDirectory: distribution/whatsnew
           mappingFile: src-tauri/gen/android/app/build/outputs/mapping/universalRelease/mapping.txt
 
       - name: Remove signing material
