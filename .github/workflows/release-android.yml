@@ -1,0 +1,136 @@
+name: Release Android
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-android
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      NDK_VERSION: 28.2.13676358
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Check release version
+        id: version
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Use a stable major.minor.patch version');
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
+            throw new Error('Release tag must match src-tauri/tauri.conf.json version');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          NODE
+
+      - run: pnpm install --frozen-lockfile
+      - name: Check frontend
+        run: |
+          pnpm run lint:check
+          pnpm run check
+          pnpm test
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - name: Install Android SDK and NDK
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.94.1
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Configure upload signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const env = process.env;
+          for (const key of ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD', 'ANDROID_STORE_PASSWORD']) {
+            if (!env[key]) throw new Error(`Missing secret: ${key}`);
+          }
+          const storeFile = `${env.RUNNER_TEMP}/agentdeck-upload.jks`;
+          writeFileSync(storeFile, Buffer.from(env.ANDROID_KEYSTORE_BASE64, 'base64'), { mode: 0o600 });
+          const properties = { storeFile, keyAlias: env.ANDROID_KEY_ALIAS, keyPassword: env.ANDROID_KEY_PASSWORD, storePassword: env.ANDROID_STORE_PASSWORD };
+          const escape = (value) => value.replace(/[^!-~]|\\/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+          writeFileSync('src-tauri/gen/android/key.properties', Object.entries(properties).map(([key, value]) => `${key}=${escape(value)}`).join('\n'), { mode: 0o600 });
+          NODE
+
+      - name: Build signed Android bundles
+        run: pnpm tauri android build --ci --apk --aab
+
+      - name: Verify and collect release files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          aab=src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab
+          apk=src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+          jarsigner -verify "$aab" | tee "$RUNNER_TEMP/aab-verification.txt"
+          grep -q 'jar verified' "$RUNNER_TEMP/aab-verification.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 "$apk"
+          mkdir release
+          cp "$aab" "release/AgentDeck-$VERSION.aab"
+          cp "$apk" "release/AgentDeck-$VERSION.apk"
+
+      - name: Save build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: AgentDeck-android-${{ steps.version.outputs.version }}
+          path: release/
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "AgentDeck $GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" release/* --clobber
+
+      - name: Upload Google Play production draft
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        uses: r0adkll/upload-google-play@eb49699984a39f23558439581660aa6f088acfd6 # v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.mantou.agentdeck
+          releaseFiles: release/*.aab
+          tracks: production
+          status: draft
+          releaseName: v${{ steps.version.outputs.version }}
+          mappingFile: src-tauri/gen/android/app/build/outputs/mapping/universalRelease/mapping.txt
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f src-tauri/gen/android/key.properties "$RUNNER_TEMP/agentdeck-upload.jks"

@@ -41,6 +41,24 @@ pnpm run build        # frontend bundle
 
 Husky runs Biome on staged files via lint-staged; install dependencies once to enable it.
 
+## Android releases
+
+The **Release Android** GitHub Actions workflow builds signed universal APK and AAB files for all four Android architectures. Run it manually to verify a build and download the artifacts without publishing.
+
+Configure these repository Actions Secrets once:
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | Base64 of the existing Google Play upload keystore |
+| `ANDROID_KEY_ALIAS` | Upload key alias |
+| `ANDROID_KEY_PASSWORD` | Upload key password |
+| `ANDROID_STORE_PASSWORD` | Keystore password |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | JSON credentials for a service account authorized to release AgentDeck in Play Console |
+
+For a release, increase `version` in `src-tauri/tauri.conf.json`, commit it, and push the matching `vX.Y.Z` tag. Tauri derives Android's version code from this version, so each upload needs a new version. The workflow attaches APK/AAB files to a GitHub Release and creates a **production draft** in Google Play. Add localized release notes and submit the draft from Play Console.
+
+The GitHub APK uses the upload key; Google Play may use a different app signing key, so test updates to a Play-installed app through a Play testing track.
+
 ## Project structure
 
 - `src/` — Gem + Tap UI frontend: menu, session, settings pages, relay transport, ACP session state.
@@ -53,4 +71,3 @@ Please see [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
 
 [browser4agent]: https://github.com/mantou132/browser4agent
 [relay]: https://github.com/mantou132/relay
-
