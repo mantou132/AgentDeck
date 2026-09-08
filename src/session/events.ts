@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   DeckSession,
   SessionOptions,
+  ToolCallContent,
   ToolCallData,
   ToolCallStatus,
   ToolMessage,
@@ -68,6 +69,13 @@ export type EventReduction = {
   optionsPatch?: Partial<SessionOptions>;
 };
 
+const getToolContent = (update: Record<string, unknown>) => {
+  if (!Array.isArray(update.content)) return {};
+  return {
+    content: update.content.filter((item): item is ToolCallContent => Boolean(item) && typeof item === 'object'),
+  };
+};
+
 export const reduceSessionEvent = (
   current: ChatMessage[],
   event: SessionEvent,
@@ -126,6 +134,7 @@ export const reduceSessionEvent = (
             ...(typeof update.kind === 'string' ? { kind: update.kind } : {}),
             ...(typeof update.status === 'string' ? { status: update.status as ToolCallStatus } : {}),
             ...('rawInput' in update ? { rawInput: update.rawInput } : {}),
+            ...getToolContent(update),
           },
         },
       ],
@@ -142,6 +151,7 @@ export const reduceSessionEvent = (
       ...(typeof update.kind === 'string' ? { kind: update.kind } : {}),
       ...(typeof update.status === 'string' ? { status: update.status as ToolCallStatus } : {}),
       ...('rawInput' in update ? { rawInput: update.rawInput } : {}),
+      ...getToolContent(update),
     };
     if (index < 0) {
       next.push({

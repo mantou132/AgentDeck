@@ -1,8 +1,25 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
-
 import { getToolStatusLabel, i18n } from '../i18n';
-import { markdownExtensions, markdownStyle } from '../lib/markdown';
+import { toolCallDiffs } from '../lib/diff';
+import { diffColorScheme, markdownExtensions, markdownStyle } from '../lib/markdown';
 import { getToolCommand, getToolStatus, type ProcessGroup } from '../session/timeline';
+
+// 工具标题已含文件路径，仅在过程详情中隐藏 diff 文件头。
+const diffStyle = new CSSStyleSheet();
+diffStyle.replaceSync(`
+  div.d2h-wrapper {
+    .d2h-file-header {
+      display: none;
+    }
+    .d2h-file-wrapper {
+      margin-bottom: 0;
+      border: none;
+    }
+    .d2h-code-linenumber {
+      border-left: none;
+    }
+  }
+`);
 
 const style = css`
   :scope { display: block; }
@@ -31,7 +48,8 @@ export class DeckProcessDetailElement extends GemElement {
               : 'completed'
             : getToolStatus(item.data, group.pending);
           const isPending = status === 'pending' || status === 'in_progress';
-          const hasDetail = isThought ? Boolean(item.text) : item.data.rawInput !== undefined;
+          const diffs = isThought ? [] : toolCallDiffs(item.data.content);
+          const hasDetail = isThought ? Boolean(item.text) : diffs.length > 0 || item.data.rawInput !== undefined;
           const heading = html`
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5">
@@ -82,8 +100,20 @@ export class DeckProcessDetailElement extends GemElement {
                         >${item.text}</gem-bind-marked>
                       `
                           : html`
-                        <p class="mt-0 mb-2 text-xs text-describe">${i18n.get('timeline.inputParams')}</p>
-                        <pre class="m-0 overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-bg p-3.5 font-mono text-sm leading-relaxed text-text">${JSON.stringify(item.data.rawInput, null, 2)}</pre>
+                        <div v-if=${diffs.length} class="overflow-x-auto">
+                          ${diffs.map(
+                            ({ text }) =>
+                              html`<gem-bind-diff2html
+                                class="relative block w-full overflow-x-auto"
+                                .colorScheme=${diffColorScheme}
+                                .mdStyle=${diffStyle}
+                              >${text}</gem-bind-diff2html>`,
+                          )}
+                        </div>
+                        <div v-if=${!diffs.length && item.data.rawInput !== undefined}>
+                          <p class="mt-0 mb-2 text-xs text-describe">${i18n.get('timeline.inputParams')}</p>
+                          <pre class="m-0 overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-bg p-3.5 font-mono text-sm leading-relaxed text-text">${JSON.stringify(item.data.rawInput, null, 2)}</pre>
+                        </div>
                       `
                       }
                     </div>

@@ -15,12 +15,14 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@gem-bind/diff2html": "^0.0.2",
     "@gem-bind/latex": "^0.0.1",
     "@gem-bind/marked": "^0.0.5",
     "@gem-bind/mermaid": "^0.0.2",
     "@mantou/gem": "^2.2.9",
     "@mantou/tap-ui": "^0.1.7",
     "@tauri-apps/api": "^2.11.1",
+    "diff": "^8.0.4",
     "relay-client-ts": "^0.1.6"
   },
   "devDependencies": {

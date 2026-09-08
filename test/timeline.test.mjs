@@ -42,8 +42,18 @@ test('live summaries select an unfinished tool even after another tool or though
   apply({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Waiting for the check' } });
   const group = () => groupTimelineMessages(messages, true).find((item) => item.type === 'group').group;
   assert.equal(getProcessSummary(group()), 'pnpm run check');
-  apply({ sessionUpdate: 'tool_call_update', toolCallId: 'check', rawInput: { command: 'pnpm run check --verbose' } });
+  const diffContent = [{ type: 'diff', path: 'src/app.ts', oldText: 'old', newText: 'new' }];
+  apply({
+    sessionUpdate: 'tool_call_update',
+    toolCallId: 'check',
+    rawInput: { command: 'pnpm run check --verbose' },
+    content: diffContent,
+  });
   assert.equal(getProcessSummary(group()), 'pnpm run check --verbose');
+  assert.deepEqual(
+    messages.findLast((message) => message.type === 'tool' && message.data.toolCallId === 'check').data.content,
+    diffContent,
+  );
   apply({ sessionUpdate: 'tool_call_update', toolCallId: 'check', status: 'completed' });
   assert.equal(getProcessSummary(group()), 'Thinking…');
 });

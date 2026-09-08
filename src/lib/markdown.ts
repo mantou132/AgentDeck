@@ -1,5 +1,6 @@
 import { type MarkedExtension, Renderer } from '@gem-bind/marked';
 
+import '@gem-bind/diff2html';
 import '@gem-bind/latex';
 import '@gem-bind/marked';
 import '@gem-bind/mermaid';
@@ -54,6 +55,8 @@ const inlineLatex = {
 };
 
 const defaultRenderer = new Renderer();
+const diffLanguages = ['diff', 'patch', 'udiff', 'unified-diff'];
+export const diffColorScheme = globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
 
 export const markdownExtensions: MarkedExtension[] = [
   {
@@ -70,6 +73,9 @@ export const markdownExtensions: MarkedExtension[] = [
         const language = languageFromInfo(lang || '');
         const source = escapeHtml(text);
         if (language === 'mermaid') return `<gem-bind-mermaid tabindex="0">${source}</gem-bind-mermaid>`;
+        if (diffLanguages.includes(language)) {
+          return `<gem-bind-diff2html color-scheme="${diffColorScheme}" tabindex="0">${source}</gem-bind-diff2html>`;
+        }
         if (['latex', 'tex', 'math'].includes(language)) {
           return `<gem-bind-latex block tabindex="0">${source}</gem-bind-latex>`;
         }
@@ -148,7 +154,12 @@ markdownStyle.replaceSync(`
   tr + tr td, tbody td { border-top: 1px solid var(--color-border); }
   hr { margin: .9rem 0; border: 0; border-top: 1px solid var(--color-border); }
   img { max-width: 100%; height: auto; border-radius: 12px; }
-  gem-bind-mermaid, gem-bind-latex { display: block; max-width: 100%; overflow: auto; }
+  gem-bind-mermaid, gem-bind-latex, gem-bind-diff2html { display: block; max-width: 100%; overflow: auto; }
+  gem-bind-diff2html {
+    margin: .7rem 0;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+  }
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: .01ms !important; }
   }
@@ -169,4 +180,5 @@ userMarkdownStyle.replaceSync(`
   table { border-collapse: collapse; }
   th, td { border: 1px solid rgb(255 255 255 / .25); padding: .4rem; }
   img { max-width: 100%; border-radius: 9px; }
+  gem-bind-diff2html { display: block; max-width: 100%; overflow: auto; border-radius: 9px; }
 `);

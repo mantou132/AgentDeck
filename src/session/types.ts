@@ -7,12 +7,15 @@ export type DeckSession = RemoteSession & {
 
 export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 
+export type ToolCallContent = Record<string, unknown> & { type?: string };
+
 export type ToolCallData = {
   toolCallId: string;
   title: string;
   kind?: string;
   status?: ToolCallStatus;
   rawInput?: unknown;
+  content?: ToolCallContent[];
 };
 
 export type Attachment = {
