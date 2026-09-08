@@ -1,0 +1,4 @@
+<resources>
+    <!-- Match the system and plugin: 80dp artwork scaled by 192 / 108. -->
+    <dimen name="launch_icon_size">142.22222dp</dimen>
+</resources>

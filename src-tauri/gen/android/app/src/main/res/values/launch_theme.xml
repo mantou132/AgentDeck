@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.AgentDeck.Launch" parent="Theme.AgentDeck" />
+</resources>

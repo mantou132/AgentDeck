@@ -8,7 +8,7 @@
 # 项目导航
 
 - `src/`：Gem + Tap UI 前端；`elements/` 为公共自定义元素；`i18n.ts` 与 `locales/` 提供基于 `@mantou/gem` 的多语言。
-- `src-tauri/`：Tauri 2 原生入口、配置和 Android / iOS 工程。
+- `src-tauri/`：Tauri 2 原生入口、配置和 Android / iOS 工程；Android `res/*/launch_*` 定义启动资源，`MainActivity.kt` 控制系统启动屏退出延迟；iOS `LaunchScreen.storyboard` / `LaunchIcon.imageset` 定义启动布局与图标。插件提供接续到页面 load 的原生启动层；更新应用图标时同步更新 LaunchIcon。
 - `public/`：静态品牌资源；`relay-guide/` 为三步 Relay 指南插图。
 - `test/`：Node 回归测试；`helpers/app-fixture.mjs` 提供使用实际 Relay SDK 的隔离环境。
 

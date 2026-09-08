@@ -71,7 +71,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
               <h1 class="m-0 font-display text-xl font-bold leading-none tracking-[-0.025em] text-highlight">
                 AgentDeck
               </h1>
-              <div class="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-describe">
+              <div class="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-describe text-nowrap">
                 <span
                   class=${classMap({
                     'size-[7px] rounded-full bg-disabled': true,

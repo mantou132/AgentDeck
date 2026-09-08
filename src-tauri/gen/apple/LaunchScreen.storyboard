@@ -14,6 +14,19 @@
                     <view key="view" contentMode="scaleToFill" id="5EZ-qb-Rvc">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchIcon" translatesAutoresizingMaskIntoConstraints="NO" id="launch-icon">
+                                <rect key="frame" x="167" y="408" width="80" height="80"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="80" id="icon-width"/>
+                                    <constraint firstAttribute="height" constant="80" id="icon-height"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <constraints>
+                            <constraint firstItem="launch-icon" firstAttribute="centerX" secondItem="5EZ-qb-Rvc" secondAttribute="centerX" id="icon-center-x"/>
+                            <constraint firstItem="launch-icon" firstAttribute="centerY" secondItem="5EZ-qb-Rvc" secondAttribute="centerY" id="icon-center-y"/>
+                        </constraints>
                         <viewLayoutGuide key="safeArea" id="vDu-zF-Fre"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                     </view>
@@ -23,6 +36,7 @@
         </scene>
     </scenes>
     <resources>
+        <image name="LaunchIcon" width="180" height="180"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
