@@ -23,7 +23,8 @@
     "@mantou/tap-ui": "^0.1.7",
     "@tauri-apps/api": "^2.11.1",
     "diff": "^8.0.4",
-    "relay-client-ts": "^0.1.6"
+    "relay-client-ts": "^0.1.6",
+    "tauri-plugin-edge-to-edge-api": "^0.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

@@ -1,3 +1,5 @@
+import { toWebproxyUrl } from 'tauri-plugin-edge-to-edge-api';
+
 export type MessageLink = { type: 'web'; url: string } | { type: 'file'; path: string; line?: number };
 
 // Use the raw href: the browser would resolve relative files against the app URL.
@@ -6,7 +8,8 @@ export const parseMessageLink = (href: string): MessageLink | undefined => {
   if (!value || value.startsWith('#')) return;
   if (/^(https?:)?\/\//i.test(value)) {
     try {
-      return { type: 'web', url: new URL(value.startsWith('//') ? `https:${value}` : value).href };
+      const url = new URL(value.startsWith('//') ? `https:${value}` : value);
+      return { type: 'web', url: toWebproxyUrl(url.href) };
     } catch {
       return;
     }

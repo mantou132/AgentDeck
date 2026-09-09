@@ -3,5 +3,5 @@
   "version": "0.2",
   "ignorePaths": ["**/pnpm-lock.yaml", "**/package.json", "**/settings.json", "**/cspell.json"],
   "useGitignore": true,
-  "words": ["mantou", "boolattribute", "agentclientprotocol", "agentdeck"]
+  "words": ["agentclientprotocol", "agentdeck", "boolattribute", "mantou", "tauri", "webproxy"]
 }
