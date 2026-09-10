@@ -13,7 +13,7 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
   await fixture.connect();
   await fixture.openSession();
   fixture.app.sendPrompt('s1', 'first attempt');
-  const cwd = fixture.app.agentApi.completeCwd('/tmp');
+  const cwd = fixture.app.agentApi.browseFiles('/tmp');
   await tick();
   const prompt = fixture.requests.find((request) => request.payload.method === 'agent_prompt');
   const directory = fixture.requests.at(-1);
@@ -24,8 +24,8 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
     outbox(fixture).some((message) => message.messageId === prompt.message_id),
     false,
   );
-  fixture.reply(directory, { value: '/tmp', isDirectory: true, directories: [] });
-  assert.equal((await cwd).isDirectory, true);
+  fixture.reply(directory, { path: '/tmp', entries: [] });
+  assert.equal((await cwd).path, '/tmp');
 
   fixture.transport.reconnectTransport(true);
   fixture.sockets.at(-1).open();
@@ -205,7 +205,7 @@ test('late rejection after stored or pairing change cannot fail another call', a
   fixture.reply(prompt, { answer: 'done' });
   await tick();
   const oldSocket = fixture.sockets.at(-1);
-  const cwd = fixture.app.agentApi.completeCwd('/tmp');
+  const cwd = fixture.app.agentApi.browseFiles('/tmp');
   const closed = assert.rejects(cwd, /connection closed/i);
   await tick();
   oldSocket.frame({ type: 'rejected', message_id: fixture.requests.at(-1).message_id, reason: 'queue_full:' });

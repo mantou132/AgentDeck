@@ -1,5 +1,4 @@
 import { icons } from '@mantou/tap-ui/lib/icons';
-import { agentApi } from '../agent/transport';
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { createDraftSession, refreshSessions } from '../state/sessions';
@@ -26,24 +25,36 @@ export class AgentDeckSessionListPageElement extends GemElement {
   #state = createState({
     sheetOpen: false,
     newSessionError: '',
+    selectedCwd: '',
+    navigatingCwd: false,
   });
 
   #openNewSession = () => {
     if (agentdeckStore.connection !== 'connected') return;
-    this.#state({ sheetOpen: true, newSessionError: '' });
+    this.#state({ sheetOpen: true, newSessionError: '', selectedCwd: '', navigatingCwd: true });
   };
 
   #closeNewSession = () => this.#state({ sheetOpen: false, newSessionError: '' });
 
-  #confirmNewSession = (cwd: string) => {
-    const session = createDraftSession({ agent: agentdeckStore.settings.agent, cwd });
+  #onCwdChange = (event: CustomEvent<string>) => {
+    this.#state({ selectedCwd: event.detail, navigatingCwd: false });
+  };
+
+  #onCwdNavStart = () => {
+    this.#state({ navigatingCwd: true });
+  };
+
+  #confirmNewSession = () => {
+    const { selectedCwd, navigatingCwd } = this.#state;
+    if (!selectedCwd || navigatingCwd) return;
+    const session = createDraftSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
     this.#state({ sheetOpen: false, newSessionError: '' });
     openSession(session.sessionId);
   };
 
   @template()
   #render = () => {
-    const { sheetOpen, newSessionError } = this.#state;
+    const { sheetOpen, newSessionError, selectedCwd, navigatingCwd } = this.#state;
     const {
       sessionGroups,
       connection,
@@ -180,12 +191,30 @@ export class AgentDeckSessionListPageElement extends GemElement {
         .description=${i18n.get('sessionList.newSessionDesc')}
         @close=${this.#closeNewSession}
         .content=${html`
-          <deck-cwd-picker
-            v-if=${sheetOpen}
-            .complete=${(input: string) => agentApi.completeCwd(input)}
-            .error=${newSessionError}
-            @confirm=${(event: CustomEvent<string>) => this.#confirmNewSession(event.detail)}
-          ></deck-cwd-picker>
+          <div v-if=${sheetOpen} class="w-full">
+            <deck-file-browser
+              directories-only
+              .emptyText=${i18n.get('cwdPicker.emptyDir')}
+              @navstart=${this.#onCwdNavStart}
+              @change=${this.#onCwdChange}
+            ></deck-file-browser>
+
+            <div
+              v-if=${newSessionError}
+              class="mt-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
+            >
+              ${newSessionError}
+            </div>
+
+            <button
+              type="button"
+              class="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-0 bg-primary px-4 text-sm font-semibold text-white transition-transform active:scale-[0.985] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:shadow-none disabled:active:scale-100"
+              ?disabled=${navigatingCwd || !selectedCwd}
+              @click=${this.#confirmNewSession}
+            >
+              <span>${i18n.get('cwdPicker.createHere')}</span>
+            </button>
+          </div>
         `}
       ></deck-sheet>
     `;

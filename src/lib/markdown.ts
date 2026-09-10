@@ -88,9 +88,7 @@ export const markdownExtensions: MarkedExtension[] = [
   },
 ];
 
-export const markdownStyle = new CSSStyleSheet();
-
-markdownStyle.replaceSync(`
+const baseMarkdownStyle = `
   :host {
     display: block;
     min-width: 0;
@@ -162,6 +160,17 @@ markdownStyle.replaceSync(`
   }
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: .01ms !important; }
+  }
+`;
+
+export const markdownStyle = new CSSStyleSheet();
+markdownStyle.replaceSync(baseMarkdownStyle);
+
+export const fileViewerMarkdownStyle = new CSSStyleSheet();
+fileViewerMarkdownStyle.replaceSync(`
+  ${baseMarkdownStyle}
+  :where(img, video)[src]:not([src^="http"]):not([src^="//"]) {
+    display: none;
   }
 `);
 

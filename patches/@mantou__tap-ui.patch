@@ -1,13 +1,44 @@
+diff --git a/elements/stack.d.ts b/elements/stack.d.ts
+index 79df458cca3553d4417d9d8768616afcfa3e5151..38b5454c1eba4f7717bc677a7826c176e63e5f5c 100644
+--- a/elements/stack.d.ts
++++ b/elements/stack.d.ts
+@@ -20,6 +20,25 @@ export declare class TapStackElement extends GemElement {
+     static close(): void;
+     static inCurrentStack(ele: HTMLElement): boolean;
+     static getClosestStack(ele: HTMLElement): TapStackElement | null;
++    get store(): ((value?: Partial<{
++        pages: StackPushOptions[];
++        offset: number;
++    }> | undefined) => void) & Omit<{
++        name: never;
++        apply: never;
++        call: never;
++        bind: never;
++        toString: never;
++        prototype: never;
++        length: never;
++        arguments: never;
++        caller: never;
++        [Symbol.hasInstance]: never;
++        [Symbol.metadata]: never;
++    }, "offset" | "pages"> & {
++        pages: StackPushOptions[];
++        offset: number;
++    };
+     push(options: StackPushOptions): void;
+     pop(): void;
+ }
 diff --git a/elements/stack.js b/elements/stack.js
-index 4e6dcbe69df6b2e873fbe95c21351e08dc7bd889..38bff26c690d922c4a803a49b4a0995f681477e3 100644
+index d440049949cb191506cfc9bc07eab0955aae2df4..4546657b8e705a4d4d3286cd44452664da86e641 100644
 --- a/elements/stack.js
 +++ b/elements/stack.js
-@@ -211,7 +211,7 @@ let TapStackElement = (() => {
-             stackStore({ offset });
-         };
-         #onPageSwipe = (page, evt) => {
--            if (page !== stackStore.pages.at(-1))
-+            if (page !== stackStore.pages.at(-1) || page.gesture === false)
-                 return;
-             if (evt.detail.direction === 'right' && evt.detail.speed > 0.5) {
-                 this.#closeSpeed = evt.detail.speed;
+@@ -297,6 +297,9 @@ let TapStackElement = (() => {
+             })}
+     `;
+         }));
++        get store() {
++            return this.#store;
++        }
+         push(options) {
+             if (!this.disableHistory && options.history !== false) {
+                 history.push({

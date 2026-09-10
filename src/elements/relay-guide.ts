@@ -1,8 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { CarouselItem } from '@mantou/tap-ui/elements/carousel';
 import { blockContainer, focusStyle } from '@mantou/tap-ui/lib/styles';
-
 import { i18n } from '../i18n';
-import type { CarouselItem } from './carousel';
 
 @customElement('deck-relay-guide')
 @adoptedStyle(blockContainer)
@@ -55,7 +54,7 @@ export class DeckRelayGuideElement extends GemElement {
 
   @template()
   #render = () => html`
-    <deck-carousel label=${i18n.get('relayGuide.carouselLabel')} .items=${this.#items}></deck-carousel>
+    <tap-carousel label=${i18n.get('relayGuide.carouselLabel')} .items=${this.#items}></tap-carousel>
     <button
       class="mt-5 h-12 w-full cursor-pointer rounded-xl border-0 bg-primary text-sm font-semibold text-white transition-transform active:scale-[0.985]"
       @click=${() => this.close()}

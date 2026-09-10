@@ -9,6 +9,24 @@ export type RemoteFile = { path: string } & (
   | { type: 'image'; data: string; mimeType: string }
 );
 
+export type BrowseEntry = {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+};
+
+export type FileBrowseResult = {
+  path: string;
+  home?: string;
+  entries: BrowseEntry[];
+};
+
+export type FileBrowseOptions = {
+  cwd?: string;
+  type?: 'all' | 'directory' | 'file';
+  limit?: number;
+};
+
 export type PromptAttachment = { type: 'image'; data: string; mimeType: string } | { type: 'text'; text: string };
 
 export type RemoteSession = {
@@ -115,20 +133,34 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.readFileTimeout'),
     });
 
-  completeCwd = async (input: string) => {
+  browseFiles = async (path = '', options?: FileBrowseOptions | string): Promise<FileBrowseResult> => {
+    const opts: FileBrowseOptions = typeof options === 'string' ? { cwd: options } : options || {};
     const result = await this.#peer.call<{
-      value?: string;
-      isDirectory?: boolean;
-      directories?: string[];
-    }>('agent_cwd_complete', { input, limit: 150 }, undefined, {
-      timeoutMs: 15_000,
-      timeoutMessage: i18n.get('error.readCwdTimeout'),
-    });
+      path?: string;
+      home?: string;
+      entries?: BrowseEntry[];
+    }>(
+      'file_browse',
+      {
+        path,
+        ...(opts.cwd ? { cwd: opts.cwd } : {}),
+        ...(opts.type ? { type: opts.type } : {}),
+        limit: opts.limit ?? 200,
+      },
+      undefined,
+      {
+        timeoutMs: 15_000,
+        timeoutMessage: i18n.get('error.readCwdTimeout'),
+      },
+    );
     return {
-      value: typeof result.value === 'string' ? result.value : '',
-      isDirectory: result.isDirectory === true,
-      directories: Array.isArray(result.directories)
-        ? result.directories.filter((item) => typeof item === 'string')
+      path: typeof result.path === 'string' ? result.path : '',
+      home: typeof result.home === 'string' ? result.home : undefined,
+      entries: Array.isArray(result.entries)
+        ? result.entries.filter(
+            (entry): entry is BrowseEntry =>
+              Boolean(entry) && typeof entry.name === 'string' && typeof entry.path === 'string',
+          )
         : [],
     };
   };

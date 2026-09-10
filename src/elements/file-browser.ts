@@ -1,113 +1,323 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
-import type { RemoteFile } from '../agent/api';
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
+
+import type { BrowseEntry } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
-import { markdownExtensions, markdownStyle } from '../lib/markdown';
-import { openMessageLink, openSettings } from '../navigation';
+import { displayPath, getBreadcrumbs, getParentPath } from '../lib/path';
+import { openFileViewer } from '../navigation';
 
-const style = css`
-  :scope { display: block; height: 100%; }
-  mark { background: var(--color-primary-soft); color: inherit; }
+const browserStyle = css`
+  :scope {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+  }
+  .entries-container {
+    max-height: 42dvh;
+    min-height: 10rem;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+`;
+
+const pageStyle = css`
+  :scope {
+    height: 100%;
+  }
+  deck-file-browser {
+    height: 100%;
+  }
+  deck-file-browser .entries-container {
+    max-height: none;
+    flex: 1;
+  }
+  footer {
+    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  }
 `;
 
 @customElement('deck-file-browser')
-@adoptedStyle(style)
+@adoptedStyle(blockContainer)
+@adoptedStyle(browserStyle)
 export class DeckFileBrowserElement extends GemElement {
   @property path = '';
   @property cwd = '';
-  @property line?: number;
+  @property emptyText = '';
+  @boolattribute directoriesOnly: boolean;
+
+  @emitter change: Emitter<string>;
+  @emitter navstart: Emitter<string>;
 
   #state = createState({
-    file: undefined as RemoteFile | undefined,
+    homePath: '',
+    currentPath: '',
+    entries: [] as BrowseEntry[],
     loading: true,
-    error: '',
-    revision: 0,
-    source: false,
+    navigatingPath: '',
+    browseError: '',
   });
-  #lineRef = createRef<HTMLElement>();
+  #requestToken = 0;
+  #breadcrumbsRef = createRef<HTMLElement>();
 
-  @effect((i) => [i.path, i.cwd, i.line, i.#state.revision])
-  #read = () => {
-    let active = true;
-    this.#state({ file: undefined, loading: true, error: '', source: Boolean(this.line) });
-    agentApi.readFile(this.path, this.cwd).then(
-      (file) => {
-        if (active) this.#state({ file, loading: false });
-      },
-      (error) => {
-        if (active) this.#state({ loading: false, error: error instanceof Error ? error.message : String(error) });
-      },
-    );
-    return () => {
-      active = false;
-    };
+  @effect((i) => [i.path, i.cwd])
+  #init = () => {
+    void this.#navigateTo(this.path);
   };
 
-  @effect((i) => [i.#state.file, i.#state.source])
-  #scrollToLine = () => {
-    const frame = requestAnimationFrame(() => this.#lineRef.value?.scrollIntoView({ block: 'center' }));
-    return () => cancelAnimationFrame(frame);
+  @effect((i) => [i.#state.currentPath])
+  #scrollBreadcrumbs = () => {
+    requestAnimationFrame(() => {
+      const el = this.#breadcrumbsRef.value;
+      if (el) el.scrollLeft = el.scrollWidth;
+    });
   };
 
-  #renderText = (text: string) => {
-    if (!this.line) return text;
-    const lines = text.split('\n');
-    const index = this.line - 1;
-    if (index >= lines.length) return text;
-    return html`${lines.slice(0, index).join('\n')}${index ? '\n' : ''}<mark ${this.#lineRef}>${lines[index] || ' '}</mark>${index < lines.length - 1 ? '\n' : ''}${lines.slice(index + 1).join('\n')}`;
+  #navigateTo = async (targetPath: string) => {
+    const token = ++this.#requestToken;
+    const isInitial = !this.#state.currentPath;
+    this.#state({
+      loading: isInitial,
+      navigatingPath: targetPath,
+      browseError: '',
+    });
+    this.navstart(targetPath);
+    try {
+      const result = await agentApi.browseFiles(targetPath, {
+        cwd: this.cwd,
+        type: this.directoriesOnly ? 'directory' : 'all',
+      });
+      if (token !== this.#requestToken) return;
+      const resolvedPath = result?.path || targetPath;
+      const homePath = result?.home || this.#state.homePath;
+      this.#state({
+        homePath,
+        currentPath: resolvedPath,
+        entries: result?.entries ?? [],
+        loading: false,
+        navigatingPath: '',
+        browseError: '',
+      });
+      this.change(resolvedPath);
+    } catch (error) {
+      if (token !== this.#requestToken) return;
+      this.#state({
+        loading: false,
+        navigatingPath: '',
+        browseError: error instanceof Error ? error.message : i18n.get('cwdPicker.browseError'),
+      });
+    }
+  };
+
+  #onFileClick = (file: string) => {
+    openFileViewer(file, this.cwd || this.#state.currentPath);
   };
 
   @template()
   #render = () => {
-    const { file, loading, error, source } = this.#state;
-    const path = file?.path || this.path;
-    const name = path.split(/[\\/]/).pop() || path;
-    const markdown = file?.type === 'text' && /\.(md|markdown)$/i.test(path);
+    const { homePath, currentPath, entries, loading, navigatingPath, browseError } = this.#state;
+    const crumbs = getBreadcrumbs(currentPath, homePath);
+    const parentPath = getParentPath(currentPath);
+    const hasEntries = entries.length > 0;
+
     return html`
-      <tap-page class="bg-bg text-text">
-        <tap-navbar slot="header" title=${name} back @backclick=${() => Stack.close()}>
+      <div
+        ${this.#breadcrumbsRef}
+        class="mb-4 flex min-h-11 items-center gap-1 overflow-x-auto rounded-xl bg-bg px-2 py-1.5 no-scrollbar"
+      >
+        ${crumbs.map((crumb, index) => {
+          const isLast = index === crumbs.length - 1;
+          const isNavigatingThis = navigatingPath === crumb.path;
+          return html`
+            ${index > 0 ? html`<tap-use class="size-2.5 shrink-0 text-disabled" .element=${icons.right}></tap-use>` : ''}
+            <button
+              type="button"
+              class=${classMap({
+                'inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border-0 px-2 py-1 font-mono text-sm outline-none transition-colors': true,
+                'bg-transparent font-medium text-highlight': isLast,
+                'cursor-pointer bg-transparent text-describe hover:text-highlight active:bg-bg-hover': !isLast,
+              })}
+              ?disabled=${Boolean(navigatingPath) || isLast}
+              @click=${() => this.#navigateTo(crumb.path)}
+            >
+              <tap-use v-if=${isNavigatingThis} class="size-2.5 text-primary" .element=${icons.loading}></tap-use>
+              ${crumb.name}
+            </button>
+          `;
+        })}
+      </div>
+
+      <div
+        v-if=${browseError}
+        class="mb-3 flex items-center gap-2 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
+      >
+        <tap-use class="size-3.5 shrink-0 text-negative" .element=${icons.error}></tap-use>
+        <span class="min-w-0 flex-1">${browseError}</span>
+        <button
+          class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold disabled:opacity-45"
+          ?disabled=${loading || Boolean(navigatingPath)}
+          @click=${() => this.#navigateTo(currentPath)}
+        >
+          ${i18n.get('cwdPicker.retry')}
+        </button>
+      </div>
+
+      <div class="entries-container">
+        <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
+          <tap-use class="size-4" .element=${icons.loading}></tap-use>
+          ${i18n.get('cwdPicker.reading')}
+        </div>
+
+        <div v-else class="divide-y divide-border/60">
           <button
-            v-if=${markdown}
-            slot="right"
+            v-if=${parentPath !== null}
             type="button"
-            class="min-h-11 cursor-pointer border-0 bg-transparent px-3 text-sm font-semibold text-primary-strong"
-            @click=${() => this.#state({ source: !source })}
-          >${i18n.get(source ? 'file.preview' : 'file.source')}</button>
-        </tap-navbar>
-        <main class="h-full overflow-auto overscroll-contain">
-          <div class="border-b border-border bg-bg-light px-4 py-2 font-mono text-xs break-all text-describe">${path}</div>
-          <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-describe">
-            <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
-            ${i18n.get('file.loading')}
-          </div>
-          <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-12 text-center">
-            <p class="m-0 font-semibold text-highlight">${i18n.get('file.failed')}</p>
-            <p class="mt-2 text-sm break-words text-negative">${error}</p>
-            <div class="flex justify-center gap-3">
+            class="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-1 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+            ?disabled=${Boolean(navigatingPath)}
+            @click=${() => parentPath && this.#navigateTo(parentPath)}
+          >
+            <span class="grid size-6 shrink-0 place-items-center text-describe">
+              <tap-use
+                class=${classMap({
+                  'size-3.5': true,
+                  'text-primary': navigatingPath === parentPath,
+                })}
+                .element=${navigatingPath === parentPath ? icons.loading : icons.back}
+              ></tap-use>
+            </span>
+            <span class="text-sm text-describe">${i18n.get('cwdPicker.parentDir')}</span>
+          </button>
+
+          ${entries.map((entry) => {
+            const isHidden = entry.name.startsWith('.');
+            const isNavigatingThis = navigatingPath === entry.path;
+            if (entry.isDirectory) {
+              return html`
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-1 py-3.5 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                  title=${entry.path}
+                  ?disabled=${Boolean(navigatingPath)}
+                  @click=${() => this.#navigateTo(entry.path)}
+                >
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span
+                      class=${classMap({
+                        'grid size-6 shrink-0 place-items-center': true,
+                        'text-describe': !isHidden,
+                        'text-disabled': isHidden,
+                      })}
+                    >
+                      <svg class="size-[18px]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-1.5V9a3 3 0 0 0-3-3h-4.5a3 3 0 0 0-2.12.88L6.88 8.38A3 3 0 0 0 4.76 9.25H4.5A3 3 0 0 0 1.5 12.25V18a3 3 0 0 0 3 3h15Z" opacity="0.4"/>
+                        <path d="M4.5 9.25h10.5a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H4.5A3 3 0 0 1 1.5 18v-5.75a3 3 0 0 1 3-3Z"/>
+                      </svg>
+                    </span>
+                    <span
+                      class=${classMap({
+                        'truncate font-mono text-sm font-medium': true,
+                        'text-text': !isHidden,
+                        'text-describe': isHidden,
+                      })}
+                    >
+                      ${entry.name}
+                    </span>
+                  </div>
+                  <tap-use
+                    class=${classMap({
+                      'size-3.5 shrink-0': true,
+                      'text-primary': isNavigatingThis,
+                      'text-disabled': !isNavigatingThis,
+                    })}
+                    .element=${isNavigatingThis ? icons.loading : icons.right}
+                  ></tap-use>
+                </button>
+              `;
+            }
+
+            return html`
               <button
-                class="min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 text-sm font-semibold text-primary-strong"
-                @click=${() => this.#state({ revision: this.#state.revision + 1 })}
-              >${i18n.get('global.retry')}</button>
-              <button
-                class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-4 text-sm font-semibold text-text"
-                @click=${openSettings}
-              >${i18n.get('global.openSettings')}</button>
-            </div>
+                type="button"
+                class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-1 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                title=${entry.path}
+                ?disabled=${Boolean(navigatingPath)}
+                @click=${() => this.#onFileClick(entry.path)}
+              >
+                <div class="flex min-w-0 items-center gap-3">
+                  <span
+                    class=${classMap({
+                      'grid size-6 shrink-0 place-items-center': true,
+                      'text-describe': !isHidden,
+                      'text-disabled': isHidden,
+                    })}
+                  >
+                    <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" fill="currentColor" opacity="0.1"/>
+                      <path d="M14 2v6h6M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/>
+                    </svg>
+                  </span>
+                  <span
+                    class=${classMap({
+                      'truncate font-mono text-sm': true,
+                      'text-text': !isHidden,
+                      'text-describe': isHidden,
+                    })}
+                  >
+                    ${entry.name}
+                  </span>
+                </div>
+              </button>
+            `;
+          })}
+
+          <div v-if=${!hasEntries && !browseError} class="px-4 py-8 text-center text-sm text-describe">
+            ${this.emptyText || i18n.get('fileBrowser.emptyDir')}
           </div>
-          <div v-else-if=${file?.type === 'image'} class="grid min-h-60 place-items-center p-4">
-            <img class="max-w-full rounded-xl object-contain" src=${file?.type === 'image' ? `data:${file.mimeType};base64,${file.data}` : ''} alt=${name} />
-          </div>
-          <gem-bind-marked
-            v-else-if=${markdown && !source}
-            class="mx-auto block max-w-[760px] p-5"
-            .mdStyle=${markdownStyle}
-            .extensions=${markdownExtensions}
-            @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
-          >${file?.type === 'text' ? file.text : ''}</gem-bind-marked>
-          <pre v-else class="m-0 min-w-full w-max p-4 font-mono text-sm leading-relaxed text-text" tabindex="0">${file?.type === 'text' ? this.#renderText(file.text) : ''}</pre>
-        </main>
-      </tap-page>
+        </div>
+      </div>
     `;
   };
+}
+
+@customElement('deck-file-browser-page')
+@adoptedStyle(blockContainer)
+@adoptedStyle(pageStyle)
+export class DeckFileBrowserPageElement extends GemElement {
+  @property path = '';
+  @property cwd = '';
+
+  #state = createState({
+    currentPath: '',
+  });
+
+  #title = () => {
+    const p = this.#state.currentPath || this.path;
+    if (displayPath(p) === '~') return '~';
+    return (
+      p
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .pop() ||
+      p ||
+      '/'
+    );
+  };
+
+  @template()
+  #render = () => html`
+    <tap-page class="bg-bg text-text">
+      <tap-navbar slot="header" title=${this.#title()} back @backclick=${() => Stack.pop()}></tap-navbar>
+      <main class="h-full overflow-hidden p-4">
+        <deck-file-browser
+          .path=${this.path}
+          .cwd=${this.cwd}
+          @change=${(e: CustomEvent<string>) => this.#state({ currentPath: e.detail })}
+        ></deck-file-browser>
+      </main>
+      <footer slot="footer"></footer>
+    </tap-page>
+  `;
 }

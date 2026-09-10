@@ -27,6 +27,8 @@ export default defineConfig(({ command }) => ({
       plugins: [
         unpluginGem({
           include: path.resolve(import.meta.dirname, 'src'),
+          styleMinify: true,
+          htmlMinify: true,
           autoImport: {
             extends: 'gem',
             elements: {
@@ -37,7 +39,7 @@ export default defineConfig(({ command }) => ({
                 'tap-*': '/elements/*',
               },
               'src/elements': {
-                'deck-(sheet)-*': '/$1',
+                'deck-(sheet|file-browser)-*': '/$1',
                 'deck-*': '/*',
               },
             },

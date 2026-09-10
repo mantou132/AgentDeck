@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@mantou/tap-ui':
-    hash: 4d325502f742719682af2d0ae625db9b37b27236528229ea593050f9f3872c1f
+    hash: d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e
     path: patches/@mantou__tap-ui.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
@@ -29,11 +29,11 @@ importers:
         specifier: ^0.0.2
         version: 0.0.2
       '@mantou/gem':
-        specifier: ^2.2.9
-        version: 2.2.9
+        specifier: ^2.2.10
+        version: 2.2.10
       '@mantou/tap-ui':
-        specifier: ^0.1.7
-        version: 0.1.7(patch_hash=4d325502f742719682af2d0ae625db9b37b27236528229ea593050f9f3872c1f)(@mantou/gem@2.2.9)
+        specifier: ^0.1.9
+        version: 0.1.9(patch_hash=d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e)(@mantou/gem@2.2.10)
       '@tauri-apps/api':
         specifier: ^2.11.1
         version: 2.11.1
@@ -78,8 +78,8 @@ importers:
         specifier: ~5.9.2
         version: 5.9.3
       unplugin-gem:
-        specifier: ^0.1.7
-        version: 0.1.7(@mantou/gem@2.2.9)(@rspack/core@2.1.8(@swc/helpers@0.5.23))
+        specifier: ^0.1.10
+        version: 0.1.10(@mantou/gem@2.2.10)(@rspack/core@2.1.8(@swc/helpers@0.5.23))
 
 packages:
 
@@ -196,11 +196,11 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mantou/gem@2.2.9':
-    resolution: {integrity: sha512-J6pjXoMc1QVrd6GccO3xfc3QN3qv2CqqL8yLbRCPmRoC8MIEQ7HAED0EFhbXdiAAw5SJ2GFLLW3boqWldKQAeg==}
+  '@mantou/gem@2.2.10':
+    resolution: {integrity: sha512-A2I8XUKfVM5kfCWLPSHsacn1bGNxMdRq3fSKdnoHtmuBtAyw/NIL0DeQBc/NmVznkXH2QUiqCYxgJezZoZCP3A==}
 
-  '@mantou/tap-ui@0.1.7':
-    resolution: {integrity: sha512-waZ/cVfIhmenIR8hEEcAJwNQ/WA5/J8AGXo6IqMrpkGXT0JHpv/sT/mZqRCUTfmMaBEowPFQ/3q3GwRpE8hYnQ==}
+  '@mantou/tap-ui@0.1.9':
+    resolution: {integrity: sha512-0hfP6pQyE1tm4Md/GD2+1W2n27Cr2rwipMsCB0aYJ/zVIwUq0JQX7oMJUs3lGvtPi0o4M3P01wLr1tLxIcaAWg==}
     peerDependencies:
       '@mantou/gem': ^2.x
 
@@ -1306,8 +1306,8 @@ packages:
   stylis@4.4.0:
     resolution: {integrity: sha512-5Z9ZpRzfuH6l/UAvCPAPUo3665Nk2wLaZU3x+TLHKVzIz33+sbJqbtrYoC3KD4/uVOr2Zp+L0LySezP9OHV9yA==}
 
-  swc-plugin-gem@0.1.15:
-    resolution: {integrity: sha512-QJejopSzOes4Q1wZFEJM4LbT/OBKzlPZeed6OOy65tO68VKoSLkfxX8IeUkCjzgjNDiqIA6UGbzwkWBf46yDwQ==}
+  swc-plugin-gem@0.1.18:
+    resolution: {integrity: sha512-U9LYY2Z05oGYdP2ba3oyPOrOiYZfK3KgFHM1ltX6fpXq1FbMKiuNfhJM9W8g5ckWQiyE8G3M4G0bdpexELLDzg==}
 
   tailwindcss@4.3.3:
     resolution: {integrity: sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==}
@@ -1342,8 +1342,8 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  unplugin-gem@0.1.7:
-    resolution: {integrity: sha512-sdGHxemm/4/c/cwYSHJh1q+X7xo/wu14gLOJVgz8K9nsqG2ydJGDp1k9m1rmv5e7xIkQUlUz7n7CY6iDRkVToQ==}
+  unplugin-gem@0.1.10:
+    resolution: {integrity: sha512-8t7HbYmBrN4EJ1d+qF3CpydpBM9+974PwysN3DrwkzeS5Uvd8FjTCQa+Q2h0ptzOpv/sieYQquRvsRHcop6JDQ==}
     peerDependencies:
       '@mantou/gem': '>=2.0.0'
       '@rspack/core': '>=0.0.0'
@@ -1488,31 +1488,31 @@ snapshots:
 
   '@gem-bind/diff2html@0.0.2':
     dependencies:
-      '@mantou/gem': 2.2.9
+      '@mantou/gem': 2.2.10
       '@swc/helpers': 0.5.23
       diff2html: 3.4.56
-      duoyun-ui: 2.2.8(@mantou/gem@2.2.9)
+      duoyun-ui: 2.2.8(@mantou/gem@2.2.10)
       highlight.js: 11.12.0
 
   '@gem-bind/latex@0.0.1':
     dependencies:
-      '@mantou/gem': 2.2.9
+      '@mantou/gem': 2.2.10
       '@swc/helpers': 0.5.23
-      duoyun-ui: 2.2.8(@mantou/gem@2.2.9)
+      duoyun-ui: 2.2.8(@mantou/gem@2.2.10)
       katex: 0.18.5
 
   '@gem-bind/marked@0.0.5':
     dependencies:
-      '@mantou/gem': 2.2.9
+      '@mantou/gem': 2.2.10
       '@swc/helpers': 0.5.23
-      duoyun-ui: 2.2.8(@mantou/gem@2.2.9)
+      duoyun-ui: 2.2.8(@mantou/gem@2.2.10)
       marked: 15.0.12
 
   '@gem-bind/mermaid@0.0.2':
     dependencies:
-      '@mantou/gem': 2.2.9
+      '@mantou/gem': 2.2.10
       '@swc/helpers': 0.5.23
-      duoyun-ui: 2.2.8(@mantou/gem@2.2.9)
+      duoyun-ui: 2.2.8(@mantou/gem@2.2.10)
       mermaid: 11.17.2
 
   '@iconify/types@2.0.0': {}
@@ -1542,11 +1542,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@mantou/gem@2.2.9': {}
+  '@mantou/gem@2.2.10': {}
 
-  '@mantou/tap-ui@0.1.7(patch_hash=4d325502f742719682af2d0ae625db9b37b27236528229ea593050f9f3872c1f)(@mantou/gem@2.2.9)':
+  '@mantou/tap-ui@0.1.9(patch_hash=d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e)(@mantou/gem@2.2.10)':
     dependencies:
-      '@mantou/gem': 2.2.9
+      '@mantou/gem': 2.2.10
 
   '@mermaid-js/parser@1.2.1':
     dependencies:
@@ -2210,10 +2210,10 @@ snapshots:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
-  duoyun-ui@2.2.8(@mantou/gem@2.2.9):
+  duoyun-ui@2.2.8(@mantou/gem@2.2.10):
     dependencies:
-      '@mantou/gem': 2.2.9
-      '@mantou/tap-ui': 0.1.7(patch_hash=4d325502f742719682af2d0ae625db9b37b27236528229ea593050f9f3872c1f)(@mantou/gem@2.2.9)
+      '@mantou/gem': 2.2.10
+      '@mantou/tap-ui': 0.1.9(patch_hash=d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e)(@mantou/gem@2.2.10)
       deep-query-selector: 1.0.2
 
   emoji-regex@10.6.0: {}
@@ -2542,7 +2542,7 @@ snapshots:
 
   stylis@4.4.0: {}
 
-  swc-plugin-gem@0.1.15: {}
+  swc-plugin-gem@0.1.18: {}
 
   tailwindcss@4.3.3(patch_hash=3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882): {}
 
@@ -2566,14 +2566,14 @@ snapshots:
 
   undici-types@8.3.0: {}
 
-  unplugin-gem@0.1.7(@mantou/gem@2.2.9)(@rspack/core@2.1.8(@swc/helpers@0.5.23)):
+  unplugin-gem@0.1.10(@mantou/gem@2.2.10)(@rspack/core@2.1.8(@swc/helpers@0.5.23)):
     dependencies:
       '@swc/core': 1.15.47(@swc/helpers@0.5.23)
       '@swc/helpers': 0.5.23
-      swc-plugin-gem: 0.1.15
+      swc-plugin-gem: 0.1.18
       unplugin: 3.3.0(@rspack/core@2.1.8(@swc/helpers@0.5.23))
     optionalDependencies:
-      '@mantou/gem': 2.2.9
+      '@mantou/gem': 2.2.10
       '@rspack/core': 2.1.8(@swc/helpers@0.5.23)
     transitivePeerDependencies:
       - '@farmfe/core'

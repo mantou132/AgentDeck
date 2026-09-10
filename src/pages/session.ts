@@ -1,4 +1,5 @@
-import { Stack, stackStore } from '@mantou/tap-ui/elements/stack';
+import { history } from '@mantou/gem/lib/history';
+import { Stack } from '@mantou/tap-ui/elements/stack';
 import { icons } from '@mantou/tap-ui/lib/icons';
 import { reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
@@ -30,7 +31,7 @@ const style = css`
 @customElement('agentdeck-session-page')
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
-@connectStore(stackStore)
+@connectStore(history.store)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
@@ -51,7 +52,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     }
   };
 
-  @effect((instance) => [instance.sessionId, agentdeckStore.unreadSessionIds, stackStore.pages])
+  @effect((instance) => [instance.sessionId, agentdeckStore.unreadSessionIds, history.store])
   #readCompletedResponse = () => queueMicrotask(this.#markRead);
 
   @effect(() => [])

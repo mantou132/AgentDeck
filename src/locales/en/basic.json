@@ -71,6 +71,7 @@
   "cwdPicker.reading": "Reading directory…",
   "cwdPicker.parentDir": "Parent directory",
   "cwdPicker.emptyDir": "No subdirectories, you can create a session directly here.",
+  "fileBrowser.emptyDir": "Empty directory",
   "cwdPicker.creating": "Creating session…",
   "cwdPicker.createHere": "Create session here",
   "timeline.toolCalls": "$1 tool calls",

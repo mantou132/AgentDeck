@@ -157,7 +157,7 @@ test('directory and session-list requests end at their deadlines, but prompt has
   const fixture = documentFixture();
   await fixture.connect();
   await fixture.openSession();
-  const cwd = fixture.app.agentApi.completeCwd('');
+  const cwd = fixture.app.agentApi.browseFiles('');
   const cwdRejected = assert.rejects(cwd, /Reading directory timed out/);
   await fixture.advance(15_000);
   await cwdRejected;

@@ -10,7 +10,11 @@ const { outputText } = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.CommonJS },
 });
 const exports = {};
-vm.runInNewContext(outputText, { exports, URL });
+vm.runInNewContext(outputText, {
+  exports,
+  URL,
+  require: (id) => (id === 'tauri-plugin-edge-to-edge-api' ? { toWebproxyUrl: (url) => url } : {}),
+});
 const parse = (href) => {
   const result = exports.parseMessageLink(href);
   return result && JSON.parse(JSON.stringify(result));
@@ -72,4 +76,66 @@ test('file reads use the session cwd and paired host; missing files and timeouts
   await tick();
   f.reply(f.requests.at(-1), { path: '/home/me/notes.md', type: 'text', text: '# Notes' });
   assert.equal((await retry).text, '# Notes');
+});
+
+test('browseFiles sends path, cwd, type and limit, returning path, home, and entries', async () => {
+  const f = documentFixture();
+  await f.connect();
+  const browsing = f.transport.agentApi.browseFiles('src/elements', { cwd: '/home/me/project', type: 'all' });
+  await tick();
+  const request = f.requests.at(-1);
+  assert.equal(request.payload.method, 'file_browse');
+  assert.equal(request.payload.peerId, 1);
+  assert.equal(request.payload.params.path, 'src/elements');
+  assert.equal(request.payload.params.cwd, '/home/me/project');
+  assert.equal(request.payload.params.type, 'all');
+  assert.equal(request.payload.params.limit, 200);
+  f.reply(request, {
+    path: '/home/me/project/src/elements',
+    home: '/home/me',
+    entries: [
+      { name: 'sub', path: '/home/me/project/src/elements/sub', isDirectory: true },
+      { name: 'file.ts', path: '/home/me/project/src/elements/file.ts', isDirectory: false },
+    ],
+  });
+  const result = await browsing;
+  assert.equal(result.path, '/home/me/project/src/elements');
+  assert.equal(result.home, '/home/me');
+  assert.deepEqual(JSON.parse(JSON.stringify(result.entries)), [
+    { name: 'sub', path: '/home/me/project/src/elements/sub', isDirectory: true },
+    { name: 'file.ts', path: '/home/me/project/src/elements/file.ts', isDirectory: false },
+  ]);
+});
+
+test('file browser navigation resolves correct breadcrumbs and parent path', () => {
+  const pathSource = readFileSync(new URL('../src/lib/path.ts', import.meta.url), 'utf8');
+  const { outputText: pathJs } = ts.transpileModule(pathSource, {
+    compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.CommonJS },
+  });
+  const pathExports = {};
+  vm.runInNewContext(pathJs, { exports: pathExports });
+
+  const { getBreadcrumbs, getParentPath } = pathExports;
+
+  const crumbs = getBreadcrumbs('/Users/mantou/agent-deck/src/elements', '/Users/mantou');
+  assert.deepEqual(JSON.parse(JSON.stringify(crumbs)), [
+    { name: '~', path: '/Users/mantou' },
+    { name: 'agent-deck', path: '/Users/mantou/agent-deck' },
+    { name: 'src', path: '/Users/mantou/agent-deck/src' },
+    { name: 'elements', path: '/Users/mantou/agent-deck/src/elements' },
+  ]);
+
+  const homeCrumbs = getBreadcrumbs('/Users/mantou', '/Users/mantou');
+  assert.deepEqual(JSON.parse(JSON.stringify(homeCrumbs)), [{ name: '~', path: '/Users/mantou' }]);
+
+  const rootCrumbs = getBreadcrumbs('/etc/nginx');
+  assert.deepEqual(JSON.parse(JSON.stringify(rootCrumbs)), [
+    { name: '/', path: '/' },
+    { name: 'etc', path: '/etc' },
+    { name: 'nginx', path: '/etc/nginx' },
+  ]);
+
+  assert.equal(getParentPath('/Users/mantou/agent-deck'), '/Users/mantou');
+  assert.equal(getParentPath('/Users'), '/');
+  assert.equal(getParentPath('/'), null);
 });

@@ -71,6 +71,7 @@
   "cwdPicker.reading": "正在读取目录…",
   "cwdPicker.parentDir": "上一级目录",
   "cwdPicker.emptyDir": "没有子目录，可以直接在此新建会话。",
+  "fileBrowser.emptyDir": "空目录",
   "cwdPicker.creating": "正在创建会话…",
   "cwdPicker.createHere": "在此新建会话",
   "timeline.toolCalls": "$1 次工具调用",
