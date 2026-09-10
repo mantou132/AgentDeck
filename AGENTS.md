@@ -197,4 +197,4 @@ class DuoyunTestElement extends GemElement {
 - `pnpm run tauri dev` / `pnpm run tauri android dev`：原生开发。
 - `cargo check --manifest-path src-tauri/Cargo.toml`：Rust 检查。
 - `pnpm tauri icon public/agentdeck-icon.png`：重建平台图标。
-- Android 发布：递增 `src-tauri/tauri.conf.json` 的版本、更新 `distribution/whatsnew/whatsnew-en-US`（最多 500 字符），并推送对应 `vX.Y.Z` tag；签名和 Play 凭据使用 GitHub Actions Secrets，自动提交正式版审核，上线时间由 Google 审核与 Play 发布设置决定。
+- Android 发布：递增 `src-tauri/tauri.conf.json` 的版本、更新 `distribution/whatsnew/` 下所有文件（每个最多 500 字符），并推送对应 `vX.Y.Z` tag；签名和 Play 凭据使用 GitHub Actions Secrets，自动提交正式版审核，上线时间由 Google 审核与 Play 发布设置决定。
