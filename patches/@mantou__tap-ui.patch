@@ -1,3 +1,113 @@
+diff --git a/elements/browser.d.ts b/elements/browser.d.ts
+index 68bd8d8ded403d6b75dc769f1260cebf351ae7a3..74c372122ebf5aaee1d2ae8f6270ca035c56c4bb 100644
+--- a/elements/browser.d.ts
++++ b/elements/browser.d.ts
+@@ -14,6 +14,7 @@ export interface BrowserOptions<T = unknown> {
+     actions?: BrowserItem<T>[];
+     groups?: ActionSheetGroup<T>[];
+     animated?: boolean;
++    allowedProtocols?: string[];
+ }
+ export interface MessageData {
+     type: 'next_state';
+@@ -28,11 +29,13 @@ export declare class TapBrowserElement<T = unknown> extends GemElement {
+     static navbar: string;
+     static frame: string;
+     static more: string;
++    static allowedProtocols: Set<string>;
+     src: string;
+     title: string;
+     items?: BrowserItem<T>[];
+     actions?: BrowserItem<T>[];
+     groups?: ActionSheetGroup<T>[];
++    allowedProtocols?: string[];
+     close: Emitter<null>;
+     select: Emitter<BrowserItem<T>>;
+     openExtraUri: Emitter<string>;
+diff --git a/elements/browser.js b/elements/browser.js
+index 613762f196ec83780c4cdab5f4c7d0aa1c9bcd66..6a291969a5d6ec3b3bedb372cd8ad8310b093390 100644
+--- a/elements/browser.js
++++ b/elements/browser.js
+@@ -110,6 +110,9 @@ let TapBrowserElement = (() => {
+     let _groups_decorators;
+     let _groups_initializers = [];
+     let _groups_extraInitializers = [];
++    let _allowedProtocols_decorators;
++    let _allowedProtocols_initializers = [];
++    let _allowedProtocols_extraInitializers = [];
+     let _close_decorators;
+     let _close_initializers = [];
+     let _close_extraInitializers = [];
+@@ -140,6 +143,7 @@ let TapBrowserElement = (() => {
+             _items_decorators = [property];
+             _actions_decorators = [property];
+             _groups_decorators = [property];
++            _allowedProtocols_decorators = [property];
+             _close_decorators = [emitter];
+             _select_decorators = [emitter];
+             _openExtraUri_decorators = [globalemitter];
+@@ -154,6 +158,7 @@ let TapBrowserElement = (() => {
+             __esDecorate(null, null, _items_decorators, { kind: "field", name: "items", static: false, private: false, access: { has: obj => "items" in obj, get: obj => obj.items, set: (obj, value) => { obj.items = value; } }, metadata: _metadata }, _items_initializers, _items_extraInitializers);
+             __esDecorate(null, null, _actions_decorators, { kind: "field", name: "actions", static: false, private: false, access: { has: obj => "actions" in obj, get: obj => obj.actions, set: (obj, value) => { obj.actions = value; } }, metadata: _metadata }, _actions_initializers, _actions_extraInitializers);
+             __esDecorate(null, null, _groups_decorators, { kind: "field", name: "groups", static: false, private: false, access: { has: obj => "groups" in obj, get: obj => obj.groups, set: (obj, value) => { obj.groups = value; } }, metadata: _metadata }, _groups_initializers, _groups_extraInitializers);
++            __esDecorate(null, null, _allowedProtocols_decorators, { kind: "field", name: "allowedProtocols", static: false, private: false, access: { has: obj => "allowedProtocols" in obj, get: obj => obj.allowedProtocols, set: (obj, value) => { obj.allowedProtocols = value; } }, metadata: _metadata }, _allowedProtocols_initializers, _allowedProtocols_extraInitializers);
+             __esDecorate(null, null, _close_decorators, { kind: "field", name: "close", static: false, private: false, access: { has: obj => "close" in obj, get: obj => obj.close, set: (obj, value) => { obj.close = value; } }, metadata: _metadata }, _close_initializers, _close_extraInitializers);
+             __esDecorate(null, null, _select_decorators, { kind: "field", name: "select", static: false, private: false, access: { has: obj => "select" in obj, get: obj => obj.select, set: (obj, value) => { obj.select = value; } }, metadata: _metadata }, _select_initializers, _select_extraInitializers);
+             __esDecorate(null, null, _openExtraUri_decorators, { kind: "field", name: "openExtraUri", static: false, private: false, access: { has: obj => "openExtraUri" in obj, get: obj => obj.openExtraUri, set: (obj, value) => { obj.openExtraUri = value; } }, metadata: _metadata }, _openExtraUri_initializers, _openExtraUri_extraInitializers);
+@@ -167,12 +172,14 @@ let TapBrowserElement = (() => {
+         static navbar = __runInitializers(_classThis, _static_navbar_initializers, void 0);
+         static frame = (__runInitializers(_classThis, _static_navbar_extraInitializers), __runInitializers(_classThis, _static_frame_initializers, void 0));
+         static more = (__runInitializers(_classThis, _static_frame_extraInitializers), __runInitializers(_classThis, _static_more_initializers, void 0));
++        static allowedProtocols = (__runInitializers(_classThis, _static_more_extraInitializers), new Set(['http:', 'https:']));
+         src = __runInitializers(this, _src_initializers, void 0);
+         title = (__runInitializers(this, _src_extraInitializers), __runInitializers(this, _title_initializers, void 0));
+         items = (__runInitializers(this, _title_extraInitializers), __runInitializers(this, _items_initializers, void 0));
+         actions = (__runInitializers(this, _items_extraInitializers), __runInitializers(this, _actions_initializers, void 0));
+         groups = (__runInitializers(this, _actions_extraInitializers), __runInitializers(this, _groups_initializers, void 0));
+-        close = (__runInitializers(this, _groups_extraInitializers), __runInitializers(this, _close_initializers, void 0));
++        allowedProtocols = (__runInitializers(this, _groups_extraInitializers), __runInitializers(this, _allowedProtocols_initializers, void 0));
++        close = (__runInitializers(this, _allowedProtocols_extraInitializers), __runInitializers(this, _close_initializers, void 0));
+         select = (__runInitializers(this, _close_extraInitializers), __runInitializers(this, _select_initializers, void 0));
+         openExtraUri = (__runInitializers(this, _select_extraInitializers), __runInitializers(this, _openExtraUri_initializers, void 0));
+         static open(options) {
+@@ -181,6 +188,9 @@ let TapBrowserElement = (() => {
+             browser.title = options.title || '';
+             browser.items = options.items || options.actions;
+             browser.groups = options.groups;
++            if (options.allowedProtocols) {
++                browser.allowedProtocols = options.allowedProtocols;
++            }
+             const result = DyPromise.new((resolve) => {
+                 browser.#onClosed = resolve;
+             }, { browser });
+@@ -226,7 +236,10 @@ let TapBrowserElement = (() => {
+                     return;
+                 if (data?.type === 'next_state' && data?.state) {
+                     const url = new URL(data.state.url);
+-                    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
++                    const allowed = this.allowedProtocols
++                        ? new Set(this.allowedProtocols)
++                        : TapBrowserElement.allowedProtocols;
++                    if (!allowed.has(url.protocol)) {
+                         this.openExtraUri(url.href);
+                         return;
+                     }
+@@ -234,6 +247,7 @@ let TapBrowserElement = (() => {
+                         Browser.open({
+                             title: data.state.title,
+                             src: url.href,
++                            allowedProtocols: this.allowedProtocols,
+                         });
+                     }
+                     else {
+@@ -279,7 +293,6 @@ let TapBrowserElement = (() => {
+             __runInitializers(this, _private_render_extraInitializers);
+         }
+         static {
+-            __runInitializers(_classThis, _static_more_extraInitializers);
+             __runInitializers(_classThis, _classExtraInitializers);
+         }
+     };
 diff --git a/elements/stack.d.ts b/elements/stack.d.ts
 index 79df458cca3553d4417d9d8768616afcfa3e5151..38b5454c1eba4f7717bc677a7826c176e63e5f5c 100644
 --- a/elements/stack.d.ts

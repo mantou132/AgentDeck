@@ -3379,7 +3379,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-edge-to-edge"
 version = "0.3.3"
-source = "git+https://github.com/mantou132/tauri-plugin-edge-to-edge#4920d64aa03a6eafd497b43f0d223b07a4f68ed1"
+source = "git+https://github.com/mantou132/tauri-plugin-edge-to-edge#002d47567f5b237b7713d5c73cf325e0f097aced"
 dependencies = [
  "reqwest 0.12.28",
  "serde",

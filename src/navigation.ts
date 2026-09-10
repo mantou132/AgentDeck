@@ -2,6 +2,8 @@ import { Browser } from '@mantou/tap-ui/elements/browser';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { parseMessageLink } from './lib/links';
 
+Browser.allowedProtocols.add('webproxy:');
+
 export const openFileBrowser = (path: string, cwd: string) => {
   Stack.push({
     content: html`<deck-file-browser-page .path=${path} .cwd=${cwd}></deck-file-browser-page>`,

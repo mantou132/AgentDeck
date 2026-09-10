@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@mantou/tap-ui':
-    hash: d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e
+    hash: bb04e7565200fcdbbfd808761c8618ffbcc5d09cb4eb93d04e44ca9666fa74b3
     path: patches/@mantou__tap-ui.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
@@ -33,7 +33,7 @@ importers:
         version: 2.2.10
       '@mantou/tap-ui':
         specifier: ^0.1.9
-        version: 0.1.9(patch_hash=d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e)(@mantou/gem@2.2.10)
+        version: 0.1.9(patch_hash=bb04e7565200fcdbbfd808761c8618ffbcc5d09cb4eb93d04e44ca9666fa74b3)(@mantou/gem@2.2.10)
       '@tauri-apps/api':
         specifier: ^2.11.1
         version: 2.11.1
@@ -44,8 +44,8 @@ importers:
         specifier: ^0.1.6
         version: 0.1.6
       tauri-plugin-edge-to-edge-api:
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.1.1
+        version: 0.1.1
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.15
@@ -1316,8 +1316,8 @@ packages:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
 
-  tauri-plugin-edge-to-edge-api@0.1.0:
-    resolution: {integrity: sha512-NxNuH0EsCPaByfgtir1HXCHUDi6+3L/nUjWYhR/xIJ3LHKYguTCfaOiFe8FG06ra4veotg6c6EmoDpC0aa+Nlg==}
+  tauri-plugin-edge-to-edge-api@0.1.1:
+    resolution: {integrity: sha512-opGf01TcofIKsI2ieMGXYYvh3xkerDi9Pu6v9Y/pUSuZGwYHUKuSpIuvtdutk6l2ttO9TYlivqlJa2lZuX83fQ==}
 
   tinyexec@1.3.0:
     resolution: {integrity: sha512-QKAl9m8gWWGHV8jZcPeym6j+XULi6tOf1mT83WYJ4Lk2ytW/uwAWkrP0uFsdoYMdueVJ0qs26wZ+23xeB4ibNQ==}
@@ -1544,7 +1544,7 @@ snapshots:
 
   '@mantou/gem@2.2.10': {}
 
-  '@mantou/tap-ui@0.1.9(patch_hash=d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e)(@mantou/gem@2.2.10)':
+  '@mantou/tap-ui@0.1.9(patch_hash=bb04e7565200fcdbbfd808761c8618ffbcc5d09cb4eb93d04e44ca9666fa74b3)(@mantou/gem@2.2.10)':
     dependencies:
       '@mantou/gem': 2.2.10
 
@@ -2213,7 +2213,7 @@ snapshots:
   duoyun-ui@2.2.8(@mantou/gem@2.2.10):
     dependencies:
       '@mantou/gem': 2.2.10
-      '@mantou/tap-ui': 0.1.9(patch_hash=d25aa09c31605963b8695b2427d17e244d535b79030e5ba0dccb4eef35d6bb4e)(@mantou/gem@2.2.10)
+      '@mantou/tap-ui': 0.1.9(patch_hash=bb04e7565200fcdbbfd808761c8618ffbcc5d09cb4eb93d04e44ca9666fa74b3)(@mantou/gem@2.2.10)
       deep-query-selector: 1.0.2
 
   emoji-regex@10.6.0: {}
@@ -2548,7 +2548,7 @@ snapshots:
 
   tapable@2.3.3: {}
 
-  tauri-plugin-edge-to-edge-api@0.1.0:
+  tauri-plugin-edge-to-edge-api@0.1.1:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
