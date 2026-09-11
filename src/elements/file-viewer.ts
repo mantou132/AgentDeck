@@ -94,7 +94,7 @@ export class DeckFileViewerElement extends GemElement {
           >${i18n.get(source ? 'file.preview' : 'file.source')}</button>
         </tap-navbar>
         <main class="h-full overflow-auto overscroll-contain">
-          <div class="border-b border-border bg-bg-light px-4 py-2 font-mono text-xs break-all text-describe">${path}</div>
+          <div class="sticky top-0 z-10 border-b border-border bg-bg-light px-4 py-2 font-mono text-xs break-all text-describe">${path}</div>
           <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-describe">
             <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
             ${i18n.get('file.loading')}
