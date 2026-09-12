@@ -1,6 +1,8 @@
+import { repeat } from '@mantou/gem/lib/element';
+
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
-import { createDraftSession, refreshSessions } from '../state/sessions';
+import { createDraftSession, deleteSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
 
@@ -144,14 +146,19 @@ export class AgentDeckSessionListPageElement extends GemElement {
           </div>
 
           <div v-if=${hasGroups} class="flex flex-col gap-5 pt-2">
-            ${sessionGroups.map(
+            ${repeat(
+              sessionGroups,
+              (group) => group.cwd,
               (group) => html`
                 <deck-session-group
                   .cwd=${group.cwd}
                   .sessions=${group.sessions}
                   .unreadSessionIds=${agentdeckStore.unreadSessionIds}
                   .pendingSessionIds=${agentdeckStore.pendingSessionIds}
+                  .deletingSessionIds=${agentdeckStore.deletingSessionIds}
+                  ?deletion-disabled=${!isConnected}
                   @select=${(event: CustomEvent<string>) => openSession(event.detail)}
+                  @request-delete=${(event: CustomEvent<string>) => deleteSession(event.detail)}
                 ></deck-session-group>
               `,
             )}

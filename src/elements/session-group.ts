@@ -1,4 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { repeat } from '@mantou/gem/lib/element';
 import { Time } from '@mantou/tap-ui/lib/time';
 
 import { i18n } from '../i18n';
@@ -19,7 +20,10 @@ export class DeckSessionGroupElement extends GemElement {
   @property sessions: DeckSession[] = [];
   @property unreadSessionIds: string[] = [];
   @property pendingSessionIds: string[] = [];
+  @property deletingSessionIds: string[] = [];
+  @boolattribute deletionDisabled: boolean;
   @emitter select: Emitter<string>;
+  @emitter requestDelete: Emitter<string>;
 
   #state = createState({ expanded: false });
 
@@ -45,49 +49,80 @@ export class DeckSessionGroupElement extends GemElement {
           <span class="rounded-lg bg-bg px-2 py-1 font-mono text-xs font-bold text-describe">${sessions.length}</span>
         </header>
         <div>
-          ${visibleSessions.map(
+          ${repeat(
+            visibleSessions,
+            (session) => session.sessionId,
             (session) => html`
-              <button
-                class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 border-b border-solid border-border/70 bg-transparent px-4 py-3 text-left text-text transition-colors duration-150 last:border-b-0 active:bg-bg-hover"
-                @click=${() => this.select(session.sessionId)}
+              <tap-swipeout
+                class="border-0 border-b border-solid border-border/70 last:border-b-0"
+                ?disabled=${this.deletionDisabled || this.deletingSessionIds.includes(session.sessionId)}
+                @click=${(event: MouseEvent) => {
+                  if (!event.defaultPrevented && !this.deletingSessionIds.includes(session.sessionId)) {
+                    this.select(session.sessionId);
+                  }
+                }}
               >
-                <span class="min-w-0">
-                  <span class="flex min-w-0 items-center gap-2">
-                    <span class="truncate text-base leading-snug font-semibold text-highlight">
-                      ${session.title || i18n.get('session.untitled')}
+                <button
+                  type="button"
+                  class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-bg-light px-4 py-3 text-left text-text transition-colors duration-150 active:bg-bg-hover disabled:cursor-default disabled:opacity-50"
+                  ?disabled=${this.deletingSessionIds.includes(session.sessionId)}
+                  aria-busy=${this.deletingSessionIds.includes(session.sessionId)}
+                >
+                  <span class="min-w-0">
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span class="truncate text-base leading-snug font-semibold text-highlight">
+                        ${session.title || i18n.get('session.untitled')}
+                      </span>
+                      <span
+                        v-if=${this.pendingSessionIds.includes(session.sessionId)}
+                        class="inline-flex shrink-0 items-center gap-1 rounded-full bg-informative/10 px-2 py-0.5 text-xs font-semibold text-informative"
+                        title=${i18n.get('session.runningTip')}
+                      >
+                        <span class="size-1.5 animate-pulse rounded-full bg-informative"></span>
+                        ${i18n.get('session.running')}
+                      </span>
+                      <span
+                        v-if=${this.unreadSessionIds.includes(session.sessionId)}
+                        class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 text-xs font-semibold text-positive"
+                        title=${i18n.get('session.completedUnreadTip')}
+                      >
+                        <span class="size-1.5 rounded-full bg-positive"></span>
+                        ${i18n.get('session.completed')}
+                      </span>
                     </span>
-                    <span
-                      v-if=${this.pendingSessionIds.includes(session.sessionId)}
-                      class="inline-flex shrink-0 items-center gap-1 rounded-full bg-informative/10 px-2 py-0.5 text-xs font-semibold text-informative"
-                      title=${i18n.get('session.runningTip')}
-                    >
-                      <span class="size-1.5 animate-pulse rounded-full bg-informative"></span>
-                      ${i18n.get('session.running')}
-                    </span>
-                    <span
-                      v-if=${this.unreadSessionIds.includes(session.sessionId)}
-                      class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 text-xs font-semibold text-positive"
-                      title=${i18n.get('session.completedUnreadTip')}
-                    >
-                      <span class="size-1.5 rounded-full bg-positive"></span>
-                      ${i18n.get('session.completed')}
+                    <span class="mt-1.5 block truncate font-mono text-xs text-describe">
+                      ${session.sessionId}
                     </span>
                   </span>
-                  <span class="mt-1.5 block truncate font-mono text-xs text-describe">
-                    ${session.sessionId}
+                  <span class="flex shrink-0 items-center gap-1.5 text-xs text-describe">
+                    <span>
+                      ${
+                        session.updatedAt
+                          ? new Time().relativeTimeFormat(new Time(session.updatedAt), { lang: i18n.currentLanguage })
+                          : '—'
+                      }
+                    </span>
+                    <tap-use
+                      class="size-[15px]"
+                      .element=${this.deletingSessionIds.includes(session.sessionId) ? icons.loading : icons.right}
+                    ></tap-use>
                   </span>
-                </span>
-                <span class="flex shrink-0 items-center gap-1.5 text-xs text-describe">
-                  <span>
-                    ${
-                      session.updatedAt
-                        ? new Time().relativeTimeFormat(new Time(session.updatedAt), { lang: i18n.currentLanguage })
-                        : '—'
-                    }
-                  </span>
-                  <tap-use class="size-[15px]" .element=${icons.right}></tap-use>
-                </span>
-              </button>
+                </button>
+                <button
+                  slot="end"
+                  type="button"
+                  class="flex min-w-20 cursor-pointer flex-col items-center justify-center gap-1 border-0 bg-negative px-4 text-sm font-semibold text-white active:opacity-80 disabled:cursor-default disabled:opacity-50"
+                  ?disabled=${this.deletionDisabled || this.deletingSessionIds.includes(session.sessionId)}
+                  aria-label=${i18n.get('sessionList.deleteAria', session.title || i18n.get('session.untitled'))}
+                  @click=${(event: MouseEvent) => {
+                    event.preventDefault();
+                    this.requestDelete(session.sessionId);
+                  }}
+                >
+                  <tap-use class="size-5" .element=${icons.delete}></tap-use>
+                  ${i18n.get(this.deletingSessionIds.includes(session.sessionId) ? 'sessionList.deleting' : 'sessionList.delete')}
+                </button>
+              </tap-swipeout>
             `,
           )}
         </div>

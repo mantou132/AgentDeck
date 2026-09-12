@@ -75,6 +75,7 @@ export const resetRemoteState = () => {
     sessionsLoading: false,
     sessionsLoaded: false,
     sessionsError: '',
+    deletingSessionIds: [],
     messagesBySession: {},
     loadedSessionIds: [],
     loadingSessionIds: [],
@@ -124,6 +125,60 @@ export const getSession = (sessionId: string) => {
   if (remote) return remote;
   const agent = agentdeckStore.settings.agent;
   return localSessions.get(sessionId) && agent ? localSessions.get(sessionId) : undefined;
+};
+
+export const deleteSession = async (sessionId: string) => {
+  const session = getSession(sessionId);
+  if (!session || session.draft || agentdeckStore.deletingSessionIds.includes(sessionId)) return;
+  if (agentdeckStore.connection !== 'connected') {
+    agentdeckStore({ sessionsError: i18n.get('error.remoteNotConnected') });
+    return;
+  }
+  const { agent, relayId } = agentdeckStore.settings;
+  const isCurrentHost = () => agent === agentdeckStore.settings.agent && relayId === agentdeckStore.settings.relayId;
+  setSessionFlag('deletingSessionIds', sessionId, true);
+  agentdeckStore({ sessionsError: '' });
+  try {
+    const { deleted } = await agentApi.deleteSession(session.agent, sessionId);
+    if (!isCurrentHost()) return;
+    if (!deleted) throw new Error(i18n.get('error.deleteSessionFailed'));
+
+    // A list request started before deletion must not restore the removed row.
+    sessionsRequest += 1;
+    sessionLoads.delete(sessionId);
+    failedSessionLoads.delete(sessionId);
+    localSessions.delete(sessionId);
+    openedSessionIds.delete(sessionId);
+    resolvePermission(sessionId, null);
+    const sessions = agentdeckStore.sessions.filter((item) => item.sessionId !== sessionId);
+    const messagesBySession = { ...agentdeckStore.messagesBySession };
+    const errorsBySession = { ...agentdeckStore.errorsBySession };
+    const optionsBySession = { ...agentdeckStore.optionsBySession };
+    delete messagesBySession[sessionId];
+    delete errorsBySession[sessionId];
+    delete optionsBySession[sessionId];
+    agentdeckStore({
+      sessions,
+      sessionGroups: getSortedSessionGroups(sessions),
+      sessionsLoading: false,
+      messagesBySession,
+      errorsBySession,
+      optionsBySession,
+      loadedSessionIds: agentdeckStore.loadedSessionIds.filter((id) => id !== sessionId),
+      loadingSessionIds: agentdeckStore.loadingSessionIds.filter((id) => id !== sessionId),
+      pendingSessionIds: agentdeckStore.pendingSessionIds.filter((id) => id !== sessionId),
+      unreadSessionIds: agentdeckStore.unreadSessionIds.filter((id) => id !== sessionId),
+      changingModeSessionIds: agentdeckStore.changingModeSessionIds.filter((id) => id !== sessionId),
+    });
+  } catch (error) {
+    if (isCurrentHost()) {
+      agentdeckStore({
+        sessionsError: error instanceof Error ? error.message : i18n.get('error.deleteSessionFailed'),
+      });
+    }
+  } finally {
+    if (isCurrentHost()) setSessionFlag('deletingSessionIds', sessionId, false);
+  }
 };
 
 export type CreateSessionInput = {

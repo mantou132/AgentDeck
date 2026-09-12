@@ -238,4 +238,12 @@ export class AgentApi {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.closeSessionTimeout'),
     });
+
+  deleteSession = (agent: string, sessionId: string) =>
+    this.#peer.call<{ deleted: boolean }>(
+      'agent_session_delete',
+      { agent, sessionId, timeoutSeconds: sessionTimeoutSeconds },
+      undefined,
+      { timeoutMs: 65_000, timeoutMessage: i18n.get('error.deleteSessionTimeout') },
+    );
 }
