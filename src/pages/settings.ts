@@ -40,7 +40,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
       saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent });
       this.#state({ error: '' });
       if (this.canGoBack) {
-        Stack.close();
+        Stack.pop();
       }
     } catch (error) {
       this.#state({ error: error instanceof Error ? error.message : i18n.get('settings.saveFailed') });
@@ -68,7 +68,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
             class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft disabled:invisible"
             ?disabled=${!this.canGoBack}
             aria-label=${i18n.get('settings.backAria')}
-            @click=${() => Stack.close()}
+            @click=${() => Stack.pop()}
           >
             <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
           </button>

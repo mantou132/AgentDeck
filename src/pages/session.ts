@@ -140,7 +140,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         <button
           class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
           aria-label=${i18n.get('session.backAria')}
-          @click=${() => Stack.close()}
+          @click=${() => Stack.pop()}
         >
           <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
         </button>

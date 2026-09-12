@@ -120,3 +120,26 @@ test('newly created sessions receive completion reminders and resetting clears t
   f.app.resetRemoteState();
   assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
 });
+
+test('pending permission requests expose active permission status for session list items', async () => {
+  const f = await running();
+  assert.equal(Object.keys(f.app.agentdeckStore.permissionsBySession).length, 0);
+  f.deliver({
+    id: 'permission',
+    method: 'agent_permission_request',
+    peerId: 1,
+    params: {
+      agent: 'codex',
+      sessionId: 's1',
+      options: [{ optionId: 'allow', name: 'Allow' }],
+    },
+  });
+  await tick();
+  assert.deepEqual(Object.keys(f.app.agentdeckStore.permissionsBySession), ['s1']);
+  assert.equal(f.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+
+  f.app.resolvePermission('s1', 'allow');
+  await tick();
+  assert.equal(Object.keys(f.app.agentdeckStore.permissionsBySession).length, 0);
+  assert.equal(f.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+});

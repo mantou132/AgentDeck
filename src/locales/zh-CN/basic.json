@@ -55,6 +55,8 @@
   "session.completedUnreadTip": "响应已完成，尚未查看",
   "session.running": "进行中",
   "session.runningTip": "任务正在执行",
+  "session.permission": "等待操作",
+  "session.permissionTip": "正在进行权限请求，等待用户操作",
   "session.collapse": "收起会话",
   "session.expandMore": "展开其余 $1 个会话",
   "composer.readingAttachments": "正在读取附件，请稍后再粘贴或选择文件。",

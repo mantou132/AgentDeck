@@ -20,6 +20,7 @@ export class DeckSessionGroupElement extends GemElement {
   @property sessions: DeckSession[] = [];
   @property unreadSessionIds: string[] = [];
   @property pendingSessionIds: string[] = [];
+  @property permissionSessionIds: string[] = [];
   @property deletingSessionIds: string[] = [];
   @boolattribute deletionDisabled: boolean;
   @emitter select: Emitter<string>;
@@ -54,7 +55,7 @@ export class DeckSessionGroupElement extends GemElement {
             (session) => session.sessionId,
             (session) => html`
               <tap-swipeout
-                class="border-0 border-b border-solid border-border/70 last:border-b-0"
+                class="group border-0 border-b border-solid border-border/70 last:border-b-0"
                 ?disabled=${this.deletionDisabled || this.deletingSessionIds.includes(session.sessionId)}
                 @click=${(event: MouseEvent) => {
                   if (!event.defaultPrevented && !this.deletingSessionIds.includes(session.sessionId)) {
@@ -64,7 +65,7 @@ export class DeckSessionGroupElement extends GemElement {
               >
                 <button
                   type="button"
-                  class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-bg-light px-4 py-3 text-left text-text transition-colors duration-150 active:bg-bg-hover disabled:cursor-default disabled:opacity-50"
+                  class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-bg-light px-4 py-3 text-left text-text transition-colors duration-150 group-[:state(opened)]:bg-bg-hover hover:bg-bg-hover active:bg-bg-hover disabled:cursor-default disabled:opacity-50"
                   ?disabled=${this.deletingSessionIds.includes(session.sessionId)}
                   aria-busy=${this.deletingSessionIds.includes(session.sessionId)}
                 >
@@ -74,7 +75,15 @@ export class DeckSessionGroupElement extends GemElement {
                         ${session.title || i18n.get('session.untitled')}
                       </span>
                       <span
-                        v-if=${this.pendingSessionIds.includes(session.sessionId)}
+                        v-if=${this.permissionSessionIds.includes(session.sessionId)}
+                        class="inline-flex shrink-0 items-center gap-1 rounded-full bg-notice/10 px-2 py-0.5 text-xs font-semibold text-notice"
+                        title=${i18n.get('session.permissionTip')}
+                      >
+                        <span class="size-1.5 animate-pulse rounded-full bg-notice"></span>
+                        ${i18n.get('session.permission')}
+                      </span>
+                      <span
+                        v-else-if=${this.pendingSessionIds.includes(session.sessionId)}
                         class="inline-flex shrink-0 items-center gap-1 rounded-full bg-informative/10 px-2 py-0.5 text-xs font-semibold text-informative"
                         title=${i18n.get('session.runningTip')}
                       >

@@ -55,6 +55,8 @@
   "session.completedUnreadTip": "Response completed, not viewed yet",
   "session.running": "Running",
   "session.runningTip": "Task is in progress",
+  "session.permission": "Action Required",
+  "session.permissionTip": "Permission request in progress, waiting for user action",
   "session.collapse": "Collapse sessions",
   "session.expandMore": "Expand remaining $1 sessions",
   "composer.readingAttachments": "Reading attachments, please wait before pasting or choosing files.",

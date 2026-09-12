@@ -155,6 +155,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                   .sessions=${group.sessions}
                   .unreadSessionIds=${agentdeckStore.unreadSessionIds}
                   .pendingSessionIds=${agentdeckStore.pendingSessionIds}
+                  .permissionSessionIds=${Object.keys(agentdeckStore.permissionsBySession)}
                   .deletingSessionIds=${agentdeckStore.deletingSessionIds}
                   ?deletion-disabled=${!isConnected}
                   @select=${(event: CustomEvent<string>) => openSession(event.detail)}
