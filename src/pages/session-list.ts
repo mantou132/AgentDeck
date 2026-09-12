@@ -33,7 +33,11 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
   #openNewSession = () => {
     if (agentdeckStore.connection !== 'connected') return;
-    this.#state({ sheetOpen: true, newSessionError: '', selectedCwd: '', navigatingCwd: true });
+    this.#state({
+      sheetOpen: true,
+      newSessionError: '',
+      navigatingCwd: !this.#state.selectedCwd,
+    });
   };
 
   #closeNewSession = () => this.#state({ sheetOpen: false, newSessionError: '' });
@@ -243,7 +247,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
         .description=${i18n.get('sessionList.newSessionDesc')}
         @close=${this.#closeNewSession}
         .content=${html`
-          <div v-if=${sheetOpen} class="w-full">
+          <div class="w-full">
             <deck-file-browser
               directories-only
               .emptyText=${i18n.get('cwdPicker.emptyDir')}

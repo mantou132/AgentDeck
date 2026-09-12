@@ -163,7 +163,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
         .description=${i18n.get('settings.relayGuideDesc')}
         @close=${this.#closeRelayGuide}
         .content=${html`
-          <deck-relay-guide v-if=${this.#state.relayGuideOpen} @close=${this.#closeRelayGuide}></deck-relay-guide>
+          <deck-relay-guide @close=${this.#closeRelayGuide}></deck-relay-guide>
         `}
       ></deck-sheet>
     `;

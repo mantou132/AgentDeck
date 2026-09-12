@@ -38,24 +38,37 @@ export class DeckSheetElement extends GemElement {
   @property content?: TemplateResult;
   @emitter close: Emitter;
 
+  #state = createState({ hasOpened: false });
+
+  @effect((i) => [i.open])
+  #watchOpen = () => {
+    if (this.open && !this.#state.hasOpened) {
+      this.#state({ hasOpened: true });
+    }
+  };
+
   @template()
-  #render = () => html`
-    <tap-reflect .target=${document.body}>
-      <deck-sheet-layer .content=${html`
-        <tap-sheet
-          ?open=${this.open}
-          header=${this.heading}
-          gesture
-          mask-closable
-          @close=${() => this.close()}
-        >
-          <div slot="header" class="pt-1.5 text-center">
-            <h2 class="m-0 break-words font-display text-lg leading-snug font-semibold tracking-tight text-highlight">${this.heading}</h2>
-            <p v-if=${this.description} class="mt-1.5 mb-0 text-sm leading-relaxed font-normal text-describe">${this.description}</p>
-          </div>
-          ${this.content}
-        </tap-sheet>
-      `}></deck-sheet-layer>
-    </tap-reflect>
-  `;
+  #render = () => {
+    if (!this.#state.hasOpened && !this.open) return null;
+
+    return html`
+      <tap-reflect .target=${document.body}>
+        <deck-sheet-layer .content=${html`
+          <tap-sheet
+            ?open=${this.open}
+            header=${this.heading}
+            gesture
+            mask-closable
+            @close=${() => this.close()}
+          >
+            <div slot="header" class="pt-1.5 text-center">
+              <h2 class="m-0 break-words font-display text-lg leading-snug font-semibold tracking-tight text-highlight">${this.heading}</h2>
+              <p v-if=${this.description} class="mt-1.5 mb-0 text-sm leading-relaxed font-normal text-describe">${this.description}</p>
+            </div>
+            ${this.content}
+          </tap-sheet>
+        `}></deck-sheet-layer>
+      </tap-reflect>
+    `;
+  };
 }
