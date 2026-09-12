@@ -37,9 +37,10 @@ export class DeckFileViewerElement extends GemElement {
     revision: 0,
     source: false,
   });
+  #mainRef = createRef<HTMLElement>();
   #lineRef = createRef<HTMLElement>();
 
-  @effect((i) => [i.path, i.cwd, i.line, i.#state.revision])
+  @effect((i) => [i.path, i.cwd, i.#state.revision])
   #read = () => {
     let active = true;
     this.#state({ file: undefined, loading: true, error: '', source: Boolean(this.line) });
@@ -63,18 +64,48 @@ export class DeckFileViewerElement extends GemElement {
     };
   };
 
-  @effect((i) => [i.#state.file, i.#state.source])
+  @effect((i) => [i.line])
+  #watchLine = () => {
+    if (this.line && !this.#state.source) {
+      this.#state({ source: true });
+    }
+  };
+
+  @effect((i) => [i.#state.file, i.#state.source, i.line])
   #scrollToLine = () => {
-    const frame = requestAnimationFrame(() => this.#lineRef.value?.scrollIntoView({ block: 'center' }));
-    return () => cancelAnimationFrame(frame);
+    if (!this.line) return;
+    const lineEl = this.#lineRef.value;
+    const mainEl = this.#mainRef.value;
+    if (!lineEl || !mainEl) return;
+    const scrollToTarget = () => {
+      const lineRect = lineEl.getBoundingClientRect();
+      const mainRect = mainEl.getBoundingClientRect();
+      if (!mainRect.height) return;
+      const targetTop = mainEl.scrollTop + (lineRect.top - mainRect.top) - (mainEl.clientHeight - lineRect.height) / 2;
+      mainEl.scrollTop = Math.max(0, targetTop);
+    };
+    if (mainEl.clientHeight) {
+      scrollToTarget();
+    } else {
+      const frame = requestAnimationFrame(scrollToTarget);
+      return () => cancelAnimationFrame(frame);
+    }
   };
 
   #renderText = (text: string) => {
-    if (!this.line) return text;
-    const lines = text.split('\n');
-    const index = this.line - 1;
-    if (index >= lines.length) return text;
-    return html`${lines.slice(0, index).join('\n')}${index ? '\n' : ''}<mark ${this.#lineRef}>${lines[index] || ' '}</mark>${index < lines.length - 1 ? '\n' : ''}${lines.slice(index + 1).join('\n')}`;
+    if (!this.line || this.line < 1) return text;
+    let start = 0;
+    for (let i = 1; i < this.line; i++) {
+      const next = text.indexOf('\n', start);
+      if (next === -1) return text;
+      start = next + 1;
+    }
+    const nextNewline = text.indexOf('\n', start);
+    const end = nextNewline === -1 ? text.length : nextNewline;
+    const before = text.slice(0, start);
+    const current = text.slice(start, end);
+    const after = text.slice(end);
+    return html`${before}<mark ${this.#lineRef}>${current || ' '}</mark>${after}`;
   };
 
   @template()
@@ -94,7 +125,7 @@ export class DeckFileViewerElement extends GemElement {
             @click=${() => this.#state({ source: !source })}
           >${i18n.get(source ? 'file.preview' : 'file.source')}</button>
         </tap-navbar>
-        <main class="h-full overflow-auto overscroll-contain">
+        <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">
           <div class="sticky top-0 z-10 border-b border-border bg-bg-light px-4 py-2 font-mono text-xs break-all text-describe">${path}</div>
           <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-describe">
             <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
