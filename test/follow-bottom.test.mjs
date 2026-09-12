@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.CommonJS },
 });
 
-function fixture() {
+function fixture({ active = true } = {}) {
   const frames = new Map();
   const observers = [];
   let nextFrame = 0;
@@ -53,7 +53,10 @@ function fixture() {
   const viewport = new Viewport();
   const content = {};
   const changes = [];
-  const controller = exports.followBottom(viewport, content, (following) => changes.push(following));
+  const controller = exports.followBottom(viewport, content, {
+    onFollowingChange: (following) => changes.push(following),
+    isActive: () => active,
+  });
   return {
     viewport,
     content,
@@ -61,6 +64,9 @@ function fixture() {
     controller,
     frames,
     observers,
+    setActive(value) {
+      active = value;
+    },
     flush() {
       const callbacks = [...frames.values()];
       frames.clear();
@@ -138,4 +144,48 @@ test('cleanup cancels pending scrolling and removes resize and scroll subscripti
   assert.equal(f.frames.size, 0);
   assert.ok(f.observers.every((observer) => observer.targets.size === 0));
   assert.deepEqual(f.changes, [true]);
+});
+
+test('inactive content stays in place on opening and resizing, then follows active updates', () => {
+  const f = fixture({ active: false });
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 0);
+  f.viewport.scrollHeight = 1400;
+  f.resize();
+  f.viewport.clientHeight = 120;
+  f.resize(f.viewport);
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 0);
+  f.setActive(true);
+  f.viewport.scrollHeight = 1600;
+  f.resize();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 1480);
+});
+
+test('finishing an update prevents an already queued animation frame from scrolling', () => {
+  const f = fixture();
+  f.flush();
+  f.viewport.scrollHeight = 1200;
+  f.resize();
+  f.setActive(false);
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 800);
+  f.viewport.scrollHeight = 1500;
+  f.resize();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 800);
+});
+
+test('pausing manually stays effective when updates stop and restart', () => {
+  const f = fixture();
+  f.flush();
+  f.viewport.scroll(100);
+  f.setActive(false);
+  f.setActive(true);
+  f.viewport.scrollHeight = 1500;
+  f.resize();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 100);
+  assert.deepEqual(f.changes, [true, false]);
 });

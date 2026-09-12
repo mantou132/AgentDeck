@@ -71,9 +71,9 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   @effect((i) => [i.sessionId, i.#messagesRef.value, i.#messagesContentRef.value])
   #followMessages = () => {
-    this.#following = followBottom(this.#messagesRef.value, this.#messagesContentRef.value, (followMessages) =>
-      this.#state({ followMessages }),
-    );
+    this.#following = followBottom(this.#messagesRef.value, this.#messagesContentRef.value, {
+      onFollowingChange: (followMessages) => this.#state({ followMessages }),
+    });
     return this.#following?.disconnect;
   };
 

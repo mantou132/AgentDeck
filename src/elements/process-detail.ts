@@ -1,4 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
@@ -114,8 +115,11 @@ export class DeckProcessDetailElement extends GemElement {
 
   @effect((i) => [i.sessionId, i.groupId, i.#pageRef.value, i.#contentRef.value])
   #followContent = () =>
-    followBottom(this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>('[part=main]'), this.#contentRef.value)
-      ?.disconnect;
+    followBottom(
+      this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>(`[part=${TapPageElement.main}]`),
+      this.#contentRef.value,
+      { isActive: () => Boolean(this.#group?.pending) },
+    )?.disconnect;
 
   @memo((i) => [
     i.sessionId,

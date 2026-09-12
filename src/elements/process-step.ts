@@ -1,11 +1,18 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
 import { followBottom } from '../lib/follow-bottom';
 import { diffColorScheme, markdownExtensions, markdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
-import { getToolCommand, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
+import {
+  getToolCommand,
+  getToolStatus,
+  getToolTitle,
+  groupTimelineMessages,
+  type ProcessGroup,
+} from '../session/timeline';
 import { getSession } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
 import { agentDeckTheme } from '../styles/theme';
@@ -73,8 +80,11 @@ export class DeckProcessStepElement extends GemElement {
 
   @effect((i) => [i.sessionId, i.groupId, i.itemId, i.#pageRef.value, i.#contentRef.value])
   #followContent = () =>
-    followBottom(this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>('[part=main]'), this.#contentRef.value)
-      ?.disconnect;
+    followBottom(
+      this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>(`[part=${TapPageElement.main}]`),
+      this.#contentRef.value,
+      { isActive: () => this.#updating },
+    )?.disconnect;
 
   @memo((i) => [
     i.sessionId,
@@ -93,6 +103,14 @@ export class DeckProcessStepElement extends GemElement {
 
   get #item() {
     return this.#group?.items.find((item) => item.id === this.itemId);
+  }
+
+  get #updating() {
+    const item = this.#item;
+    if (!this.#group?.pending || !item) return false;
+    if (item.type === 'thought') return item.pending;
+    const status = getToolStatus(item.data, true);
+    return status === 'pending' || status === 'in_progress';
   }
 
   #openLink = (event: MouseEvent) => {

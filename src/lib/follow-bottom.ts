@@ -1,7 +1,10 @@
 export const followBottom = (
   viewport: HTMLElement | null | undefined,
   content: HTMLElement | undefined,
-  onFollowingChange?: (following: boolean) => void,
+  {
+    onFollowingChange,
+    isActive = () => true,
+  }: { onFollowingChange?: (following: boolean) => void; isActive?: () => boolean } = {},
 ) => {
   if (!viewport || !content) return;
 
@@ -15,11 +18,11 @@ export const followBottom = (
   };
 
   const scrollToBottom = () => {
-    if (!following) return;
+    if (!following || !isActive()) return;
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
       frame = 0;
-      viewport.scrollTop = viewport.scrollHeight;
+      if (isActive()) viewport.scrollTop = viewport.scrollHeight;
     });
   };
 

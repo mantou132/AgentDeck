@@ -1,4 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
 import {
   createPasteReference,
@@ -14,9 +15,6 @@ import { icons } from '../styles/icons';
 export type ComposerInput = { text: string; attachments: Attachment[] };
 type InputSelection = { input: string; start: number; end: number };
 const style = css`
-  :scope {
-    display: block;
-  }
   .composer-shell {
     padding-bottom: calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
@@ -33,6 +31,7 @@ const style = css`
 
 @customElement('deck-composer')
 @adoptedStyle(style)
+@adoptedStyle(blockContainer)
 export class DeckComposerElement extends GemElement {
   @property sessionKey = '';
   @property mode?: ModeSelection;

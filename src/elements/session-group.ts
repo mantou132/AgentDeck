@@ -1,20 +1,14 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { repeat } from '@mantou/gem/lib/element';
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { Time } from '@mantou/tap-ui/lib/time';
-
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import type { DeckSession } from '../session/types';
 import { icons } from '../styles/icons';
 
-const style = css`
-  :scope {
-    display: block;
-  }
-`;
-
 @customElement('deck-session-group')
-@adoptedStyle(style)
+@adoptedStyle(blockContainer)
 export class DeckSessionGroupElement extends GemElement {
   @property cwd = '';
   @property sessions: DeckSession[] = [];

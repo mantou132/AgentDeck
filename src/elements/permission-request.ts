@@ -1,16 +1,10 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { PermissionRequest } from '../agent/api';
 import { i18n } from '../i18n';
 
-const style = css`
-  :scope {
-    display: block;
-  }
-`;
-
 @customElement('deck-permission-request')
-@adoptedStyle(style)
+@adoptedStyle(blockContainer)
 export class DeckPermissionRequestElement extends GemElement {
   @property request?: PermissionRequest;
   @emitter resolve: Emitter<string | null>;
