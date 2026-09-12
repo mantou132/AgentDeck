@@ -3,6 +3,7 @@ import { Stack } from '@mantou/tap-ui/elements/stack';
 import { reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { getConnectionLabel, i18n } from '../i18n';
+import { followBottom } from '../lib/follow-bottom';
 import { displayPath } from '../lib/path';
 import { openSession, openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
@@ -40,7 +41,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   #messagesRef = createRef<HTMLElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
-  #scrollFrame = 0;
+  #following?: ReturnType<typeof followBottom>;
 
   #markRead = () => {
     if (
@@ -66,50 +67,21 @@ export class AgentDeckSessionPageElement extends GemElement {
   #openSession = () => {
     this.#state({ previewAttachment: null });
     void ensureSessionLoaded(this.sessionId);
-    queueMicrotask(this.#scrollToLatest);
   };
 
-  @effect((instance) => [instance.#messagesRef.value, instance.#messagesContentRef.value])
-  #watchMessageSize = () => {
-    const viewport = this.#messagesRef.value;
-    const content = this.#messagesContentRef.value;
-    if (!viewport || !content) return;
-    // Markdown/images can finish rendering after the session state update.
-    const observer = new ResizeObserver(this.#scrollToLatest);
-    observer.observe(viewport);
-    observer.observe(content);
-    return () => observer.disconnect();
+  @effect((i) => [i.sessionId, i.#messagesRef.value, i.#messagesContentRef.value])
+  #followMessages = () => {
+    this.#following = followBottom(this.#messagesRef.value, this.#messagesContentRef.value, (followMessages) =>
+      this.#state({ followMessages }),
+    );
+    return this.#following?.disconnect;
   };
 
-  @unmounted()
-  #cleanupFrame = () => {
-    cancelAnimationFrame(this.#scrollFrame);
+  @effect(() => [])
+  #cleanupDraft = () => () => {
     if (this.sessionId === 'draft') {
       resetDraftSession();
     }
-  };
-
-  #onScroll = () => {
-    const element = this.#messagesRef.value;
-    if (!element) return;
-    const followMessages = element.scrollHeight - element.clientHeight - element.scrollTop <= 4;
-    if (followMessages === this.#state.followMessages) return;
-    if (!followMessages) cancelAnimationFrame(this.#scrollFrame);
-    this.#state({ followMessages });
-  };
-
-  #resumeFollowing = () => {
-    this.#state({ followMessages: true });
-    this.#scrollToLatest();
-  };
-
-  #scrollToLatest = () => {
-    if (!this.#state.followMessages) return;
-    cancelAnimationFrame(this.#scrollFrame);
-    this.#scrollFrame = requestAnimationFrame(() => {
-      const element = this.#messagesRef.value;
-      if (element) element.scrollTop = element.scrollHeight;
-    });
   };
 
   #send = async ({ text, attachments }: ComposerInput) => {
@@ -216,7 +188,6 @@ export class AgentDeckSessionPageElement extends GemElement {
             class="no-scrollbar h-full overflow-x-hidden overflow-y-auto px-4 pt-[22px] pb-7 overscroll-y-contain sm:px-6"
             tabindex="0"
             aria-label=${i18n.get('session.messagesAria')}
-            @scroll=${this.#onScroll}
           >
             <div ${this.#messagesContentRef} class="mx-auto min-h-full w-full max-w-[720px]">
               <section v-if=${loading} class="grid min-h-full place-items-center content-center px-6 py-12 text-center">
@@ -257,7 +228,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             v-if=${!this.#state.followMessages}
             type="button"
             class="absolute bottom-3 left-1/2 flex min-h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-bg-light px-3.5 text-sm font-semibold whitespace-nowrap text-primary-strong shadow-float active:bg-primary-soft"
-            @click=${this.#resumeFollowing}
+            @click=${() => this.#following?.resume()}
           >
             <tap-use class="size-4" .element=${icons.arrowDown}></tap-use>
             ${i18n.get('session.scrollToLatest')}

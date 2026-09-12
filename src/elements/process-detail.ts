@@ -2,6 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
+import { followBottom } from '../lib/follow-bottom';
 import { getToolStatus, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
@@ -108,6 +109,14 @@ export class DeckProcessDetailElement extends GemElement {
   @property groupId = '';
   @emitter navigate: Emitter;
 
+  #pageRef = createRef<HTMLElement>();
+  #contentRef = createRef<HTMLElement>();
+
+  @effect((i) => [i.sessionId, i.groupId, i.#pageRef.value, i.#contentRef.value])
+  #followContent = () =>
+    followBottom(this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>('[part=main]'), this.#contentRef.value)
+      ?.disconnect;
+
   @memo((i) => [
     i.sessionId,
     i.groupId,
@@ -184,9 +193,9 @@ export class DeckProcessDetailElement extends GemElement {
 
   @template()
   #render = () => html`
-    <tap-page>
+    <tap-page ${this.#pageRef}>
       <tap-navbar slot="header" title=${i18n.get('timeline.processSummary')}></tap-navbar>
-      <div class="page-content">${this.#renderList()}</div>
+      <div ${this.#contentRef} class="page-content">${this.#renderList()}</div>
     </tap-page>
   `;
 }

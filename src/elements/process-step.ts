@@ -2,6 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
+import { followBottom } from '../lib/follow-bottom';
 import { diffColorScheme, markdownExtensions, markdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
 import { getToolCommand, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
@@ -67,6 +68,14 @@ export class DeckProcessStepElement extends GemElement {
   @property itemId = '';
   @emitter navigate: Emitter;
 
+  #pageRef = createRef<HTMLElement>();
+  #contentRef = createRef<HTMLElement>();
+
+  @effect((i) => [i.sessionId, i.groupId, i.itemId, i.#pageRef.value, i.#contentRef.value])
+  #followContent = () =>
+    followBottom(this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>('[part=main]'), this.#contentRef.value)
+      ?.disconnect;
+
   @memo((i) => [
     i.sessionId,
     i.groupId,
@@ -129,9 +138,9 @@ export class DeckProcessStepElement extends GemElement {
     const item = this.#item;
     const title = item?.type === 'tool' ? getToolTitle(item.data) : i18n.get('timeline.thought');
     return html`
-      <tap-page>
+      <tap-page ${this.#pageRef}>
         <tap-navbar slot="header" title=${title} back default-back></tap-navbar>
-        <div class="page-content">${this.#renderContent()}</div>
+        <div ${this.#contentRef} class="page-content">${this.#renderContent()}</div>
       </tap-page>
     `;
   };
