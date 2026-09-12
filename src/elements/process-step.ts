@@ -23,17 +23,25 @@ const style = css`
     font-family: ${agentDeckTheme.font};
     line-height: 1.5;
   }
-  tap-page, tap-navbar { background: ${agentDeckTheme.lightBackgroundColor}; }
-  tap-navbar { border: 0; }
+  tap-page, tap-navbar {
+    background: ${agentDeckTheme.lightBackgroundColor};
+  }
+  tap-navbar {
+    border: 0;
+    margin-inline: 10px;
+  }
   .page-content {
-    padding: 0 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    min-height: 40vh;
+    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   gem-bind-marked {
     color: ${agentDeckTheme.textColor};
     font-size: 1rem;
     line-height: 1.625;
   }
-  .diffs { overflow-x: auto; }
+  .diffs {
+    overflow-x: auto;
+  }
   gem-bind-diff2html {
     position: relative;
     box-sizing: border-box;
@@ -60,7 +68,6 @@ const style = css`
   .input-params {
     overflow-x: auto;
     border-radius: ${agentDeckTheme.normalRound};
-    padding: 0.875rem;
     background: ${agentDeckTheme.backgroundColor};
   }
 `;
@@ -145,7 +152,7 @@ export class DeckProcessStepElement extends GemElement {
       </div>
       <div v-if=${!diffs.length && item.data.rawInput !== undefined}>
         <p class="input-label">${i18n.get('timeline.inputParams')}</p>
-        <pre class="input-params">${JSON.stringify(item.data.rawInput, null, 2)}</pre>
+        <tap-code-block codelang="json" class="input-params">${JSON.stringify(item.data.rawInput, null, 2)}</tap-code-block>
       </div>
       <pre v-if=${!diffs.length && item.data.rawInput === undefined}>${getToolCommand(item.data)}</pre>
     `;

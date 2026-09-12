@@ -6,13 +6,14 @@ import { i18n } from '../i18n';
 import { fileViewerMarkdownStyle, markdownExtensions } from '../lib/markdown';
 import { openFileBrowser, openMessageLink, openSettings } from '../navigation';
 import { icons } from '../styles/icons';
+import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
   :scope {
     height: 100%;
   }
   mark {
-    background: var(--color-primary-soft);
+    background: ${agentDeckTheme.primarySoftColor};
     color: inherit;
     scroll-margin-inline-start: 1rem;
   }

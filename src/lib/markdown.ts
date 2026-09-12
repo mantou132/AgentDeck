@@ -1,4 +1,5 @@
 import { type MarkedExtension, Renderer } from '@gem-bind/marked';
+import { agentDeckTheme } from '../styles/theme';
 
 import '@gem-bind/diff2html';
 import '@gem-bind/latex';
@@ -46,7 +47,8 @@ const inlineLatex = {
   },
   tokenizer(source: string) {
     const match =
-      /^\$(?!\$|\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\$)/.exec(source) || /^\\\((?!\s)([^\n]*?)(?<!\s)\\\)/.exec(source);
+      /^\$(?!\$|\s)((?:\\.|[^$\n])+?)(?<!\s)\$(?!\$)/.exec(source) ||
+      /^\x5c\((?!\s)([^\n]*?)(?<!\s)\x5c\)/.exec(source);
     if (match?.[1]) return { type: 'latexInline', raw: match[0], text: match[1] };
   },
   renderer(token: { text: string }) {
@@ -101,8 +103,8 @@ const baseMarkdownStyle = `
   p:not(:first-child) { margin-top: .48rem; }
   h1, h2, h3, h4, h5, h6 {
     margin: .85rem 0 .35rem;
-    color: var(--color-highlight);
-    font-family: var(--font-display);
+    color: ${agentDeckTheme.highlightColor};
+    font-family: ${agentDeckTheme.displayFont};
     font-weight: 720;
     line-height: 1.3;
   }
@@ -113,27 +115,27 @@ const baseMarkdownStyle = `
   li + li { margin-top: .18rem; }
   blockquote {
     margin: .65rem 0;
-    border-left: 3px solid var(--color-primary);
+    border-left: 3px solid ${agentDeckTheme.primaryColor};
     padding: .08rem 0 .08rem .8rem;
-    color: var(--color-describe);
+    color: ${agentDeckTheme.describeColor};
   }
-  a { color: var(--color-primary-strong); text-underline-offset: 2px; }
+  a { color: ${agentDeckTheme.primaryStrongColor}; text-underline-offset: 2px; }
   code {
     border-radius: 5px;
-    background: var(--color-primary-soft);
+    background: ${agentDeckTheme.primarySoftColor};
     padding: .1em .32em;
-    font-family: var(--font-mono);
+    font-family: ${agentDeckTheme.codeFont};
     font-size: .9em;
   }
   pre {
     max-width: 100%;
     margin: .7rem 0;
     overflow: auto;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    background: var(--color-bg);
+    border: 1px solid ${agentDeckTheme.borderColor};
+    border-radius: ${agentDeckTheme.normalRound};
+    background: ${agentDeckTheme.backgroundColor};
     padding: .85rem;
-    color: var(--color-text);
+    color: ${agentDeckTheme.textColor};
     line-height: 1.55;
   }
   pre code { background: none; padding: 0; }
@@ -142,20 +144,20 @@ const baseMarkdownStyle = `
     max-width: 100%;
     margin: .7rem 0;
     overflow-x: auto;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    background: var(--color-bg);
+    border: 1px solid ${agentDeckTheme.borderColor};
+    border-radius: ${agentDeckTheme.normalRound};
+    background: ${agentDeckTheme.backgroundColor};
   }
   table { width: 100%; border-collapse: collapse; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }
-  th { background: var(--color-bg-hover); color: var(--color-highlight); text-align: left; }
-  tr + tr td, tbody td { border-top: 1px solid var(--color-border); }
-  hr { margin: .9rem 0; border: 0; border-top: 1px solid var(--color-border); }
-  img { max-width: 100%; height: auto; border-radius: 12px; }
+  th { background: ${agentDeckTheme.hoverBackgroundColor}; color: ${agentDeckTheme.highlightColor}; text-align: left; }
+  tr + tr td, tbody td { border-top: 1px solid ${agentDeckTheme.borderColor}; }
+  hr { margin: .9rem 0; border: 0; border-top: 1px solid ${agentDeckTheme.borderColor}; }
+  img { max-width: 100%; height: auto; border-radius: ${agentDeckTheme.normalRound}; }
   gem-bind-mermaid, gem-bind-latex, gem-bind-diff2html { display: block; max-width: 100%; overflow: auto; }
   gem-bind-diff2html {
     margin: .7rem 0;
-    border-radius: 12px;
+    border-radius: ${agentDeckTheme.normalRound};
   }
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: .01ms !important; }
@@ -182,7 +184,7 @@ userMarkdownStyle.replaceSync(`
   ul, ol { margin: .35rem 0; padding-left: 1.3rem; }
   blockquote { margin: .5rem 0; border-left: 2px solid currentColor; padding-left: .65rem; opacity: .85; }
   a, a:visited { color: inherit; text-underline-offset: 2px; }
-  code { border-radius: 4px; background: rgb(255 255 255 / .16); padding: .1em .3em; font-family: var(--font-mono); }
+  code { border-radius: ${agentDeckTheme.smallRound}; background: rgb(255 255 255 / .16); padding: .1em .3em; font-family: ${agentDeckTheme.codeFont}; }
   pre { max-width: 100%; margin: .6rem 0; overflow: auto; border-radius: 9px; background: rgb(0 0 0 / .18); padding: .7rem; }
   pre code { background: none; padding: 0; }
   table { border-collapse: collapse; }

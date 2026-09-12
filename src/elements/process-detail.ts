@@ -15,10 +15,15 @@ const style = css`
     font-family: ${agentDeckTheme.font};
     line-height: 1.5;
   }
-  tap-page, tap-navbar { background: ${agentDeckTheme.lightBackgroundColor}; }
-  tap-navbar { border: 0; }
+  tap-page, tap-navbar {
+    background: ${agentDeckTheme.lightBackgroundColor};
+  }
+  tap-navbar {
+    border: 0;
+  }
   .page-content {
-    padding: 0 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    min-height: 40vh;
+    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .empty {
     padding: 2.5rem 0;

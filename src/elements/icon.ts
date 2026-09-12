@@ -16,7 +16,7 @@ const style = css`
     position: absolute;
     width: 14px;
     height: 17px;
-    border-radius: 4px;
+    border-radius: ${agentDeckTheme.smallRound};
     content: '';
   }
 

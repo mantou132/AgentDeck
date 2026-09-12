@@ -8,13 +8,8 @@ const layerStyle = css`
     max-width: 620px;
     border: 1px solid ${agentDeckTheme.borderColor};
     border-bottom: 0;
-    border-radius: 24px 24px 0 0;
     background: ${agentDeckTheme.lightBackgroundColor};
     padding: 0 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-  }
-
-  tap-sheet::part(header) {
-    padding: 4px 0 20px;
   }
 `;
 

@@ -29,4 +29,5 @@ export const agentDeckTheme = extendTheme({
   primaryStrongColor: 'var(--color-primary-strong)',
   primarySoftColor: 'var(--color-primary-soft)',
   floatShadow: 'var(--shadow-float)',
+  primaryShadow: 'var(--shadow-primary)',
 });
