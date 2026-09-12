@@ -1,5 +1,6 @@
 import { extendTheme } from '@mantou/tap-ui/lib/theme';
 
+import './icons';
 import './tailwind.css';
 
 export const agentDeckTheme = extendTheme({

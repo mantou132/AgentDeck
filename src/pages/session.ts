@@ -1,6 +1,5 @@
 import { history } from '@mantou/gem/lib/history';
 import { Stack } from '@mantou/tap-ui/elements/stack';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { getConnectionLabel, i18n } from '../i18n';
@@ -21,6 +20,7 @@ import {
   sendPrompt,
 } from '../state/sessions';
 import { agentdeckStore, clearSessionError, setSessionFlag } from '../state/store';
+import { icons } from '../styles/icons';
 
 const style = css`
   .session-header {
@@ -259,7 +259,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             class="absolute bottom-3 left-1/2 flex min-h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-bg-light px-3.5 text-sm font-semibold whitespace-nowrap text-primary-strong shadow-float active:bg-primary-soft"
             @click=${this.#resumeFollowing}
           >
-            <tap-use class="size-4" .element=${icons.expand}></tap-use>
+            <tap-use class="size-4" .element=${icons.arrowDown}></tap-use>
             ${i18n.get('session.scrollToLatest')}
           </button>
         </div>

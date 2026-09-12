@@ -1,15 +1,16 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { i18n } from '../i18n';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
 import {
   extractDataImageAttachments,
   getProcessSummary,
+  getToolStatus,
   groupTimelineMessages,
   type ProcessGroup,
 } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
+import { icons } from '../styles/icons';
 
 const style = css`
   :scope { display: block; }
@@ -54,6 +55,11 @@ export class DeckSessionTimelineElement extends GemElement {
 
   #renderProcessGroup = (group: ProcessGroup) => {
     const summary = getProcessSummary(group);
+    const hasTools = group.items.some((item) => item.type === 'tool');
+    const hasFailed = group.items.some(
+      (item) => item.type === 'tool' && getToolStatus(item.data, group.pending) === 'failed',
+    );
+    const icon = group.pending ? icons.loading : hasFailed ? icons.error : hasTools ? icons.terminal : icons.sparkles;
     return html`
       <div class="mb-3 flex min-w-0 items-center">
         <button
@@ -62,7 +68,14 @@ export class DeckSessionTimelineElement extends GemElement {
           title=${summary}
           @click=${() => this.#openProcessSheet(group)}
         >
-          <tap-use class="size-4 shrink-0" .element=${group.pending ? icons.loading : icons.schedule}></tap-use>
+          <tap-use
+            class=${classMap({
+              'size-4 shrink-0': true,
+              'text-primary-strong': group.pending,
+              'text-negative': !group.pending && hasFailed,
+            })}
+            .element=${icon}
+          ></tap-use>
           <span class="min-w-0 truncate">${summary}</span>
           <tap-use class="size-3.5 shrink-0 text-disabled" .element=${icons.right}></tap-use>
         </button>

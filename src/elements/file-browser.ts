@@ -1,6 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Stack } from '@mantou/tap-ui/elements/stack';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 
 import type { BrowseEntry } from '../agent/api';
@@ -8,6 +7,7 @@ import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { displayPath, getBreadcrumbs, getParentPath } from '../lib/path';
 import { openFileViewer } from '../navigation';
+import { icons } from '../styles/icons';
 
 const browserStyle = css`
   :scope {
@@ -211,10 +211,7 @@ export class DeckFileBrowserElement extends GemElement {
                         'text-disabled': isHidden,
                       })}
                     >
-                      <svg class="size-[18px]" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-1.5V9a3 3 0 0 0-3-3h-4.5a3 3 0 0 0-2.12.88L6.88 8.38A3 3 0 0 0 4.76 9.25H4.5A3 3 0 0 0 1.5 12.25V18a3 3 0 0 0 3 3h15Z" opacity="0.4"/>
-                        <path d="M4.5 9.25h10.5a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H4.5A3 3 0 0 1 1.5 18v-5.75a3 3 0 0 1 3-3Z"/>
-                      </svg>
+                      <tap-use class="size-[18px]" .element=${icons.folder}></tap-use>
                     </span>
                     <span
                       class=${classMap({
@@ -254,10 +251,7 @@ export class DeckFileBrowserElement extends GemElement {
                       'text-disabled': isHidden,
                     })}
                   >
-                    <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" fill="currentColor" opacity="0.1"/>
-                      <path d="M14 2v6h6M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/>
-                    </svg>
+                    <tap-use class="size-[18px]" .element=${icons.file}></tap-use>
                   </span>
                   <span
                     class=${classMap({

@@ -1,8 +1,8 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { icons } from '@mantou/tap-ui/lib/icons';
 
 import { i18n } from '../i18n';
 import type { Attachment } from '../session/types';
+import { icons } from '../styles/icons';
 
 const style = css`
   :scope {
@@ -47,7 +47,9 @@ export class DeckAttachmentElement extends GemElement {
           <span
             v-else
             class="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-xs font-bold text-primary-strong"
-          >TXT</span>
+          >
+            <tap-use class="size-5" .element=${icons.file}></tap-use>
+          </span>
           <span class=${this.compact || attachment.kind === 'text' ? 'min-w-0 flex-1' : 'block px-1.5 py-1'}>
             <span class="block truncate text-sm font-medium">${attachment.name}</span>
             <span v-if=${this.compact || attachment.kind === 'text'} class="block text-xs text-describe">

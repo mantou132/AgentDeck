@@ -1,8 +1,8 @@
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { createDraftSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
+import { icons } from '../styles/icons';
 
 const style = css`
   .menu-header {
@@ -183,7 +183,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                 class="flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-border bg-bg-light px-4 text-xs font-semibold text-highlight shadow-card transition-transform active:scale-95"
                 @click=${openSettings}
               >
-                <tap-use class="size-3.5 text-describe" .element=${icons.tune}></tap-use>
+                <tap-use class="size-3.5 text-describe" .element=${icons.settings}></tap-use>
                 ${i18n.get('global.openSettings')}
               </button>
             </div>
@@ -194,7 +194,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
             class="mt-16 grid place-items-center px-8 py-10 text-center"
           >
             <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
-              <tap-use class="size-6 text-describe" .element=${icons.menu}></tap-use>
+              <tap-use class="size-6 text-describe" .element=${icons.messageSquare}></tap-use>
             </div>
             <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">
               ${i18n.get('sessionList.emptyTitle')}
@@ -224,7 +224,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
               aria-label=${i18n.get('sessionList.openSettingsAria')}
               @click=${openSettings}
             >
-              <tap-use class="size-[20px]" .element=${icons.tune}></tap-use>
+              <tap-use class="size-[20px]" .element=${icons.settings}></tap-use>
             </button>
           </div>
         </footer>

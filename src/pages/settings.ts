@@ -1,9 +1,9 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { RELAY_GUIDE_SEEN_KEY } from '../config';
 import { i18n } from '../i18n';
 import { hardResetApp, saveSettings } from '../state/app';
 import { agentdeckStore } from '../state/store';
+import { icons } from '../styles/icons';
 
 const style = css`
   .settings-header {

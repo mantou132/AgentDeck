@@ -1,11 +1,11 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { fileViewerMarkdownStyle, markdownExtensions } from '../lib/markdown';
 import { openFileBrowser, openMessageLink, openSettings } from '../navigation';
+import { icons } from '../styles/icons';
 
 const style = css`
   :scope {
@@ -100,6 +100,7 @@ export class DeckFileViewerElement extends GemElement {
             ${i18n.get('file.loading')}
           </div>
           <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-12 text-center">
+            <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
             <p class="m-0 font-semibold text-highlight">${i18n.get('file.failed')}</p>
             <p class="mt-2 text-sm break-words text-negative">${error}</p>
             <div class="flex justify-center gap-3">

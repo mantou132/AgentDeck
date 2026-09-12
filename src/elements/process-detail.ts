@@ -1,10 +1,10 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { getToolStatusLabel, i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
 import { diffColorScheme, markdownExtensions, markdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
 import { getToolCommand, getToolStatus, type ProcessGroup } from '../session/timeline';
+import { icons } from '../styles/icons';
 
 // 工具标题已含文件路径，仅在过程详情中隐藏 diff 文件头。
 const diffStyle = new CSSStyleSheet();
@@ -86,7 +86,7 @@ export class DeckProcessDetailElement extends GemElement {
                     'text-primary-strong': isPending,
                     'text-negative': status === 'failed',
                   })}
-                  .element=${isPending ? icons.loading : status === 'failed' ? icons.error : isThought ? icons.schedule : icons.tune}
+                  .element=${isPending ? icons.loading : status === 'failed' ? icons.error : isThought ? icons.sparkles : icons.terminal}
                 ></tap-use>
                 <span v-if=${index < group.items.length - 1} class="my-2 w-px flex-1 bg-border"></span>
               </div>

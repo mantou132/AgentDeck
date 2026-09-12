@@ -1,10 +1,10 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { Time } from '@mantou/tap-ui/lib/time';
 
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import type { DeckSession } from '../session/types';
+import { icons } from '../styles/icons';
 
 const style = css`
   :scope {
@@ -37,7 +37,7 @@ export class DeckSessionGroupElement extends GemElement {
       <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
         <header class="flex min-w-0 items-center gap-2.5 border-b border-border bg-bg-light/80 px-4 py-3">
           <span class="grid size-7 shrink-0 place-items-center rounded-[9px] bg-primary-soft text-primary-strong">
-            <span class="font-mono text-xs font-bold">/</span>
+            <tap-use class="size-4" .element=${icons.folder}></tap-use>
           </span>
           <span class="min-w-0 flex-1 truncate font-mono text-sm font-medium text-highlight" title=${cwd}>
             ${displayPath(cwd)}

@@ -1,5 +1,4 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { icons } from '@mantou/tap-ui/lib/icons';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
 import {
   createPasteReference,
@@ -10,6 +9,7 @@ import {
 import { i18n } from '../i18n';
 import type { ModeSelection } from '../session/modes';
 import type { Attachment, TextMessage } from '../session/types';
+import { icons } from '../styles/icons';
 
 export type ComposerInput = { text: string; attachments: Attachment[] };
 type InputSelection = { input: string; start: number; end: number };
@@ -308,7 +308,7 @@ export class DeckComposerElement extends GemElement {
                     ?disabled=${this.#state.readingAttachments || this.#state.submitting || this.#state.attachments.length >= MAX_ATTACHMENTS}
                     @click=${() => this.#fileInputRef.value?.click()}
                   >
-                    <tap-use class="size-5" .element=${this.#state.readingAttachments ? icons.loading : icons.add}></tap-use>
+                    <tap-use class="size-5" .element=${this.#state.readingAttachments ? icons.loading : icons.paperclip}></tap-use>
                   </button>
                   <span v-if=${this.#state.readingAttachments || this.#state.submitting} class="truncate">
                     ${this.#state.readingAttachments ? i18n.get('composer.readingState') : i18n.get('composer.preparingSession')}
@@ -347,7 +347,7 @@ export class DeckComposerElement extends GemElement {
                   aria-label=${i18n.get('composer.sendAria')}
                   @click=${this.#send}
                 >
-                  <tap-use class="size-[17px]" .element=${icons.outward}></tap-use>
+                  <tap-use class="size-[17px]" .element=${icons.arrowUp}></tap-use>
                 </button>
               </div>
             </div>
