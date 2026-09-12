@@ -150,6 +150,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                   .cwd=${group.cwd}
                   .sessions=${group.sessions}
                   .unreadSessionIds=${agentdeckStore.unreadSessionIds}
+                  .pendingSessionIds=${agentdeckStore.pendingSessionIds}
                   @select=${(event: CustomEvent<string>) => openSession(event.detail)}
                 ></deck-session-group>
               `,

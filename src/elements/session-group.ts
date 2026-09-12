@@ -18,6 +18,7 @@ export class DeckSessionGroupElement extends GemElement {
   @property cwd = '';
   @property sessions: DeckSession[] = [];
   @property unreadSessionIds: string[] = [];
+  @property pendingSessionIds: string[] = [];
   @emitter select: Emitter<string>;
 
   #state = createState({ expanded: false });
@@ -54,6 +55,14 @@ export class DeckSessionGroupElement extends GemElement {
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-base leading-snug font-semibold text-highlight">
                       ${session.title || i18n.get('session.untitled')}
+                    </span>
+                    <span
+                      v-if=${this.pendingSessionIds.includes(session.sessionId)}
+                      class="inline-flex shrink-0 items-center gap-1 rounded-full bg-informative/10 px-2 py-0.5 text-xs font-semibold text-informative"
+                      title=${i18n.get('session.runningTip')}
+                    >
+                      <span class="size-1.5 animate-pulse rounded-full bg-informative"></span>
+                      ${i18n.get('session.running')}
                     </span>
                     <span
                       v-if=${this.unreadSessionIds.includes(session.sessionId)}

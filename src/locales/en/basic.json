@@ -49,6 +49,8 @@
   "session.placeholderLoad": "Please load session first…",
   "session.completed": "Completed",
   "session.completedUnreadTip": "Response completed, not viewed yet",
+  "session.running": "Running",
+  "session.runningTip": "Task is in progress",
   "session.collapse": "Collapse sessions",
   "session.expandMore": "Expand remaining $1 sessions",
   "composer.readingAttachments": "Reading attachments, please wait before pasting or choosing files.",
