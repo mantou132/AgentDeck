@@ -136,7 +136,6 @@
   "error.relayTimeout": "连接 Relay 超时，请检查网络或重新连接。",
   "error.relayClosed": "Relay 连接已关闭",
   "error.connectHostTimeout": "连接远端超时，请重试；持续失败可在设置中重置 App。",
-  "error.readAgentTimeout": "读取 Agent 超时，请重试；持续失败可在设置中重置 App。",
   "error.readCwdTimeout": "读取目录超时，请重试；持续失败可在设置中重置 App。",
   "error.createSessionTimeout": "创建会话超时，结果尚未确认。请先刷新列表检查，或在设置中重置 App。",
   "error.readSessionListTimeout": "读取会话列表超时，请重试；持续失败可在设置中重置 App。",

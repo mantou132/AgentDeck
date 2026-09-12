@@ -136,7 +136,6 @@
   "error.relayTimeout": "Connecting to Relay timed out. Please check your network or reconnect.",
   "error.relayClosed": "Relay connection closed",
   "error.connectHostTimeout": "Connecting to host timed out. Please retry; if it continues failing, reset the app in settings.",
-  "error.readAgentTimeout": "Reading agent timed out. Please retry; if it continues failing, reset the app in settings.",
   "error.readCwdTimeout": "Reading directory timed out. Please retry; if it continues failing, reset the app in settings.",
   "error.createSessionTimeout": "Creating session timed out. Result unconfirmed; please refresh list to check, or reset the app in settings.",
   "error.readSessionListTimeout": "Reading session list timed out. Please retry; if it continues failing, reset the app in settings.",

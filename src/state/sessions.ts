@@ -96,14 +96,13 @@ export const refreshSessions = async () => {
   const agent = agentdeckStore.settings.agent;
   agentdeckStore({ sessionsLoading: true, sessionsError: '' });
   try {
-    const [agents, sessions] = await Promise.all([agentApi.listAgents(), agentApi.listSessions(agent)]);
+    const sessions = await agentApi.listSessions(agent);
     if (request !== sessionsRequest || agent !== agentdeckStore.settings.agent) return;
     const normalized = sessions
       .filter((session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string')
       .map((session) => ({ ...session, agent }));
     const groups = getSortedSessionGroups(normalized);
     agentdeckStore({
-      ...(agents.length ? { agents } : {}),
       sessions: normalized,
       sessionGroups: groups,
       sessionsLoaded: true,

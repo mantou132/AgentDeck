@@ -1,6 +1,6 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
-import { fallbackAgents, readSettings } from '../config';
+import { popularAgents, readSettings } from '../config';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
 import type { ChatMessage, DeckSession, SessionOptions } from '../session/types';
 
@@ -8,7 +8,7 @@ const initialSettings = readSettings();
 
 export const agentdeckStore = createStore({
   settings: initialSettings,
-  agents: fallbackAgents,
+  agents: popularAgents,
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
   draftSession: null as DeckSession | null,

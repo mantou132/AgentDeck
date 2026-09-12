@@ -2,8 +2,6 @@ import { i18n } from '../i18n';
 import type { RpcId, RpcMessage } from './rpc';
 import { RpcPeer } from './rpc';
 
-export type RemoteAgent = { id: string; name: string };
-
 export type RemoteFile = { path: string } & (
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string }
@@ -117,14 +115,6 @@ export class AgentApi {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.connectHostTimeout'),
     });
-  };
-
-  listAgents = async () => {
-    const result = await this.#peer.call<{ agents?: RemoteAgent[] }>('agent_list', {}, undefined, {
-      timeoutMs: 15_000,
-      timeoutMessage: i18n.get('error.readAgentTimeout'),
-    });
-    return Array.isArray(result.agents) ? result.agents : [];
   };
 
   readFile = (path: string, cwd: string) =>

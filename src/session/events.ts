@@ -100,7 +100,7 @@ export const reduceSessionEvent = (
     sessionUpdate === 'agent_message_chunk' ? 'agent' : sessionUpdate === 'user_message_chunk' ? 'user' : undefined;
 
   if (role && content.type === 'text' && typeof content.text === 'string') {
-    if (agent === 'claude' && role === 'user' && content.text.trim() === '[Request interrupted by user]') {
+    if (agent === 'claude-acp' && role === 'user' && content.text.trim() === '[Request interrupted by user]') {
       return messages !== current ? { messages } : null;
     }
     return { messages: appendContent(messages, role, content.text, streaming) };
