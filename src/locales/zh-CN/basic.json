@@ -30,6 +30,7 @@
   "sessionList.openSettingsAria": "打开设置",
   "session.backAria": "返回会话列表",
   "session.openSettingsAria": "打开设置",
+  "session.newSessionHereAria": "在此目录新建会话",
   "session.unavailableTitle": "会话不可用",
   "session.notFound": "无法找到这个会话",
   "session.notFoundDesc": "可以返回列表选择其他会话，或在设置中重置 App 后重新加载。",

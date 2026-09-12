@@ -5,12 +5,13 @@ import { reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { getConnectionLabel, i18n } from '../i18n';
 import { displayPath } from '../lib/path';
-import { openSettings } from '../navigation';
+import { openSession, openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
 import type { Attachment, TextMessage } from '../session/types';
 import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
+  createDraftSession,
   ensureSessionLoaded,
   getSession,
   promoteDraftSession,
@@ -158,11 +159,16 @@ export class AgentDeckSessionPageElement extends GemElement {
           </div>
         </div>
         <button
-          class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft"
-          aria-label=${i18n.get('session.openSettingsAria')}
-          @click=${openSettings}
+          class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft disabled:cursor-default disabled:opacity-45"
+          aria-label=${i18n.get('session.newSessionHereAria')}
+          ?disabled=${!connected || !cwd}
+          @click=${() => {
+            if (!cwd) return;
+            const draft = createDraftSession({ agent: agentdeckStore.settings.agent, cwd });
+            openSession(draft.sessionId);
+          }}
         >
-          <tap-use class="size-[20px]" .element=${icons.tune}></tap-use>
+          <tap-use class="size-[20px]" .element=${icons.add}></tap-use>
         </button>
       </header>
     `;

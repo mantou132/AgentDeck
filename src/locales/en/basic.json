@@ -30,6 +30,7 @@
   "sessionList.openSettingsAria": "Open settings",
   "session.backAria": "Back to session list",
   "session.openSettingsAria": "Open settings",
+  "session.newSessionHereAria": "New session in this directory",
   "session.unavailableTitle": "Session unavailable",
   "session.notFound": "Cannot find this session",
   "session.notFoundDesc": "You can return to the list to select another session, or reset the app in settings and reload.",
