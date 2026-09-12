@@ -126,7 +126,7 @@ export class DeckFileBrowserElement extends GemElement {
     return html`
       <div
         ${this.#breadcrumbsRef}
-        class="mb-4 flex min-h-11 items-center gap-1 overflow-x-auto rounded-xl bg-bg px-2 py-1.5 no-scrollbar"
+        class="mb-4 flex min-h-11 items-center gap-1 overflow-x-auto rounded-xl border border-border bg-bg px-2 py-1.5 no-scrollbar"
       >
         ${crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;

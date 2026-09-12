@@ -1,3 +1,5 @@
+const BOTTOM_THRESHOLD = 24;
+
 export const followBottom = (
   viewport: HTMLElement | null | undefined,
   content: HTMLElement | undefined,
@@ -10,6 +12,7 @@ export const followBottom = (
 
   let following = true;
   let frame = 0;
+  let lastScrollTop = viewport.scrollTop;
 
   const setFollowing = (value: boolean) => {
     if (following === value) return;
@@ -19,16 +22,35 @@ export const followBottom = (
 
   const scrollToBottom = () => {
     if (!following || !isActive()) return;
-    cancelAnimationFrame(frame);
+    if (frame) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      if (isActive()) viewport.scrollTop = viewport.scrollHeight;
+      if (!isActive() || !following) return;
+      viewport.scrollTop = viewport.scrollHeight;
+      lastScrollTop = viewport.scrollTop;
     });
   };
 
   const onScroll = () => {
-    setFollowing(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 4);
-    if (!following) cancelAnimationFrame(frame);
+    const currentScrollTop = viewport.scrollTop;
+    const distanceToBottom = viewport.scrollHeight - viewport.clientHeight - currentScrollTop;
+
+    if (following) {
+      if (currentScrollTop < lastScrollTop - 2 && distanceToBottom > BOTTOM_THRESHOLD) {
+        setFollowing(false);
+        if (frame) {
+          cancelAnimationFrame(frame);
+          frame = 0;
+        }
+      } else if (distanceToBottom > 0) {
+        scrollToBottom();
+      }
+    } else if (distanceToBottom <= BOTTOM_THRESHOLD) {
+      setFollowing(true);
+      scrollToBottom();
+    }
+
+    lastScrollTop = currentScrollTop;
   };
 
   // Also catches delayed Markdown, image and diff layout changes.
@@ -45,7 +67,10 @@ export const followBottom = (
       scrollToBottom();
     },
     disconnect: () => {
-      cancelAnimationFrame(frame);
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
       observer.disconnect();
       viewport.removeEventListener('scroll', onScroll);
     },

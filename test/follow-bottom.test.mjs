@@ -189,3 +189,29 @@ test('pausing manually stays effective when updates stop and restart', () => {
   assert.equal(f.viewport.scrollTop, 100);
   assert.deepEqual(f.changes, [true, false]);
 });
+
+test('rapid content streaming and intermediate scroll events do not break follow mode', () => {
+  const f = fixture();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 800);
+
+  // Rapid growth during fast model output (e.g. Flash model)
+  f.viewport.scrollHeight = 1400;
+  f.resize();
+  // Browser fires a scroll event before rAF runs or while distanceToBottom is large
+  f.viewport.dispatchEvent(new Event('scroll'));
+  assert.deepEqual(f.changes, [true]); // Following must not be erroneously cancelled!
+
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 1200);
+
+  // Another rapid burst
+  f.viewport.scrollHeight = 2000;
+  f.resize();
+  f.resize(); // Repeated resize calls within the same frame must coalesce without starvation
+  f.viewport.dispatchEvent(new Event('scroll'));
+  assert.deepEqual(f.changes, [true]);
+
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 1800);
+});
