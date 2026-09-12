@@ -35,6 +35,14 @@ export const getToolCommand = ({ rawInput, title }: ToolCallData) => {
   return title || i18n.get('timeline.toolCall');
 };
 
+export const getToolTitle = ({ rawInput, title }: ToolCallData) => {
+  if (rawInput && typeof rawInput === 'object' && 'description' in rawInput) {
+    const { description } = rawInput;
+    if (typeof description === 'string' && description.trim()) return description;
+  }
+  return title || i18n.get('timeline.toolCall');
+};
+
 // 历史消息里的内联 base64 图片不再渲染为链接，还原成消息附件展示
 const dataImageLinkPattern = /!?\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
 

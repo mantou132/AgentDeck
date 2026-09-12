@@ -1,4 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { Sheet } from '@mantou/tap-ui/elements/sheet';
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
@@ -12,12 +14,8 @@ import {
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 import { icons } from '../styles/icons';
 
-const style = css`
-  :scope { display: block; }
-`;
-
 @customElement('deck-session-timeline')
-@adoptedStyle(style)
+@adoptedStyle(blockContainer)
 export class DeckSessionTimelineElement extends GemElement {
   @property sessionKey = '';
   @property cwd = '';
@@ -26,14 +24,6 @@ export class DeckSessionTimelineElement extends GemElement {
   @boolattribute canRestoreInput: boolean;
   @emitter restore: Emitter<TextMessage>;
   @emitter preview: Emitter<Attachment>;
-  #state = createState({ selectedGroupId: null as string | null });
-  #lastGroup?: ProcessGroup;
-
-  @effect((i) => [i.sessionKey])
-  #resetSelection = () => {
-    this.#state({ selectedGroupId: null });
-    this.#lastGroup = undefined;
-  };
 
   #renderMarkdown = (text: string, streaming = false, user = false) => html`
     <gem-bind-marked
@@ -45,12 +35,18 @@ export class DeckSessionTimelineElement extends GemElement {
   `;
 
   #openProcessSheet = (group: ProcessGroup) => {
-    this.#lastGroup = group;
-    this.#state({ selectedGroupId: group.id });
-  };
-
-  #closeProcessSheet = () => {
-    this.#state({ selectedGroupId: null });
+    Sheet.open({
+      paddingless: true,
+      maskClosable: true,
+      body: html`
+        <tap-stack auto-height disable-history .maxHeight=${innerHeight * 0.77}>
+          <deck-process-detail
+            .sessionId=${this.sessionKey}
+            .groupId=${group.id}
+          ></deck-process-detail>
+        </tap-stack>
+      `,
+    });
   };
 
   #renderProcessGroup = (group: ProcessGroup) => {
@@ -132,31 +128,8 @@ export class DeckSessionTimelineElement extends GemElement {
   @template()
   #render = () => {
     const timelineItems = groupTimelineMessages(this.messages, this.pending);
-    const selectedGroup = this.#state.selectedGroupId
-      ? timelineItems.find(
-          (item): item is { type: 'group'; group: ProcessGroup } =>
-            item.type === 'group' && item.group.id === this.#state.selectedGroupId,
-        )?.group
-      : undefined;
-    if (selectedGroup) {
-      this.#lastGroup = selectedGroup;
-    }
-    const currentGroup = selectedGroup || this.#lastGroup;
     return html`
       ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
-      <deck-sheet
-        ?open=${Boolean(this.#state.selectedGroupId)}
-        .heading=${i18n.get('timeline.processSummary')}
-        @close=${this.#closeProcessSheet}
-        .content=${html`
-          <deck-process-detail
-            v-if=${Boolean(this.#state.selectedGroupId)}
-            .group=${currentGroup}
-            .cwd=${this.cwd}
-            @navigate=${this.#closeProcessSheet}
-          ></deck-process-detail>
-        `}
-      ></deck-sheet>
     `;
   };
 }

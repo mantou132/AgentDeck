@@ -20,7 +20,7 @@
 - `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
 - `src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信；`src/config.ts` 保存配置读取与连接常量。
 - `src/session/`：types 为会话类型，events 为 ACP reducer，groups / timeline 为列表与消息分组，turn 控制流式任务和权限决断，modes 只适配 ACP 模式信息。
-- `src/elements/`：composer 管理输入和附件，session-timeline / process-detail 展示消息与过程，attachment / attachment-preview 展示附件；file-viewer 通过 `file_read` 浏览远端文件，file-browser 通过 `file_browse` 浏览远端目录与文件并在新建会话弹窗及独立页面栈中复用，消息链接由 `navigation.ts` 分流到 Tap Browser、目录栈或文件 Viewer；sheet.ts 封装弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域；carousel 提供通用 CSS Scroll Snap 分页，relay-guide 提供三步指南图文；其余为目录、会话分组、权限和品牌组件。
+- `src/elements/`：composer 管理输入和附件，session-timeline 展示消息并通过 `Sheet.open` 打开过程弹层；process-detail 按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step；process-step 按 sessionId / groupId / itemId 自行订阅详情更新；attachment / attachment-preview 展示附件；file-viewer 通过 `file_read` 浏览远端文件，file-browser 通过 `file_browse` 浏览远端目录与文件并在新建会话弹窗及独立页面栈中复用，消息链接由 `navigation.ts` 分流到 Tap Browser、目录栈或文件 Viewer；sheet.ts 封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域；carousel 提供通用 CSS Scroll Snap 分页，relay-guide 提供三步指南图文；其余为目录、会话分组、权限和品牌组件。
 - `src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`src/lib/`：Markdown、diff2html 输入转换与路径显示。
 - `src/styles/`：tailwind.css 共享主题 token，theme.ts 桥接 Tap UI。
 - `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；内部 `deck-sheet-layer` 标签映射到 `sheet.ts`；`biome.json`：格式和 lint。
