@@ -2,7 +2,6 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
-import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
 import {
   extractDataImageAttachments,
@@ -25,13 +24,14 @@ export class DeckSessionTimelineElement extends GemElement {
   @emitter restore: Emitter<TextMessage>;
   @emitter preview: Emitter<Attachment>;
 
-  #renderMarkdown = (text: string, streaming = false, user = false) => html`
-    <gem-bind-marked
+  #renderMarkdown = (text: string, streamKey = '', streaming = false, user = false) => html`
+    <deck-stream-markdown
+      .text=${text}
+      .streamKey=${streamKey}
       ?streaming=${streaming}
-      .mdStyle=${user ? userMarkdownStyle : markdownStyle}
-      .extensions=${markdownExtensions}
+      ?user=${user}
       @click=${(event: MouseEvent) => openMessageLink(event, this.cwd)}
-    >${text}</gem-bind-marked>
+    ></deck-stream-markdown>
   `;
 
   #openProcessSheet = (group: ProcessGroup) => {
@@ -94,7 +94,7 @@ export class DeckSessionTimelineElement extends GemElement {
                   `,
                 )}
               </div>
-              ${this.#renderMarkdown(markdown, message.streaming, true)}
+              ${this.#renderMarkdown(markdown, `${this.sessionKey}:${message.id}`, message.streaming, true)}
             </div>
             <button
               v-if=${message.failed}
@@ -120,7 +120,7 @@ export class DeckSessionTimelineElement extends GemElement {
             `,
           )}
         </div>
-        ${this.#renderMarkdown(markdown, message.streaming)}
+        ${this.#renderMarkdown(markdown, `${this.sessionKey}:${message.id}`, message.streaming)}
       </article>
     `;
   };

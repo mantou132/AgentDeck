@@ -4,7 +4,7 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
 import { followBottom } from '../lib/follow-bottom';
-import { diffColorScheme, markdownExtensions, markdownStyle } from '../lib/markdown';
+import { diffColorScheme, markdownStyle } from '../lib/markdown';
 import { openMessageLink } from '../navigation';
 import {
   getToolCommand,
@@ -34,6 +34,7 @@ const style = css`
     min-height: 40vh;
     padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
+  deck-stream-markdown,
   gem-bind-marked {
     color: ${agentDeckTheme.textColor};
     font-size: 1rem;
@@ -129,12 +130,13 @@ export class DeckProcessStepElement extends GemElement {
     if (!item) return html``;
     if (item.type === 'thought') {
       return html`
-        <gem-bind-marked
-          ?streaming=${this.#group?.pending && item.pending}
+        <deck-stream-markdown
+          .text=${item.text}
+          .streamKey=${`${this.sessionId}:${this.groupId}:${item.id}`}
+          ?streaming=${Boolean(this.#group?.pending && item.pending)}
           .mdStyle=${markdownStyle}
-          .extensions=${markdownExtensions}
           @click=${this.#openLink}
-        >${item.text}</gem-bind-marked>
+        ></deck-stream-markdown>
       `;
     }
     const diffs = toolCallDiffs(item.data.content);
