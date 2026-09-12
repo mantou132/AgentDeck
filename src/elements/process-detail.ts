@@ -6,23 +6,6 @@ import { openMessageLink } from '../navigation';
 import { getToolCommand, getToolStatus, type ProcessGroup } from '../session/timeline';
 import { icons } from '../styles/icons';
 
-// 工具标题已含文件路径，仅在过程详情中隐藏 diff 文件头。
-const diffStyle = new CSSStyleSheet();
-diffStyle.replaceSync(`
-  div.d2h-wrapper {
-    .d2h-file-header {
-      display: none;
-    }
-    .d2h-file-wrapper {
-      margin-bottom: 0;
-      border: none;
-    }
-    .d2h-code-linenumber {
-      border-left: none;
-    }
-  }
-`);
-
 const style = css`
   :scope { display: block; }
   summary::-webkit-details-marker { display: none; }
@@ -113,9 +96,10 @@ export class DeckProcessDetailElement extends GemElement {
                           ${diffs.map(
                             ({ text }) =>
                               html`<gem-bind-diff2html
-                                class="relative block w-full overflow-x-auto"
+                                class="relative block w-full overflow-x-auto rounded-xl"
                                 .colorScheme=${diffColorScheme}
-                                .mdStyle=${diffStyle}
+                                no-header
+                                compact-line-numbers
                               >${text}</gem-bind-diff2html>`,
                           )}
                         </div>

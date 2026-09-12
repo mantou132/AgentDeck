@@ -74,7 +74,7 @@ export const markdownExtensions: MarkedExtension[] = [
         const source = escapeHtml(text);
         if (language === 'mermaid') return `<gem-bind-mermaid tabindex="0">${source}</gem-bind-mermaid>`;
         if (diffLanguages.includes(language)) {
-          return `<gem-bind-diff2html color-scheme="${diffColorScheme}" tabindex="0">${source}</gem-bind-diff2html>`;
+          return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }
         if (['latex', 'tex', 'math'].includes(language)) {
           return `<gem-bind-latex block tabindex="0">${source}</gem-bind-latex>`;
@@ -155,7 +155,6 @@ const baseMarkdownStyle = `
   gem-bind-mermaid, gem-bind-latex, gem-bind-diff2html { display: block; max-width: 100%; overflow: auto; }
   gem-bind-diff2html {
     margin: .7rem 0;
-    border: 1px solid var(--color-border);
     border-radius: 12px;
   }
   @media (prefers-reduced-motion: reduce) {

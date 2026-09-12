@@ -17,8 +17,8 @@ importers:
   .:
     dependencies:
       '@gem-bind/diff2html':
-        specifier: ^0.0.2
-        version: 0.0.2
+        specifier: ^0.0.3
+        version: 0.0.3
       '@gem-bind/latex':
         specifier: ^0.0.1
         version: 0.0.1
@@ -162,8 +162,8 @@ packages:
   '@emnapi/wasi-threads@1.2.3':
     resolution: {integrity: sha512-ELEBe8PsLvvJ6QMr0zLt8ffvOHW/dc1m3CEzNMg7aJUv3bMaoDtw2TXyDAwkYBuroxxuHEwhRTLJSe5sya547g==}
 
-  '@gem-bind/diff2html@0.0.2':
-    resolution: {integrity: sha512-wHbpryPaXdNkAXeZtJk9MFtN1l3WZp9H19wOXiHK5qBQKv/e7EGSX7E/lQB/wL+dcHQmhCxDOBJvTaqfBYnlMg==}
+  '@gem-bind/diff2html@0.0.3':
+    resolution: {integrity: sha512-BxPO5yf4XLDuTYegkY9g/i116nGwhgtfw3iezH0GF6gD1etYjYx1T7S9YQ7TgbDbxrSbzX4Wff4aqAOUoUffbA==}
 
   '@gem-bind/latex@0.0.1':
     resolution: {integrity: sha512-bd4IFPzUXuXKADZrEZUyJtigcv5coiJwlyTjjXXHlb4pzPSnd2G3lXyuPFMIIwE7dOf8dUgMXPiUTHZRcSNJaQ==}
@@ -1486,7 +1486,7 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@gem-bind/diff2html@0.0.2':
+  '@gem-bind/diff2html@0.0.3':
     dependencies:
       '@mantou/gem': 2.2.10
       '@swc/helpers': 0.5.23

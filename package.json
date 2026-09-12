@@ -15,7 +15,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@gem-bind/diff2html": "^0.0.2",
+    "@gem-bind/diff2html": "^0.0.3",
     "@gem-bind/latex": "^0.0.1",
     "@gem-bind/marked": "^0.0.5",
     "@gem-bind/mermaid": "^0.0.2",
