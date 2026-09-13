@@ -1,5 +1,6 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
 import { Stack } from '@mantou/tap-ui/elements/stack';
+import { agentApi } from './agent/transport';
 import { parseMessageLink } from './lib/links';
 
 Browser.allowedProtocols.add('webproxy:');
@@ -18,6 +19,23 @@ export const openFileViewer = (path: string, cwd: string, line?: number) => {
   });
 };
 
+export const openPath = async (path: string, cwd: string, line?: number) => {
+  if (path.endsWith('/') || path.endsWith('\\') || path === '.' || path === '..') {
+    openFileBrowser(path, cwd);
+    return;
+  }
+  if (line) {
+    openFileViewer(path, cwd, line);
+    return;
+  }
+  try {
+    await agentApi.browseFiles(path, { cwd, limit: 1 });
+    openFileBrowser(path, cwd);
+  } catch {
+    openFileViewer(path, cwd);
+  }
+};
+
 export const openMessageLink = (event: MouseEvent, cwd: string) => {
   if (event.defaultPrevented || event.button !== 0) return false;
   const anchor = event
@@ -30,10 +48,8 @@ export const openMessageLink = (event: MouseEvent, cwd: string) => {
   if (!link) return false;
   if (link.type === 'web') {
     void Browser.open({ src: link.url, title: anchor?.textContent?.trim() || link.url });
-  } else if (link.path.endsWith('/') || link.path.endsWith('\\') || link.path === '.' || link.path === '..') {
-    openFileBrowser(link.path, cwd);
   } else {
-    openFileViewer(link.path, cwd, link.line);
+    void openPath(link.path, cwd, link.line);
   }
   return true;
 };

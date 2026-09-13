@@ -4,7 +4,7 @@ import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { fileViewerMarkdownStyle, markdownExtensions } from '../lib/markdown';
-import { openFileBrowser, openMessageLink, openSettings } from '../navigation';
+import { openMessageLink, openSettings } from '../navigation';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -51,11 +51,6 @@ export class DeckFileViewerElement extends GemElement {
       (error) => {
         if (!active) return;
         const message = error instanceof Error ? error.message : String(error);
-        if (/is a directory/i.test(message)) {
-          Stack.pop();
-          openFileBrowser(this.path, this.cwd);
-          return;
-        }
         this.#state({ loading: false, error: message });
       },
     );
