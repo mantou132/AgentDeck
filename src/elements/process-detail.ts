@@ -22,7 +22,6 @@ const style = css`
     border: 0;
   }
   .page-content {
-    min-height: 40vh;
     padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .empty {

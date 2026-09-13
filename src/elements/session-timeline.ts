@@ -36,15 +36,11 @@ export class DeckSessionTimelineElement extends GemElement {
 
   #openProcessSheet = (group: ProcessGroup) => {
     Sheet.open({
-      paddingless: true,
       maskClosable: true,
+      hasStack: true,
+      snap: true,
       body: html`
-        <tap-stack auto-height disable-history .maxHeight=${innerHeight * 0.77}>
-          <deck-process-detail
-            .sessionId=${this.sessionKey}
-            .groupId=${group.id}
-          ></deck-process-detail>
-        </tap-stack>
+        <deck-process-detail .sessionId=${this.sessionKey} .groupId=${group.id}></deck-process-detail>
       `,
     });
   };

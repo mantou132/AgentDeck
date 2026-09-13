@@ -32,16 +32,9 @@ html {
   color-scheme: light dark;
 }
 
-html,
-body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  -webkit-tap-highlight-color: transparent;
+/* webkit bug: ::part in scope invalid */
+tap-sheet::part(sheet) {
+  background: var(--color-bg-light);
 }
 
 @layer base {
