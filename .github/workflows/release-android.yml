@@ -86,7 +86,7 @@ jobs:
           NODE
 
       - name: Build signed Android bundles
-        run: pnpm tauri android build --ci --apk --aab
+        run: pnpm tauri android build --ci --apk --aab --config src-tauri/tauri.prod.conf.json
 
       - name: Verify and collect release files
         env:

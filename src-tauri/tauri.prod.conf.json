@@ -1,0 +1,11 @@
+{
+  "app": {
+    "windows": [
+      {
+        "useHttpsScheme": true,
+        "label": "main",
+        "title": "AgentDeck"
+      }
+    ]
+  }
+}
