@@ -1,4 +1,5 @@
 import { history } from '@mantou/gem/lib/history';
+import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { reconnectTransport } from '../agent/transport';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
@@ -37,7 +38,7 @@ const style = css`
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState({ previewAttachment: null as Attachment | null, followMessages: true, canRestoreInput: true });
+  #state = createState({ followMessages: true, canRestoreInput: true });
   #messagesRef = createRef<HTMLElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
@@ -65,7 +66,6 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
-    this.#state({ previewAttachment: null });
     void ensureSessionLoaded(this.sessionId);
   };
 
@@ -95,7 +95,10 @@ export class AgentDeckSessionPageElement extends GemElement {
   };
 
   #previewAttachment = (event: CustomEvent<Attachment>) => {
-    this.#state({ previewAttachment: event.detail });
+    Sheet.open({
+      maskClosable: true,
+      body: html`<deck-attachment-preview .attachment=${event.detail}></deck-attachment-preview>`,
+    });
   };
 
   #retryLoad = () => {
@@ -290,10 +293,6 @@ export class AgentDeckSessionPageElement extends GemElement {
           ></deck-composer>
         </footer>
       </tap-page>
-      <deck-attachment-preview
-        .attachment=${this.#state.previewAttachment}
-        @close=${() => this.#state({ previewAttachment: null })}
-      ></deck-attachment-preview>
     `;
   };
 }

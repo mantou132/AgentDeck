@@ -147,6 +147,9 @@ export function documentFixture(previous) {
         if (name === '@mantou/gem/helper/i18n') {
           return { I18n: MockI18n };
         }
+        if (name === '@mantou/tap-ui/lib/utils') {
+          return { getStringFromTemplate: (t) => (typeof t === 'string' ? t : t?.strings ? t.strings.join('') : '') };
+        }
         if (name === '@mantou/tap-ui/lib/locale') {
           return { loadLocale: () => Promise.resolve() };
         }

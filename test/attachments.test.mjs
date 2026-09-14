@@ -33,6 +33,9 @@ const loadFilesModule = () => {
         },
       };
     }
+    if (id === '@mantou/tap-ui/lib/utils') {
+      return { getStringFromTemplate: (t) => (typeof t === 'string' ? t : t?.strings ? t.strings.join('') : '') };
+    }
     if (id === '@mantou/tap-ui/lib/image') {
       return { compressionImage: async () => 'data:image/png;base64,abc' };
     }
