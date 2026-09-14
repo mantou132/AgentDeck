@@ -1,6 +1,8 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { CarouselItem } from '@mantou/tap-ui/elements/carousel';
 import { blockContainer, focusStyle } from '@mantou/tap-ui/lib/styles';
+import { openWebBrowser } from 'src/navigation';
+import { toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { i18n } from '../i18n';
 
 @customElement('deck-relay-guide')
@@ -9,19 +11,25 @@ import { i18n } from '../i18n';
 export class DeckRelayGuideElement extends GemElement {
   @emitter close: Emitter;
 
+  #goB4A = () => {
+    this.close();
+    openWebBrowser(toWebproxyUrl('https://github.com/mantou132/browser4agent'), 'Browser for AI Agent');
+  };
+
   get #items(): CarouselItem[] {
     return [
       {
         title: i18n.get('relayGuide.step1Title'),
         image: 'install',
-        description: html`
-          ${i18n.get('relayGuide.step1DescPre')}<a
-            class="text-primary-strong underline decoration-primary/30 underline-offset-4"
-            href="https://github.com/mantou132/browser4agent"
-            target="_blank"
-            rel="noopener noreferrer"
-          >Browser for AI Agent</a>${i18n.get('relayGuide.step1DescPost')}
-        `,
+        description: i18n.get(
+          'relayGuide.step1Desc',
+          (text) => html`
+            <a
+              class="text-primary-strong underline decoration-primary/30 underline-offset-4"
+              @click=${this.#goB4A}
+            >${text}</a>
+          `,
+        ),
       },
       {
         title: i18n.get('relayGuide.step2Title'),
