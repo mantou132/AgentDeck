@@ -1,11 +1,35 @@
 import { compressionImage } from '@mantou/tap-ui/lib/image';
 
+import { i18n } from '../i18n';
 import type { Attachment } from '../session/types';
 
 export const MAX_ATTACHMENTS = 10;
 export const MAX_TEXT_BYTES = 256 * 1024;
 const TEXT_EXTENSION =
-  /\.(txt|md|markdown|json|jsonl|ndjson|csv|tsv|log|xml|svg|yaml|yml|toml|ini|cfg|conf|env|html?|css|scss|less|[jt]sx?|mjs|cjs|graphql|proto|py|rb|rs|go|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|fish|ps1|sql|r)$/i;
+  /\.(txt|md|markdown|json|jsonl|ndjson|csv|tsv|log|xml|svg|yaml|yml|toml|ini|cfg|conf|env|html?|css|scss|less|[jt]sx?|mjs|cjs|graphql|proto|py|rb|rs|go|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|fish|ps1|sql|r|vue|svelte|astro|zig|nim|lua|dart|scala|ex|exs|erl|clj|hs|elm|diff|patch|lock|properties|mod|sum)$/i;
+
+const isBinaryBuffer = (buffer: ArrayBuffer): boolean => {
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0) return true;
+  }
+  return false;
+};
+
+const isTextFile = async (file: File): Promise<boolean> => {
+  if (
+    /^text\/|\b(?:json|xml|yaml|javascript|typescript|ecmascript|x-sh|sql|toml)\b/i.test(file.type) ||
+    TEXT_EXTENSION.test(file.name)
+  ) {
+    return true;
+  }
+  try {
+    const chunk = await file.slice(0, 4096).arrayBuffer();
+    return !isBinaryBuffer(chunk);
+  } catch {
+    return false;
+  }
+};
 
 const readImage = async (file: File) => {
   const url = await new Promise<string>((resolve, reject) => {
@@ -29,17 +53,18 @@ export const readAttachment = async (file: File): Promise<Attachment> => {
     try {
       return { ...base, kind: 'image', ...(await readImage(file)) };
     } catch {
-      throw new Error(`无法读取图片“${file.name}”，请重新选择有效的图片文件。`);
+      throw new Error(i18n.get('composer.attachmentImageFailed', file.name) as unknown as string);
     }
   }
-  const textFile =
-    /^text\/|\b(?:json|xml|yaml|javascript|ecmascript|x-sh|sql|toml)\b/.test(file.type) ||
-    (!file.type && TEXT_EXTENSION.test(file.name));
-  if (!textFile) throw new Error(`暂不支持“${file.name}”，请选择图片或文本文件。`);
-  if (file.size > MAX_TEXT_BYTES) throw new Error(`“${file.name}”超过 256 KB，请缩小文本文件后重试。`);
+  if (!(await isTextFile(file))) {
+    throw new Error(i18n.get('composer.attachmentUnsupported', file.name) as unknown as string);
+  }
+  if (file.size > MAX_TEXT_BYTES) {
+    throw new Error(i18n.get('composer.attachmentTooLarge', file.name) as unknown as string);
+  }
   try {
     return { ...base, kind: 'text', text: await file.text() };
   } catch {
-    throw new Error(`无法读取“${file.name}”，请重新选择文件。`);
+    throw new Error(i18n.get('composer.attachmentReadFailed', file.name) as unknown as string);
   }
 };
