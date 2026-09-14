@@ -1,6 +1,6 @@
 import type { MarkedExtension } from '@gem-bind/marked';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { markdownExtensions, markdownStyle, userMarkdownStyle } from '../lib/markdown';
+import { markdownExtensions, markdownStyle, userMarkdownExtensions, userMarkdownStyle } from '../lib/markdown';
 import { nextStreamingText, STREAM_REVEAL_INTERVAL } from '../lib/stream-text';
 
 @customElement('deck-stream-markdown')
@@ -9,7 +9,7 @@ export class DeckStreamMarkdownElement extends GemElement {
   @property text = '';
   @property streamKey = '';
   @property mdStyle?: CSSStyleSheet;
-  @property extensions: MarkedExtension[] = markdownExtensions;
+  @property extensions?: MarkedExtension[];
   @boolattribute streaming: boolean;
   @boolattribute user: boolean;
 
@@ -57,7 +57,7 @@ export class DeckStreamMarkdownElement extends GemElement {
     <gem-bind-marked
       ?streaming=${this.streaming}
       .mdStyle=${this.mdStyle ?? (this.user ? userMarkdownStyle : markdownStyle)}
-      .extensions=${this.extensions}
+      .extensions=${this.extensions ?? (this.user ? userMarkdownExtensions : markdownExtensions)}
     >${this.#displayText}</gem-bind-marked>
   `;
 }

@@ -1,5 +1,6 @@
 import { type MarkedExtension, Renderer } from '@gem-bind/marked';
 import { agentDeckTheme } from '../styles/theme';
+import { isSmallTextFile } from './file-preview';
 
 import '@gem-bind/diff2html';
 import '@gem-bind/latex';
@@ -60,7 +61,7 @@ const defaultRenderer = new Renderer();
 const diffLanguages = ['diff', 'patch', 'udiff', 'unified-diff'];
 export const diffColorScheme = globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
 
-export const markdownExtensions: MarkedExtension[] = [
+const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): MarkedExtension[] => [
   {
     gfm: true,
     breaks: true,
@@ -81,6 +82,9 @@ export const markdownExtensions: MarkedExtension[] = [
         if (['latex', 'tex', 'math'].includes(language)) {
           return `<gem-bind-latex block tabindex="0">${source}</gem-bind-latex>`;
         }
+        if (options.codeBlock && isSmallTextFile(text)) {
+          return `<tap-code-block codelang="${escapeHtml(language)}" tabindex="0">${source}</tap-code-block>`;
+        }
         return `<pre tabindex="0"><code data-language="${escapeHtml(language)}">${source}</code></pre>`;
       },
       table(token) {
@@ -89,6 +93,9 @@ export const markdownExtensions: MarkedExtension[] = [
     },
   },
 ];
+
+export const markdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true });
+export const userMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: false });
 
 const baseMarkdownStyle = `
   :host {
@@ -127,19 +134,24 @@ const baseMarkdownStyle = `
     font-family: ${agentDeckTheme.codeFont};
     font-size: .9em;
   }
-  pre {
+  pre, tap-code-block {
     max-width: 100%;
     margin: .7rem 0;
-    overflow: auto;
     border: 1px solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.backgroundColor};
-    padding: .85rem;
     color: ${agentDeckTheme.textColor};
     line-height: 1.55;
   }
+  pre {
+    overflow: auto;
+    padding: .85rem;
+  }
+  tap-code-block {
+    overflow: hidden;
+  }
   pre code { background: none; padding: 0; }
-  pre, .table-scroll { outline: none; }
+  pre, tap-code-block, .table-scroll { outline: none; }
   .table-scroll {
     max-width: 100%;
     margin: .7rem 0;

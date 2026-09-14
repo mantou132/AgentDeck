@@ -1,8 +1,10 @@
+import type { TapCodeBlockElement } from '@mantou/tap-ui/elements/code-block';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
+import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
 import { fileViewerMarkdownStyle, markdownExtensions } from '../lib/markdown';
 import { openMessageLink, openSettings } from '../navigation';
 import { icons } from '../styles/icons';
@@ -39,6 +41,7 @@ export class DeckFileViewerElement extends GemElement {
   });
   #mainRef = createRef<HTMLElement>();
   #lineRef = createRef<HTMLElement>();
+  #codeBlockRef = createRef<TapCodeBlockElement>();
 
   @effect((i) => [i.path, i.cwd, i.#state.revision])
   #read = () => {
@@ -69,22 +72,17 @@ export class DeckFileViewerElement extends GemElement {
   @effect((i) => [i.#state.file, i.#state.source, i.line])
   #scrollToLine = () => {
     if (!this.line) return;
-    const lineEl = this.#lineRef.value;
-    const mainEl = this.#mainRef.value;
-    if (!lineEl || !mainEl) return;
-    const scrollToTarget = () => {
+    requestAnimationFrame(() => {
+      const lineEl =
+        this.#codeBlockRef.value?.shadowRoot?.querySelector<HTMLElement>('.highlight') || this.#lineRef.value;
+      const mainEl = this.#mainRef.value;
+      if (!lineEl || !mainEl?.clientHeight) return;
       const lineRect = lineEl.getBoundingClientRect();
       const mainRect = mainEl.getBoundingClientRect();
       if (!mainRect.height) return;
       const targetTop = mainEl.scrollTop + (lineRect.top - mainRect.top) - (mainEl.clientHeight - lineRect.height) / 2;
       mainEl.scrollTop = Math.max(0, targetTop);
-    };
-    if (mainEl.clientHeight) {
-      scrollToTarget();
-    } else {
-      const frame = requestAnimationFrame(scrollToTarget);
-      return () => cancelAnimationFrame(frame);
-    }
+    });
   };
 
   #renderText = (text: string) => {
@@ -109,6 +107,10 @@ export class DeckFileViewerElement extends GemElement {
     const path = file?.path || this.path;
     const name = path.split(/[\\/]/).pop() || path;
     const markdown = file?.type === 'text' && /\.(md|markdown)$/i.test(path);
+    const isText = file?.type === 'text';
+    const text = isText ? file.text : '';
+    const isSmall = isSmallTextFile(text);
+
     return html`
       <tap-page class="bg-bg text-text">
         <tap-navbar slot="header" title=${name} back @backclick=${() => Stack.pop()}>
@@ -150,8 +152,15 @@ export class DeckFileViewerElement extends GemElement {
             .mdStyle=${fileViewerMarkdownStyle}
             .extensions=${markdownExtensions}
             @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
-          >${file?.type === 'text' ? file.text : ''}</gem-bind-marked>
-          <pre v-else class="max-w-full overflow-auto m-0 min-w-full w-max p-4 font-mono text-sm leading-relaxed text-text" tabindex="0">${file?.type === 'text' ? this.#renderText(file.text) : ''}</pre>
+          >${text}</gem-bind-marked>
+          <tap-code-block
+            v-else-if=${isText && isSmall}
+            ${this.#codeBlockRef}
+            class="m-0 w-full text-sm bg-transparent rounded-none"
+            codelang=${getCodeLang(path)}
+            highlight=${this.line ? String(this.line) : ''}
+          >${text}</tap-code-block>
+          <pre v-else class="overflow-auto m-0 w-full p-4 font-mono text-sm leading-relaxed text-text" tabindex="0">${isText ? this.#renderText(text) : ''}</pre>
         </main>
         <footer slot="footer"></footer>
       </tap-page>
