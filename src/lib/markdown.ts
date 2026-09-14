@@ -75,7 +75,7 @@ const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): Marked
       code({ text, lang }) {
         const language = languageFromInfo(lang || '');
         const source = escapeHtml(text);
-        if (language === 'mermaid') return `<gem-bind-mermaid tabindex="0">${source}</gem-bind-mermaid>`;
+        if (language === 'mermaid') return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
         if (diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }
@@ -166,7 +166,6 @@ const baseMarkdownStyle = `
   tr + tr td, tbody td { border-top: 1px solid ${agentDeckTheme.borderColor}; }
   hr { margin: .9rem 0; border: 0; border-top: 1px solid ${agentDeckTheme.borderColor}; }
   img { max-width: 100%; height: auto; border-radius: ${agentDeckTheme.normalRound}; }
-  gem-bind-mermaid, gem-bind-latex, gem-bind-diff2html { display: block; max-width: 100%; overflow: auto; }
   gem-bind-diff2html {
     margin: .7rem 0;
     border-radius: ${agentDeckTheme.normalRound};

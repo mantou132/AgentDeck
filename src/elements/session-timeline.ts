@@ -1,7 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
 import { openMessageLink } from '../navigation';
 import {
   extractDataImageAttachments,
@@ -20,8 +19,6 @@ export class DeckSessionTimelineElement extends GemElement {
   @property cwd = '';
   @property messages: ChatMessage[] = [];
   @boolattribute pending: boolean;
-  @boolattribute canRestoreInput: boolean;
-  @emitter restore: Emitter<TextMessage>;
   @emitter preview: Emitter<Attachment>;
 
   #renderMarkdown = (text: string, streamKey = '', streaming = false, user = false) => html`
@@ -92,16 +89,6 @@ export class DeckSessionTimelineElement extends GemElement {
               </div>
               ${this.#renderMarkdown(markdown, `${this.sessionKey}:${message.id}`, message.streaming, true)}
             </div>
-            <button
-              v-if=${message.failed}
-              type="button"
-              class="mt-1.5 ml-auto block cursor-pointer border-0 bg-transparent py-1 text-sm font-medium text-primary-strong disabled:cursor-default disabled:text-disabled"
-              ?disabled=${!this.canRestoreInput}
-              title=${this.canRestoreInput ? i18n.get('timeline.restoreInputTitle') : i18n.get('timeline.clearInputFirst')}
-              @click=${() => this.restore(message)}
-            >
-              ${i18n.get('timeline.restoreInput')}
-            </button>
           </div>
         </div>
       `;
@@ -123,7 +110,10 @@ export class DeckSessionTimelineElement extends GemElement {
 
   @template()
   #render = () => {
-    const timelineItems = groupTimelineMessages(this.messages, this.pending);
+    const timelineItems = groupTimelineMessages(
+      this.messages.filter((message) => !('failed' in message && message.failed)),
+      this.pending,
+    );
     return html`
       ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
     `;

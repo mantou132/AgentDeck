@@ -283,7 +283,7 @@ export const retrySessionLoad = (sessionId: string) => {
   return ensureSessionLoaded(sessionId);
 };
 
-const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: number) => {
+const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: number, onFailed?: () => void) => {
   setSessionFlag('unreadSessionIds', session.sessionId, false);
   setSessionFlag('pendingSessionIds', session.sessionId, true);
   setSessionError(session.sessionId, '');
@@ -309,6 +309,7 @@ const runPromptTurn = (session: DeckSession, prompt: TextMessage, turnStart: num
           session.sessionId,
           messages.map((message) => (message.id === prompt.id ? { ...message, failed: true } : message)),
         );
+        onFailed?.();
       },
       onDone: (completed) => {
         resolvePermission(session.sessionId, null);
@@ -327,9 +328,11 @@ export const promoteDraftSession = async (
   draft: DeckSession,
   text: string,
   attachments: Attachment[] = [],
+  onFailed?: () => void,
 ): Promise<DeckSession | null> => {
   if (agentdeckStore.connection !== 'connected') {
     setSessionError('draft', i18n.get('error.remoteNotConnectedCreate'));
+    onFailed?.();
     return null;
   }
   const selectedMode = getModeSelection(agentdeckStore.optionsBySession.draft)?.currentValue;
@@ -349,6 +352,7 @@ export const promoteDraftSession = async (
     setMessages('draft', []);
     setSessionFlag('pendingSessionIds', 'draft', false);
     setSessionError('draft', error instanceof Error ? error.message : i18n.get('error.createSessionFailed'));
+    onFailed?.();
     return null;
   }
 
@@ -409,13 +413,19 @@ export const promoteDraftSession = async (
   if (modeError) {
     setMessages(sessionId, [{ ...userMessage, failed: true }]);
     setSessionError(sessionId, modeError);
+    onFailed?.();
   } else {
-    runPromptTurn(liveSession, userMessage, stagedMessages.length);
+    runPromptTurn(liveSession, userMessage, stagedMessages.length, onFailed);
   }
   return liveSession;
 };
 
-export const sendPrompt = (sessionId: string, prompt: string, attachments: Attachment[] = []) => {
+export const sendPrompt = (
+  sessionId: string,
+  prompt: string,
+  attachments: Attachment[] = [],
+  onFailed?: () => void,
+) => {
   const text = prompt.trim();
   const session = getSession(sessionId);
   if (
@@ -427,13 +437,14 @@ export const sendPrompt = (sessionId: string, prompt: string, attachments: Attac
     agentdeckStore.pendingSessionIds.includes(sessionId) ||
     agentdeckStore.changingModeSessionIds.includes(sessionId)
   ) {
+    onFailed?.();
     return false;
   }
   const messages = completeThought(agentdeckStore.messagesBySession[sessionId] ?? []);
   const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
   setMessages(sessionId, [...messages, userMessage]);
   const turnStart = messages.length + 1;
-  runPromptTurn(session, userMessage, turnStart);
+  runPromptTurn(session, userMessage, turnStart, onFailed);
   return true;
 };
 

@@ -9,7 +9,7 @@ import {
 } from '../composer/references';
 import { i18n } from '../i18n';
 import type { ModeSelection } from '../session/modes';
-import type { Attachment, TextMessage } from '../session/types';
+import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
 
 export type ComposerInput = { text: string; attachments: Attachment[] };
@@ -45,7 +45,6 @@ export class DeckComposerElement extends GemElement {
   @emitter cancel: Emitter;
   @emitter preview: Emitter<Attachment>;
   @emitter draftChange: Emitter;
-  @emitter restoreChange: Emitter<boolean>;
 
   #state = createState({
     draft: '',
@@ -62,9 +61,6 @@ export class DeckComposerElement extends GemElement {
   @effect((i) => [i.sessionKey])
   #resetInput = () => this.#clearInput();
 
-  @effect((i) => [i.#canRestoreInput])
-  #reportRestore = () => this.restoreChange(this.#canRestoreInput);
-
   get #canSend() {
     return (
       this.ready &&
@@ -79,10 +75,11 @@ export class DeckComposerElement extends GemElement {
 
   #send = async () => {
     if (!this.#canSend || !this.submit) return;
+    const input: ComposerInput = { text: this.#state.draft.trim(), attachments: this.#state.attachments };
+    this.#clearInput();
     this.#state({ submitting: true });
     try {
-      if (await this.submit({ text: this.#state.draft.trim(), attachments: this.#state.attachments }))
-        this.#clearInput();
+      await this.submit(input);
     } finally {
       this.#state({ submitting: false });
     }
@@ -103,17 +100,7 @@ export class DeckComposerElement extends GemElement {
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
   };
 
-  get #canRestoreInput() {
-    return (
-      !this.#state.draft.trim() &&
-      !this.#state.attachments.length &&
-      !this.#state.readingAttachments &&
-      !this.#state.submitting
-    );
-  }
-
-  restore = (message: TextMessage) => {
-    if (!this.#canRestoreInput) return;
+  restore = (message: { text: string; attachments?: Attachment[] }) => {
     this.#pastedAttachments.clear();
     for (const attachment of message.attachments ?? []) {
       if (attachment.marker) this.#pastedAttachments.set(attachment.id, attachment);

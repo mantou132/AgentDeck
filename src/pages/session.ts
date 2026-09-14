@@ -8,7 +8,7 @@ import { followBottom } from '../lib/follow-bottom';
 import { displayPath } from '../lib/path';
 import { openSession, openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
-import type { Attachment, TextMessage } from '../session/types';
+import type { Attachment } from '../session/types';
 import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
@@ -38,7 +38,7 @@ const style = css`
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState({ followMessages: true, canRestoreInput: true });
+  #state = createState({ followMessages: true });
   #messagesRef = createRef<HTMLElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
@@ -86,10 +86,19 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   #send = async ({ text, attachments }: ComposerInput) => {
     const session = getSession(this.sessionId);
-    if (!session) return false;
-    if (!session.draft) return sendPrompt(this.sessionId, text, attachments);
-    const liveSession = await promoteDraftSession(session, text, attachments);
-    if (!liveSession) return false;
+    const restoreInput = () => {
+      this.#composerRef.value?.restore({ text, attachments });
+    };
+    if (!session) {
+      restoreInput();
+      return false;
+    }
+    if (!session.draft) return sendPrompt(this.sessionId, text, attachments, restoreInput);
+    const liveSession = await promoteDraftSession(session, text, attachments, restoreInput);
+    if (!liveSession) {
+      restoreInput();
+      return false;
+    }
     this.sessionId = liveSession.sessionId;
     return true;
   };
@@ -206,8 +215,6 @@ export class AgentDeckSessionPageElement extends GemElement {
                   .cwd=${session.cwd}
                   .messages=${messages}
                   ?pending=${pending}
-                  ?can-restore-input=${this.#state.canRestoreInput}
-                  @restore=${(event: CustomEvent<TextMessage>) => this.#composerRef.value?.restore(event.detail)}
                   @preview=${this.#previewAttachment}
                 ></deck-session-timeline>
               </div>
@@ -289,7 +296,6 @@ export class AgentDeckSessionPageElement extends GemElement {
             @cancel=${() => cancelTurn(this.sessionId)}
             @preview=${this.#previewAttachment}
             @draft-change=${() => clearSessionError(this.sessionId)}
-            @restore-change=${(event: CustomEvent<boolean>) => this.#state({ canRestoreInput: event.detail })}
           ></deck-composer>
         </footer>
       </tap-page>
