@@ -30,6 +30,7 @@ export class DeckSheetElement extends GemElement {
   @boolattribute open: boolean;
   @property heading = '';
   @property description = '';
+  @property snap?: number[];
   @property content?: TemplateResult;
   @emitter close: Emitter;
 
@@ -52,6 +53,7 @@ export class DeckSheetElement extends GemElement {
           <tap-sheet
             ?open=${this.open}
             header=${this.heading}
+            .snap=${this.snap ? this.snap : false}
             gesture
             mask-closable
             @close=${() => this.close()}

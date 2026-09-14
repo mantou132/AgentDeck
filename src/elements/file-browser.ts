@@ -13,12 +13,13 @@ const browserStyle = css`
   :scope {
     display: flex;
     flex-direction: column;
+    height: 100%;
     min-height: 0;
     width: 100%;
   }
   .entries-container {
-    max-height: 42dvh;
-    min-height: 10rem;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior-y: contain;
   }
@@ -126,7 +127,7 @@ export class DeckFileBrowserElement extends GemElement {
     return html`
       <div
         ${this.#breadcrumbsRef}
-        class="mb-4 flex min-h-11 items-center gap-1 overflow-x-auto rounded-xl bg-bg px-2 py-1.5 no-scrollbar"
+        class="mb-4 flex min-h-11 items-center gap-1 overflow-x-auto rounded-xl bg-bg px-2.5 py-1.5 no-scrollbar"
       >
         ${crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;
@@ -171,11 +172,11 @@ export class DeckFileBrowserElement extends GemElement {
           ${i18n.get('cwdPicker.reading')}
         </div>
 
-        <div v-else class="divide-y divide-border/60">
+        <div v-else>
           <button
             v-if=${parentPath !== null}
             type="button"
-            class="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-1 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+            class="flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
             ?disabled=${Boolean(navigatingPath)}
             @click=${() => parentPath && this.#navigateTo(parentPath)}
           >
@@ -198,7 +199,7 @@ export class DeckFileBrowserElement extends GemElement {
               return html`
                 <button
                   type="button"
-                  class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-1 py-3.5 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                  class="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
                   title=${entry.path}
                   ?disabled=${Boolean(navigatingPath)}
                   @click=${() => this.#navigateTo(entry.path)}
@@ -238,7 +239,7 @@ export class DeckFileBrowserElement extends GemElement {
             return html`
               <button
                 type="button"
-                class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-1 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                class="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
                 title=${entry.path}
                 ?disabled=${Boolean(navigatingPath)}
                 @click=${() => this.#onFileClick(entry.path)}

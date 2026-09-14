@@ -243,11 +243,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
       </tap-page>
       <deck-sheet
         ?open=${sheetOpen}
+        .snap=${[0.7]}
         .heading=${i18n.get('sessionList.newSessionHeading')}
         .description=${i18n.get('sessionList.newSessionDesc')}
         @close=${this.#closeNewSession}
         .content=${html`
-          <div class="w-full">
+          <div class="flex h-full flex-col">
             <deck-file-browser
               directories-only
               .emptyText=${i18n.get('cwdPicker.emptyDir')}
@@ -257,14 +258,14 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
             <div
               v-if=${newSessionError}
-              class="mt-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
+              class="mt-3 shrink-0 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
             >
               ${newSessionError}
             </div>
 
             <button
               type="button"
-              class="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-0 bg-primary px-4 text-sm font-semibold text-white transition-transform active:scale-[0.985] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:shadow-none disabled:active:scale-100"
+              class="mt-4 flex h-12 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border-0 bg-primary px-4 text-sm font-semibold text-white transition-transform active:scale-[0.985] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:shadow-none disabled:active:scale-100"
               ?disabled=${navigatingCwd || !selectedCwd}
               @click=${this.#confirmNewSession}
             >
