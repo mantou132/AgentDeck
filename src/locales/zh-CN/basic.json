@@ -121,8 +121,6 @@
   "settings.saveAndConnect": "保存并连接",
   "settings.resetApp": "重置 App",
   "settings.resetDesc": "重新加载 App，清空本地会话缓存和未发送内容。保留配对设置与远端历史，远端任务可能仍在运行。",
-  "settings.relayGuideTitle": "获取 Relay ID",
-  "settings.relayGuideDesc": "在运行 Agent 的电脑上完成以下三步。",
   "relayGuide.step1Title": "安装浏览器扩展",
   "relayGuide.step1DescPre": "在电脑浏览器中安装",
   "relayGuide.step1DescPost": "，并按欢迎页指引安装 Native Host。",

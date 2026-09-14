@@ -1,4 +1,4 @@
-import { toWebproxyUrl } from 'tauri-plugin-edge-to-edge-api';
+import { toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 
 export type MessageLink = { type: 'web'; url: string } | { type: 'file'; path: string; line?: number };
 

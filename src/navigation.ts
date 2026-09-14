@@ -1,9 +1,27 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
 import { Stack } from '@mantou/tap-ui/elements/stack';
+import { onWebProxyState } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
 import { parseMessageLink } from './lib/links';
 
-Browser.allowedProtocols.add('webproxy:');
+export const openWebBrowser = async (url: string, title = '') => {
+  const result = Browser.open({ src: url, title });
+  await new Promise((res) => requestAnimationFrame(res));
+  onWebProxyState(result.browser.contentWindow, (state) => {
+    const url = new URL(state.url);
+    if (!['https:', 'http:', 'webproxy:'].includes(url.protocol)) {
+      // openExtraUri(url.href);
+      return;
+    }
+    if (state.target === '_blank') {
+      openWebBrowser(state.url, state.title);
+    } else {
+      result.browser.title = state.title;
+      result.browser.src = state.url;
+    }
+  });
+  return result;
+};
 
 export const openFileBrowser = (path: string, cwd: string) => {
   Stack.push({
@@ -47,7 +65,7 @@ export const openMessageLink = (event: MouseEvent, cwd: string) => {
   const link = parseMessageLink(href);
   if (!link) return false;
   if (link.type === 'web') {
-    void Browser.open({ src: link.url, title: anchor?.textContent?.trim() || link.url });
+    openWebBrowser(link.url, anchor?.textContent?.trim() || link.url);
   } else {
     void openPath(link.path, cwd, link.line);
   }

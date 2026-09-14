@@ -54,7 +54,7 @@ export class DeckRelayGuideElement extends GemElement {
 
   @template()
   #render = () => html`
-    <tap-carousel label=${i18n.get('relayGuide.carouselLabel')} .items=${this.#items}></tap-carousel>
+    <tap-carousel class="mt-5" label=${i18n.get('relayGuide.carouselLabel')} .items=${this.#items}></tap-carousel>
     <button
       class="mt-5 h-12 w-full cursor-pointer rounded-xl border-0 bg-primary text-sm font-semibold text-white transition-transform active:scale-[0.985]"
       @click=${() => this.close()}

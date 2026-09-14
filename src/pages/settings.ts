@@ -159,8 +159,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
       </tap-page>
       <deck-sheet
         ?open=${this.#state.relayGuideOpen}
-        .heading=${i18n.get('settings.relayGuideTitle')}
-        .description=${i18n.get('settings.relayGuideDesc')}
         @close=${this.#closeRelayGuide}
         .content=${html`
           <deck-relay-guide @close=${this.#closeRelayGuide}></deck-relay-guide>

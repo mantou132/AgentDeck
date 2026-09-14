@@ -13,7 +13,7 @@ const exports = {};
 vm.runInNewContext(outputText, {
   exports,
   URL,
-  require: (id) => (id === 'tauri-plugin-edge-to-edge-api' ? { toWebproxyUrl: (url) => url } : {}),
+  require: (id) => (id === 'tauri-plugin-webproxy-api' ? { toWebproxyUrl: (url) => url } : {}),
 });
 const parse = (href) => {
   const result = exports.parseMessageLink(href);

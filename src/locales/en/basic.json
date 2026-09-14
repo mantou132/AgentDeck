@@ -121,8 +121,6 @@
   "settings.saveAndConnect": "Save & Connect",
   "settings.resetApp": "Reset App",
   "settings.resetDesc": "Reloads the app and clears local session cache and unsent drafts. Pairing settings and remote history are preserved; remote tasks may still be running.",
-  "settings.relayGuideTitle": "Get Relay ID",
-  "settings.relayGuideDesc": "Complete the following three steps on the computer running the agent.",
   "relayGuide.step1Title": "Install Browser Extension",
   "relayGuide.step1DescPre": "Install ",
   "relayGuide.step1DescPost": " in your computer browser and follow the welcome page to install the Native Host.",

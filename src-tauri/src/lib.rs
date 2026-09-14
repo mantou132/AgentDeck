@@ -2,6 +2,7 @@
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_edge_to_edge::init())
+        .plugin(tauri_plugin_webproxy::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
