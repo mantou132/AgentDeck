@@ -1,3 +1,4 @@
+import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { i18n } from '../i18n';
 import type { Attachment, ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
 
@@ -16,7 +17,7 @@ export const getProcessSummary = (group: ProcessGroup): string => {
   const tools = group.items.filter((item) => item.type === 'tool');
   if (!group.pending) {
     return tools.length
-      ? (i18n.get('timeline.toolCalls', String(tools.length)) as unknown as string)
+      ? getStringFromTemplate(i18n.get('timeline.toolCalls', String(tools.length)))
       : i18n.get('timeline.thought');
   }
   const active = tools.findLast(

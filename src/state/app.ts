@@ -1,3 +1,4 @@
+import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { isRelayId } from 'relay-client-ts';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
@@ -49,10 +50,9 @@ export const startApp = () => {
     agentdeckStore({
       connection: 'disconnected',
       sessionsLoaded: true,
-      sessionsError: i18n.get(
-        'error.resetLocalFailed',
-        error instanceof Error ? error.message : String(error),
-      ) as unknown as string,
+      sessionsError: getStringFromTemplate(
+        i18n.get('error.resetLocalFailed', error instanceof Error ? error.message : String(error)),
+      ),
     });
     return;
   }

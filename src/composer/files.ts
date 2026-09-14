@@ -1,5 +1,5 @@
 import { compressionImage } from '@mantou/tap-ui/lib/image';
-
+import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { i18n } from '../i18n';
 import type { Attachment } from '../session/types';
 
@@ -53,18 +53,18 @@ export const readAttachment = async (file: File): Promise<Attachment> => {
     try {
       return { ...base, kind: 'image', ...(await readImage(file)) };
     } catch {
-      throw new Error(i18n.get('composer.attachmentImageFailed', file.name) as unknown as string);
+      throw new Error(getStringFromTemplate(i18n.get('composer.attachmentImageFailed', file.name)));
     }
   }
   if (!(await isTextFile(file))) {
-    throw new Error(i18n.get('composer.attachmentUnsupported', file.name) as unknown as string);
+    throw new Error(getStringFromTemplate(i18n.get('composer.attachmentUnsupported', file.name)));
   }
   if (file.size > MAX_TEXT_BYTES) {
-    throw new Error(i18n.get('composer.attachmentTooLarge', file.name) as unknown as string);
+    throw new Error(getStringFromTemplate(i18n.get('composer.attachmentTooLarge', file.name)));
   }
   try {
     return { ...base, kind: 'text', text: await file.text() };
   } catch {
-    throw new Error(i18n.get('composer.attachmentReadFailed', file.name) as unknown as string);
+    throw new Error(getStringFromTemplate(i18n.get('composer.attachmentReadFailed', file.name)));
   }
 };

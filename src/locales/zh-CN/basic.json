@@ -102,7 +102,6 @@
   "timeline.statusFailed": "失败",
   "timeline.statusEnded": "已结束",
   "attachment.viewAria": "查看附件“$1”",
-  "attachment.removeAria": "删除附件“$1”",
   "attachment.image": "图片",
   "attachment.text": "文本",
   "attachment.previewHeading": "附件预览",
