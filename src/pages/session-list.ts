@@ -108,9 +108,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
           </div>
         </header>
 
-        <main
-          class="menu-scroll no-scrollbar h-full overflow-auto px-4 pt-2 overscroll-y-contain min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
-        >
+        <main class="menu-scroll px-4 pt-2 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]">
           <div
             v-if=${hasGroups && hasError}
             class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-negative/20 bg-negative/[0.06] px-4 py-3 text-xs leading-relaxed text-negative"

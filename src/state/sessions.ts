@@ -1,3 +1,4 @@
+import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import type { CreatedSession, SessionEvent } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { i18n } from '../i18n';
@@ -139,7 +140,10 @@ export const deleteSession = async (sessionId: string) => {
   setSessionFlag('deletingSessionIds', sessionId, true);
   agentdeckStore({ sessionsError: '' });
   try {
-    const { deleted } = await agentApi.deleteSession(session.agent, sessionId);
+    const [{ deleted }] = await Promise.all([
+      agentApi.deleteSession(session.agent, sessionId),
+      TapSwipeoutElement.activeSwipeout?.dismiss(),
+    ]);
     if (!isCurrentHost()) return;
     if (!deleted) throw new Error(i18n.get('error.deleteSessionFailed'));
 
