@@ -63,7 +63,7 @@ export const patchSession = (sessionId: string, patch: Partial<DeckSession>) => 
   );
   agentdeckStore({
     sessions: nextSessions,
-    sessionGroups: getSortedSessionGroups(nextSessions),
+    sessionGroups: getSortedSessionGroups(nextSessions, agentdeckStore.sessionGroups),
   });
 };
 

@@ -102,7 +102,7 @@ export const refreshSessions = async () => {
     const normalized = sessions
       .filter((session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string')
       .map((session) => ({ ...session, agent }));
-    const groups = getSortedSessionGroups(normalized);
+    const groups = getSortedSessionGroups(normalized, agentdeckStore.sessionGroups);
     agentdeckStore({
       sessions: normalized,
       sessionGroups: groups,
@@ -159,7 +159,7 @@ export const deleteSession = async (sessionId: string) => {
     delete optionsBySession[sessionId];
     agentdeckStore({
       sessions,
-      sessionGroups: getSortedSessionGroups(sessions),
+      sessionGroups: getSortedSessionGroups(sessions, agentdeckStore.sessionGroups),
       sessionsLoading: false,
       messagesBySession,
       errorsBySession,
@@ -397,7 +397,7 @@ export const promoteDraftSession = async (
 
   agentdeckStore({
     sessions: nextSessions,
-    sessionGroups: getSortedSessionGroups(nextSessions),
+    sessionGroups: getSortedSessionGroups(nextSessions, agentdeckStore.sessionGroups),
     messagesBySession: {
       ...agentdeckStore.messagesBySession,
       [liveSession.sessionId]: stagedMessages,
