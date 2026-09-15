@@ -49,19 +49,19 @@ export class DeckSessionGroupElement extends GemElement {
             (session) => session.sessionId,
             (session) => html`
               <tap-swipeout
-                class="group border-0 border-b border-solid border-border/70 last:border-b-0"
+                class="border-0 border-b border-solid border-border/70 last:border-b-0"
                 ?disabled=${this.deletionDisabled || this.deletingSessionIds.includes(session.sessionId)}
-                @click=${(event: MouseEvent) => {
-                  if (!event.defaultPrevented && !this.deletingSessionIds.includes(session.sessionId)) {
-                    this.select(session.sessionId);
-                  }
-                }}
               >
                 <button
                   type="button"
-                  class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-bg-light px-4 py-3 text-left text-text transition-colors duration-150 group-[:state(opened)]:bg-bg-hover hover:bg-bg-hover active:bg-bg-hover disabled:cursor-default disabled:opacity-50"
+                  class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-bg-light px-4 py-3 text-left text-text transition-colors duration-150 disabled:cursor-default disabled:opacity-50"
                   ?disabled=${this.deletingSessionIds.includes(session.sessionId)}
                   aria-busy=${this.deletingSessionIds.includes(session.sessionId)}
+                  @click=${(event: MouseEvent) => {
+                    if (!event.defaultPrevented && !this.deletingSessionIds.includes(session.sessionId)) {
+                      this.select(session.sessionId);
+                    }
+                  }}
                 >
                   <span class="min-w-0">
                     <span class="flex min-w-0 items-center gap-2">
@@ -112,7 +112,7 @@ export class DeckSessionGroupElement extends GemElement {
                   </span>
                 </button>
                 <button
-                  slot="end"
+                  slot="danger"
                   type="button"
                   class="flex min-w-20 cursor-pointer flex-col items-center justify-center gap-1 border-0 bg-negative px-4 text-sm font-semibold text-white active:opacity-80 disabled:cursor-default disabled:opacity-50"
                   ?disabled=${this.deletionDisabled || this.deletingSessionIds.includes(session.sessionId)}

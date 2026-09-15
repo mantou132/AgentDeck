@@ -153,6 +153,9 @@ export function documentFixture(previous) {
         if (name === '@mantou/tap-ui/lib/locale') {
           return { loadLocale: () => Promise.resolve() };
         }
+        if (name === '@mantou/tap-ui/elements/swipeout') {
+          return { TapSwipeoutElement: { activeSwipeout: undefined } };
+        }
         if (name.endsWith('.json')) {
           return load(path.resolve(path.dirname(file), name));
         }
