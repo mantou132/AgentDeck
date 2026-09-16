@@ -1,5 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
+import { selectionFeedback } from '@tauri-apps/plugin-haptics';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
 import {
   createPasteReference,
@@ -78,6 +79,7 @@ export class DeckComposerElement extends GemElement {
     const input: ComposerInput = { text: this.#state.draft.trim(), attachments: this.#state.attachments };
     this.#clearInput();
     this.#state({ submitting: true });
+    selectionFeedback();
     try {
       await this.submit(input);
     } finally {

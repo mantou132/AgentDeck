@@ -23,3 +23,6 @@ tauri-plugin-edge-to-edge = { git = "https://github.com/mantou132/tauri-plugin-e
 tauri-plugin-webproxy = { git = "https://github.com/mantou132/tauri-plugin-webproxy" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-haptics = "2"
