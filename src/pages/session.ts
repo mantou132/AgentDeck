@@ -29,6 +29,13 @@ const style = css`
     min-height: calc(62px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
     padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
+
+  deck-session-timeline {
+    transition: opacity 0.25s ease-out;
+    @starting-style {
+      opacity: 0;
+    }
+  }
 `;
 
 @customElement('agentdeck-session-page')
@@ -209,15 +216,14 @@ export class AgentDeckSessionPageElement extends GemElement {
                 <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">${i18n.get('session.loadingTitle')}</h2>
                 <p class="m-0 text-sm text-describe">${i18n.get('session.loadingDesc')}</p>
               </section>
-              <div v-if=${!loading && !!messages.length} class="contents">
-                <deck-session-timeline
-                  .sessionKey=${this.sessionId}
-                  .cwd=${session.cwd}
-                  .messages=${messages}
-                  ?pending=${pending}
-                  @preview=${this.#previewAttachment}
-                ></deck-session-timeline>
-              </div>
+              <deck-session-timeline
+                v-if=${!loading && !!messages.length}
+                .sessionKey=${this.sessionId}
+                .cwd=${session.cwd}
+                .messages=${messages}
+                ?pending=${pending}
+                @preview=${this.#previewAttachment}
+              ></deck-session-timeline>
               <section
                 v-if=${!loading && loaded && !messages.length}
                 class="grid min-h-full place-items-center content-center px-5 py-8 text-center"
