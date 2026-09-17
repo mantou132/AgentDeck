@@ -7,6 +7,7 @@ import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { displayPath, getBreadcrumbs, getParentPath } from '../lib/path';
 import { openFileViewer } from '../navigation';
+import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
 
 const browserStyle = css`
@@ -44,6 +45,7 @@ const pageStyle = css`
 @customElement('deck-file-browser')
 @adoptedStyle(blockContainer)
 @adoptedStyle(browserStyle)
+@connectStore(agentdeckStore)
 export class DeckFileBrowserElement extends GemElement {
   @property path = '';
   @property cwd = '';
@@ -67,6 +69,16 @@ export class DeckFileBrowserElement extends GemElement {
   @effect((i) => [i.path, i.cwd])
   #init = () => {
     void this.#navigateTo(this.path);
+  };
+
+  @effect(() => [agentdeckStore.connection])
+  #watchConnection = () => {
+    if (
+      agentdeckStore.connection === 'connected' &&
+      (this.#state.browseError || (!this.#state.currentPath && !this.#state.entries.length))
+    ) {
+      void this.#navigateTo(this.#state.currentPath || this.path);
+    }
   };
 
   @effect((i) => [i.#state.currentPath])
