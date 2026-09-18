@@ -170,5 +170,7 @@
   "error.cannotStopTask": "Host can no longer stop this task. Reset the app in settings and reload the session.",
   "error.relayNotConfigured": "Relay is not configured",
   "error.remoteNotConnectedRetry": "Host is not connected. Please reconnect and retry.",
-  "attachment.imageDefaultName": "Image"
+  "attachment.imageDefaultName": "Image",
+  "timeline.expandMessage": "Expand",
+  "timeline.collapseMessage": "Collapse"
 }

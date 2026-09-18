@@ -73,26 +73,19 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderTextMessage = (message: TextMessage) => {
-    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(message.text);
-    const attachments = [...(message.attachments ?? []), ...linkedAttachments];
     if (message.role === 'user') {
       return html`
-        <div class="mb-[18px] flex justify-end">
-          <div class="max-w-[min(86%,560px)]">
-            <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary">
-              <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
-                ${attachments.map(
-                  (attachment) => html`
-                    <deck-attachment .attachment=${attachment} @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}></deck-attachment>
-                  `,
-                )}
-              </div>
-              ${this.#renderMarkdown(markdown, `${this.sessionKey}:${message.id}`, message.streaming, true)}
-            </div>
-          </div>
-        </div>
+        <deck-user-message
+          .sessionKey=${this.sessionKey}
+          .cwd=${this.cwd}
+          .message=${message}
+          @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}
+        ></deck-user-message>
       `;
     }
+
+    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(message.text);
+    const attachments = [...(message.attachments ?? []), ...linkedAttachments];
 
     return html`
       <article class="mb-5 min-w-0 text-base leading-[1.68] text-text">

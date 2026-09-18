@@ -170,5 +170,7 @@
   "error.cannotStopTask": "远端已无法停止这个任务，请在设置中重置 App 后重新加载会话。",
   "error.relayNotConfigured": "Relay 尚未配置",
   "error.remoteNotConnectedRetry": "远端尚未连接，请重新连接后重试",
-  "attachment.imageDefaultName": "图片"
+  "attachment.imageDefaultName": "图片",
+  "timeline.expandMessage": "展开",
+  "timeline.collapseMessage": "收起"
 }
