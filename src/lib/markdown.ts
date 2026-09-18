@@ -61,6 +61,15 @@ const defaultRenderer = new Renderer();
 const diffLanguages = ['diff', 'patch', 'udiff', 'unified-diff'];
 export const diffColorScheme = globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
 
+export const isCodeBlockClosed = (raw = '') => {
+  const match = /^[ \t]*(`{3,}|~{3,})/.exec(raw);
+  if (!match) return true;
+  const fence = match[1];
+  const fenceChar = fence[0];
+  const fenceLen = fence.length;
+  return new RegExp(`\\n[ \\t]{0,3}${fenceChar}{${fenceLen},}[ \\t]*\\n?$`).test(raw);
+};
+
 const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): MarkedExtension[] => [
   {
     gfm: true,
@@ -72,17 +81,19 @@ const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): Marked
         const title = token.title ? ` title="${escapeHtml(token.title)}"` : '';
         return `<a href="${escapeHtml(token.href)}" target="_blank" rel="noopener noreferrer"${title}>${label}</a>`;
       },
-      code({ text, lang }) {
+      code({ text, lang, raw }) {
         const language = languageFromInfo(lang || '');
         const source = escapeHtml(text);
-        if (language === 'mermaid') return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
-        if (diffLanguages.includes(language)) {
+        const closed = isCodeBlockClosed(raw);
+        if (closed && language === 'mermaid')
+          return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
+        if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }
-        if (['latex', 'tex', 'math'].includes(language)) {
+        if (closed && ['latex', 'tex', 'math'].includes(language)) {
           return `<gem-bind-latex block tabindex="0">${source}</gem-bind-latex>`;
         }
-        if (options.codeBlock && isSmallTextFile(text)) {
+        if (closed && options.codeBlock && isSmallTextFile(text)) {
           return `<tap-code-block codelang="${escapeHtml(language)}" tabindex="0">${source}</tap-code-block>`;
         }
         return `<pre tabindex="0"><code data-language="${escapeHtml(language)}">${source}</code></pre>`;
