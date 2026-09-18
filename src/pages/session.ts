@@ -197,12 +197,15 @@ export class AgentDeckSessionPageElement extends GemElement {
         <div class="relative h-full">
           <main
             ${this.#messagesRef}
-            class="no-scrollbar h-full overflow-x-hidden overflow-y-auto px-4 pt-[22px] pb-7 overscroll-y-contain sm:px-6"
+            class="no-scrollbar h-full overflow-x-hidden overflow-y-auto overscroll-y-contain"
             tabindex="0"
             aria-label=${i18n.get('session.messagesAria')}
           >
-            <div ${this.#messagesContentRef} class="mx-auto min-h-full w-full max-w-[720px]">
-              <section v-if=${loading} class="grid min-h-full place-items-center content-center px-6 py-12 text-center">
+            <div
+              ${this.#messagesContentRef}
+              class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-[22px] pb-7 sm:px-6"
+            >
+              <section v-if=${loading} class="grid flex-1 place-items-center content-center px-6 py-12 text-center">
                 <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
                   <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
                 </div>
@@ -219,7 +222,7 @@ export class AgentDeckSessionPageElement extends GemElement {
               ></deck-session-timeline>
               <section
                 v-if=${!loading && loaded && !messages.length}
-                class="grid min-h-full place-items-center content-center px-5 py-8 text-center"
+                class="grid flex-1 place-items-center content-center px-5 py-8 text-center"
               >
                 <div class="grid size-[54px] place-items-center rounded-[18px] border border-border bg-bg-light shadow-float">
                   <deck-icon></deck-icon>
