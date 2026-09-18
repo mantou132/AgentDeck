@@ -134,6 +134,7 @@ export const reduceSessionEvent = (
             ...(typeof update.kind === 'string' ? { kind: update.kind } : {}),
             ...(typeof update.status === 'string' ? { status: update.status as ToolCallStatus } : {}),
             ...('rawInput' in update ? { rawInput: update.rawInput } : {}),
+            ...('rawOutput' in update ? { rawOutput: update.rawOutput } : {}),
             ...getToolContent(update),
           },
         },
@@ -151,6 +152,7 @@ export const reduceSessionEvent = (
       ...(typeof update.kind === 'string' ? { kind: update.kind } : {}),
       ...(typeof update.status === 'string' ? { status: update.status as ToolCallStatus } : {}),
       ...('rawInput' in update ? { rawInput: update.rawInput } : {}),
+      ...('rawOutput' in update ? { rawOutput: update.rawOutput } : {}),
       ...getToolContent(update),
     };
     if (index < 0) {

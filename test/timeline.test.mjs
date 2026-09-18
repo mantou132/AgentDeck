@@ -9,7 +9,10 @@ const {
   groupTimelineMessages,
   reduceSessionEvent,
   extractDataImageAttachments,
+  parseToolOutputs,
 } = documentFixture().app;
+
+const plain = (value) => JSON.parse(JSON.stringify(value));
 
 test('tool summaries show shell commands and fall back to the reported tool title', () => {
   const tool = { toolCallId: 'tool', title: 'Execute command' };
@@ -54,14 +57,47 @@ test('live summaries select an unfinished tool even after another tool or though
     toolCallId: 'check',
     rawInput: { command: 'pnpm run check --verbose' },
     content: diffContent,
+    rawOutput: { exitCode: 0, stdout: 'All checks passed' },
   });
   assert.equal(getProcessSummary(group()), 'pnpm run check --verbose');
-  assert.deepEqual(
-    messages.findLast((message) => message.type === 'tool' && message.data.toolCallId === 'check').data.content,
-    diffContent,
-  );
+  const checkTool = messages.findLast((message) => message.type === 'tool' && message.data.toolCallId === 'check');
+  assert.deepEqual(plain(checkTool.data.content), diffContent);
+  assert.deepEqual(plain(checkTool.data.rawOutput), { exitCode: 0, stdout: 'All checks passed' });
   apply({ sessionUpdate: 'tool_call_update', toolCallId: 'check', status: 'completed' });
   assert.equal(getProcessSummary(group()), 'Thinking…');
+});
+
+test('parseToolOutputs extracts text, structured rawOutput, and ignores duplicates', () => {
+  const toolData = {
+    toolCallId: 't1',
+    title: 'Run task',
+    content: [
+      { type: 'text', text: 'First line of stdout' },
+      { type: 'content', content: { type: 'text', text: 'Second line of stdout' } },
+    ],
+    rawOutput: 'First line of stdout',
+  };
+  const parsed = parseToolOutputs(toolData);
+  assert.deepEqual(plain(parsed.texts), ['First line of stdout', 'Second line of stdout']);
+  assert.equal(parsed.raw, undefined);
+
+  const structured = parseToolOutputs({
+    toolCallId: 't2',
+    title: 'Check files',
+    rawOutput: { files: ['a.ts', 'b.ts'], count: 2 },
+  });
+  assert.deepEqual(plain(structured.texts), []);
+  assert.deepEqual(plain(structured.raw), { files: ['a.ts', 'b.ts'], count: 2 });
+
+  const fencedData = {
+    toolCallId: 't3',
+    title: 'Run bash',
+    content: [{ type: 'text', text: '```console\n(Bash completed with no output)\n```' }],
+    rawOutput: '(Bash completed with no output)',
+  };
+  const fencedParsed = parseToolOutputs(fencedData);
+  assert.deepEqual(plain(fencedParsed.texts), ['```console\n(Bash completed with no output)\n```']);
+  assert.equal(fencedParsed.raw, undefined);
 });
 
 test('finished history uses a general summary instead of an old command', () => {
@@ -108,7 +144,6 @@ test('starting another task does not revive unfinished tools from an earlier tur
 
 test('inline base64 images in message text become attachments instead of links', () => {
   const markdown = 'before\n![shot](data:image/png;base64,QUJD) after\n[titled](data:image/jpeg;base64,REVG)';
-  const plain = (value) => JSON.parse(JSON.stringify(value));
   const { attachments, markdown: rest } = extractDataImageAttachments(markdown);
   assert.equal(rest, 'before\n after\n');
   assert.equal(attachments.length, 2);

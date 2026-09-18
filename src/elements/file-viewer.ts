@@ -1,5 +1,4 @@
 import type { TapCodeBlockElement } from '@mantou/tap-ui/elements/code-block';
-import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
@@ -113,7 +112,7 @@ export class DeckFileViewerElement extends GemElement {
 
     return html`
       <tap-page class="bg-bg text-text">
-        <tap-navbar slot="header" title=${name} back @backclick=${() => Stack.pop()}>
+        <tap-navbar slot="header" title=${name} back default-back>
           <button
             v-if=${markdown}
             slot="right"

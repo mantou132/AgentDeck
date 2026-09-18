@@ -1,5 +1,5 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
-import { Stack } from '@mantou/tap-ui/elements/stack';
+import { Stack, type TapStackElement } from '@mantou/tap-ui/elements/stack';
 import { onWebProxyState } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
 import { parseMessageLink } from './lib/links';
@@ -23,38 +23,38 @@ export const openWebBrowser = async (url: string, title = '') => {
   return result;
 };
 
-export const openFileBrowser = (path: string, cwd: string) => {
-  Stack.push({
+export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement | null) => {
+  (stack || Stack).push({
     content: html`<deck-file-browser-page .path=${path} .cwd=${cwd}></deck-file-browser-page>`,
     gesture: true,
   });
 };
 
-export const openFileViewer = (path: string, cwd: string, line?: number) => {
-  Stack.push({
+export const openFileViewer = (path: string, cwd: string, line?: number, stack?: TapStackElement | null) => {
+  (stack || Stack).push({
     content: html`<deck-file-viewer .path=${path} .cwd=${cwd} .line=${line}></deck-file-viewer>`,
     gesture: true,
   });
 };
 
-export const openPath = async (path: string, cwd: string, line?: number) => {
+export const openPath = async (path: string, cwd: string, line?: number, stack?: TapStackElement | null) => {
   if (path.endsWith('/') || path.endsWith('\\') || path === '.' || path === '..') {
-    openFileBrowser(path, cwd);
+    openFileBrowser(path, cwd, stack);
     return;
   }
   if (line) {
-    openFileViewer(path, cwd, line);
+    openFileViewer(path, cwd, line, stack);
     return;
   }
   try {
     await agentApi.browseFiles(path, { cwd, limit: 1 });
-    openFileBrowser(path, cwd);
+    openFileBrowser(path, cwd, stack);
   } catch {
-    openFileViewer(path, cwd);
+    openFileViewer(path, cwd, undefined, stack);
   }
 };
 
-export const openMessageLink = (event: MouseEvent, cwd: string) => {
+export const openMessageLink = (event: MouseEvent, cwd: string, targetStack?: TapStackElement | null) => {
   if (event.defaultPrevented || event.button !== 0) return false;
   const anchor = event
     .composedPath()
@@ -67,7 +67,8 @@ export const openMessageLink = (event: MouseEvent, cwd: string) => {
   if (link.type === 'web') {
     openWebBrowser(link.url, anchor?.textContent?.trim() || link.url);
   } else {
-    void openPath(link.path, cwd, link.line);
+    const stack = targetStack || (anchor ? Stack.getClosestStack(anchor) : undefined);
+    void openPath(link.path, cwd, link.line, stack);
   }
   return true;
 };

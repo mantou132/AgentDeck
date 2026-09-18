@@ -44,6 +44,45 @@ export const getToolTitle = ({ rawInput, title }: ToolCallData) => {
   return title || i18n.get('timeline.toolCall');
 };
 
+export type ToolParsedOutputs = {
+  texts: string[];
+  raw?: unknown;
+};
+
+export const parseToolOutputs = (data: ToolCallData): ToolParsedOutputs => {
+  const texts: string[] = [];
+
+  if (Array.isArray(data.content)) {
+    for (const item of data.content) {
+      if (!item || typeof item !== 'object') continue;
+      const record = item as Record<string, unknown>;
+      if (record.type === 'text' && typeof record.text === 'string' && record.text.trim()) {
+        texts.push(record.text);
+      } else if (record.type === 'content' && record.content && typeof record.content === 'object') {
+        const nested = record.content as Record<string, unknown>;
+        if (nested.type === 'text' && typeof nested.text === 'string' && nested.text.trim()) {
+          texts.push(nested.text);
+        }
+      }
+    }
+  }
+
+  let raw: unknown;
+  if (data.rawOutput !== undefined && data.rawOutput !== null) {
+    if (typeof data.rawOutput === 'string') {
+      const trimmed = data.rawOutput.trim();
+      const alreadyIncluded = texts.some((t) => t.includes(trimmed) || trimmed.includes(t.trim()));
+      if (trimmed && !alreadyIncluded && texts.length === 0) {
+        texts.push(data.rawOutput);
+      }
+    } else if (texts.length === 0) {
+      raw = data.rawOutput;
+    }
+  }
+
+  return { texts, raw };
+};
+
 // 历史消息里的内联 base64 图片不再渲染为链接，还原成消息附件展示
 const dataImageLinkPattern = /!?\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
 

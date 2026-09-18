@@ -126,7 +126,7 @@ export class DeckFileBrowserElement extends GemElement {
   };
 
   #onFileClick = (file: string) => {
-    openFileViewer(file, this.cwd || this.#state.currentPath);
+    openFileViewer(file, this.cwd || this.#state.currentPath, undefined, Stack.getClosestStack(this));
   };
 
   @template()
@@ -316,7 +316,7 @@ export class DeckFileBrowserPageElement extends GemElement {
   @template()
   #render = () => html`
     <tap-page class="bg-bg text-text">
-      <tap-navbar slot="header" title=${this.#title()} back @backclick=${() => Stack.pop()}></tap-navbar>
+      <tap-navbar slot="header" title=${this.#title()} back default-back></tap-navbar>
       <main class="h-full overflow-hidden p-4">
         <deck-file-browser
           .path=${this.path}

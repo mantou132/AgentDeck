@@ -93,6 +93,7 @@
   "timeline.processSummary": "Process Summary",
   "timeline.noProcess": "No process records",
   "timeline.inputParams": "Input parameters",
+  "timeline.output": "Output",
   "timeline.statusPending": "Pending",
   "timeline.statusInProgress": "In progress",
   "timeline.statusCompleted": "Completed",

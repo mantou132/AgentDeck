@@ -15,6 +15,7 @@ export type ToolCallData = {
   kind?: string;
   status?: ToolCallStatus;
   rawInput?: unknown;
+  rawOutput?: unknown;
   content?: ToolCallContent[];
 };
 
