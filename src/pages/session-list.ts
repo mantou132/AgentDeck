@@ -40,7 +40,9 @@ export class AgentDeckSessionListPageElement extends GemElement {
     });
   };
 
-  #closeNewSession = () => this.#state({ sheetOpen: false, newSessionError: '' });
+  #closeNewSession = () => {
+    this.#state({ sheetOpen: false, newSessionError: '', navigatingCwd: false });
+  };
 
   #onCwdChange = (event: CustomEvent<string>) => {
     this.#state({ selectedCwd: event.detail, navigatingCwd: false });
@@ -263,8 +265,14 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
             <button
               type="button"
-              class="mt-4 flex h-12 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border-0 bg-primary px-4 text-sm font-semibold text-white transition-transform active:scale-[0.985] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:shadow-none disabled:active:scale-100"
-              ?disabled=${navigatingCwd || !selectedCwd}
+              class=${classMap({
+                'mt-4 flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border-0 px-4 text-sm font-semibold transition-transform': true,
+                'cursor-default bg-border text-disabled shadow-none': !selectedCwd,
+                'bg-primary text-white shadow-primary': Boolean(selectedCwd),
+                'cursor-pointer active:scale-[0.985]': Boolean(selectedCwd) && !navigatingCwd,
+                'pointer-events-none': navigatingCwd,
+              })}
+              aria-disabled=${String(!selectedCwd || navigatingCwd)}
               @click=${this.#confirmNewSession}
             >
               <span>${i18n.get('cwdPicker.createHere')}</span>

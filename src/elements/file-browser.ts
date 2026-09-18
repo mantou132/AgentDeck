@@ -151,9 +151,11 @@ export class DeckFileBrowserElement extends GemElement {
               class=${classMap({
                 'inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border-0 px-2 py-1 font-mono text-sm outline-none transition-colors': true,
                 'bg-transparent font-medium text-highlight': isLast,
-                'cursor-pointer bg-transparent text-describe hover:text-highlight active:bg-bg-hover': !isLast,
+                'cursor-pointer bg-transparent text-describe hover:text-highlight active:bg-bg-hover':
+                  !isLast && !navigatingPath,
+                'pointer-events-none': Boolean(navigatingPath) || isLast,
               })}
-              ?disabled=${Boolean(navigatingPath) || isLast}
+              ?disabled=${isLast}
               @click=${() => this.#navigateTo(crumb.path)}
             >
               <tap-use v-if=${isNavigatingThis} class="size-2.5 text-primary" .element=${icons.loading}></tap-use>
@@ -188,8 +190,11 @@ export class DeckFileBrowserElement extends GemElement {
           <button
             v-if=${parentPath !== null}
             type="button"
-            class="flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
-            ?disabled=${Boolean(navigatingPath)}
+            class=${classMap({
+              'flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors': true,
+              'cursor-pointer hover:bg-bg-hover active:bg-bg-hover': !navigatingPath,
+              'pointer-events-none': Boolean(navigatingPath),
+            })}
             @click=${() => parentPath && this.#navigateTo(parentPath)}
           >
             <span class="grid size-6 shrink-0 place-items-center text-describe">
@@ -211,9 +216,12 @@ export class DeckFileBrowserElement extends GemElement {
               return html`
                 <button
                   type="button"
-                  class="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                  class=${classMap({
+                    'flex w-full items-center justify-between gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors': true,
+                    'cursor-pointer hover:bg-bg-hover active:bg-bg-hover': !navigatingPath,
+                    'pointer-events-none': Boolean(navigatingPath),
+                  })}
                   title=${entry.path}
-                  ?disabled=${Boolean(navigatingPath)}
                   @click=${() => this.#navigateTo(entry.path)}
                 >
                   <div class="flex min-w-0 items-center gap-3">
@@ -251,9 +259,12 @@ export class DeckFileBrowserElement extends GemElement {
             return html`
               <button
                 type="button"
-                class="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+                class=${classMap({
+                  'flex w-full items-center justify-between gap-3 rounded-xl border-0 bg-transparent px-2.5 py-3 text-left transition-colors': true,
+                  'cursor-pointer hover:bg-bg-hover active:bg-bg-hover': !navigatingPath,
+                  'pointer-events-none': Boolean(navigatingPath),
+                })}
                 title=${entry.path}
-                ?disabled=${Boolean(navigatingPath)}
                 @click=${() => this.#onFileClick(entry.path)}
               >
                 <div class="flex min-w-0 items-center gap-3">
