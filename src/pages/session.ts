@@ -29,13 +29,6 @@ const style = css`
     min-height: calc(62px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
     padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
-
-  deck-session-timeline {
-    transition: opacity 0.25s ease-out;
-    @starting-style {
-      opacity: 0;
-    }
-  }
 `;
 
 @customElement('agentdeck-session-page')
