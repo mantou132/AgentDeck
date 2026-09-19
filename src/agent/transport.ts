@@ -75,6 +75,8 @@ export type TransportMessage =
 
 type MessageHandler = (message: TransportMessage) => void;
 let globalMessageHandler: MessageHandler | undefined;
+let beforePayloadHook: (() => Promise<unknown> | undefined) | undefined;
+
 const reportReplyFailure = () =>
   globalMessageHandler?.({
     type: 'delivery_error',
@@ -119,7 +121,7 @@ export const syncHostConnection = () => {
   return attaching;
 };
 
-export const startTransport = (relayId: string) => {
+export const startTransport = (relayId: string, options?: { ackHead?: boolean }) => {
   if (!isRelayId(relayId)) return;
   if (relayClient && currentRelayId === relayId) {
     reconnectTransport(true);
@@ -163,8 +165,7 @@ export const startTransport = (relayId: string) => {
     endpoint: '2',
     deviceId: getDeviceId(),
     relayUrl: RELAY_URL,
-    // Only a fresh document/pairing abandons the old server backlog.
-    ackHead: true,
+    ackHead: options?.ackHead ?? false,
     store,
     onMessageRejected: (messageId, reason) => {
       if (relayClient !== client) return;
@@ -179,8 +180,13 @@ export const startTransport = (relayId: string) => {
         reportReplyFailure();
       }
     },
-    onPayload: (payload) => {
+    onPayload: async (payload) => {
       if (relayClient !== client) return;
+      if (beforePayloadHook) {
+        try {
+          await beforePayloadHook();
+        } catch {}
+      }
       const data = payload as Record<string, unknown>;
       // An attach response may assign a new peer ID after host recovery.
       const attachResponse = attachId !== undefined && data?.id === attachId;
@@ -191,7 +197,7 @@ export const startTransport = (relayId: string) => {
         data.peerId !== currentPeerId
       )
         return;
-      agentApi.dispatch(payload as RpcMessage);
+      await agentApi.dispatch(payload as RpcMessage);
     },
     onStateChange: (connection, error = '') => {
       if (relayClient !== client) return;
@@ -275,12 +281,15 @@ export const initTransport = (options: {
   initialRelayId: string;
   onRequestPermission: (request: PermissionRequest) => Promise<string>;
   onMessage: MessageHandler;
+  onBeforePayload?: () => Promise<unknown> | undefined;
+  ackHead?: boolean;
 }) => {
   globalMessageHandler = options.onMessage;
+  beforePayloadHook = options.onBeforePayload;
   if (transportInitialized) return;
   transportInitialized = true;
   agentApi.setPermissionHandler(options.onRequestPermission);
   agentApi.setSessionEndedHandler(({ sessionId }) => globalMessageHandler?.({ type: 'session_ended', sessionId }));
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
-  if (isRelayId(options.initialRelayId)) startTransport(options.initialRelayId);
+  if (isRelayId(options.initialRelayId)) startTransport(options.initialRelayId, { ackHead: options.ackHead });
 };

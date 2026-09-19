@@ -156,6 +156,9 @@ export function documentFixture(previous) {
         if (name === '@mantou/tap-ui/elements/swipeout') {
           return { TapSwipeoutElement: { activeSwipeout: undefined } };
         }
+        if (name === '@mantou/tap-ui/lib/timer') {
+          return { throttle: (fn) => fn };
+        }
         if (name.endsWith('.json')) {
           return load(path.resolve(path.dirname(file), name));
         }

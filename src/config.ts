@@ -5,10 +5,19 @@ export type AppSettings = {
   agent: string;
 };
 
+// Storage Keys (localStorage / sessionStorage)
 export const SETTINGS_KEY = 'agentdeck.settings.v1';
 export const DEVICE_ID_KEY = 'agentdeck.device_id.v1';
 export const RESET_PENDING_KEY = 'agentdeck.reset_pending.v1';
 export const RELAY_GUIDE_SEEN_KEY = 'agentdeck.relay_guide_seen.v1';
+export const ACTIVE_MARKER_KEY = 'agentdeck.active_in_flight.v1';
+export const FALLBACK_KEY = 'agentdeck.in_flight_fallback.v1';
+
+// IndexedDB Constants
+export const DB_NAME = 'agentdeck-db';
+export const DB_VERSION = 1;
+export const STORE_NAME = 'in_flight_sessions';
+
 export const RELAY_URL =
   process.env.NODE_ENV === 'development' ? 'ws://192.168.77.137:39371/ws' : 'wss://agent-deck.xianqiao.wang/ws';
 

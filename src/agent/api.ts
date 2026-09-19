@@ -218,14 +218,31 @@ export class AgentApi {
     sessionId: string,
     agent: string,
     prompt: string,
-    onEvent: (event: SessionEvent) => void,
+    onEvent: (event: SessionEvent) => void | Promise<void>,
     attachments: PromptAttachment[] = [],
+    callId?: RpcId,
   ) =>
     this.#peer.call<{ answer?: string }>(
       'agent_prompt',
       { agent, sessionId, prompt, attachments, stream: true },
       (event) => onEvent(event as SessionEvent),
+      undefined,
+      callId,
     );
+
+  resumePrompt = (
+    rpcId: RpcId,
+    handlers: {
+      onEvent?: (event: SessionEvent) => void | Promise<void>;
+      resolve?: (value: { answer?: string }) => void;
+      reject?: (error: Error) => void;
+    },
+  ) =>
+    this.#peer.resumeCall(rpcId, {
+      onEvent: (event) => handlers.onEvent?.(event as SessionEvent),
+      resolve: (value) => handlers.resolve?.(value as { answer?: string }),
+      reject: handlers.reject,
+    });
 
   cancelPrompt = (sessionId: string, agent: string) =>
     this.#peer.call<{ cancelled?: boolean }>('agent_prompt_cancel', { agent, sessionId }, undefined, {

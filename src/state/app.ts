@@ -3,8 +3,17 @@ import { isRelayId } from 'relay-client-ts';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
+import { getSortedSessionGroups } from '../session/groups';
 import { requestPermission as requestTurnPermission } from '../session/turn';
-import { applySessionEvent, endSession, getSession, refreshSessions, resetRemoteState } from './sessions';
+import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
+import {
+  applySessionEvent,
+  endSession,
+  getSession,
+  refreshSessions,
+  resetRemoteState,
+  resumeInFlightTurn,
+} from './sessions';
 import { agentdeckStore } from './store';
 
 /**
@@ -40,10 +49,13 @@ const handleTransportMessage = (message: TransportMessage) => {
 };
 
 export const startApp = () => {
+  let resetWasPending = false;
   try {
     if (sessionStorage.getItem(RESET_PENDING_KEY)) {
+      resetWasPending = true;
       // Clear after reload: callbacks in the old document can no longer refill the outbox.
       clearTransportStorage();
+      void clearAllInFlight();
       sessionStorage.removeItem(RESET_PENDING_KEY);
     }
   } catch (error) {
@@ -57,8 +69,43 @@ export const startApp = () => {
     return;
   }
 
+  const restoreInFlights = getAllInFlight()
+    .then((inFlights) => {
+      if (!inFlights.length) return;
+      const messagesBySession = { ...agentdeckStore.messagesBySession };
+      const optionsBySession = { ...agentdeckStore.optionsBySession };
+      const pendingSessionIds = [...agentdeckStore.pendingSessionIds];
+      const loadedSessionIds = [...agentdeckStore.loadedSessionIds];
+      const currentSessions = [...agentdeckStore.sessions];
+
+      for (const item of inFlights) {
+        messagesBySession[item.sessionId] = item.messages;
+        if (item.options) optionsBySession[item.sessionId] = item.options;
+        if (!pendingSessionIds.includes(item.sessionId)) pendingSessionIds.push(item.sessionId);
+        if (!loadedSessionIds.includes(item.sessionId)) loadedSessionIds.push(item.sessionId);
+        if (!currentSessions.some((s) => s.sessionId === item.sessionId)) {
+          currentSessions.unshift(item.session);
+        }
+        resumeInFlightTurn(item);
+      }
+
+      agentdeckStore({
+        messagesBySession,
+        optionsBySession,
+        pendingSessionIds,
+        loadedSessionIds,
+        sessions: currentSessions,
+        sessionGroups: getSortedSessionGroups(currentSessions, agentdeckStore.sessionGroups),
+      });
+    })
+    .catch((error) => {
+      console.error('Failed to restore in-flight sessions:', error);
+    });
+
+  const shouldAckHead = resetWasPending || !hasActiveInFlightMarker();
   initTransport({
     initialRelayId: agentdeckStore.settings.relayId,
+    ackHead: shouldAckHead,
     onRequestPermission: (request) => {
       const session = getSession(request.sessionId);
       if (session?.agent !== request.agent || !agentdeckStore.pendingSessionIds.includes(request.sessionId)) {
@@ -71,6 +118,7 @@ export const startApp = () => {
       });
     },
     onMessage: handleTransportMessage,
+    onBeforePayload: () => restoreInFlights,
   });
 };
 
@@ -86,13 +134,14 @@ export const saveSettings = (settings: AppSettings) => {
   if (relayChanged || agentChanged) {
     resetRemoteState();
   }
-  if (relayChanged || notConnected) startTransport(next.relayId);
+  if (relayChanged) startTransport(next.relayId, { ackHead: true });
+  else if (notConnected) startTransport(next.relayId);
   else if (agentChanged && agentdeckStore.connection === 'connected') void refreshSessions();
 };
 
 /**
  * 重载整个 App，结束旧文档中的连接、回调、权限等待和 Stack 页面。
- * 配对设置保留，Relay 缓存在新文档启动时清除；不等待远端取消或关闭。
+ * 配对设置保留，Relay 缓存和未决会话在重新启动时清除；不等待远端取消或关闭。
  */
 export const hardResetApp = () => {
   sessionStorage.setItem(RESET_PENDING_KEY, 'true');

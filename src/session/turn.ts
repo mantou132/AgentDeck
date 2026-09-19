@@ -39,12 +39,13 @@ export const performTurn = async (
   session: DeckSession,
   text: string,
   handlers: {
-    onEvent: (event: SessionEvent) => void;
+    onEvent: (event: SessionEvent) => void | Promise<void>;
     onAnswer: (answer: string) => void;
     onError: (error: string) => void;
     onDone: (completed: boolean) => void;
   },
   attachments: Attachment[] = [],
+  callId?: string,
 ) => {
   let completed = false;
   let cancelled = false;
@@ -53,9 +54,9 @@ export const performTurn = async (
       session.sessionId,
       session.agent,
       text,
-      (event) => {
+      async (event) => {
         if (event.event === 'stop') cancelled = event.stop_reason === 'cancelled';
-        handlers.onEvent(event);
+        await handlers.onEvent(event);
       },
       attachments.map((attachment) => {
         if (attachment.kind === 'image') {
@@ -64,6 +65,7 @@ export const performTurn = async (
         const name = attachment.name.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
         return { type: 'text', text: `<attachment name="${name}">\n${attachment.text}\n</attachment>` };
       }),
+      callId,
     );
     if (result.answer) {
       handlers.onAnswer(result.answer);

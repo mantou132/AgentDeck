@@ -14,7 +14,7 @@ export type RpcMessage = {
 type PendingCall = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
-  onEvent?: (event: unknown) => void;
+  onEvent?: (event: unknown) => void | Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
 };
 
@@ -32,9 +32,15 @@ export class RpcPeer {
     this.#onTimeout = onTimeout;
   }
 
-  call = <T>(method: string, params: unknown = {}, onEvent?: (event: unknown) => void, options?: CallOptions) => {
-    // Replies from before an App reload must never match a new call.
-    const id = crypto.randomUUID();
+  call = <T>(
+    method: string,
+    params: unknown = {},
+    onEvent?: (event: unknown) => void | Promise<void>,
+    options?: CallOptions,
+    callId?: RpcId,
+  ) => {
+    // Replies from before an App reload must never match a new call unless explicitly resumed.
+    const id = callId ?? crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
       const pending: PendingCall = { resolve: resolve as (value: unknown) => void, reject, onEvent };
       this.#pending.set(id, pending);
@@ -55,6 +61,21 @@ export class RpcPeer {
       } catch (error) {
         failed(error);
       }
+    });
+  };
+
+  resumeCall = (
+    id: RpcId,
+    handlers: {
+      onEvent?: (event: unknown) => void | Promise<void>;
+      resolve?: (value: unknown) => void;
+      reject?: (error: Error) => void;
+    },
+  ) => {
+    this.#pending.set(id, {
+      resolve: handlers.resolve ?? (() => {}),
+      reject: handlers.reject ?? (() => {}),
+      onEvent: handlers.onEvent,
     });
   };
 
@@ -90,7 +111,7 @@ export class RpcPeer {
       if (!pending) return;
       if ('event' in message) {
         try {
-          pending.onEvent?.(message.event);
+          return pending.onEvent?.(message.event);
         } catch (error) {
           this.#takePending(id);
           pending.reject(error instanceof Error ? error : new Error(String(error)));
