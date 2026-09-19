@@ -18,7 +18,7 @@
 - `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Relay ID 时打开 settings，否则打开 list。
 - `src/pages/`：session-list、session、settings 三页面；settings 提供 Relay 获取指南 sheet，首次未配对使用时自动展示一次；`src/navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
 - `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
-- `src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信；`src/config.ts` 保存配置读取与连接常量。
+- `src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信，encryption 提供由 ID 识别的可选端到端加密；`src/config.ts` 保存配置读取与连接常量。
 - `src/session/`：types 为会话类型，events 为 ACP reducer，groups / timeline 为列表与消息分组，turn 控制流式任务和权限决断，modes 只适配 ACP 模式信息。
 - `src/elements/`：composer 管理输入和附件，session-timeline 展示消息并通过 `Sheet.open` 打开过程弹层；process-detail 按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step；process-step 按 sessionId / groupId / itemId 自行订阅详情更新；attachment / attachment-preview 展示附件；file-viewer 通过 `file_read` 浏览远端文件，file-browser 通过 `file_browse` 浏览远端目录与文件并在新建会话弹窗及独立页面栈中复用，消息链接由 `navigation.ts` 分流到 Tap Browser、目录栈或文件 Viewer；sheet.ts 封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域；carousel 提供通用 CSS Scroll Snap 分页，relay-guide 提供三步指南图文；其余为目录、会话分组、权限和品牌组件。
 - `src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`src/lib/`：Markdown、diff2html 输入转换与路径显示；`follow-bottom.ts` 提供 session、process-detail、process-step 共用的滚动跟底逻辑，由组件 `@effect` 绑定和清理。
@@ -29,6 +29,7 @@
 
 - 新会话先建本地 draft，首次发送才远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
 - App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `src/config.ts`，相关源码在 `~/relay`、`~/browser-mcp`。
+- 普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
 - 异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
 - Android identifier / namespace / applicationId / MainActivity package 保持 `com.mantou.agentdeck` 一致；对应 `src-tauri/tauri.conf.json`、`src-tauri/gen/android/app/build.gradle.kts` 和 `MainActivity.kt`。Rust library 为 `agentdeck_lib`。

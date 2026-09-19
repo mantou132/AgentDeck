@@ -1,4 +1,4 @@
-import { isRelayId } from 'relay-client-ts';
+import { isPairingId } from './agent/encryption';
 
 export type AppSettings = {
   relayId: string;
@@ -38,7 +38,7 @@ export const popularAgents: { id: string; name: string }[] = [
 export const readSettings = (): AppSettings => {
   try {
     const value = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') as Partial<AppSettings> | null;
-    const relayId = typeof value?.relayId === 'string' && isRelayId(value.relayId) ? value.relayId : '';
+    const relayId = typeof value?.relayId === 'string' && isPairingId(value.relayId) ? value.relayId : '';
     return {
       relayId,
       agent: typeof value?.agent === 'string' && value.agent ? value.agent : 'codex',

@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import * as chacha from '@noble/ciphers/chacha.js';
+import * as hkdf from '@noble/hashes/hkdf.js';
+import * as sha2 from '@noble/hashes/sha2.js';
 import ts from 'typescript';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -27,12 +30,12 @@ const memoryStorage = () => {
 
 // Each fixture is a new document/module realm. Only browser storage and the
 // simulated host survive reload; use the installed Relay SDK and App source.
-export function documentFixture(previous) {
+export function documentFixture(previous, options = {}) {
   const localStorage = previous?.localStorage ?? memoryStorage();
   const sessionStorage = previous?.sessionStorage ?? memoryStorage();
   const host = previous?.host ?? { sequence: 0 };
   if (!previous) {
-    localStorage.setItem(settingsKey, JSON.stringify({ relayId, agent: 'codex' }));
+    localStorage.setItem(settingsKey, JSON.stringify({ relayId: options.pairingId ?? relayId, agent: 'codex' }));
     localStorage.setItem('unrelated.preference', 'keep');
   }
   const sockets = [];
@@ -42,6 +45,8 @@ export function documentFixture(previous) {
   let timerId = 0;
   let now = 0;
   let reloads = 0;
+  let hostEncryption;
+  let outgoingEncryption;
 
   class Socket extends EventTarget {
     static OPEN = 1;
@@ -55,7 +60,11 @@ export function documentFixture(previous) {
     send(data) {
       const frame = JSON.parse(data);
       this.sent.push(frame);
-      if (frame.type === 'message') requests.push(frame);
+      if (frame.type === 'message') {
+        requests.push(
+          outgoingEncryption ? { ...frame, payload: outgoingEncryption.readOutgoing(frame.payload) } : frame,
+        );
+      }
     }
     close() {
       this.readyState = 3;
@@ -82,6 +91,10 @@ export function documentFixture(previous) {
     Set,
     URL,
     TextEncoder,
+    TextDecoder,
+    Uint8Array,
+    btoa,
+    atob,
     queueMicrotask,
     localStorage,
     sessionStorage,
@@ -141,6 +154,14 @@ export function documentFixture(previous) {
     });
     run(
       (name) => {
+        if (name === '@noble/ciphers/chacha.js') return chacha;
+        if (name === '@noble/hashes/hkdf.js') return hkdf;
+        if (name === '@noble/hashes/sha2.js') return sha2;
+        if (name === '@mantou/tap-ui/lib/encode') {
+          return load(path.join(root, 'node_modules/@mantou/tap-ui/lib/encode.js'));
+        }
+        // Encoding uses the real Tap UI module; its number helpers are unrelated.
+        if (file.endsWith('/@mantou/tap-ui/lib/encode.js') && name === './number') return {};
         if (name === 'relay-client-ts') {
           return load(path.join(root, 'node_modules/relay-client-ts/src/relay-client.ts'));
         }
@@ -183,10 +204,21 @@ export function documentFixture(previous) {
     ].map((name) => load(path.join(root, `src/${name}.ts`))),
   );
   const remoteSession = { sessionId: 's1', cwd: '/tmp', agent: 'codex', title: 'Reset test' };
+  const encryption = load(path.join(root, 'src/agent/encryption.ts'));
+  const pairingId = app.agentdeckStore.settings.relayId;
+  if (pairingId.startsWith('adk1_')) {
+    hostEncryption = new encryption.RelayEncryption(pairingId, 'host', 'host');
+    outgoingEncryption = new encryption.RelayEncryption(pairingId, 'app', 'unused');
+  }
   const processed = new Set();
   const deliver = (payload) => {
     const sequence = ++host.sequence;
-    sockets.at(-1).frame({ type: 'message', message_id: `host-${sequence}`, sequence, payload });
+    sockets.at(-1).frame({
+      type: 'message',
+      message_id: `host-${sequence}`,
+      sequence,
+      payload: hostEncryption ? hostEncryption.seal(payload) : payload,
+    });
   };
   const reply = (request, result) => deliver({ id: request.payload.id, result, peerId: 1 });
   async function settleHost() {
@@ -225,6 +257,7 @@ export function documentFixture(previous) {
 
   return {
     app,
+    encryption,
     transport: load(path.join(root, 'src/agent/transport.ts')),
     rpc: load(path.join(root, 'src/agent/rpc.ts')),
     window,

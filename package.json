@@ -21,6 +21,8 @@
     "@gem-bind/mermaid": "^0.0.3",
     "@mantou/gem": "^2.2.11",
     "@mantou/tap-ui": "^0.1.10",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-haptics": "~2.3.3",
     "diff": "^8.0.4",

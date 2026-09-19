@@ -1,6 +1,5 @@
 import {
   DEFAULT_STORAGE_KEY,
-  isRelayId,
   localStorageStore,
   RelayClient,
   type RelayConnectionState,
@@ -9,6 +8,7 @@ import {
 import { DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
 import { AgentApi, type PermissionRequest, type SessionEvent } from './api';
+import { createRelayEncryption, isPairingId, type RelayEncryption } from './encryption';
 import type { RpcId, RpcMessage } from './rpc';
 
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
@@ -29,6 +29,7 @@ let currentPeerId: number | undefined;
 export const getPeerId = () => currentPeerId;
 let relayClient: RelayClient | undefined;
 let relayStore: RelayStore | undefined;
+let relayEncryption: RelayEncryption | undefined;
 let currentRelayId = '';
 let connectionState: ConnectionState = 'disconnected';
 let relayConnected = false;
@@ -61,7 +62,7 @@ export const agentApi = new AgentApi(
     if (!store) return;
     for (const message of await store.outbox()) {
       if (store !== relayStore) return;
-      const payload = message.payload as RpcMessage;
+      const payload = (relayEncryption ? relayEncryption.readOutgoing(message.payload) : message.payload) as RpcMessage;
       if (payload?.id === id && payload.method) await store.removeFromOutbox(message.messageId);
     }
   },
@@ -122,32 +123,50 @@ export const syncHostConnection = () => {
 };
 
 export const startTransport = (relayId: string, options?: { ackHead?: boolean }) => {
-  if (!isRelayId(relayId)) return;
+  if (!isPairingId(relayId)) return;
   if (relayClient && currentRelayId === relayId) {
     reconnectTransport(true);
     return;
   }
   closeTransport();
   currentRelayId = relayId;
-  const persistedStore = localStorageStore(relayId);
+  const encryption = createRelayEncryption(relayId, getDeviceId());
+  relayEncryption = encryption;
+  const routeId = encryption?.routeId ?? relayId;
+  const persistedStore = localStorageStore(routeId);
   const deliveries = new Map<string, Pick<RpcMessage, 'id' | 'method'>>();
   const store: RelayStore = {
     ...persistedStore,
-    outbox: () => (relayStore === store ? persistedStore.outbox() : []),
+    outbox: async () => {
+      if (relayStore !== store) return [];
+      const messages = await persistedStore.outbox();
+      for (const message of messages) {
+        if (deliveries.has(message.messageId)) continue;
+        const { id, method } = (encryption ? encryption.readOutgoing(message.payload) : message.payload) as RpcMessage;
+        deliveries.set(message.messageId, { id, method });
+      }
+      return messages;
+    },
     enqueue: async (message) => {
       if (relayStore !== store) return;
+      const { id, method } = message.payload as RpcMessage;
+      let payload: unknown;
+      try {
+        payload = encryption ? encryption.seal(message.payload) : message.payload;
+      } catch {
+        throw new Error(i18n.get('error.encryptionFailed'));
+      }
       // Match Relay's full WebSocket message limit, including the envelope.
-      const frame = JSON.stringify({ type: 'message', message_id: message.messageId, payload: message.payload });
+      const frame = JSON.stringify({ type: 'message', message_id: message.messageId, payload });
       if (new TextEncoder().encode(frame).byteLength > 10 * 1024 * 1024) {
         throw new Error(i18n.get('error.messageTooLarge'));
       }
       try {
-        await persistedStore.enqueue(message);
+        await persistedStore.enqueue({ ...message, payload });
       } catch {
         throw new Error(i18n.get('error.storageFailed'));
       }
       if (relayStore !== store) return;
-      const { id, method } = message.payload as RpcMessage;
       deliveries.set(message.messageId, { id, method });
     },
     markReceived: (sequence) => {
@@ -161,7 +180,7 @@ export const startTransport = (relayId: string, options?: { ackHead?: boolean })
   };
   relayStore = store;
   const client = new RelayClient({
-    relayId,
+    relayId: routeId,
     endpoint: '2',
     deviceId: getDeviceId(),
     relayUrl: RELAY_URL,
@@ -182,6 +201,13 @@ export const startTransport = (relayId: string, options?: { ackHead?: boolean })
     },
     onPayload: async (payload) => {
       if (relayClient !== client) return;
+      if (encryption) {
+        try {
+          payload = encryption.open(payload).message;
+        } catch {
+          throw new Error(i18n.get('error.decryptionFailed'));
+        }
+      }
       if (beforePayloadHook) {
         try {
           await beforePayloadHook();
@@ -250,7 +276,7 @@ export const startTransport = (relayId: string, options?: { ackHead?: boolean })
 
 export const reconnectTransport = (force = false) => {
   if (!relayClient) {
-    if (isRelayId(currentRelayId)) startTransport(currentRelayId);
+    if (isPairingId(currentRelayId)) startTransport(currentRelayId);
     return;
   }
   // Reuse the SDK's receive chain, outbox and peer. Replacing only the socket
@@ -266,6 +292,7 @@ export const closeTransport = () => {
   const previous = relayClient;
   relayClient = undefined;
   relayStore = undefined;
+  relayEncryption = undefined;
   relayConnected = false;
   currentPeerId = undefined;
   invalidateAttach();
@@ -291,5 +318,5 @@ export const initTransport = (options: {
   agentApi.setPermissionHandler(options.onRequestPermission);
   agentApi.setSessionEndedHandler(({ sessionId }) => globalMessageHandler?.({ type: 'session_ended', sessionId }));
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
-  if (isRelayId(options.initialRelayId)) startTransport(options.initialRelayId, { ackHead: options.ackHead });
+  if (isPairingId(options.initialRelayId)) startTransport(options.initialRelayId, { ackHead: options.ackHead });
 };

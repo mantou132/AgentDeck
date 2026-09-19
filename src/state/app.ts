@@ -1,5 +1,5 @@
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
-import { isRelayId } from 'relay-client-ts';
+import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
@@ -124,7 +124,7 @@ export const startApp = () => {
 
 export const saveSettings = (settings: AppSettings) => {
   const next = { relayId: settings.relayId.trim(), agent: settings.agent.trim() };
-  if (!isRelayId(next.relayId)) throw new Error(i18n.get('error.invalidRelayId'));
+  if (!isPairingId(next.relayId)) throw new Error(i18n.get('error.invalidRelayId'));
   if (!next.agent) throw new Error(i18n.get('error.selectRemoteAgent'));
   const relayChanged = next.relayId !== agentdeckStore.settings.relayId;
   const agentChanged = next.agent !== agentdeckStore.settings.agent;

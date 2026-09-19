@@ -9,16 +9,18 @@ AgentDeck (phone) ⇄ Relay ⇄ browser4agent (desktop) ⇄ Claude Code / Codex 
 ```
 
 1. Run [browser4agent][browser4agent] on the machine where your agents live. Its Agent panel talks to the same ACP agents that AgentDeck uses.
-2. Get the **Relay ID** from the browser4agent extension settings page. This UUID pairs AgentDeck with your desktop: it is the credential for a private, durable WebSocket channel.
+2. Copy the **Relay ID** from the browser4agent extension. This ID pairs AgentDeck with your desktop: it is the credential for a private, durable WebSocket channel.
 3. Enter the Relay ID in AgentDeck's settings page. The app connects to the relay and lists the sessions of your selected agent, grouped by working directory.
 4. Open a session to replay its history, or tap **新建会话 (New session)** in the footer and pick a working directory from the agent's machine.
 
 The relay is protocol-agnostic and durable: if the phone goes offline, prompts sent from the other side keep their history and catch up when the app reconnects.
 
+AgentDeck supports **end-to-end encryption** between your phone and computer. With an `adk1_` pairing ID, only your paired devices can decrypt the messages; the relay forwards and queues ciphertext and cannot read your prompts, replies, attachments, or file contents. New installations generate encrypted pairing IDs by default; existing UUID pairing IDs retain the legacy plaintext mode.
+
 ## Pairing AgentDeck with your agents
 
 1. Install [browser4agent][browser4agent] and register its native host.
-2. Open the extension settings page and copy the **Relay ID**.
+2. Copy the **Relay ID** from the browser4agent extension.
 3. In AgentDeck, open **设置 (Settings)**, paste the Relay ID, and pick an agent.
 4. Save — the app connects to the relay (`wss://agent-deck.xianqiao.wang/ws` in production builds) and the session list appears.
 
