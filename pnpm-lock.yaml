@@ -14,23 +14,23 @@ importers:
   .:
     dependencies:
       '@gem-bind/diff2html':
-        specifier: ^0.0.4
-        version: 0.0.4
+        specifier: ^0.0.5
+        version: 0.0.5(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))
       '@gem-bind/latex':
-        specifier: ^0.0.2
-        version: 0.0.2
-      '@gem-bind/marked':
-        specifier: ^0.0.6
-        version: 0.0.6
-      '@gem-bind/mermaid':
         specifier: ^0.0.3
-        version: 0.0.3
+        version: 0.0.3(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))
+      '@gem-bind/marked':
+        specifier: ^0.0.7
+        version: 0.0.7(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))
+      '@gem-bind/mermaid':
+        specifier: ^0.0.5
+        version: 0.0.5(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))
       '@mantou/gem':
         specifier: ^2.2.11
         version: 2.2.11
       '@mantou/tap-ui':
-        specifier: ^0.1.10
-        version: 0.1.10(@mantou/gem@2.2.11)
+        specifier: ^0.1.11
+        version: 0.1.11(@mantou/gem@2.2.11)
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -87,8 +87,8 @@ importers:
         specifier: ~5.9.2
         version: 5.9.3
       unplugin-gem:
-        specifier: ^0.1.10
-        version: 0.1.10(@mantou/gem@2.2.11)(@rspack/core@2.1.8(@swc/helpers@0.5.23))
+        specifier: ^0.1.11
+        version: 0.1.11(@mantou/gem@2.2.11)(@rspack/core@2.1.8(@swc/helpers@0.5.23))
 
 packages:
 
@@ -171,17 +171,29 @@ packages:
   '@emnapi/wasi-threads@1.2.3':
     resolution: {integrity: sha512-ELEBe8PsLvvJ6QMr0zLt8ffvOHW/dc1m3CEzNMg7aJUv3bMaoDtw2TXyDAwkYBuroxxuHEwhRTLJSe5sya547g==}
 
-  '@gem-bind/diff2html@0.0.4':
-    resolution: {integrity: sha512-WdbY83850YwOb64DPSMZVfYI1UP52tUIXz8UAC1qTov4NRMX5qcdh+KHjoufb3YmQ+AvrQvvUo+d0yXkoZT7aQ==}
+  '@gem-bind/diff2html@0.0.5':
+    resolution: {integrity: sha512-sweoEGTd0w2GRygmoR8t++IWAM0Kx0UkrDimkfcejKIZjYwgut/v6wV6Se/ClGfkFApUlqD4IN/xxztsd9t1pQ==}
+    peerDependencies:
+      '@mantou/gem': ^2.0.0
+      duoyun-ui: ^2.0.0
 
-  '@gem-bind/latex@0.0.2':
-    resolution: {integrity: sha512-krhvmB2doUZVwlklEbyWOqiieaboppbHH/Ko4iKOXIMOZ9kZ8uzsixf+D3pL+tdV7tQCHYYyWWX8AchY6Oy2Tw==}
+  '@gem-bind/latex@0.0.3':
+    resolution: {integrity: sha512-djiP5LuZpLSaTfGdmZsxO8POGsOUhKAdif/P7QGAx7ICv00lcIcvSCq0z0NscL//kTy1HcanEyYLAY6PkGvO6Q==}
+    peerDependencies:
+      '@mantou/gem': ^2.0.0
+      duoyun-ui: ^2.0.0
 
-  '@gem-bind/marked@0.0.6':
-    resolution: {integrity: sha512-0BynZTRgpI0kn1HCSmqqzhs4PlvKHsAlPFFGnM5mZPnV7RAOI0cnPGJIv24z132azmMOZWWurITtpAefcBGh2g==}
+  '@gem-bind/marked@0.0.7':
+    resolution: {integrity: sha512-N8GdcpXza/roA0Qy3stqEHjum1G1wXAfv2WmmLfWevzhmScJ6saE4zhUTR/FaCAHOgWRYm4/7Ark2nGY78F+LA==}
+    peerDependencies:
+      '@mantou/gem': ^2.0.0
+      duoyun-ui: ^2.0.0
 
-  '@gem-bind/mermaid@0.0.3':
-    resolution: {integrity: sha512-D6lHXuph9YIsDVjfcoqTJf9+xr/Nfv7xu/+aC3CAdoiZ9VjhPrWhCCxT9eouW9qum1g5RNmnMFLB8UkfkGbGeg==}
+  '@gem-bind/mermaid@0.0.5':
+    resolution: {integrity: sha512-Q3+USolHW5DwcEiiv4kcVOme2NmVKS6RkzgMnntZPQFMbjHUsp30bgAixN73183+yOvmAgz7UctXCWw1TIk7iQ==}
+    peerDependencies:
+      '@mantou/gem': ^2.0.0
+      duoyun-ui: ^2.0.0
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -208,8 +220,8 @@ packages:
   '@mantou/gem@2.2.11':
     resolution: {integrity: sha512-0HtQVQIyUklXtE5MRW3elAxWTeUgrGgpeblVK2y0e+szs4uilYiXMQvweViPmBT6/9uiGPasx7KFz/fxI03MDA==}
 
-  '@mantou/tap-ui@0.1.10':
-    resolution: {integrity: sha512-KCa0xNUrBhTIuJdwwxKHuJZ5NxdZisuRmK7kyKoXDPnQ+3gFNYJe1Uy54354mCvCpbcP6YM1zWpMFmgalntIwQ==}
+  '@mantou/tap-ui@0.1.11':
+    resolution: {integrity: sha512-qFK7xdUshEYWzKsfpv7VKQZNBRpovf4UptXzgFuRZa+g/80ph7LHOBnXIIGM07qQlUMzX8KAi3jRuIA/6YMoMw==}
     peerDependencies:
       '@mantou/gem': ^2.x
 
@@ -1326,8 +1338,8 @@ packages:
   stylis@4.4.0:
     resolution: {integrity: sha512-5Z9ZpRzfuH6l/UAvCPAPUo3665Nk2wLaZU3x+TLHKVzIz33+sbJqbtrYoC3KD4/uVOr2Zp+L0LySezP9OHV9yA==}
 
-  swc-plugin-gem@0.1.18:
-    resolution: {integrity: sha512-U9LYY2Z05oGYdP2ba3oyPOrOiYZfK3KgFHM1ltX6fpXq1FbMKiuNfhJM9W8g5ckWQiyE8G3M4G0bdpexELLDzg==}
+  swc-plugin-gem@0.1.17-beta:
+    resolution: {integrity: sha512-txFeD0y7aU/+/gObqPyYZfTKofvonlg6DOxycOm4RAm2iDLf6R00X8jmifi4APZWTax5RiOQ9Qd2mPj0Vw2scw==}
 
   tailwindcss@4.3.3:
     resolution: {integrity: sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==}
@@ -1365,8 +1377,8 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  unplugin-gem@0.1.10:
-    resolution: {integrity: sha512-8t7HbYmBrN4EJ1d+qF3CpydpBM9+974PwysN3DrwkzeS5Uvd8FjTCQa+Q2h0ptzOpv/sieYQquRvsRHcop6JDQ==}
+  unplugin-gem@0.1.11:
+    resolution: {integrity: sha512-7wQUaKPZvfVoClIpND3csDBun/vrdTeuqECQnRpd+sS4X8p2dxurz/GTDVgl9w+CbM0Kv25hKjrxVYzYxuQ1ug==}
     peerDependencies:
       '@mantou/gem': '>=2.0.0'
       '@rspack/core': '>=0.0.0'
@@ -1509,7 +1521,7 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@gem-bind/diff2html@0.0.4':
+  '@gem-bind/diff2html@0.0.5(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))':
     dependencies:
       '@mantou/gem': 2.2.11
       '@swc/helpers': 0.5.23
@@ -1517,21 +1529,21 @@ snapshots:
       duoyun-ui: 2.2.8(@mantou/gem@2.2.11)
       highlight.js: 11.12.0
 
-  '@gem-bind/latex@0.0.2':
+  '@gem-bind/latex@0.0.3(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))':
     dependencies:
       '@mantou/gem': 2.2.11
       '@swc/helpers': 0.5.23
       duoyun-ui: 2.2.8(@mantou/gem@2.2.11)
       katex: 0.18.5
 
-  '@gem-bind/marked@0.0.6':
+  '@gem-bind/marked@0.0.7(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))':
     dependencies:
       '@mantou/gem': 2.2.11
       '@swc/helpers': 0.5.23
       duoyun-ui: 2.2.8(@mantou/gem@2.2.11)
       marked: 15.0.12
 
-  '@gem-bind/mermaid@0.0.3':
+  '@gem-bind/mermaid@0.0.5(@mantou/gem@2.2.11)(duoyun-ui@2.2.8(@mantou/gem@2.2.11))':
     dependencies:
       '@mantou/gem': 2.2.11
       '@swc/helpers': 0.5.23
@@ -1567,7 +1579,7 @@ snapshots:
 
   '@mantou/gem@2.2.11': {}
 
-  '@mantou/tap-ui@0.1.10(@mantou/gem@2.2.11)':
+  '@mantou/tap-ui@0.1.11(@mantou/gem@2.2.11)':
     dependencies:
       '@mantou/gem': 2.2.11
 
@@ -2244,7 +2256,7 @@ snapshots:
   duoyun-ui@2.2.8(@mantou/gem@2.2.11):
     dependencies:
       '@mantou/gem': 2.2.11
-      '@mantou/tap-ui': 0.1.10(@mantou/gem@2.2.11)
+      '@mantou/tap-ui': 0.1.11(@mantou/gem@2.2.11)
       deep-query-selector: 1.0.2
 
   emoji-regex@10.6.0: {}
@@ -2573,7 +2585,7 @@ snapshots:
 
   stylis@4.4.0: {}
 
-  swc-plugin-gem@0.1.18: {}
+  swc-plugin-gem@0.1.17-beta: {}
 
   tailwindcss@4.3.3(patch_hash=3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882): {}
 
@@ -2601,11 +2613,11 @@ snapshots:
 
   undici-types@8.3.0: {}
 
-  unplugin-gem@0.1.10(@mantou/gem@2.2.11)(@rspack/core@2.1.8(@swc/helpers@0.5.23)):
+  unplugin-gem@0.1.11(@mantou/gem@2.2.11)(@rspack/core@2.1.8(@swc/helpers@0.5.23)):
     dependencies:
       '@swc/core': 1.15.47(@swc/helpers@0.5.23)
       '@swc/helpers': 0.5.23
-      swc-plugin-gem: 0.1.18
+      swc-plugin-gem: 0.1.17-beta
       unplugin: 3.3.0(@rspack/core@2.1.8(@swc/helpers@0.5.23))
     optionalDependencies:
       '@mantou/gem': 2.2.11

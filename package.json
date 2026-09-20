@@ -1,7 +1,7 @@
 {
   "name": "agentdeck",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "rsbuild dev",
@@ -15,12 +15,12 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@gem-bind/diff2html": "^0.0.4",
-    "@gem-bind/latex": "^0.0.2",
-    "@gem-bind/marked": "^0.0.6",
-    "@gem-bind/mermaid": "^0.0.3",
+    "@gem-bind/diff2html": "^0.0.5",
+    "@gem-bind/latex": "^0.0.3",
+    "@gem-bind/marked": "^0.0.7",
+    "@gem-bind/mermaid": "^0.0.5",
     "@mantou/gem": "^2.2.11",
-    "@mantou/tap-ui": "^0.1.10",
+    "@mantou/tap-ui": "^0.1.11",
     "@noble/ciphers": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@tauri-apps/api": "^2.11.1",
@@ -41,7 +41,7 @@
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
     "typescript": "~5.9.2",
-    "unplugin-gem": "^0.1.10"
+    "unplugin-gem": "^0.1.11"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,json,jsonc,css,html}": "biome check --write --no-errors-on-unmatched"
