@@ -73,7 +73,7 @@ export class DeckFileViewerElement extends GemElement {
     if (!this.line) return;
     requestAnimationFrame(() => {
       const lineEl =
-        this.#codeBlockRef.value?.shadowRoot?.querySelector<HTMLElement>('.highlight') || this.#lineRef.value;
+        this.#codeBlockRef.value?.shadowRoot?.querySelector<HTMLElement>('.gem-highlight') || this.#lineRef.value;
       const mainEl = this.#mainRef.value;
       if (!lineEl || !mainEl?.clientHeight) return;
       const lineRect = lineEl.getBoundingClientRect();
