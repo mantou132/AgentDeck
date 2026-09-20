@@ -25,6 +25,32 @@ export type FileBrowseOptions = {
   limit?: number;
 };
 
+export type GitFileStatus = {
+  path: string;
+  status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed' | 'typechange' | 'conflicted' | string;
+  staged: boolean;
+  unstaged: boolean;
+};
+
+export type GitDiffStats = {
+  insertions: number;
+  deletions: number;
+  filesChanged: number;
+};
+
+export type GitStatusResult = {
+  repo: string;
+  branch?: string;
+  files: GitFileStatus[];
+  stats?: GitDiffStats | null;
+};
+
+export type GitDiffResult = {
+  diff: string;
+  path?: string;
+  stats?: GitDiffStats | null;
+};
+
 export type PromptAttachment = { type: 'image'; data: string; mimeType: string } | { type: 'text'; text: string };
 
 export type RemoteSession = {
@@ -154,6 +180,18 @@ export class AgentApi {
         : [],
     };
   };
+
+  gitStatus = (cwd: string) =>
+    this.#peer.call<GitStatusResult>('git_status', { cwd }, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: i18n.get('error.gitStatusTimeout'),
+    });
+
+  gitDiff = (cwd: string, path?: string) =>
+    this.#peer.call<GitDiffResult>('git_diff', { cwd, ...(path ? { path } : {}) }, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: i18n.get('error.gitDiffTimeout'),
+    });
 
   createSession = ({ agent, cwd }: { agent: string; cwd: string }) =>
     this.#peer.call<CreatedSession>(

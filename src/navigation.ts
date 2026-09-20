@@ -37,6 +37,20 @@ export const openFileViewer = (path: string, cwd: string, line?: number, stack?:
   });
 };
 
+export const openChanges = (cwd: string) => {
+  Stack.push({
+    content: html`<deck-changes-page .cwd=${cwd}></deck-changes-page>`,
+    gesture: true,
+  });
+};
+
+export const openChangesDiff = (path: string, cwd: string) => {
+  Stack.push({
+    content: html`<deck-changes-diff-page .path=${path} .cwd=${cwd}></deck-changes-diff-page>`,
+    gesture: true,
+  });
+};
+
 export const openPath = async (path: string, cwd: string, line?: number, stack?: TapStackElement | null) => {
   if (path.endsWith('/') || path.endsWith('\\') || path === '.' || path === '..') {
     openFileBrowser(path, cwd, stack);

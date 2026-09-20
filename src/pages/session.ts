@@ -6,7 +6,7 @@ import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { displayPath } from '../lib/path';
-import { openSession, openSettings } from '../navigation';
+import { openChanges, openSession, openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
 import type { Attachment } from '../session/types';
 import { changeSessionMode } from '../state/modes';
@@ -130,7 +130,16 @@ export class AgentDeckSessionPageElement extends GemElement {
         </button>
         <div class="min-w-0 text-center">
           <div class="truncate font-display text-base leading-tight font-semibold text-highlight">${title}</div>
-          <div v-if=${cwd} class="mt-1 flex min-w-0 items-center justify-center gap-1.5 text-sm font-medium text-describe">
+          <button
+            v-if=${cwd}
+            type="button"
+            class="group mt-0.5 inline-flex max-w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border-0 bg-transparent px-2 py-0.5 text-sm font-medium text-describe transition-[background-color,transform] duration-150 hover:bg-bg-hover hover:text-text active:scale-[0.97]"
+            title=${i18n.get('changes.viewChanges')}
+            @click=${() => {
+              if (!cwd) return;
+              openChanges(cwd);
+            }}
+          >
             <span
               class=${classMap({
                 'size-1.5 shrink-0 rounded-full': true,
@@ -140,7 +149,7 @@ export class AgentDeckSessionPageElement extends GemElement {
               })}
             ></span>
             <span class="truncate font-mono">${displayPath(cwd || '')}</span>
-          </div>
+          </button>
         </div>
         <button
           class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft disabled:cursor-default disabled:opacity-45"
