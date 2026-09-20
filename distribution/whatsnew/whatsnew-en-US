@@ -1,1 +1,1 @@
-Added session deletion; show running indicators and pending permission requests in session list; added animated text reveal for streaming markdown; improved step navigation, file jumping, and auto-scroll behavior.
+Added optional end-to-end encryption for Relay pairing IDs; file and web links open through a dedicated browser stack; code block preview for text files; haptic feedback; improved streaming recovery, process step rendering, and timeline animations.
