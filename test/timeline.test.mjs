@@ -142,6 +142,55 @@ test('starting another task does not revive unfinished tools from an earlier tur
   assert.equal(getToolStatus({ ...oldTool, status: 'failed' }, false), 'failed');
 });
 
+test('empty agent text messages do not split process groups, but non-empty or attachment messages do', () => {
+  const thought = { id: 'thought', type: 'thought', text: 'Thinking', pending: false };
+  const tool1 = { id: 'tool-1', type: 'tool', data: { toolCallId: 'tool-1', title: 'Tool 1', status: 'completed' } };
+  const tool2 = { id: 'tool-2', type: 'tool', data: { toolCallId: 'tool-2', title: 'Tool 2', status: 'completed' } };
+  const emptyAgentMessage = { id: 'empty', role: 'agent', text: '\n\n' };
+  const whitespaceAgentMessage = { id: 'ws', role: 'agent', text: '   ' };
+
+  const mergedItems = groupTimelineMessages(
+    [{ id: 'user', role: 'user', text: 'Question' }, thought, emptyAgentMessage, tool1, whitespaceAgentMessage, tool2],
+    false,
+  );
+
+  assert.equal(mergedItems.length, 2);
+  assert.equal(mergedItems[0].type, 'message');
+  assert.equal(mergedItems[1].type, 'group');
+  assert.equal(mergedItems[1].group.items.length, 3);
+  assert.equal(getProcessSummary(mergedItems[1].group), '2 tool calls');
+
+  const splitItems = groupTimelineMessages(
+    [
+      { id: 'user', role: 'user', text: 'Question' },
+      thought,
+      { id: 'real', role: 'agent', text: 'Here is what I found:' },
+      tool1,
+    ],
+    false,
+  );
+
+  assert.equal(splitItems.length, 4);
+  assert.equal(splitItems[1].type, 'group');
+  assert.equal(splitItems[2].type, 'message');
+  assert.equal(splitItems[3].type, 'group');
+
+  const attachmentItems = groupTimelineMessages(
+    [
+      { id: 'user', role: 'user', text: 'Question' },
+      thought,
+      { id: 'attachment-msg', role: 'agent', text: '', attachments: [{ id: 'a1', kind: 'image', name: 'img' }] },
+      tool1,
+    ],
+    false,
+  );
+
+  assert.equal(attachmentItems.length, 4);
+  assert.equal(attachmentItems[1].type, 'group');
+  assert.equal(attachmentItems[2].type, 'message');
+  assert.equal(attachmentItems[3].type, 'group');
+});
+
 test('inline base64 images in message text become attachments instead of links', () => {
   const markdown = 'before\n![shot](data:image/png;base64,QUJD) after\n[titled](data:image/jpeg;base64,REVG)';
   const { attachments, markdown: rest } = extractDataImageAttachments(markdown);

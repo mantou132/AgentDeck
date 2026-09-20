@@ -134,8 +134,12 @@ export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: b
         }
       }
     } else {
+      const textMsg = msg as TextMessage;
+      if (textMsg.role === 'agent' && !textMsg.text?.trim() && !textMsg.attachments?.length) {
+        continue;
+      }
       currentGroup = null;
-      result.push({ type: 'message', message: msg as TextMessage });
+      result.push({ type: 'message', message: textMsg });
     }
   }
 
