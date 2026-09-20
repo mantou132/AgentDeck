@@ -1,4 +1,5 @@
 import { initApp } from '@mantou/tap-ui/helper/webapp';
+import { startPushNotifications } from './agent/push';
 
 import { startApp } from './state/app';
 
@@ -13,3 +14,4 @@ initApp({
 });
 
 startApp();
+void startPushNotifications();

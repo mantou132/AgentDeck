@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "219373982611",
+    "project_id": "agent-deck-push",
+    "storage_bucket": "agent-deck-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:219373982611:android:7511bfbff53f2b149c0e66",
+        "android_client_info": {
+          "package_name": "com.mantou.agentdeck"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMASPjjv9faiaY-JcQDL-a1ynY-orPbD4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

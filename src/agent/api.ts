@@ -110,8 +110,8 @@ export class AgentApi {
 
   setHostReconnectedHandler = (handler: () => void) => this.#peer.onNotify('host_reconnected', () => handler());
 
-  attachPeer = async (deviceId: string) => {
-    return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId }, undefined, {
+  attachPeer = async (deviceId: string, fcmToken?: string | null) => {
+    return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId, fcmToken }, undefined, {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.connectHostTimeout'),
     });

@@ -19,6 +19,7 @@
 - `src/pages/`：session-list、session、settings 三页面；settings 提供 Relay 获取指南 sheet，首次未配对使用时自动展示一次；`src/navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
 - `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
 - `src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信，encryption 提供由 ID 识别的可选端到端加密；`src/config.ts` 保存配置读取与连接常量。
+- `src/agent/push.ts`：移动端 FCM 注册与同步；使用 `tauri-plugin-fcm` 插件管理通知权限、渠道和 token 刷新；Android 客户端配置在 `src-tauri/gen/android/app/google-services.json`，禁止放入服务账号私钥。token 经 `peer_attach` 同步，更新不切换连接状态，通知由 FCM 在后台显示。
 - `src/session/`：types 为会话类型，events 为 ACP reducer，groups / timeline 为列表与消息分组，turn 控制流式任务和权限决断，modes 只适配 ACP 模式信息。
 - `src/elements/`：composer 管理输入和附件，session-timeline 展示消息并通过 `Sheet.open` 打开过程弹层；process-detail 按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step；process-step 按 sessionId / groupId / itemId 自行订阅详情更新；attachment / attachment-preview 展示附件；file-viewer 通过 `file_read` 浏览远端文件，file-browser 通过 `file_browse` 浏览远端目录与文件并在新建会话弹窗及独立页面栈中复用，消息链接由 `navigation.ts` 分流到 Tap Browser、目录栈或文件 Viewer；sheet.ts 封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域；carousel 提供通用 CSS Scroll Snap 分页，relay-guide 提供三步指南图文；其余为目录、会话分组、权限和品牌组件。
 - `src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`src/lib/`：Markdown、diff2html 输入转换与路径显示；`follow-bottom.ts` 提供 session、process-detail、process-step 共用的滚动跟底逻辑，由组件 `@effect` 绑定和清理。
@@ -42,7 +43,7 @@
 - 布局优先 Tailwind utility，Shadow DOM 内不能使用。Light DOM 样式用 `:scope`，Shadow DOM 用 `:host`；通过 `css` / `@adoptedStyle` 共享样式，避免模板内联样式。
 - 主题统一使用 `src/styles/tailwind.css` token 和 `src/styles/theme.ts`，不新增平行的应用级 CSS 变量。原生安全区变量继续局部使用。
 - 保留 `patches/tailwindcss.patch` 对 Gem 元素的 Preflight 排除；`icons.loading` SVG 自带动画，不加额外旋转。
-- 元素文件名为去前缀的标签名，继承 GemElement；使用 ES 装饰器，不使用已弃用的生命周期函数，也不额外声明自定义元素类型。
+- 元素文件名去前缀的标签名，继承 GemElement；使用 ES 装饰器，不使用已弃用的生命周期函数，也不额外声明自定义元素类型。
 - 用 `@property` / attribute 装饰器定义输入；不要在元素内部修改输入，attribute 不赋默认值。内部数据用 `createState`，CSS 状态用 `@state`；优先使用 `#` 私有字段。
 - `@memo` / `@effect` 用依赖数组控制执行，effect 返回清理函数；`@template` 定义模板，支持 `v-if`、ref 和属性展开。
 - 全局状态用 `createStore` / `@connectStore`；事件用 `@emitter`，跨 Shadow DOM 冒泡用 `@globalemitter`；part / slot 用静态装饰字段。
@@ -135,7 +136,7 @@ class DuoyunTestElement extends GemElement {
   // 注意和 CSS 状态 `@state` 无关
   #state = createState({ internalCount: 1 });
 
-  // Attribute 不要赋初始值，因为 DOM 序列化会多出以内容，如果需要默认值，可以定义一个 `getter`
+  // Attribute 不要赋初始值，因为 DOM 序列化会多出一些内容，如果需要默认值，可以定义一个 `getter`
   // Property 可以赋初始值，但也可以同样用 `getter`
   get #src() {
     return this.src || 'test';

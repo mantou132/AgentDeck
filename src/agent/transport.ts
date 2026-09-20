@@ -36,6 +36,8 @@ let relayConnected = false;
 let attachVersion = 0;
 let attachId: RpcId | undefined;
 let attaching: Promise<void> | undefined;
+let fcmToken: string | null | undefined;
+let syncedFcmToken: string | null | undefined;
 let connectTimer: ReturnType<typeof setTimeout> | undefined;
 let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -94,29 +96,41 @@ const invalidateAttach = () => {
   attachId = undefined;
 };
 
-export const syncHostConnection = () => {
+export const updateFcmToken = (token: string | null) => {
+  fcmToken = token;
+  if (connectionState === 'connected' && token !== syncedFcmToken) void syncHostConnection(true);
+};
+
+export const syncHostConnection = (metadataOnly = false) => {
   if (!relayConnected) return Promise.resolve();
   if (attaching) return attaching;
   const version = ++attachVersion;
-  emitConnection('attaching');
+  const silent = metadataOnly && connectionState === 'connected';
+  const sentToken = fcmToken;
+  if (!silent) emitConnection('attaching');
   attaching = agentApi
-    .attachPeer(getDeviceId())
+    .attachPeer(getDeviceId(), sentToken)
     .then((result) => {
       if (version !== attachVersion) return;
       if (!Number.isSafeInteger(result?.peerId) || result.peerId <= 0) {
         throw new Error(i18n.get('error.invalidDeviceId'));
       }
+      const peerChanged = currentPeerId !== result.peerId;
       currentPeerId = result.peerId;
-      emitConnection('connected');
+      syncedFcmToken = sentToken;
+      if (!silent || peerChanged) emitConnection('connected');
     })
     .catch((error) => {
-      if (version === attachVersion)
-        emitConnection('unavailable', error instanceof Error ? error.message : String(error));
+      if (version !== attachVersion) return;
+      if (silent) console.error('Failed to synchronize push registration:', error);
+      else emitConnection('unavailable', error instanceof Error ? error.message : String(error));
     })
     .finally(() => {
       if (version === attachVersion) {
         attaching = undefined;
         attachId = undefined;
+        // A token can arrive or rotate while the initial handshake is pending.
+        if (connectionState === 'connected' && fcmToken !== sentToken) void syncHostConnection(true);
       }
     });
   return attaching;

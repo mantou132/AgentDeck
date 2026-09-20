@@ -1,0 +1,4 @@
+<resources>
+    <string name="notification_channel_responses">Agent 响应</string>
+    <string name="notification_response_complete">Agent 已完成本次响应。</string>
+</resources>

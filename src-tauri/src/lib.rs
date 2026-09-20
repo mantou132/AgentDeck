@@ -1,9 +1,11 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(mobile)]
-            app.handle().plugin(tauri_plugin_haptics::init())?;
+            _app.handle().plugin(tauri_plugin_fcm::init())?;
+            #[cfg(mobile)]
+            _app.handle().plugin(tauri_plugin_haptics::init())?;
             Ok(())
         })
         .plugin(tauri_plugin_edge_to_edge::init())

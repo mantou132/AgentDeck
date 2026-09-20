@@ -13,6 +13,7 @@
 		4D8497A2664B350284200224 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */; };
 		5FC641B441D0B7D3E2F209B5 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B7A019AC4B744FAFFA5604F /* Security.framework */; };
 		6E3E1B4C056668E3970FE775 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 860CBE7E3FB1776357472F4D /* CoreGraphics.framework */; };
+		791A0E1C30601A81001CBED7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */; };
 		81928F20E7671D77D34AC039 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D7466D105FC21244370BC876 /* QuartzCore.framework */; };
 		A26CDA1E3A363364BA88ED5C /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 07FDE4F572A7A540D7796C5B /* libapp.a */; };
 		A3AA947601E86B0B7A41EF10 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 9D4F7221E2A457F89DF1019C /* assets */; };
@@ -30,6 +31,7 @@
 		5A03567258072F49EB1E09EC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		69F4EB1434773CED0CDD10F2 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
 		78CB78DE555762C0467FFC5B /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		860CBE7E3FB1776357472F4D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -112,6 +114,7 @@
 		7F64332A44AB37722E628EBE /* agentdeck_iOS */ = {
 			isa = PBXGroup;
 			children = (
+				791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */,
 				19EC4957519500559466C137 /* agentdeck_iOS.entitlements */,
 				14FEFCCE8C4E76330EF845D8 /* Info.plist */,
 			);
@@ -207,6 +210,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				361E2D241516AAD2769A5D20 /* Assets.xcassets in Resources */,
+				791A0E1C30601A81001CBED7 /* GoogleService-Info.plist in Resources */,
 				DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */,
 				A3AA947601E86B0B7A41EF10 /* assets in Resources */,
 			);
