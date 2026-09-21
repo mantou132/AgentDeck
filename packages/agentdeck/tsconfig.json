@@ -17,6 +17,6 @@
     "noEmit": true,
     "baseUrl": "."
   },
-  "include": ["src", "rsbuild.config.ts"],
+  "include": ["./"],
   "exclude": ["dist", "node_modules"]
 }

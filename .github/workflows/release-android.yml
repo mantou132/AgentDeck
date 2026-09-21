@@ -35,10 +35,10 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync, appendFileSync } from 'node:fs';
-          const { version } = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const { version } = JSON.parse(readFileSync('crates/agentdeck/tauri.conf.json', 'utf8'));
           if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Use a stable major.minor.patch version');
           if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
-            throw new Error('Release tag must match src-tauri/tauri.conf.json version');
+            throw new Error('Release tag must match crates/agentdeck/tauri.conf.json version');
           }
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           NODE
@@ -84,18 +84,18 @@ jobs:
           writeFileSync(storeFile, Buffer.from(env.ANDROID_KEYSTORE_BASE64, 'base64'), { mode: 0o600 });
           const properties = { storeFile, keyAlias: env.ANDROID_KEY_ALIAS, keyPassword: env.ANDROID_KEY_PASSWORD, storePassword: env.ANDROID_STORE_PASSWORD };
           const escape = (value) => value.replace(/[^!-~]|\\/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
-          writeFileSync('src-tauri/gen/android/key.properties', Object.entries(properties).map(([key, value]) => `${key}=${escape(value)}`).join('\n'), { mode: 0o600 });
+          writeFileSync('crates/agentdeck/gen/android/key.properties', Object.entries(properties).map(([key, value]) => `${key}=${escape(value)}`).join('\n'), { mode: 0o600 });
           NODE
 
       - name: Build signed Android bundles
-        run: pnpm tauri android build --ci --apk --aab --config src-tauri/tauri.prod.conf.json
+        run: pnpm tauri android build --ci --apk --aab --config crates/agentdeck/tauri.prod.conf.json
 
       - name: Verify and collect release files
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          aab=src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab
-          apk=src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+          aab=crates/agentdeck/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab
+          apk=crates/agentdeck/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
           jarsigner -verify "$aab" | tee "$RUNNER_TEMP/aab-verification.txt"
           grep -q 'jar verified' "$RUNNER_TEMP/aab-verification.txt"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$apk"
@@ -133,8 +133,8 @@ jobs:
           changesNotSentForReview: false
           releaseName: v${{ steps.version.outputs.version }}
           whatsNewDirectory: distribution/whatsnew
-          mappingFile: src-tauri/gen/android/app/build/outputs/mapping/universalRelease/mapping.txt
+          mappingFile: crates/agentdeck/gen/android/app/build/outputs/mapping/universalRelease/mapping.txt
 
       - name: Remove signing material
         if: always()
-        run: rm -f src-tauri/gen/android/key.properties "$RUNNER_TEMP/agentdeck-upload.jks"
+        run: rm -f crates/agentdeck/gen/android/key.properties "$RUNNER_TEMP/agentdeck-upload.jks"

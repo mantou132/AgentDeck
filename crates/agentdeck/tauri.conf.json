@@ -4,10 +4,10 @@
   "version": "0.2.1",
   "identifier": "com.mantou.agentdeck",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "pnpm -C packages/agentdeck dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "pnpm -C packages/agentdeck build",
+    "frontendDist": "../../packages/agentdeck/dist"
   },
   "app": {
     "withGlobalTauri": true,

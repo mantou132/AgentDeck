@@ -294,6 +294,17 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.closeSessionTimeout'),
     });
 
+  completeCwd = (input = '', cwd?: string, limit?: number) =>
+    this.#peer.call<{ directories: string[]; value?: string; isDirectory?: boolean }>(
+      'agent_cwd_complete',
+      { input, cwd, limit },
+      undefined,
+      {
+        timeoutMs: 10_000,
+        timeoutMessage: 'Complete cwd timeout',
+      },
+    );
+
   deleteSession = (agent: string, sessionId: string) =>
     this.#peer.call<{ deleted: boolean }>(
       'agent_session_delete',

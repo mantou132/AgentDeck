@@ -1,5 +1,5 @@
 packages:
-  - .
+  - packages/*
 
 patchedDependencies:
   tailwindcss: patches/tailwindcss.patch

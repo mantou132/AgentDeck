@@ -1,7 +1,8 @@
 // AUTOMATICALLY GENERATED, DO NOT MODIFY MANUALLY.
 // DELETING WILL REGENERATE
 
-export {}
+export {};
+
 declare global {
   const classMap: typeof import('@mantou/gem')['classMap'];
   const property: typeof import('@mantou/gem')['property'];

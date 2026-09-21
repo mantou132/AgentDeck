@@ -47,7 +47,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/styles/tailwind.css"],
+      "includes": ["packages/agentdeck/src/styles/tailwind.css"],
       "linter": {
         "rules": {
           "complexity": {
@@ -58,6 +58,6 @@
     }
   ],
   "files": {
-    "includes": ["**", "!src/auto-import.d.ts", "!src-tauri/gen"]
+    "includes": ["**", "!**/auto-import.d.ts", "!crates/agentdeck/gen"]
   }
 }

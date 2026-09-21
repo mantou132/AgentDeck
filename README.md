@@ -28,17 +28,15 @@ AgentDeck supports **end-to-end encryption** between your phone and computer. Wi
 
 ```sh
 pnpm install
-pnpm run dev          # browser preview
-pnpm run tauri dev    # desktop
 pnpm run tauri android dev  # Android device/emulator
 ```
 
 ### Checks before commit
 
 ```sh
-pnpm run lint:check   # Biome
-pnpm run check        # TypeScript strict
-pnpm run build        # frontend bundle
+pnpm run lint         # Biome & TypeScript strict check
+pnpm test             # Regression tests
+cargo check           # Rust workspace check
 ```
 
 Husky runs Biome on staged files via lint-staged; install dependencies once to enable it.
@@ -57,15 +55,18 @@ Configure these repository Actions Secrets once:
 | `ANDROID_STORE_PASSWORD` | Keystore password |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | JSON credentials for a service account authorized to release AgentDeck in Play Console |
 
-For a release, increase `version` in `src-tauri/tauri.conf.json`, update all files in `distribution/whatsnew/` (at most 500 characters each), commit the changes, and push the matching `vX.Y.Z` tag. Tauri derives Android's version code from this version, so each upload needs a new version. The workflow attaches APK/AAB files to a GitHub Release and **submits the production release for Google Play review**, including the release notes. Google review still applies; if managed publishing is enabled in Play Console, publish the approved changes there when ready.
+For a release, increase `version` in `crates/agentdeck/tauri.conf.json`, update all files in `distribution/whatsnew/` (at most 500 characters each), commit the changes, and push the matching `vX.Y.Z` tag. Tauri derives Android's version code from this version, so each upload needs a new version. The workflow attaches APK/AAB files to a GitHub Release and **submits the production release for Google Play review**, including the release notes. Google review still applies; if managed publishing is enabled in Play Console, publish the approved changes there when ready.
 
 The GitHub APK uses the upload key; Google Play may use a different app signing key, so test updates to a Play-installed app through a Play testing track.
 
 ## Project structure
 
-- `src/` — Gem + Tap UI frontend: menu, session, settings pages, relay transport, ACP session state.
-- `src-tauri/` — Tauri 2 native shell and generated Android/iOS projects.
-- `public/` — static brand assets copied by Rsbuild.
+This repository is structured as a monorepo (pnpm workspace + Cargo workspace):
+
+- `packages/agentdeck/` — Gem + Tap UI frontend application (`src/`, `public/`, `test/`).
+- `packages/extension/` — AgentDeck browser extension.
+- `crates/agentdeck/` — Tauri 2 native shell, capabilities, Android and iOS projects.
+- `crates/daemon/` — Standalone daemon service (`agentdeckd`).
 
 ## Privacy Policy
 

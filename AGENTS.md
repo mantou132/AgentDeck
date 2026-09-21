@@ -7,33 +7,39 @@
 
 # 项目导航
 
-- `src/`：Gem + Tap UI 前端；`elements/` 为公共自定义元素；`i18n.ts` 与 `locales/` 提供基于 `@mantou/gem` 的多语言。
-- `src-tauri/`：Tauri 2 原生入口、配置和 Android / iOS 工程；Android `res/*/launch_*` 定义启动资源，`MainActivity.kt` 控制系统启动屏退出延迟；iOS `LaunchScreen.storyboard` / `LaunchIcon.imageset` 定义启动布局与图标。插件提供接续到页面 load 的原生启动层；更新应用图标时同步更新 LaunchIcon。
-- `public/`：静态品牌资源；`relay-guide/` 为三步 Relay 指南插图。
-- `test/`：Node 回归测试；`helpers/app-fixture.mjs` 提供使用实际 Relay SDK 的隔离环境。
+项目为 monorepo 结构（pnpm workspace + Cargo workspace）：
+
+- `packages/agentdeck/`：AgentDeck 客户端前端工程。
+  - `src/`：Gem + Tap UI 前端；`elements/` 为公共自定义元素；`i18n.ts` 与 `locales/` 提供基于 `@mantou/gem` 的多语言。
+  - `public/`：静态品牌资源；`relay-guide/` 为三步 Relay 指南插图。
+  - `test/`：Node 回归测试；`helpers/app-fixture.mjs` 提供使用实际 Relay SDK 的隔离环境。
+  - `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；内部 `deck-sheet-layer` 标签映射到 `sheet.ts`。
+- `packages/extension/`：AgentDeck 浏览器扩展。
+- `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 工程；Android `res/*/launch_*` 定义启动资源，`MainActivity.kt` 控制系统启动屏退出延迟；iOS `LaunchScreen.storyboard` / `LaunchIcon.imageset` 定义启动布局与图标。插件提供接续到页面 load 的原生启动层；更新应用图标时同步更新 LaunchIcon。
+- `crates/daemon/`：独立后台服务 `agentdeckd`。
 - `.github/workflows/release-android.yml`：Android 签名构建；手动运行仅保存构建产物，推送匹配 Tauri 版本的 `v*` tag 创建 GitHub Release 并提交 Google Play 正式版审核；`distribution/whatsnew/` 保存 Play 发布说明。
+- `biome.json`：根目录格式化和 lint 配置。
 
 关键入口：
 
-- `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Relay ID 时打开 settings，否则打开 list。
-- `src/pages/`：session-list、session、settings 三页面；settings 提供 Relay 获取指南 sheet，首次未配对使用时自动展示一次；`src/navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
-- `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
-- `src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信，encryption 提供由 ID 识别的可选端到端加密；`src/config.ts` 保存配置读取与连接常量。
-- `src/agent/push.ts`：移动端 FCM 注册与同步；使用 `tauri-plugin-fcm` 插件管理通知权限、渠道和 token 刷新；Android 客户端配置在 `src-tauri/gen/android/app/google-services.json`，禁止放入服务账号私钥。token 经 `peer_attach` 同步，更新不切换连接状态，通知由 FCM 在后台显示。
-- `src/session/`：types 为会话类型，events 为 ACP reducer，groups / timeline 为列表与消息分组，turn 控制流式任务和权限决断，modes 只适配 ACP 模式信息。
-- `src/elements/`：composer 管理输入和附件，session-timeline 展示消息并通过 `Sheet.open` 打开过程弹层；process-detail 按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step；process-step 按 sessionId / groupId / itemId 自行订阅详情更新；attachment / attachment-preview 展示附件；file-viewer 通过 `file_read` 浏览远端文件，file-browser 通过 `file_browse` 浏览远端目录与文件并在新建会话弹窗及独立页面栈中复用，消息链接由 `navigation.ts` 分流到 Tap Browser、目录栈或文件 Viewer；sheet.ts 封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域；carousel 提供通用 CSS Scroll Snap 分页，relay-guide 提供三步指南图文；其余为目录、会话分组、权限和品牌组件。
-- `src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`src/lib/`：Markdown、diff2html 输入转换与路径显示；`follow-bottom.ts` 提供 session、process-detail、process-step 共用的滚动跟底逻辑，由组件 `@effect` 绑定和清理。
-- `src/styles/`：tailwind.css 共享主题 token，theme.ts 桥接 Tap UI。
-- `rsbuild.config.ts`、`postcss.config.js`：构建、自动导入与 Tailwind；内部 `deck-sheet-layer` 标签映射到 `sheet.ts`；`biome.json`：格式和 lint。
+- `packages/agentdeck/src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Relay ID 时打开 settings，否则打开 list。
+- `packages/agentdeck/src/pages/`：session-list、session、settings 三页面；settings 提供 Relay 获取指南 sheet，首次未配对使用时自动展示一次；`navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
+- `packages/agentdeck/src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
+- `packages/agentdeck/src/agent/`：transport 管理 Relay 连接与 host 握手，api 提供远端接口，rpc 负责双向流式通信，encryption 提供由 ID 识别的可选端到端加密；`config.ts` 保存配置读取与连接常量。
+- `packages/agentdeck/src/agent/push.ts`：移动端 FCM 注册与同步；使用 `tauri-plugin-fcm` 插件管理通知权限、渠道和 token 刷新；Android 客户端配置在 `crates/agentdeck/gen/android/app/google-services.json`，禁止放入服务账号私钥。token 经 `peer_attach` 同步，更新不切换连接状态，通知由 FCM 在后台显示。
+- `packages/agentdeck/src/session/`：types 为会话类型，events 为 ACP reducer，groups / timeline 为列表与消息分组，turn 控制流式任务和权限决断，modes 只适配 ACP 模式信息。
+- `packages/agentdeck/src/elements/`：composer 管理输入和附件，session-timeline 展示消息并通过 `Sheet.open` 打开过程弹层；process-detail 按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step；process-step 按 sessionId / groupId / itemId 自行订阅详情更新；attachment / attachment-preview 展示附件；file-viewer 通过 `file_read` 浏览远端文件，file-browser 通过 `file_browse` 浏览远端目录与文件并在新建立会话弹窗及独立页面栈中复用，消息链接由 `navigation.ts` 分流到 Tap Browser、目录栈或文件 Viewer；sheet.ts 封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域；carousel 提供通用 CSS Scroll Snap 分页，relay-guide 提供三步指南图文；其余为目录、会话分组、权限和品牌组件。
+- `packages/agentdeck/src/composer/`：files 读取文件并检查限制，references 管理粘贴引用与编辑范围；`lib/`：Markdown、diff2html 输入转换与路径显示；`follow-bottom.ts` 提供 session、process-detail、process-step 共用的滚动跟底逻辑，由组件 `@effect` 绑定和清理。
+- `packages/agentdeck/src/styles/`：tailwind.css 共享主题 token，theme.ts 桥接 Tap UI。
 
 # 运行约束
 
 - 新会话先建本地 draft，首次发送才远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
-- App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `src/config.ts`，相关源码在 `~/relay`、`~/browser-mcp`。
+- App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`，相关源码在 `~/relay`、`~/browser-mcp`。
 - 普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
 - 异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
-- Android identifier / namespace / applicationId / MainActivity package 保持 `com.mantou.agentdeck` 一致；对应 `src-tauri/tauri.conf.json`、`src-tauri/gen/android/app/build.gradle.kts` 和 `MainActivity.kt`。Rust library 为 `agentdeck_lib`。
+- Android identifier / namespace / applicationId / MainActivity package 保持 `com.mantou.agentdeck` 一致；对应 `crates/agentdeck/tauri.conf.json`、`crates/agentdeck/gen/android/app/build.gradle.kts` 和 `MainActivity.kt`。Rust library 为 `agentdeck_lib`。
 
 # 前端开发
 
@@ -41,7 +47,7 @@
 
 - `unplugin-gem` 自动导入 Gem 成员、Tap UI 和 `elements/*` 元素，无需手动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`。
 - 布局优先 Tailwind utility，Shadow DOM 内不能使用。Light DOM 样式用 `:scope`，Shadow DOM 用 `:host`；通过 `css` / `@adoptedStyle` 共享样式，避免模板内联样式。
-- 主题统一使用 `src/styles/tailwind.css` token 和 `src/styles/theme.ts`，不新增平行的应用级 CSS 变量。原生安全区变量继续局部使用。
+- 主题统一使用 `packages/agentdeck/src/styles/tailwind.css` token 和 `theme.ts`，不新增平行的应用级 CSS 变量。原生安全区变量继续局部使用。
 - 保留 `patches/tailwindcss.patch` 对 Gem 元素的 Preflight 排除；`icons.loading` SVG 自带动画，不加额外旋转。
 - 元素文件名去前缀的标签名，继承 GemElement；使用 ES 装饰器，不使用已弃用的生命周期函数，也不额外声明自定义元素类型。
 - 用 `@property` / attribute 装饰器定义输入；不要在元素内部修改输入，attribute 不赋默认值。内部数据用 `createState`，CSS 状态用 `@state`；优先使用 `#` 私有字段。
@@ -193,10 +199,8 @@ class DuoyunTestElement extends GemElement {
 
 # 常用命令
 
-- `pnpm run dev`：开发预览；`pnpm run build`：前端构建。
-- `pnpm run check`：类型检查；`pnpm test`：回归测试。
-- `pnpm run lint:check`：只检查；`pnpm run lint`：检查并修复。Husky pre-commit 的 lint-staged 仅检查暂存文件。
-- `pnpm run tauri dev` / `pnpm run tauri android dev`：原生开发。
-- `cargo check --manifest-path src-tauri/Cargo.toml`：Rust 检查。
-- `pnpm tauri icon public/agentdeck-icon.png`：重建平台图标。
-- Android 发布：递增 `src-tauri/tauri.conf.json` 的版本、更新 `distribution/whatsnew/` 下所有文件（每个最多 500 字符），并推送对应 `vX.Y.Z` tag；签名和 Play 凭据使用 GitHub Actions Secrets，自动提交正式版审核，上线时间由 Google 审核与 Play 发布设置决定。
+- `pnpm run lint`：Biome 代码风格检查；`pnpm run lint`：检查并修复。Husky pre-commit 的 lint-staged 仅检查暂存文件。
+- `pnpm run tauri android dev`：原生应用 Android 开发。
+- `cargo check`：Rust workspace 检查；`cargo check -p agentdeck`：单测 agentdeck 原生壳 crate。
+- `pnpm tauri icon packages/agentdeck/public/agentdeck-icon.png`：基于前端图标重建各平台原生图标。
+- Android 发布：递增 `crates/agentdeck/tauri.conf.json` 的版本、更新 `distribution/whatsnew/` 下所有文件（每个最多 500 字符），并推送对应 `vX.Y.Z` tag；签名和 Play 凭据使用 GitHub Actions Secrets，自动提交正式版审核，上线时间由 Google 审核与 Play 发布设置决定。
