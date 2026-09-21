@@ -35,6 +35,12 @@ let sessionsRequest = 0;
 const sessionLoads = new Map<string, number>();
 const failedSessionLoads = new Set<string>();
 const localSessions = new Map<string, DeckSession>();
+const inFlightSessions = new Map<string, DeckSession>();
+
+export const recordInFlightSession = (session: DeckSession) => {
+  inFlightSessions.set(session.sessionId, session);
+  localSessions.set(session.sessionId, session);
+};
 
 // App 运行生命周期内已成功打开过的 session（只要打开过一次就不再重复 close+load）
 const openedSessionIds = new Set<string>();
@@ -58,6 +64,8 @@ export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
     patchSession(sessionId, reduction.sessionPatch);
     const local = localSessions.get(sessionId);
     if (local) localSessions.set(sessionId, { ...local, ...reduction.sessionPatch });
+    const inFlight = inFlightSessions.get(sessionId);
+    if (inFlight) inFlightSessions.set(sessionId, { ...inFlight, ...reduction.sessionPatch });
   }
   if (reduction.optionsPatch) updateSessionOptions(sessionId, reduction.optionsPatch);
 };
@@ -75,6 +83,7 @@ export const resetRemoteState = () => {
   sessionLoads.clear();
   failedSessionLoads.clear();
   localSessions.clear();
+  inFlightSessions.clear();
   openedSessionIds.clear();
   void clearAllInFlight();
   declineAllPermissions((id) => {
@@ -102,6 +111,36 @@ export const resetRemoteState = () => {
   });
 };
 
+export const mergeSessionsWithInFlight = (
+  remoteSessions: DeckSession[],
+  inFlightList: Iterable<DeckSession>,
+): DeckSession[] => {
+  const remoteMap = new Map(remoteSessions.map((s) => [s.sessionId, s]));
+  const merged: DeckSession[] = [...remoteSessions];
+
+  for (const inFlight of inFlightList) {
+    const activeUpdatedAt = inFlight.updatedAt || new Date().toISOString();
+    const activeSession: DeckSession = { ...inFlight, updatedAt: activeUpdatedAt };
+    const existing = remoteMap.get(inFlight.sessionId);
+    if (existing) {
+      const localTime = Date.parse(activeUpdatedAt) || 0;
+      const remoteTime = Date.parse(existing.updatedAt || '') || 0;
+      const index = merged.findIndex((s) => s.sessionId === inFlight.sessionId);
+      if (index !== -1) {
+        merged[index] = {
+          ...existing,
+          ...activeSession,
+          updatedAt: localTime >= remoteTime ? activeUpdatedAt : existing.updatedAt,
+        };
+      }
+    } else {
+      merged.unshift(activeSession);
+    }
+  }
+
+  return merged;
+};
+
 export const refreshSessions = async () => {
   if (agentdeckStore.connection !== 'connected') {
     reconnectTransport(true);
@@ -116,16 +155,31 @@ export const refreshSessions = async () => {
     const normalized = sessions
       .filter((session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string')
       .map((session) => ({ ...session, agent }));
-    const groups = getSortedSessionGroups(normalized, agentdeckStore.sessionGroups);
+    const merged = mergeSessionsWithInFlight(normalized, inFlightSessions.values());
+    const prevGroups = agentdeckStore.sessionsLoaded ? agentdeckStore.sessionGroups : [];
+    const groups = getSortedSessionGroups(merged, prevGroups);
     agentdeckStore({
-      sessions: normalized,
+      sessions: merged,
       sessionGroups: groups,
       sessionsLoaded: true,
       sessionsLoading: false,
     });
+    for (const sessionId of Array.from(inFlightSessions.keys())) {
+      if (!agentdeckStore.pendingSessionIds.includes(sessionId)) {
+        inFlightSessions.delete(sessionId);
+      }
+    }
   } catch (error) {
     if (request !== sessionsRequest) return;
+    let fallbackSessions = agentdeckStore.sessions;
+    let fallbackGroups = agentdeckStore.sessionGroups;
+    if (!agentdeckStore.sessionsLoaded && inFlightSessions.size > 0) {
+      fallbackSessions = Array.from(inFlightSessions.values());
+      fallbackGroups = getSortedSessionGroups(fallbackSessions, []);
+    }
     agentdeckStore({
+      sessions: fallbackSessions,
+      sessionGroups: fallbackGroups,
       sessionsLoading: false,
       sessionsLoaded: true,
       sessionsError: error instanceof Error ? error.message : i18n.get('error.fetchSessionsFailed'),
@@ -165,6 +219,7 @@ export const deleteSession = async (sessionId: string) => {
     sessionLoads.delete(sessionId);
     failedSessionLoads.delete(sessionId);
     localSessions.delete(sessionId);
+    inFlightSessions.delete(sessionId);
     openedSessionIds.delete(sessionId);
     void removeInFlight(sessionId);
     resolvePermission(sessionId, null);
@@ -313,17 +368,20 @@ const runPromptTurn = (
   onFailed?: () => void,
   callId?: string,
 ) => {
+  const now = new Date().toISOString();
   setSessionFlag('unreadSessionIds', session.sessionId, false);
   setSessionFlag('pendingSessionIds', session.sessionId, true);
   setSessionError(session.sessionId, '');
-  patchSession(session.sessionId, { updatedAt: new Date().toISOString() });
+  patchSession(session.sessionId, { updatedAt: now });
   const rpcId = callId ?? crypto.randomUUID();
   const currentMessages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
+  const activeSession: DeckSession = { ...session, updatedAt: now };
+  recordInFlightSession(activeSession);
   void saveInFlight({
     sessionId: session.sessionId,
     agent: session.agent,
     rpcId,
-    session,
+    session: activeSession,
     messages: currentMessages,
     options: agentdeckStore.optionsBySession[session.sessionId],
     updatedAt: Date.now(),
@@ -465,6 +523,7 @@ export const promoteDraftSession = async (
   updateSessionOptions(sessionId, options);
 
   localSessions.set(liveSession.sessionId, liveSession);
+  recordInFlightSession(liveSession);
   openedSessionIds.add(liveSession.sessionId);
   const stagedMessages = agentdeckStore.messagesBySession.draft ?? [userMessage];
   const nextSessions = [liveSession, ...agentdeckStore.sessions.filter((s) => s.sessionId !== liveSession.sessionId)];

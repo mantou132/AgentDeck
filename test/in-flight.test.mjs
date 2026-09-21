@@ -98,3 +98,56 @@ test('app restart restores in-flight pending session and seamlessly receives rem
   await restartAgain.connect();
   assert.equal(restartAgain.app.agentdeckStore.pendingSessionIds.length, 0);
 });
+
+test('app restart reconciles in-flight session with remote list, keeping the active session group at the top', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  await fixture.openSession('s1');
+
+  // Send a prompt to enter in-flight status
+  assert.equal(fixture.app.sendPrompt('s1', 'Do something'), true);
+  await tick();
+
+  // Simulate App restart
+  const fresh = documentFixture(fixture);
+  // Hold session list request so we can verify initial display state
+  fresh.heldMethods.add('agent_session_list');
+  await fresh.connect();
+
+  // Before remote session list arrives, sessionsLoaded remains false (skeleton displays cleanly)
+  assert.equal(fresh.app.agentdeckStore.sessionsLoaded, false);
+
+  // Deliver remote session list containing multiple older projects
+  const listReq = fresh.requests.find((r) => r.payload.method === 'agent_session_list');
+  assert.ok(listReq, 'session list request was sent');
+  fresh.reply(listReq, {
+    sessions: [
+      {
+        sessionId: 'old-1',
+        cwd: '/projects/old-1',
+        agent: 'codex',
+        title: 'Old 1',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        sessionId: 'old-2',
+        cwd: '/projects/old-2',
+        agent: 'codex',
+        title: 'Old 2',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+    ],
+  });
+  await tick();
+
+  assert.equal(fresh.app.agentdeckStore.sessionsLoaded, true);
+  const groups = fresh.app.agentdeckStore.sessionGroups;
+  // The in-flight session s1 (cwd: '/tmp') must be reconciled and ordered at the top!
+  assert.ok(groups.length >= 2, 'contains both active and remote groups');
+  assert.equal(groups[0].cwd, '/tmp', 'active in-flight project group is at the top');
+  assert.equal(
+    groups[0].sessions.some((s) => s.sessionId === 's1'),
+    true,
+    'contains the in-flight session',
+  );
+});

@@ -3,13 +3,13 @@ import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
-import { getSortedSessionGroups } from '../session/groups';
 import { requestPermission as requestTurnPermission } from '../session/turn';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
 import {
   applySessionEvent,
   endSession,
   getSession,
+  recordInFlightSession,
   refreshSessions,
   resetRemoteState,
   resumeInFlightTurn,
@@ -76,16 +76,16 @@ export const startApp = () => {
       const optionsBySession = { ...agentdeckStore.optionsBySession };
       const pendingSessionIds = [...agentdeckStore.pendingSessionIds];
       const loadedSessionIds = [...agentdeckStore.loadedSessionIds];
-      const currentSessions = [...agentdeckStore.sessions];
 
       for (const item of inFlights) {
         messagesBySession[item.sessionId] = item.messages;
         if (item.options) optionsBySession[item.sessionId] = item.options;
         if (!pendingSessionIds.includes(item.sessionId)) pendingSessionIds.push(item.sessionId);
         if (!loadedSessionIds.includes(item.sessionId)) loadedSessionIds.push(item.sessionId);
-        if (!currentSessions.some((s) => s.sessionId === item.sessionId)) {
-          currentSessions.unshift(item.session);
-        }
+        const effectiveUpdatedAt =
+          item.session.updatedAt ||
+          (item.updatedAt ? new Date(item.updatedAt).toISOString() : new Date().toISOString());
+        recordInFlightSession({ ...item.session, updatedAt: effectiveUpdatedAt });
         resumeInFlightTurn(item);
       }
 
@@ -94,8 +94,6 @@ export const startApp = () => {
         optionsBySession,
         pendingSessionIds,
         loadedSessionIds,
-        sessions: currentSessions,
-        sessionGroups: getSortedSessionGroups(currentSessions, agentdeckStore.sessionGroups),
       });
     })
     .catch((error) => {
