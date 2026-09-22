@@ -1,0 +1,35 @@
+[package]
+name = "agentdeck-daemon"
+version = "0.1.0"
+edition = "2024"
+description = "Daemon for AgentDeck that provisions and manages local ACP agents and connects to Relay"
+license = "MIT"
+
+[[bin]]
+name = "agentdeckd"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+chacha20poly1305 = "0.10.1"
+hkdf = "0.12.4"
+sha2 = "0.10.9"
+chrono = { version = "0.4", features = ["clock"] }
+dirs = "6"
+clap = { version = "4", features = ["derive", "env"] }
+flate2 = "1"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tar = "0.4"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+agent-client-protocol = "1.0.0"
+relay-client = { git = "https://github.com/mantou132/relay.git" }
+zip = { version = "2", default-features = false, features = ["deflate-flate2", "flate2"] }
+git2 = { version = "0.21.0", default-features = false }
+
+[dev-dependencies]
+axum = "0.8"
+futures-util = "0.3"

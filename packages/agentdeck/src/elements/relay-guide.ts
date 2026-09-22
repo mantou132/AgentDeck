@@ -1,9 +1,9 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { CarouselItem } from '@mantou/tap-ui/elements/carousel';
 import { blockContainer, focusStyle } from '@mantou/tap-ui/lib/styles';
-import { openWebBrowser } from 'src/navigation';
 import { toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { i18n } from '../i18n';
+import { openWebBrowser } from '../navigation';
 
 @customElement('deck-relay-guide')
 @adoptedStyle(blockContainer)

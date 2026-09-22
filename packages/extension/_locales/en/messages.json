@@ -1,0 +1,116 @@
+{
+  "actionTitle": {
+    "message": "AgentDeck"
+  },
+  "appDescription": {
+    "message": "AgentDeck browser extension"
+  },
+  "appName": {
+    "message": "AgentDeck"
+  },
+  "devtoolsAgentLabel": {
+    "message": "Agent"
+  },
+  "devtoolsCwdNoDirectories": {
+    "message": "No matching directories"
+  },
+  "devtoolsCwdPlaceholder": {
+    "message": "Working directory"
+  },
+  "devtoolsCwdTitle": {
+    "message": "Choose working directory"
+  },
+  "devtoolsNewSessionTitle": {
+    "message": "New session"
+  },
+  "devtoolsPanelAttach": {
+    "message": "Add attachment"
+  },
+  "devtoolsPanelAttachmentFailed": {
+    "message": "Could not read that file"
+  },
+  "devtoolsPanelAttachmentTooLarge": {
+    "message": "Text file too large (256 KB max)"
+  },
+  "devtoolsPanelAttachmentUnsupported": {
+    "message": "Only image and text files can be attached"
+  },
+  "devtoolsPanelCancel": {
+    "message": "Cancel"
+  },
+  "devtoolsPanelDelete": {
+    "message": "Delete session"
+  },
+  "devtoolsPanelDropToAttach": {
+    "message": "Drop to attach"
+  },
+  "devtoolsPanelEditHint": {
+    "message": "Editing a queued prompt — Enter updates it"
+  },
+  "devtoolsPanelEditPrompt": {
+    "message": "Edit"
+  },
+  "devtoolsPanelEmpty": {
+    "message": "Click “New” or pick a session on the left to start chatting. Some agents require Node.js 22+ and npm; sign in to the agent you select"
+  },
+  "devtoolsPanelEnqueue": {
+    "message": "Add to queue"
+  },
+  "devtoolsPanelHostReconnected": {
+    "message": "Native host reconnected — the current session is stale; reopen or create a session"
+  },
+  "devtoolsPanelImageAttachment": {
+    "message": "Image"
+  },
+  "devtoolsPanelLoading": {
+    "message": "Loading session…"
+  },
+  "devtoolsPanelNew": {
+    "message": "New"
+  },
+  "devtoolsPanelNewSession": {
+    "message": "New session"
+  },
+  "devtoolsPanelNoSessions": {
+    "message": "No sessions"
+  },
+  "devtoolsPanelPlaceholder": {
+    "message": "Message the agent — Enter to send, Shift+Enter for a new line"
+  },
+  "devtoolsPanelQueuedPrompts": {
+    "message": "Queued prompts"
+  },
+  "devtoolsPanelRemoveAttachment": {
+    "message": "Remove attachment"
+  },
+  "devtoolsPanelRemovePrompt": {
+    "message": "Delete"
+  },
+  "devtoolsPanelSend": {
+    "message": "Send"
+  },
+  "devtoolsPanelSendNow": {
+    "message": "Send now"
+  },
+  "devtoolsPanelSessions": {
+    "message": "Sessions"
+  },
+  "devtoolsPermissionCancel": {
+    "message": "Cancel"
+  },
+  "devtoolsPermissionTitle": {
+    "message": "Permission required"
+  },
+  "devtoolsPermissionToolFallback": {
+    "message": "The agent wants to run a tool"
+  },
+  "devtoolsThought": {
+    "message": "Thought"
+  },
+  "devtoolsToolCall": {
+    "message": "Tool call"
+  },
+  "devtoolsToolInput": {
+    "message": "Parameters"
+  }
+}

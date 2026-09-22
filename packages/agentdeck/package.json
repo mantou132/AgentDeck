@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.2.1",
   "type": "module",
+  "main": "./src/main.ts",
+  "exports": {
+    ".": "./src/main.ts",
+    "./*": "./src/*"
+  },
   "scripts": {
     "dev": "rsbuild dev",
     "build": "rsbuild build",
@@ -21,7 +26,7 @@
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-haptics": "~2.3.3",
     "diff": "^8.0.4",
-    "relay-client-ts": "^0.1.6",
+    "relay-client-ts": "^0.1.7",
     "tauri-plugin-edge-to-edge-api": "^0.1.1",
     "tauri-plugin-fcm": "^0.2.0",
     "tauri-plugin-webproxy-api": "^0.1.2"

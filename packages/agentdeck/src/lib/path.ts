@@ -3,8 +3,22 @@ export type Breadcrumb = {
   path: string;
 };
 
-export const displayPath = (path: string) =>
-  path.replace(/^\/Users\/[^/]+(?=\/|$)/, '~').replace(/^\/home\/[^/]+(?=\/|$)/, '~');
+export const displayPath = (path: string, home?: string) => {
+  if (home) {
+    const windows = /^[a-z]:[\\/]/i.test(home) || home.startsWith('\\\\');
+    const trimEnd = (value: string) => value.replace(/[\\/]+$/, '');
+    const normalizedHome = trimEnd(home);
+    const normalizedPath = trimEnd(path);
+    const comparableHome = windows ? normalizedHome.replaceAll('\\', '/').toLowerCase() : normalizedHome;
+    const comparablePath = windows ? normalizedPath.replaceAll('\\', '/').toLowerCase() : normalizedPath;
+
+    if (comparablePath === comparableHome) return '~';
+    if (comparablePath.startsWith(`${comparableHome}/`)) {
+      return `~/${normalizedPath.slice(normalizedHome.length + 1).replaceAll('\\', '/')}`;
+    }
+  }
+  return path.replace(/^\/Users\/[^/]+(?=\/|$)/, '~').replace(/^\/home\/[^/]+(?=\/|$)/, '~');
+};
 
 export const getBreadcrumbs = (currentPath: string, homePath?: string): Breadcrumb[] => {
   const norm = currentPath.replace(/[\\/]+$/, '');

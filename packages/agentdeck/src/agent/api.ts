@@ -126,15 +126,16 @@ export class AgentApi {
 
   rejectAll = (error: Error) => this.#peer.rejectAll(error);
 
-  setPermissionHandler = (handler: (request: PermissionRequest) => Promise<string>) =>
-    this.#peer.handle('agent_permission_request', (params) =>
-      handler(params as PermissionRequest).then((optionId) => ({ optionId })),
+  setPermissionHandler = (handler?: ((request: PermissionRequest) => Promise<string | null | undefined>) | null) =>
+    this.#peer.handle('agent_permission_request', async (params) =>
+      handler?.(params as PermissionRequest).then((optionId) => ({ optionId })),
     );
 
-  setSessionEndedHandler = (handler: (params: { agent: string; sessionId: string }) => void) =>
-    this.#peer.onNotify('agent_session_ended', (params) => handler(params as { agent: string; sessionId: string }));
+  setSessionEndedHandler = (handler?: ((params: { agent: string; sessionId: string }) => void) | null) =>
+    this.#peer.onNotify('agent_session_ended', (params) => handler?.(params as { agent: string; sessionId: string }));
 
-  setHostReconnectedHandler = (handler: () => void) => this.#peer.onNotify('host_reconnected', () => handler());
+  setHostReconnectedHandler = (handler?: (() => void) | null) =>
+    this.#peer.onNotify('host_reconnected', () => handler?.());
 
   attachPeer = async (deviceId: string, fcmToken?: string | null) => {
     return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId, fcmToken }, undefined, {
@@ -193,10 +194,10 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.gitDiffTimeout'),
     });
 
-  createSession = ({ agent, cwd }: { agent: string; cwd: string }) =>
+  createSession = ({ agent, cwd, panelContext }: { agent: string; cwd: string; panelContext?: unknown }) =>
     this.#peer.call<CreatedSession>(
       'agent_session_create',
-      { agent, cwd, timeoutSeconds: sessionTimeoutSeconds },
+      { agent, cwd, ...(panelContext ? { panelContext } : {}), timeoutSeconds: sessionTimeoutSeconds },
       undefined,
       {
         timeoutMs: 65_000,
@@ -227,10 +228,22 @@ export class AgentApi {
     return sessions;
   };
 
-  loadSession = (session: RemoteSession, agent: string, onEvent: (event: SessionEvent) => void) =>
+  loadSession = (
+    session: RemoteSession,
+    agent: string,
+    onEvent: (event: SessionEvent) => void,
+    panelContext?: unknown,
+  ) =>
     this.#peer.call<LoadedSession>(
       'agent_session_load',
-      { agent, sessionId: session.sessionId, cwd: session.cwd, stream: true, timeoutSeconds: sessionTimeoutSeconds },
+      {
+        agent,
+        sessionId: session.sessionId,
+        cwd: session.cwd,
+        stream: true,
+        timeoutSeconds: sessionTimeoutSeconds,
+        ...(panelContext ? { panelContext } : {}),
+      },
       (event) => onEvent(event as SessionEvent),
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
     );
@@ -241,7 +254,7 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.switchModeTimeout'),
     });
 
-  setSessionModeOption = (agent: string, sessionId: string, configId: string, value: string) =>
+  setSessionConfigOption = (agent: string, sessionId: string, configId: string, value: string) =>
     this.#peer.call<{ configOptions: SessionConfigOption[] }>(
       'agent_session_set_config_option',
       { agent, sessionId, configId, value },

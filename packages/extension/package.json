@@ -1,0 +1,30 @@
+{
+  "name": "agentdeck-extension",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "extension dev",
+    "build": "extension build",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@gem-bind/diff2html": "^0.0.5",
+    "@gem-bind/latex": "^0.0.3",
+    "@gem-bind/marked": "^0.0.7",
+    "@gem-bind/mermaid": "^0.0.5",
+    "@mantou/gem": "^2.2.11",
+    "@swc/helpers": "^0.5.23",
+    "agentdeck": "workspace:*",
+    "diff": "^8.0.4",
+    "duoyun-ui": "^2.2.14",
+    "relay-client-ts": "^0.1.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/chrome": "^0.1.42",
+    "extension": "^3.16.0",
+    "postcss": "^8.5.14",
+    "swc-plugin-gem": "^0.1.18",
+    "tailwindcss": "^4.3.0"
+  }
+}

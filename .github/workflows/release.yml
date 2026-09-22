@@ -1,0 +1,182 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-rust:
+    name: Build Daemon (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build agentdeckd binary
+        run: cargo build --release --target ${{ matrix.target }} -p agentdeck-daemon
+
+      - name: Package archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          name="agentdeckd-${{ matrix.target }}"
+          tar -C "target/${{ matrix.target }}/release" -czf "${name}.tar.gz" agentdeckd
+          shasum -a 256 "${name}.tar.gz" | awk '{print $1}' > "${name}.tar.gz.sha256"
+
+      - name: Package archive (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $name = "agentdeckd-${{ matrix.target }}"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/agentdeckd.exe" -DestinationPath "$name.zip"
+          $hash = (Get-FileHash "$name.zip" -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "$name.zip.sha256" -Value $hash -NoNewline
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentdeckd-${{ matrix.target }}
+          path: |
+            agentdeckd-${{ matrix.target }}.tar.gz
+            agentdeckd-${{ matrix.target }}.tar.gz.sha256
+            agentdeckd-${{ matrix.target }}.zip
+            agentdeckd-${{ matrix.target }}.zip.sha256
+          if-no-files-found: ignore
+
+  build-extension:
+    name: Build Browser Extensions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Strip manifest key (Web Store rejects packages containing it)
+        run: jq 'del(.key)' packages/extension/manifest.json > packages/extension/manifest.tmp && mv packages/extension/manifest.tmp packages/extension/manifest.json
+
+      - name: Build extensions
+        run: pnpm --filter agentdeck-extension build --browser chrome,firefox --zip
+
+      - name: Rename extension archives
+        run: |
+          mv packages/extension/dist/chrome/*.zip packages/extension/dist/chrome/extension-chrome.zip
+          mv packages/extension/dist/firefox/*.zip packages/extension/dist/firefox/extension-firefox.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-chrome-zip
+          path: packages/extension/dist/chrome/extension-chrome.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-firefox-zip
+          path: packages/extension/dist/firefox/extension-firefox.zip
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-rust, build-extension]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: artifacts/**/*
+
+  bump-packages:
+    needs: [release]
+    uses: ./.github/workflows/bump-packages.yml
+    secrets: inherit
+    with:
+      tag: ${{ github.ref_name }}
+
+  publish-chrome:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-chrome-zip
+
+      - uses: wdzeng/chrome-extension@v1
+        with:
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          zip-path: '*.zip'
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+
+  publish-edge:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-chrome-zip
+
+      - uses: wdzeng/edge-addon@v2
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          zip-path: '*.zip'
+          api-key: ${{ secrets.EDGE_API_KEY }}
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
+
+  publish-firefox:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-firefox-zip
+
+      - uses: wdzeng/firefox-addon@v1
+        with:
+          addon-guid: ${{ secrets.FIREFOX_ADDON_GUID }}
+          xpi-path: '*.zip'
+          jwt-issuer: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          jwt-secret: ${{ secrets.FIREFOX_JWT_SECRET }}

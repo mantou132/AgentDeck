@@ -15,7 +15,7 @@ export const applyRemoteMode = async (
   }
   if (mode.currentValue === modeId) return options;
   if (mode.configId) {
-    return agentApi.setSessionModeOption(session.agent, session.sessionId, mode.configId, modeId);
+    return agentApi.setSessionConfigOption(session.agent, session.sessionId, mode.configId, modeId);
   }
   await agentApi.setSessionMode(session.agent, session.sessionId, modeId);
   return withCurrentMode(options, modeId);

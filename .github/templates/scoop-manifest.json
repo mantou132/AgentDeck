@@ -1,0 +1,22 @@
+{
+  "version": "__VERSION__",
+  "description": "Local agent daemon and session manager for AgentDeck",
+  "homepage": "https://github.com/__REPO__",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/__REPO__/releases/download/__TAG__/agentdeckd-x86_64-pc-windows-msvc.zip",
+      "hash": "__WIN_X86__"
+    }
+  },
+  "bin": "agentdeckd.exe",
+  "notes": "Run 'agentdeckd' to start the local agent daemon and session manager.",
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/__REPO__/releases/download/v$version/agentdeckd-x86_64-pc-windows-msvc.zip"
+      }
+    }
+  }
+}

@@ -58,6 +58,6 @@
     }
   ],
   "files": {
-    "includes": ["**", "!**/auto-import.d.ts", "!crates/agentdeck/gen"]
+    "includes": ["**", "!**/auto-import.d.ts", "!crates/agentdeck/gen", "!packages/extension/public/vendor"]
   }
 }

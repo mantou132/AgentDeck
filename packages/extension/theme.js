@@ -1,0 +1,33 @@
+import { theme } from 'duoyun-ui/lib/theme';
+
+// Follow the DevTools panel theme; a no-op outside devtools pages.
+const themeName = globalThis.chrome?.devtools?.panels?.themeName;
+if (themeName) document.documentElement.style.colorScheme = themeName === 'dark' ? 'dark' : 'light';
+
+theme({
+  // colorScheme: 'light dark',
+  primaryColor: 'var(--color-primary)',
+  highlightColor: 'var(--color-highlight)',
+  textColor: 'var(--color-text)',
+  describeColor: 'var(--color-describe)',
+  backgroundColor: 'var(--color-bg)',
+  lightBackgroundColor: 'var(--color-bg-light)',
+  hoverBackgroundColor: 'var(--color-bg-hover)',
+  borderColor: 'var(--color-border)',
+  disabledColor: 'var(--color-disabled)',
+  // maskAlpha: 'var(--color-mask-alpha)',
+  // controlShadow: 'var(--color-control-shadow)',
+  informativeColor: 'var(--color-informative)',
+  neutralColor: 'var(--color-neutral)',
+  positiveColor: 'var(--color-positive)',
+  noticeColor: 'var(--color-notice)',
+  negativeColor: 'var(--color-negative)',
+  focusColor: 'var(--color-focus)',
+  normalRound: 'var(--radius-sm)',
+  smallRound: 'var(--radius-xs)',
+  // gridGutter: 'var(--grid-gutter)',
+  // popupZIndex: 'var(--popup-z-index)',
+  // timingFunction: 'var(--timing-function)',
+  // timingEasingFunction: 'var(--timing-easing-function)',
+  // codeFont: 'var(--font-code)',
+});
