@@ -29,6 +29,11 @@ agent-client-protocol = "1.0.0"
 relay-client = { git = "https://github.com/mantou132/relay.git" }
 zip = { version = "2", default-features = false, features = ["deflate-flate2", "flate2"] }
 git2 = { version = "0.21.0", default-features = false }
+service-manager = "0.11"
+fd-lock = "4"
+
+[target.'cfg(windows)'.dependencies]
+planif = "1.0.0"
 
 [dev-dependencies]
 axum = "0.8"

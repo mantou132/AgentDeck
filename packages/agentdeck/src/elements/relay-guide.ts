@@ -11,9 +11,9 @@ import { openWebBrowser } from '../navigation';
 export class DeckRelayGuideElement extends GemElement {
   @emitter close: Emitter;
 
-  #goB4A = () => {
+  #goRepo = () => {
     this.close();
-    openWebBrowser(toWebproxyUrl('https://github.com/mantou132/browser4agent'), 'Browser for AI Agent');
+    openWebBrowser(toWebproxyUrl('https://github.com/mantou132/AgentDeck'), 'AgentDeck');
   };
 
   get #items(): CarouselItem[] {
@@ -26,7 +26,7 @@ export class DeckRelayGuideElement extends GemElement {
           (text) => html`
             <a
               class="text-primary-strong underline decoration-primary/30 underline-offset-4"
-              @click=${this.#goB4A}
+              @click=${this.#goRepo}
             >${text}</a>
           `,
         ),

@@ -37,10 +37,10 @@ fn endpoint_url(relay_id: &str) -> String {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RemoteDevice {
-    peer_id: u64,
+pub(crate) struct RemoteDevice {
+    pub(crate) peer_id: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    fcm_token: Option<String>,
+    pub(crate) fcm_token: Option<String>,
 }
 
 fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
@@ -78,7 +78,14 @@ impl RemotePeerManager {
         service: AgentService,
         outbound_tx: tokio::sync::mpsc::UnboundedSender<(Value, Option<String>)>,
     ) -> Self {
-        let initial_dev_map = load_persisted_peers();
+        Self::with_devices(service, outbound_tx, load_persisted_peers())
+    }
+
+    pub fn with_devices(
+        service: AgentService,
+        outbound_tx: tokio::sync::mpsc::UnboundedSender<(Value, Option<String>)>,
+        initial_dev_map: HashMap<String, RemoteDevice>,
+    ) -> Self {
         let max_id = initial_dev_map
             .values()
             .map(|device| device.peer_id)
@@ -396,7 +403,7 @@ mod tests {
     #[tokio::test]
     async fn repeated_attach_updates_fcm_token() {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        let manager = RemotePeerManager::new(AgentService::new(), tx);
+        let manager = RemotePeerManager::with_devices(AgentService::new(), tx, HashMap::new());
         manager
             .dispatch(json!({
                 "id": "1",
@@ -444,8 +451,10 @@ mod tests {
 
     #[test]
     fn encrypted_file_response_over_limit_becomes_a_small_authenticated_error() {
-        let vector: Value =
-            serde_json::from_str(include_str!("../../../packages/agentdeck/test/fixtures/e2ee-v1.json")).unwrap();
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../packages/agentdeck/test/fixtures/e2ee-v1.json"
+        ))
+        .unwrap();
         let codec = RelayEncryption::new(vector["id"].as_str().unwrap()).unwrap();
         let frame = encrypt_for_relay(
             &codec,
@@ -461,8 +470,10 @@ mod tests {
 
     #[tokio::test]
     async fn encrypted_handler_routes_authenticated_devices() {
-        let vector: Value =
-            serde_json::from_str(include_str!("../../../packages/agentdeck/test/fixtures/e2ee-v1.json")).unwrap();
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../packages/agentdeck/test/fixtures/e2ee-v1.json"
+        ))
+        .unwrap();
         let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel();
         // A known device keeps this test independent from user pairing files.
         let manager = Arc::new(RemotePeerManager {
@@ -535,7 +546,11 @@ mod tests {
         let (outbound_tx, mut outbound_rx) =
             tokio::sync::mpsc::unbounded_channel::<(Value, Option<String>)>();
         let service = AgentService::new();
-        let manager = Arc::new(RemotePeerManager::new(service, outbound_tx));
+        let manager = Arc::new(RemotePeerManager::with_devices(
+            service,
+            outbound_tx,
+            HashMap::new(),
+        ));
 
         // Phone A attaches
         manager
