@@ -1,5 +1,5 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
-import type { CreatedSession, SessionEvent } from '../agent/api';
+import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { i18n } from '../i18n';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
@@ -330,7 +330,13 @@ export const ensureSessionLoaded = async (sessionId: string) => {
   try {
     // 重启后首次进 session，走一遍 close + load session
     await agentApi.closeSession(session.agent, sessionId);
-    const loaded = await agentApi.loadSession(session, session.agent, (event) => applySessionEvent(sessionId, event));
+    const loaded = await agentApi.loadSession({
+      agent: session.agent,
+      sessionId,
+      cwd: session.cwd,
+      onEvent: (event) => applySessionEvent(sessionId, event),
+      panelContext: REMOTE_APP_PANEL_CONTEXT,
+    });
     if (sessionLoads.get(sessionId) !== token) return;
     failedSessionLoads.delete(sessionId);
     openedSessionIds.add(sessionId);
@@ -476,7 +482,11 @@ export const promoteDraftSession = async (
 
   let created: CreatedSession;
   try {
-    created = await agentApi.createSession({ agent: draft.agent, cwd: draft.cwd });
+    created = await agentApi.createSession({
+      agent: draft.agent,
+      cwd: draft.cwd,
+      panelContext: REMOTE_APP_PANEL_CONTEXT,
+    });
     if (typeof created.sessionId !== 'string' || !created.sessionId) {
       throw new Error(i18n.get('error.missingSessionId'));
     }

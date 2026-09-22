@@ -110,6 +110,13 @@ export type CreatedSession = {
   configOptions?: SessionConfigOption[] | null;
 };
 
+export type PanelContext =
+  | { surface: 'devtools'; tabId: number }
+  | { surface: 'side_panel' }
+  | { surface: 'remote_app' };
+
+export const REMOTE_APP_PANEL_CONTEXT: PanelContext = { surface: 'remote_app' };
+
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 
 // Allow ACP startup/history work more time than the lightweight host handshake.
@@ -194,7 +201,15 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.gitDiffTimeout'),
     });
 
-  createSession = ({ agent, cwd, panelContext }: { agent: string; cwd: string; panelContext?: unknown }) =>
+  createSession = ({
+    agent,
+    cwd,
+    panelContext,
+  }: {
+    agent: string;
+    cwd: string;
+    panelContext?: PanelContext | unknown;
+  }) =>
     this.#peer.call<CreatedSession>(
       'agent_session_create',
       { agent, cwd, ...(panelContext ? { panelContext } : {}), timeoutSeconds: sessionTimeoutSeconds },
@@ -228,23 +243,30 @@ export class AgentApi {
     return sessions;
   };
 
-  loadSession = (
-    session: RemoteSession,
-    agent: string,
-    onEvent: (event: SessionEvent) => void,
-    panelContext?: unknown,
-  ) =>
+  loadSession = ({
+    agent,
+    sessionId,
+    cwd,
+    onEvent,
+    panelContext,
+  }: {
+    agent: string;
+    sessionId: string;
+    cwd?: string;
+    onEvent?: (event: SessionEvent) => void;
+    panelContext?: PanelContext | unknown;
+  }) =>
     this.#peer.call<LoadedSession>(
       'agent_session_load',
       {
         agent,
-        sessionId: session.sessionId,
-        cwd: session.cwd,
+        sessionId,
+        ...(cwd ? { cwd } : {}),
         stream: true,
         timeoutSeconds: sessionTimeoutSeconds,
         ...(panelContext ? { panelContext } : {}),
       },
-      (event) => onEvent(event as SessionEvent),
+      onEvent ? (event) => onEvent(event as SessionEvent) : undefined,
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
     );
 

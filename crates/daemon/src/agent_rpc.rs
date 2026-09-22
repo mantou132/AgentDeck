@@ -875,6 +875,11 @@ fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String>
              suitable page-provided tool returned by read_active_tab."
                 .to_string(),
         )),
+        "remote_app" => Ok(Some(
+            "You are running inside AgentDeck's mobile app. The user is interacting remotely \
+             from a mobile device; the host environment is running on their remote machine."
+                .to_string(),
+        )),
         _ => Err(format!("unknown panelContext.surface: {surface}")),
     }
 }
@@ -969,6 +974,18 @@ mod tests {
 
         assert!(prompt.contains("browser sidebar"));
         assert!(prompt.contains("read_active_tab"));
+    }
+
+    #[test]
+    fn builds_remote_app_panel_system_prompt() {
+        let prompt = message_panel_system_prompt(&serde_json::json!({
+            "panelContext": { "surface": "remote_app" }
+        }))
+        .expect("valid panel context")
+        .expect("system prompt");
+
+        assert!(prompt.contains("mobile app"));
+        assert!(prompt.contains("remote machine"));
     }
 
     #[test]

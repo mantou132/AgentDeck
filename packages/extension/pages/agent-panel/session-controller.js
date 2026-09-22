@@ -146,12 +146,13 @@ export function createSessionController({ state, runtime, turns, api }) {
     pendingLoads.set(sessionKey, record);
     try {
       await api.closeSession(selected.agent, selected.sessionId).catch(() => {});
-      const { configOptions, title, updatedAt } = await api.loadSession(
-        { sessionId: selected.sessionId, cwd: selected.cwd },
-        selected.agent,
-        (event) => runtime.applyEvent(sessionKey, event),
-        getPanelContext(),
-      );
+      const { configOptions, title, updatedAt } = await api.loadSession({
+        agent: selected.agent,
+        sessionId: selected.sessionId,
+        cwd: selected.cwd,
+        onEvent: (event) => runtime.applyEvent(sessionKey, event),
+        panelContext: getPanelContext(),
+      });
       if (!record.alive) return;
       runtime.finishThought(sessionKey);
       if (title || updatedAt) {

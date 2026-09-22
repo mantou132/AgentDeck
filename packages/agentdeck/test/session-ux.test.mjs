@@ -143,3 +143,20 @@ test('pending permission requests expose active permission status for session li
   assert.equal(Object.keys(f.app.agentdeckStore.permissionsBySession).length, 0);
   assert.equal(f.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
 });
+
+test('createSession and loadSession pass remote_app panelContext', async () => {
+  const f = documentFixture();
+  await f.connect();
+  await f.openSession();
+  const loadReq = f.requests.find((r) => r.payload.method === 'agent_session_load');
+  assert.ok(loadReq);
+  assert.deepEqual(loadReq.payload.params.panelContext, { surface: 'remote_app' });
+
+  const draft = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
+  const creating = f.app.promoteDraftSession(draft, 'First task');
+  await f.settleHost();
+  await creating;
+  const createReq = f.requests.find((r) => r.payload.method === 'agent_session_create');
+  assert.ok(createReq);
+  assert.deepEqual(createReq.payload.params.panelContext, { surface: 'remote_app' });
+});
