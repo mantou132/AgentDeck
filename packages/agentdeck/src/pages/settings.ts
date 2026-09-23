@@ -162,7 +162,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
             <div
               v-if=${this.#state.error}
-              class="mb-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm text-negative"
+              class="select-text mb-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm text-negative"
             >
               ${this.#state.error}
             </div>

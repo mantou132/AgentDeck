@@ -300,7 +300,7 @@ export class DeckComposerElement extends GemElement {
                 )}
               </div>
               <div v-if=${attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-sm leading-relaxed text-negative">
-                <span class="min-w-0 flex-1 whitespace-pre-line">${attachmentError}</span>
+                <span class="select-text min-w-0 flex-1 whitespace-pre-line">${attachmentError}</span>
                 <button
                   type="button"
                   class="grid size-6 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-negative"
@@ -311,7 +311,7 @@ export class DeckComposerElement extends GemElement {
                   <tap-use class="size-4" .element=${icons.close}></tap-use>
                 </button>
               </div>
-              <div v-if=${this.#state.draftError} role="alert" class="px-3.5 pt-3 text-sm text-negative">${this.#state.draftError}</div>
+              <div v-if=${this.#state.draftError} role="alert" class="select-text px-3.5 pt-3 text-sm text-negative">${this.#state.draftError}</div>
               <textarea
                 ${this.#textareaRef}
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"

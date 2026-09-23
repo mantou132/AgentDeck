@@ -314,7 +314,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             v-if=${error}
             class="mx-3 mb-2 flex items-center gap-2 rounded-[11px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2 text-sm leading-relaxed text-negative"
           >
-            <span class="min-w-0 flex-1">${error}</span>
+            <span class="select-text min-w-0 flex-1">${error}</span>
             <button
               v-if=${!connected || (!loaded && !loading)}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"

@@ -122,7 +122,7 @@ export class DeckFileViewerElement extends GemElement {
           >${i18n.get(source ? 'file.preview' : 'file.source')}</button>
         </tap-navbar>
         <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">
-          <div class="sticky top-0 z-10 border-b border-border bg-bg-light px-4 py-2 font-mono text-xs break-all text-describe">${path}</div>
+          <div class="select-text sticky top-0 z-10 border-b border-border bg-bg-light px-4 py-2 font-mono text-xs break-all text-describe">${path}</div>
           <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-describe">
             <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
             ${i18n.get('file.loading')}
@@ -130,7 +130,7 @@ export class DeckFileViewerElement extends GemElement {
           <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-12 text-center">
             <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
             <p class="m-0 font-semibold text-highlight">${i18n.get('file.failed')}</p>
-            <p class="mt-2 text-sm break-words text-negative">${error}</p>
+            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
             <div class="flex justify-center gap-3">
               <button
                 class="min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 text-sm font-semibold text-primary-strong"
@@ -147,7 +147,7 @@ export class DeckFileViewerElement extends GemElement {
           </div>
           <gem-bind-marked
             v-else-if=${markdown && !source}
-            class="mx-auto block max-w-[760px] p-5"
+            class="select-text mx-auto block max-w-[760px] p-5"
             .mdStyle=${fileViewerMarkdownStyle}
             .extensions=${markdownExtensions}
             @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
@@ -155,11 +155,11 @@ export class DeckFileViewerElement extends GemElement {
           <tap-code-block
             v-else-if=${isText && isSmall}
             ${this.#codeBlockRef}
-            class="m-0 w-full text-sm bg-transparent rounded-none"
+            class="select-text m-0 w-full text-sm bg-transparent rounded-none"
             codelang=${getCodeLang(path)}
             highlight=${this.line ? String(this.line) : ''}
           >${text}</tap-code-block>
-          <pre v-else class="overflow-auto m-0 w-full p-4 font-mono text-sm leading-relaxed text-text" tabindex="0">${isText ? this.#renderText(text) : ''}</pre>
+          <pre v-else class="select-text overflow-auto m-0 w-full p-4 font-mono text-sm leading-relaxed text-text" tabindex="0">${isText ? this.#renderText(text) : ''}</pre>
         </main>
         <footer slot="footer"></footer>
       </tap-page>

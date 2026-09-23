@@ -136,7 +136,7 @@ export class DeckChangesPageElement extends GemElement {
           <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-16 text-center">
             <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
             <p class="m-0 font-semibold text-highlight">${i18n.get('changes.failed')}</p>
-            <p class="mt-2 text-sm break-words text-negative">${error}</p>
+            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
             <button
               class="mt-4 min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
               @click=${() => this.#state({ revision: this.#state.revision + 1 })}

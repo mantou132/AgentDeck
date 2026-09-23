@@ -117,7 +117,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
           >
             <div class="flex min-w-0 items-center gap-2">
               <tap-use class="size-4 shrink-0" .element=${icons.error}></tap-use>
-              <span class="truncate">${errorMessage}</span>
+              <span class="select-text truncate">${errorMessage}</span>
             </div>
             <button
               class="shrink-0 cursor-pointer font-semibold underline underline-offset-2"
@@ -181,7 +181,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
             <h2 class="mt-5 mb-2 font-display text-lg font-bold tracking-tight text-highlight">
               ${i18n.get('sessionList.errorTitle')}
             </h2>
-            <p class="m-0 max-w-[340px] text-xs leading-relaxed text-describe">
+            <p class="select-text m-0 max-w-[340px] text-xs leading-relaxed text-describe">
               ${errorMessage}
             </p>
             <div class="mt-6 flex flex-wrap items-center justify-center gap-3">

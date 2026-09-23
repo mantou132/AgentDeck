@@ -224,7 +224,7 @@ export class DeckProcessStepElement extends GemElement {
     return html`
       <tap-page ${this.#pageRef}>
         <tap-navbar slot="header" title=${title} back default-back></tap-navbar>
-        <div ${this.#contentRef} class="page-content">${this.#renderContent()}</div>
+        <div ${this.#contentRef} class="page-content select-text">${this.#renderContent()}</div>
       </tap-page>
     `;
   };

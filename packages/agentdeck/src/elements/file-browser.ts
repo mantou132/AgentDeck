@@ -170,7 +170,7 @@ export class DeckFileBrowserElement extends GemElement {
         class="mb-3 flex items-center gap-2 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
       >
         <tap-use class="size-3.5 shrink-0 text-negative" .element=${icons.error}></tap-use>
-        <span class="min-w-0 flex-1">${browseError}</span>
+        <span class="select-text min-w-0 flex-1">${browseError}</span>
         <button
           class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold disabled:opacity-45"
           ?disabled=${loading || Boolean(navigatingPath)}

@@ -72,7 +72,7 @@ export class DeckChangesDiffPageElement extends GemElement {
         <main class="h-full overflow-auto overscroll-contain">
           <!-- File Path and Stats bar -->
           <div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-bg-light/95 px-4 py-2 text-xs backdrop-blur-md">
-            <span class="truncate font-mono text-describe" title=${this.path}>${this.path}</span>
+            <span class="select-text truncate font-mono text-describe" title=${this.path}>${this.path}</span>
             <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5 font-mono text-xs">
               ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
               ${stats?.deletions ? html`<span class="font-medium text-negative">-${stats.deletions}</span>` : ''}
@@ -89,7 +89,7 @@ export class DeckChangesDiffPageElement extends GemElement {
           <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-16 text-center">
             <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
             <p class="m-0 font-semibold text-highlight">${i18n.get('changes.diffFailed')}</p>
-            <p class="mt-2 text-sm break-words text-negative">${error}</p>
+            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
             <button
               class="mt-4 min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
               @click=${() => this.#state({ revision: this.#state.revision + 1 })}
@@ -106,7 +106,7 @@ export class DeckChangesDiffPageElement extends GemElement {
           <!-- Diff output -->
           <tap-code-block
             v-else
-            class="m-0 w-full bg-transparent text-sm rounded-none"
+            class="select-text m-0 w-full bg-transparent text-sm rounded-none"
             codelang="diff"
           >${diff || ''}</tap-code-block>
         </main>

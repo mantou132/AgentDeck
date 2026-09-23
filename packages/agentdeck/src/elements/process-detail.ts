@@ -79,7 +79,6 @@ const style = css`
     text-align: left;
     outline: none;
     cursor: pointer;
-    user-select: none;
   }
   .step-button::after {
     position: absolute;

@@ -82,15 +82,15 @@ export class DeckAttachmentPreviewElement extends GemElement {
 
     return html`
       <div class="header">
-        <h2 class="title">${heading}</h2>
+        <h2 class="title select-text">${heading}</h2>
         <p v-if=${!!description} class="description">${description}</p>
       </div>
       ${
         isImage
           ? html`<img class="image" src=${attachment.previewUrl} alt=${attachment.name || ''} />`
           : isSmall
-            ? html`<tap-code-block codelang=${lang} class="code-block">${text}</tap-code-block>`
-            : html`<pre class="plain-text">${text}</pre>`
+            ? html`<tap-code-block codelang=${lang} class="code-block select-text">${text}</tap-code-block>`
+            : html`<pre class="plain-text select-text">${text}</pre>`
       }
     `;
   };
