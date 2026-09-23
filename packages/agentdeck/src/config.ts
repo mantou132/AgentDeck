@@ -13,10 +13,12 @@ export const RELAY_GUIDE_SEEN_KEY = 'agentdeck.relay_guide_seen.v1';
 export const ACTIVE_MARKER_KEY = 'agentdeck.active_in_flight.v1';
 export const FALLBACK_KEY = 'agentdeck.in_flight_fallback.v1';
 
-// IndexedDB Constants
-export const DB_NAME = 'agentdeck-db';
-export const DB_VERSION = 1;
-export const STORE_NAME = 'in_flight_sessions';
+// IndexedDB database names are unique within this app's origin.
+// Keep all database/store identities here; retain existing names for persisted data.
+export const DATABASES = {
+  inFlight: { name: 'agentdeck-db', version: 1, storeName: 'in_flight_sessions', keyPath: 'sessionId' },
+  drafts: { name: 'agentdeck-drafts', version: 1, storeName: 'drafts' },
+} as const;
 
 export const RELAY_URL = 'wss://agent-deck.xianqiao.wang/ws';
 

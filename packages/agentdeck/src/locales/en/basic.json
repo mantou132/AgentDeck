@@ -75,6 +75,7 @@
   "composer.readingState": "Reading attachments…",
   "composer.preparingSession": "Preparing session…",
   "composer.modeAria": "Session mode",
+  "composer.draftSaveFailed": "Draft could not be saved. Keep this page open and try editing again.",
   "composer.defaultMode": "Default mode",
   "composer.stopAria": "Stop generation",
   "composer.sendAria": "Send",

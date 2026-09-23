@@ -58,7 +58,7 @@ test('rejected handshake can reconnect without waiting for its deadline', async 
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 });
 
-test('rejected session list and draft creation both leave a usable retry path', async () => {
+test('rejected session list and pending session creation both leave a usable retry path', async () => {
   const fixture = documentFixture();
   await fixture.connect();
   fixture.heldMethods.add('agent_session_list');
@@ -76,16 +76,16 @@ test('rejected session list and draft creation both leave a usable retry path', 
   assert.equal(fixture.app.agentdeckStore.sessionsError, '');
 
   fixture.heldMethods.add('agent_session_create');
-  const draft = fixture.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
-  const creation = fixture.app.promoteDraftSession(draft, 'draft task');
+  const pendingSession = fixture.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  const creation = fixture.app.promotePendingSession(pendingSession, 'pending session task');
   await tick();
   await reject(fixture, fixture.requests.at(-1));
   assert.equal(await creation, null);
   assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.ok(fixture.app.agentdeckStore.draftSession);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.draft, /queue is full/i);
+  assert.ok(fixture.app.agentdeckStore.pendingSession);
+  assert.match(fixture.app.agentdeckStore.errorsBySession['pending-session'], /queue is full/i);
   fixture.heldMethods.clear();
-  const created = fixture.app.promoteDraftSession(draft, 'draft task');
+  const created = fixture.app.promotePendingSession(pendingSession, 'pending session task');
   await fixture.settleHost();
   assert.equal((await created).sessionId, 'created');
   const prompt = fixture.requests.at(-1);

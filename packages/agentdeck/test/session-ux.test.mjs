@@ -110,8 +110,8 @@ for (const outcome of ['failed', 'cancelled', 'ended']) {
 test('newly created sessions receive completion reminders and resetting clears them', async () => {
   const f = documentFixture();
   await f.connect();
-  const draft = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
-  const creating = f.app.promoteDraftSession(draft, 'First task');
+  const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  const creating = f.app.promotePendingSession(pendingSession, 'First task');
   await f.settleHost();
   const session = await creating;
   f.reply(f.requests.at(-1), { answer: 'Done' });
@@ -152,8 +152,8 @@ test('createSession and loadSession pass remote_app panelContext', async () => {
   assert.ok(loadReq);
   assert.deepEqual(loadReq.payload.params.panelContext, { surface: 'remote_app' });
 
-  const draft = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
-  const creating = f.app.promoteDraftSession(draft, 'First task');
+  const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  const creating = f.app.promotePendingSession(pendingSession, 'First task');
   await f.settleHost();
   await creating;
   const createReq = f.requests.find((r) => r.payload.method === 'agent_session_create');

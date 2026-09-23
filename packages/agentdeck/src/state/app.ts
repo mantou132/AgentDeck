@@ -1,6 +1,7 @@
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
+import { clearDrafts } from '../composer/drafts';
 import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
 import { requestPermission as requestTurnPermission } from '../session/turn';
@@ -56,6 +57,7 @@ export const startApp = () => {
       // Clear after reload: callbacks in the old document can no longer refill the outbox.
       clearTransportStorage();
       void clearAllInFlight();
+      void clearDrafts().catch(console.error);
       sessionStorage.removeItem(RESET_PENDING_KEY);
     }
   } catch (error) {

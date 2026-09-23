@@ -2,7 +2,7 @@ import { repeat } from '@mantou/gem/lib/element';
 
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
-import { createDraftSession, deleteSession, refreshSessions } from '../state/sessions';
+import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
 
@@ -55,7 +55,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
   #confirmNewSession = () => {
     const { selectedCwd, navigatingCwd } = this.#state;
     if (!selectedCwd || navigatingCwd) return;
-    const session = createDraftSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
+    const session = createPendingSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
     this.#state({ sheetOpen: false, newSessionError: '' });
     openSession(session.sessionId);
   };

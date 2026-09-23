@@ -1,6 +1,7 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
+import { draftKey, removeDraft } from '../composer/drafts';
 import { i18n } from '../i18n';
 import { hapticSuccess } from '../lib/haptics';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
@@ -9,10 +10,10 @@ import { getModeSelection, withCurrentMode } from '../session/modes';
 import {
   cancelTurnPrompt,
   declineAllPermissions,
-  isDraftCanceled,
+  isPendingSessionCanceled,
   performTurn,
   resolvePermission as resolveTurnPermission,
-  setDraftCanceled,
+  setPendingSessionCanceled,
 } from '../session/turn';
 import type { Attachment, DeckSession, SessionOptions, TextMessage } from '../session/types';
 import {
@@ -93,7 +94,7 @@ export const resetRemoteState = () => {
     agentdeckStore({ permissionsBySession });
   });
   agentdeckStore({
-    draftSession: null,
+    pendingSession: null,
     sessions: [],
     sessionGroups: [],
     sessionsLoading: false,
@@ -189,7 +190,7 @@ export const refreshSessions = async () => {
 };
 
 export const getSession = (sessionId: string) => {
-  if (sessionId === 'draft') return agentdeckStore.draftSession ?? undefined;
+  if (sessionId === 'pending-session') return agentdeckStore.pendingSession ?? undefined;
   const remote = agentdeckStore.sessions.find((session) => session.sessionId === sessionId);
   if (remote) return remote;
   const agent = agentdeckStore.settings.agent;
@@ -198,7 +199,7 @@ export const getSession = (sessionId: string) => {
 
 export const deleteSession = async (sessionId: string) => {
   const session = getSession(sessionId);
-  if (!session || session.draft || agentdeckStore.deletingSessionIds.includes(sessionId)) return;
+  if (!session || session.pendingCreation || agentdeckStore.deletingSessionIds.includes(sessionId)) return;
   if (agentdeckStore.connection !== 'connected') {
     agentdeckStore({ sessionsError: i18n.get('error.remoteNotConnected') });
     return;
@@ -223,6 +224,7 @@ export const deleteSession = async (sessionId: string) => {
     inFlightSessions.delete(sessionId);
     openedSessionIds.delete(sessionId);
     void removeInFlight(sessionId);
+    void removeDraft(draftKey(session)).catch(console.error);
     resolvePermission(sessionId, null);
     const sessions = agentdeckStore.sessions.filter((item) => item.sessionId !== sessionId);
     const messagesBySession = { ...agentdeckStore.messagesBySession };
@@ -260,40 +262,40 @@ export type CreateSessionInput = {
   cwd: string;
 };
 
-export const createDraftSession = ({ agent, cwd }: CreateSessionInput): DeckSession => {
-  const draftSession: DeckSession = {
+export const createPendingSession = ({ agent, cwd }: CreateSessionInput): DeckSession => {
+  const pendingSession: DeckSession = {
     agent,
-    sessionId: 'draft',
+    sessionId: 'pending-session',
     cwd,
     title: i18n.get('session.newSession'),
-    draft: true,
+    pendingCreation: true,
     updatedAt: new Date().toISOString(),
   };
-  localSessions.delete('draft');
-  setMessages('draft', []);
-  setSessionError('draft', '');
-  setSessionFlag('loadingSessionIds', 'draft', false);
-  setSessionFlag('pendingSessionIds', 'draft', false);
-  setSessionFlag('loadedSessionIds', 'draft', true);
+  localSessions.delete('pending-session');
+  setMessages('pending-session', []);
+  setSessionError('pending-session', '');
+  setSessionFlag('loadingSessionIds', 'pending-session', false);
+  setSessionFlag('pendingSessionIds', 'pending-session', false);
+  setSessionFlag('loadedSessionIds', 'pending-session', true);
   const knownSession = agentdeckStore.sessions.find(
     (session) => session.agent === agent && getModeSelection(agentdeckStore.optionsBySession[session.sessionId]),
   );
   const knownOptions = knownSession ? agentdeckStore.optionsBySession[knownSession.sessionId] : {};
   agentdeckStore({
-    draftSession,
-    optionsBySession: { ...agentdeckStore.optionsBySession, draft: withCurrentMode(knownOptions, '') },
+    pendingSession,
+    optionsBySession: { ...agentdeckStore.optionsBySession, 'pending-session': withCurrentMode(knownOptions, '') },
   });
-  return draftSession;
+  return pendingSession;
 };
 
-export const resetDraftSession = () => {
-  if (!agentdeckStore.draftSession) return;
-  setMessages('draft', []);
-  setSessionError('draft', '');
-  setSessionFlag('loadingSessionIds', 'draft', false);
-  setSessionFlag('pendingSessionIds', 'draft', false);
-  setSessionFlag('loadedSessionIds', 'draft', false);
-  agentdeckStore({ draftSession: null });
+export const resetPendingSession = () => {
+  if (!agentdeckStore.pendingSession) return;
+  setMessages('pending-session', []);
+  setSessionError('pending-session', '');
+  setSessionFlag('loadingSessionIds', 'pending-session', false);
+  setSessionFlag('pendingSessionIds', 'pending-session', false);
+  setSessionFlag('loadedSessionIds', 'pending-session', false);
+  agentdeckStore({ pendingSession: null });
 };
 
 /**
@@ -302,7 +304,7 @@ export const resetDraftSession = () => {
  * 除非重启 app（openedSessionIds 为空），首次进入 session 才走一遍 close + load。
  */
 export const ensureSessionLoaded = async (sessionId: string) => {
-  if (sessionId === 'draft') return;
+  if (sessionId === 'pending-session') return;
   if (openedSessionIds.has(sessionId)) {
     // 已经打开过，保持在内存中直接秒开，绝不重复走 close + load
     return;
@@ -467,55 +469,55 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
   });
 };
 
-export const promoteDraftSession = async (
-  draft: DeckSession,
+export const promotePendingSession = async (
+  pendingSession: DeckSession,
   text: string,
   attachments: Attachment[] = [],
   onFailed?: () => void,
 ): Promise<DeckSession | null> => {
   if (agentdeckStore.connection !== 'connected') {
-    setSessionError('draft', i18n.get('error.remoteNotConnectedCreate'));
+    setSessionError('pending-session', i18n.get('error.remoteNotConnectedCreate'));
     onFailed?.();
     return null;
   }
-  const selectedMode = getModeSelection(agentdeckStore.optionsBySession.draft)?.currentValue;
-  setDraftCanceled(false);
+  const selectedMode = getModeSelection(agentdeckStore.optionsBySession['pending-session'])?.currentValue;
+  setPendingSessionCanceled(false);
   const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
-  setMessages('draft', [userMessage]);
-  setSessionFlag('pendingSessionIds', 'draft', true);
-  setSessionError('draft', '');
+  setMessages('pending-session', [userMessage]);
+  setSessionFlag('pendingSessionIds', 'pending-session', true);
+  setSessionError('pending-session', '');
 
   let created: CreatedSession;
   try {
     created = await agentApi.createSession({
-      agent: draft.agent,
-      cwd: draft.cwd,
+      agent: pendingSession.agent,
+      cwd: pendingSession.cwd,
       panelContext: REMOTE_APP_PANEL_CONTEXT,
     });
     if (typeof created.sessionId !== 'string' || !created.sessionId) {
       throw new Error(i18n.get('error.missingSessionId'));
     }
   } catch (error) {
-    setMessages('draft', []);
-    setSessionFlag('pendingSessionIds', 'draft', false);
-    setSessionError('draft', error instanceof Error ? error.message : i18n.get('error.createSessionFailed'));
+    setMessages('pending-session', []);
+    setSessionFlag('pendingSessionIds', 'pending-session', false);
+    setSessionError('pending-session', error instanceof Error ? error.message : i18n.get('error.createSessionFailed'));
     onFailed?.();
     return null;
   }
 
   const sessionId = created.sessionId;
-  if (isDraftCanceled()) {
-    void agentApi.closeSession(draft.agent, sessionId).catch(() => {});
-    setMessages('draft', []);
-    setSessionFlag('pendingSessionIds', 'draft', false);
+  if (isPendingSessionCanceled()) {
+    void agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
+    setMessages('pending-session', []);
+    setSessionFlag('pendingSessionIds', 'pending-session', false);
     return null;
   }
 
   const now = new Date().toISOString();
   const liveSession: DeckSession = {
-    agent: draft.agent,
+    agent: pendingSession.agent,
     sessionId,
-    cwd: draft.cwd,
+    cwd: pendingSession.cwd,
     title: created.title || text.slice(0, 30) || attachments[0]?.name,
     updatedAt: typeof created.updatedAt === 'string' && created.updatedAt ? created.updatedAt : now,
   };
@@ -528,10 +530,10 @@ export const promoteDraftSession = async (
     } catch (error) {
       modeError = error instanceof Error ? error.message : i18n.get('error.switchModeFailed');
     }
-    if (isDraftCanceled()) {
-      void agentApi.closeSession(draft.agent, sessionId).catch(() => {});
-      setMessages('draft', []);
-      setSessionFlag('pendingSessionIds', 'draft', false);
+    if (isPendingSessionCanceled()) {
+      void agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
+      setMessages('pending-session', []);
+      setSessionFlag('pendingSessionIds', 'pending-session', false);
       return null;
     }
   }
@@ -540,7 +542,7 @@ export const promoteDraftSession = async (
   localSessions.set(liveSession.sessionId, liveSession);
   recordInFlightSession(liveSession);
   openedSessionIds.add(liveSession.sessionId);
-  const stagedMessages = agentdeckStore.messagesBySession.draft ?? [userMessage];
+  const stagedMessages = agentdeckStore.messagesBySession['pending-session'] ?? [userMessage];
   const nextSessions = [liveSession, ...agentdeckStore.sessions.filter((s) => s.sessionId !== liveSession.sessionId)];
 
   agentdeckStore({
@@ -549,13 +551,13 @@ export const promoteDraftSession = async (
     messagesBySession: {
       ...agentdeckStore.messagesBySession,
       [liveSession.sessionId]: stagedMessages,
-      draft: [],
+      'pending-session': [],
     },
-    draftSession: null,
+    pendingSession: null,
   });
 
-  setSessionFlag('loadedSessionIds', 'draft', false);
-  setSessionFlag('pendingSessionIds', 'draft', false);
+  setSessionFlag('loadedSessionIds', 'pending-session', false);
+  setSessionFlag('pendingSessionIds', 'pending-session', false);
   setSessionFlag('loadedSessionIds', liveSession.sessionId, true);
 
   if (modeError) {
@@ -579,7 +581,7 @@ export const sendPrompt = (
   if (
     (!text && !attachments.length) ||
     !session ||
-    session.draft ||
+    session.pendingCreation ||
     agentdeckStore.connection !== 'connected' ||
     !agentdeckStore.loadedSessionIds.includes(sessionId) ||
     agentdeckStore.pendingSessionIds.includes(sessionId) ||
@@ -600,8 +602,8 @@ export const cancelTurn = (sessionId: string) => {
   const session = getSession(sessionId);
   if (!session || !agentdeckStore.pendingSessionIds.includes(sessionId)) return;
   resolvePermission(sessionId, null);
-  if (session.draft) {
-    setDraftCanceled(true);
+  if (session.pendingCreation) {
+    setPendingSessionCanceled(true);
     setSessionFlag('pendingSessionIds', sessionId, false);
     return;
   }

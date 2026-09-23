@@ -75,6 +75,7 @@
   "composer.readingState": "正在读取附件…",
   "composer.preparingSession": "正在准备会话…",
   "composer.modeAria": "会话模式",
+  "composer.draftSaveFailed": "草稿保存失败，请保留当前页面并再次编辑以重试。",
   "composer.defaultMode": "默认模式",
   "composer.stopAria": "停止生成",
   "composer.sendAria": "发送",

@@ -2,14 +2,14 @@
 
 1. 遇到没有明确的事情不要自由发挥，应该询问确定。
 2. 始终根据目的站在全局视角下考虑问题，如果有更简洁的方案应该提出来。
-3. 结构、入口或构建方式变化时同步更新本文档及对应子目录 CLAUDE.md；外层只保留导航、公用运行约束和全局开发规范，各子项目的实现细节下沉到各自目录。
+3. 结构、入口或构建方式变化时同步更新本文档及对应子目录 CLAUDE.md，仍要保持精简；外层只保留导航、公用运行约束和全局开发规范，各子项目的实现细节下沉到各自目录。
 4. 只处理有实际依据的场景；不为不会发生的情况增加防御逻辑或不必要的复杂度。
 
 # 项目导航
 
 项目为 monorepo 结构（pnpm workspace + Cargo workspace）：
 
-- `packages/agentdeck/`：AgentDeck 客户端前端工程与移动端适配。详情参见 [`packages/agentdeck/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/agentdeck/CLAUDE.md)。
+- `packages/agentdeck/`：AgentDeck 客户端前端工程、移动端适配与本地持久化。详情参见 [`packages/agentdeck/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/agentdeck/CLAUDE.md)。
 - `packages/extension/`：AgentDeck 浏览器扩展（Chrome & Firefox）。详情参见 [`packages/extension/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/extension/CLAUDE.md)。
 - `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置、防自动睡眠与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
 - `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程。
@@ -23,7 +23,7 @@
 
 - **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，agentdeckd 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。
 - **端到端加密（E2EE）**：普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
-- **会话状态机制**：新会话先建本地 draft，首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
+- **会话状态机制**：新会话先建本地待创建会话（App 中称 pending session），首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
 - **连接与重试**：host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
 - **重置与清理**：异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
 

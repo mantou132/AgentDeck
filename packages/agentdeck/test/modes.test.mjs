@@ -51,12 +51,12 @@ const request = (f, method) => f.requests.findLast((r) => r.payload.method === m
 const failed = (f, req) => f.deliver({ id: req.payload.id, error: 'mode rejected', peerId: 1 });
 
 async function creating(f) {
-  const draft = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
-  assert.equal(selection(f, 'draft').currentValue, '');
-  assert.equal(await f.app.changeSessionMode(draft, 'plan'), true);
+  const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  assert.equal(selection(f, 'pending-session').currentValue, '');
+  assert.equal(await f.app.changeSessionMode(pendingSession, 'plan'), true);
   assert.equal(request(f, 'agent_session_create'), undefined);
   f.heldMethods.add('agent_session_create');
-  const promotion = f.app.promoteDraftSession(draft, 'First task', [
+  const promotion = f.app.promotePendingSession(pendingSession, 'First task', [
     { id: 'notes', name: 'notes.txt', kind: 'text', text: 'keep me' },
   ]);
   await f.settleHost();
@@ -209,7 +209,7 @@ test('config-only mode uses its reported ID and the server response; unrelated o
   assert.equal(selection(f).currentValue, 'default');
 });
 
-test('draft mode is applied after create and before the first prompt', async () => {
+test('pending session mode is applied after create and before the first prompt', async () => {
   const f = await opened();
   const { promotion, creation } = await creating(f);
   f.reply(creation, { sessionId: 'created', modes });
@@ -226,7 +226,7 @@ test('draft mode is applied after create and before the first prompt', async () 
 });
 
 for (const scenario of ['rejected', 'unsupported']) {
-  test(`draft mode ${scenario} keeps the created session and input recoverable without sending`, async () => {
+  test(`pending session mode ${scenario} keeps the created session and input recoverable without sending`, async () => {
     const f = await opened();
     const { promotion, creation } = await creating(f);
     f.reply(creation, { sessionId: 'created', ...(scenario === 'rejected' ? { modes } : {}) });
@@ -249,13 +249,13 @@ for (const scenario of ['rejected', 'unsupported']) {
   });
 }
 
-test('first draft uses agent default and captures capabilities; cancel during mode setup sends no prompt', async () => {
+test('first pending session uses agent default and captures capabilities; cancel during mode setup sends no prompt', async () => {
   const f = documentFixture();
   await f.connect();
-  const draft = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
-  assert.equal(selection(f, 'draft'), undefined);
+  const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  assert.equal(selection(f, 'pending-session'), undefined);
   f.heldMethods.add('agent_session_create');
-  let promotion = f.app.promoteDraftSession(draft, 'default');
+  let promotion = f.app.promotePendingSession(pendingSession, 'default');
   await tick();
   f.reply(request(f, 'agent_session_create'), { sessionId: 'created', modes });
   await promotion;
@@ -264,13 +264,13 @@ test('first draft uses agent default and captures capabilities; cancel during mo
   assert.equal(request(f, 'agent_session_set_mode'), undefined);
   f.reply(request(f, 'agent_prompt'), { answer: 'done' });
   await tick();
-  const next = f.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
+  const next = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
   await f.app.changeSessionMode(next, 'plan');
-  promotion = f.app.promoteDraftSession(next, 'cancel');
+  promotion = f.app.promotePendingSession(next, 'cancel');
   await tick();
   f.reply(request(f, 'agent_session_create'), { sessionId: 'next', modes });
   await tick();
-  f.app.cancelTurn('draft');
+  f.app.cancelTurn('pending-session');
   f.reply(request(f, 'agent_session_set_mode'), {});
   assert.equal(await promotion, null);
   await tick();

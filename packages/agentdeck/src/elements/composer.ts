@@ -1,5 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
+import { readDraft, saveDraft } from '../composer/drafts';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
 import {
   createPasteReference,
@@ -35,6 +36,7 @@ const style = css`
 @adoptedStyle(blockContainer)
 export class DeckComposerElement extends GemElement {
   @property sessionKey = '';
+  @property draftKey = '';
   @property mode?: ModeSelection;
   @boolattribute modeBusy: boolean;
   @emitter modeChange: Emitter<string>;
@@ -53,18 +55,43 @@ export class DeckComposerElement extends GemElement {
     attachmentError: '',
     readingAttachments: false,
     submitting: false,
+    loadingDraft: false,
+    draftError: '',
   });
   #textareaRef = createRef<HTMLTextAreaElement>();
   #fileInputRef = createRef<HTMLInputElement>();
   #nextPasteReference = 1;
   #pastedAttachments = new Map<string, Attachment>();
 
-  @effect((i) => [i.sessionKey])
-  #resetInput = () => this.#clearInput();
+  @effect((i) => [i.sessionKey, i.draftKey])
+  #resetInput = async () => {
+    this.#clearInput();
+    this.#state({ loadingDraft: Boolean(this.draftKey), draftError: '', readingAttachments: false });
+    if (!this.draftKey) return;
+    // 不处理本地草稿读取期间快速切换会话的竞态。
+    try {
+      const draft = await readDraft(this.draftKey);
+      if (draft) this.#restoreInput(draft, false);
+    } finally {
+      this.#state({ loadingDraft: false });
+    }
+  };
+
+  #saveDraft = async () => {
+    if (!this.draftKey) return;
+    try {
+      await saveDraft(this.draftKey, { text: this.#state.draft, attachments: this.#state.attachments });
+      this.#state({ draftError: '' });
+    } catch {
+      // 附件可能耗尽存储配额，需要提示用户草稿未保存。
+      this.#state({ draftError: i18n.get('composer.draftSaveFailed') });
+    }
+  };
 
   get #canSend() {
     return (
       this.ready &&
+      !this.#state.loadingDraft &&
       !this.pending &&
       !this.modeBusy &&
       Boolean(this.#state.draft.trim() || this.#state.attachments.length) &&
@@ -93,6 +120,7 @@ export class DeckComposerElement extends GemElement {
       draft: value,
       attachments: syncPasteReferences(value, this.#state.attachments, this.#pastedAttachments.values()),
     });
+    void this.#saveDraft();
   };
 
   #clearInput = () => {
@@ -102,17 +130,25 @@ export class DeckComposerElement extends GemElement {
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
   };
 
+  restoreIfEmpty = (key: string, message: ComposerInput) => {
+    if (this.draftKey === key && !this.#state.draft && !this.#state.attachments.length) this.restore(message);
+  };
+
   restore = (message: { text: string; attachments?: Attachment[] }) => {
+    this.#restoreInput(message, true);
+    void this.#saveDraft();
+  };
+
+  #restoreInput = (message: { text: string; attachments?: Attachment[] }, focus: boolean) => {
     this.#pastedAttachments.clear();
     for (const attachment of message.attachments ?? []) {
       if (attachment.marker) this.#pastedAttachments.set(attachment.id, attachment);
     }
     this.#nextPasteReference = Math.max(0, ...(message.attachments ?? []).map((item) => item.pasteReference ?? 0)) + 1;
-    this.#setDraft(message.text);
-    this.#state({ attachments: message.attachments ?? [], attachmentError: '' });
+    this.#state({ draft: message.text, attachments: message.attachments ?? [], attachmentError: '' });
     if (this.#textareaRef.value) {
       this.#textareaRef.value.value = message.text;
-      this.#textareaRef.value.focus();
+      if (focus) this.#textareaRef.value.focus();
     }
   };
 
@@ -124,7 +160,7 @@ export class DeckComposerElement extends GemElement {
   };
 
   #addFiles = async (files: File[], selection?: InputSelection) => {
-    if (!files.length) return;
+    if (!files.length || this.#state.loadingDraft) return;
     if (this.#state.readingAttachments) {
       this.#state({ attachmentError: i18n.get('composer.readingAttachments') });
       return;
@@ -134,6 +170,7 @@ export class DeckComposerElement extends GemElement {
       return;
     }
     this.#state({ readingAttachments: true, attachmentError: '' });
+    // 附件读取期间切换会话不做额外隔离。
     const results = await Promise.allSettled(files.map(readAttachment));
     const attachments: Attachment[] = [];
     const errors: string[] = [];
@@ -143,6 +180,7 @@ export class DeckComposerElement extends GemElement {
     }
     if (selection) this.#insertPastedAttachments(attachments, selection);
     else this.#state({ attachments: [...this.#state.attachments, ...attachments] });
+    void this.#saveDraft();
     this.#state({
       attachmentError: errors.length ? errors.join('\n') : this.#state.attachmentError,
       readingAttachments: false,
@@ -160,6 +198,7 @@ export class DeckComposerElement extends GemElement {
       return;
     }
     this.#state({ attachments: this.#state.attachments.filter((item) => item.id !== event.detail) });
+    void this.#saveDraft();
   };
 
   #replaceInputRange = (start: number, end: number, replacement: string) => {
@@ -272,6 +311,7 @@ export class DeckComposerElement extends GemElement {
                   <tap-use class="size-4" .element=${icons.close}></tap-use>
                 </button>
               </div>
+              <div v-if=${this.#state.draftError} role="alert" class="px-3.5 pt-3 text-sm text-negative">${this.#state.draftError}</div>
               <textarea
                 ${this.#textareaRef}
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
@@ -283,7 +323,7 @@ export class DeckComposerElement extends GemElement {
                 @beforeinput=${this.#onBeforeInput}
                 @paste=${this.#onPaste}
                 @keydown=${this.#onKeydown}
-                ?disabled=${this.disabled || this.#state.submitting}
+                ?disabled=${this.disabled || this.#state.submitting || this.#state.loadingDraft}
               ></textarea>
               <div class="flex min-h-11 items-center justify-between gap-2.5 px-2 pt-1 pb-2">
                 <div class="flex min-w-0 items-center gap-2 text-sm font-medium text-describe">
@@ -293,7 +333,7 @@ export class DeckComposerElement extends GemElement {
                     class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-describe active:bg-bg-hover disabled:cursor-default disabled:opacity-45"
                     aria-label=${i18n.get('composer.addAttachmentAria')}
                     title=${i18n.get('composer.addAttachmentTitle')}
-                    ?disabled=${this.#state.readingAttachments || this.#state.submitting || this.#state.attachments.length >= MAX_ATTACHMENTS}
+                    ?disabled=${this.#state.loadingDraft || this.#state.readingAttachments || this.#state.submitting || this.#state.attachments.length >= MAX_ATTACHMENTS}
                     @click=${() => this.#fileInputRef.value?.click()}
                   >
                     <tap-use class="size-5" .element=${this.#state.readingAttachments ? icons.loading : icons.paperclip}></tap-use>
@@ -314,7 +354,7 @@ export class DeckComposerElement extends GemElement {
                         this.modeChange(value);
                       }}
                     >
-                      <option v-if=${this.sessionKey === 'draft'} value="" .selected=${!this.mode?.currentValue}>${i18n.get('composer.defaultMode')}</option>
+                      <option v-if=${this.sessionKey === 'pending-session'} value="" .selected=${!this.mode?.currentValue}>${i18n.get('composer.defaultMode')}</option>
                       ${this.mode?.choices.map((choice) => html`<option value=${choice.value} .selected=${choice.value === this.mode?.currentValue}>${choice.name}</option>`)}
                     </select>
                     <tap-use v-if=${this.modeBusy} class="size-3.5 shrink-0" .element=${icons.loading}></tap-use>

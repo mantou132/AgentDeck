@@ -13,10 +13,10 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
       assert.equal(old.app.agentdeckStore.loadingSessionIds.includes('s1'), true);
     } else if (operation === 'creating') {
       old.heldMethods.add('agent_session_create');
-      const draft = old.app.createDraftSession({ agent: 'codex', cwd: '/tmp' });
-      void old.app.promoteDraftSession(draft, 'old draft');
+      const pendingSession = old.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+      void old.app.promotePendingSession(pendingSession, 'old pending session');
       await tick();
-      assert.equal(old.app.agentdeckStore.pendingSessionIds.includes('draft'), true);
+      assert.equal(old.app.agentdeckStore.pendingSessionIds.includes('pending-session'), true);
     } else {
       await old.openSession();
       old.app.sendPrompt('s1', 'old task');
@@ -58,7 +58,7 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
     assert.equal(fresh.app.agentdeckStore.pendingSessionIds.length, 0);
     assert.equal(fresh.app.agentdeckStore.loadingSessionIds.length, 0);
     assert.equal(Object.keys(fresh.app.agentdeckStore.permissionsBySession).length, 0);
-    assert.equal(fresh.app.agentdeckStore.draftSession, null);
+    assert.equal(fresh.app.agentdeckStore.pendingSession, null);
     assert.equal(
       fresh.requests.some((request) => request.message_id === 'stale'),
       false,

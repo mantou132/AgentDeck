@@ -29,13 +29,13 @@ export const declineAllPermissions = (onClean: (sessionId: string) => void) => {
   }
 };
 
-let draftCanceled = false;
+let pendingSessionCanceled = false;
 
-export const setDraftCanceled = (canceled: boolean) => {
-  draftCanceled = canceled;
+export const setPendingSessionCanceled = (canceled: boolean) => {
+  pendingSessionCanceled = canceled;
 };
 
-export const isDraftCanceled = () => draftCanceled;
+export const isPendingSessionCanceled = () => pendingSessionCanceled;
 
 export const performTurn = async (
   session: DeckSession,

@@ -2,6 +2,7 @@ import { history } from '@mantou/gem/lib/history';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { reconnectTransport } from '../agent/transport';
+import { draftKey, removeDraft, restoreDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
@@ -12,16 +13,16 @@ import type { Attachment } from '../session/types';
 import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
-  createDraftSession,
+  createPendingSession,
   ensureSessionLoaded,
   getSession,
-  promoteDraftSession,
-  resetDraftSession,
+  promotePendingSession,
+  resetPendingSession,
   resolvePermission,
   retrySessionLoad,
   sendPrompt,
 } from '../state/sessions';
-import { agentdeckStore, clearSessionError, setSessionFlag } from '../state/store';
+import { agentdeckStore, clearSessionError, setSessionError, setSessionFlag } from '../state/store';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -78,29 +79,58 @@ export class AgentDeckSessionPageElement extends GemElement {
   };
 
   @effect(() => [])
-  #cleanupDraft = () => () => {
-    if (this.sessionId === 'draft') {
-      resetDraftSession();
+  #cleanupPendingSession = () => () => {
+    if (this.sessionId === 'pending-session') {
+      resetPendingSession();
     }
   };
 
   #send = async ({ text, attachments }: ComposerInput) => {
     const session = getSession(this.sessionId);
-    const restoreInput = () => {
-      this.#composerRef.value?.restore({ text, attachments });
-    };
     if (!session) {
-      restoreInput();
+      this.#composerRef.value?.restore({ text, attachments });
       return false;
     }
-    if (!session.draft) return sendPrompt(this.sessionId, text, attachments, restoreInput);
-    const liveSession = await promoteDraftSession(session, text, attachments, restoreInput);
-    if (!liveSession) {
-      restoreInput();
-      return false;
+    const originalKey = draftKey(session);
+    let targetSession = session;
+    let preparing = true;
+    let failed = false;
+    const persistFailure = async () => {
+      const key = draftKey(targetSession);
+      try {
+        // Keep anything the user has already written for the next turn.
+        const restored = await restoreDraft(key, { text, attachments });
+        this.#composerRef.value?.restoreIfEmpty(key, restored);
+      } catch {
+        this.#composerRef.value?.restoreIfEmpty(key, { text, attachments });
+        setSessionError(targetSession.sessionId, i18n.get('composer.draftSaveFailed'));
+      }
+    };
+    const restoreInput = () => {
+      failed = true;
+      if (!preparing) void persistFailure();
+    };
+    let accepted = false;
+    try {
+      if (session.pendingCreation) {
+        const liveSession = await promotePendingSession(session, text, attachments, restoreInput);
+        if (liveSession) {
+          targetSession = liveSession;
+          this.sessionId = liveSession.sessionId;
+          accepted = true;
+        }
+      } else {
+        accepted = sendPrompt(session.sessionId, text, attachments, restoreInput);
+      }
+      // The prompt is now owned by the existing in-flight message persistence.
+      if (accepted) await removeDraft(originalKey);
+    } catch {
+      failed = true;
+    } finally {
+      preparing = false;
     }
-    this.sessionId = liveSession.sessionId;
-    return true;
+    if (failed || !accepted) await persistFailure();
+    return accepted;
   };
 
   #previewAttachment = (event: CustomEvent<Attachment>) => {
@@ -157,8 +187,8 @@ export class AgentDeckSessionPageElement extends GemElement {
           ?disabled=${!connected || !cwd}
           @click=${() => {
             if (!cwd) return;
-            const draft = createDraftSession({ agent: agentdeckStore.settings.agent, cwd });
-            openSession(draft.sessionId);
+            const pendingSession = createPendingSession({ agent: agentdeckStore.settings.agent, cwd });
+            openSession(pendingSession.sessionId);
           }}
         >
           <tap-use class="size-[20px]" .element=${icons.add}></tap-use>
@@ -201,7 +231,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     const connected = agentdeckStore.connection === 'connected';
     return html`
       <tap-page class="bg-bg text-text">
-        ${this.#renderHeader(session.title || (session.draft ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd, loading, loaded)}
+        ${this.#renderHeader(session.title || (session.pendingCreation ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd, loading, loaded)}
 
         <div class="relative h-full">
           <main
@@ -237,10 +267,10 @@ export class AgentDeckSessionPageElement extends GemElement {
                   <deck-icon></deck-icon>
                 </div>
                 <h2 class="mt-[18px] mb-2 font-display text-lg font-semibold tracking-[-0.02em] text-highlight">
-                  ${session.draft ? i18n.get('session.newSession') : i18n.get('session.ready')}
+                  ${session.pendingCreation ? i18n.get('session.newSession') : i18n.get('session.ready')}
                 </h2>
                 <p class="m-0 max-w-[280px] text-sm leading-relaxed text-describe">
-                  ${session.draft ? i18n.get('session.newSessionHint') : i18n.get('session.emptyHistoryHint')}
+                  ${session.pendingCreation ? i18n.get('session.newSessionHint') : i18n.get('session.emptyHistoryHint')}
                 </p>
               </section>
             </div>
@@ -294,6 +324,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           <deck-composer
             ${this.#composerRef}
             .sessionKey=${this.sessionId}
+            .draftKey=${draftKey(session)}
             .mode=${getModeSelection(agentdeckStore.optionsBySession[session.sessionId])}
             ?mode-busy=${changingMode}
             @mode-change=${(event: CustomEvent<string>) => {

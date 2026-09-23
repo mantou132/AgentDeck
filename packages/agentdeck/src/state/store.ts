@@ -11,7 +11,7 @@ export const agentdeckStore = createStore({
   agents: popularAgents,
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
-  draftSession: null as DeckSession | null,
+  pendingSession: null as DeckSession | null,
   sessions: [] as DeckSession[],
   sessionGroups: [] as SessionGroup[],
   sessionsLoading: false,

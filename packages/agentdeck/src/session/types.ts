@@ -2,7 +2,8 @@ import type { LoadedSession, RemoteSession } from '../agent/api';
 
 export type DeckSession = RemoteSession & {
   agent: string;
-  draft?: boolean;
+  /** Local session awaiting its first remote create request. */
+  pendingCreation?: boolean;
 };
 
 export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
