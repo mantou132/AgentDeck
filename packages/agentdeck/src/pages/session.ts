@@ -9,7 +9,7 @@ import { followBottom } from '../lib/follow-bottom';
 import { displayPath } from '../lib/path';
 import { openChanges, openSession, openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
-import type { Attachment } from '../session/types';
+import type { Attachment, DeckSession } from '../session/types';
 import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
@@ -85,51 +85,59 @@ export class AgentDeckSessionPageElement extends GemElement {
     }
   };
 
-  #send = async ({ text, attachments }: ComposerInput) => {
+  #restoreFailedInput = async (session: DeckSession, input: ComposerInput) => {
+    const key = draftKey(session);
+    try {
+      // 保留用户为下一轮输入的新内容。
+      const restored = await restoreDraft(key, input);
+      this.#composerRef.value?.restoreIfEmpty(key, restored);
+    } catch {
+      this.#composerRef.value?.restoreIfEmpty(key, input);
+      setSessionError(session.sessionId, i18n.get('composer.draftSaveFailed'));
+    }
+  };
+
+  #send = async (input: ComposerInput) => {
     const session = getSession(this.sessionId);
     if (!session) {
-      this.#composerRef.value?.restore({ text, attachments });
+      this.#composerRef.value?.restore(input);
       return false;
     }
-    const originalKey = draftKey(session);
+
+    const { text, attachments } = input;
+    const originalDraftKey = draftKey(session);
     let targetSession = session;
-    let preparing = true;
-    let failed = false;
-    const persistFailure = async () => {
-      const key = draftKey(targetSession);
-      try {
-        // Keep anything the user has already written for the next turn.
-        const restored = await restoreDraft(key, { text, attachments });
-        this.#composerRef.value?.restoreIfEmpty(key, restored);
-      } catch {
-        this.#composerRef.value?.restoreIfEmpty(key, { text, attachments });
-        setSessionError(targetSession.sessionId, i18n.get('composer.draftSaveFailed'));
-      }
-    };
-    const restoreInput = () => {
-      failed = true;
-      if (!preparing) persistFailure();
-    };
     let accepted = false;
+    let failed = false;
+    let submissionComplete = false;
+
+    const onFailed = () => {
+      failed = true;
+      // 提交期间先记录失败，等会话切换和旧草稿清理结束后再恢复。
+      if (submissionComplete) this.#restoreFailedInput(targetSession, input);
+    };
+
     try {
       if (session.pendingCreation) {
-        const liveSession = await promotePendingSession(session, text, attachments, restoreInput);
+        const liveSession = await promotePendingSession(session, text, attachments, onFailed);
         if (liveSession) {
           targetSession = liveSession;
           this.sessionId = liveSession.sessionId;
           accepted = true;
         }
       } else {
-        accepted = sendPrompt(session.sessionId, text, attachments, restoreInput);
+        accepted = sendPrompt(session.sessionId, text, attachments, onFailed);
       }
-      // The prompt is now owned by the existing in-flight message persistence.
-      if (accepted) await removeDraft(originalKey);
+
+      // 提交被接收后，由 in-flight 持久化接管输入，才能删除原草稿。
+      if (accepted) await removeDraft(originalDraftKey);
     } catch {
       failed = true;
     } finally {
-      preparing = false;
+      submissionComplete = true;
     }
-    if (failed || !accepted) await persistFailure();
+
+    if (failed || !accepted) await this.#restoreFailedInput(targetSession, input);
     return accepted;
   };
 
