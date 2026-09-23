@@ -14,7 +14,7 @@
 - `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置、防自动睡眠与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
 - `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程。
 - `.github/workflows/`：
-  - `release.yml`：Daemon 多平台构建、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）。
+  - `release.yml`：Daemon 多平台构建、npm OIDC 分发、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）；npm 实现见 `crates/daemon/CLAUDE.md`。
   - `release-android.yml`：Android 签名构建与 Google Play 发布。
   - `bump-packages.yml`：版本自动递增与包依赖管理。
 - `biome.json`：代码风格格式化与 Lint 配置。

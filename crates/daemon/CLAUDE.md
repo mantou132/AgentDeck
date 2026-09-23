@@ -4,6 +4,7 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 
 ## 关键入口与核心模块
 
+- `npm/`：npm 分发入口、平台二进制打包和安装验证；不加入 pnpm workspace，发布包由 Release 构建产物生成。
 - `src/main.rs`：CLI 与前台运行入口；负责参数解析、命令分派和终端输出。
 - `src/app_data.rs`：唯一的本地存储布局定义；`AppPaths` 管理 Daemon 文件，`AgentPaths` 管理 Agent 安装文件。路径方法无文件系统副作用，写入方显式创建目录；清理复用相同路径定义。
 - `src/config.rs`：配对 ID 生成、Relay 默认值与配置持久化；普通启动合并已保存配置，reset 从默认值和显式参数构建全新配置，不读取旧配置。
@@ -53,3 +54,15 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 - `cargo check -p agentdeck-daemon`：语法与类型快速检查。
 - `cargo test -p agentdeck-daemon`：运行 daemon 单元测试套件。
 - `cargo build --release -p agentdeck-daemon`：编译生产环境二进制包 `agentdeckd`。
+
+## npm 分发
+
+- 主包 `agentdeckd` 使用 `bin` 启动器和精确版本 `optionalDependencies` 引用四个平台包：`agentdeckd-darwin-arm64`、`agentdeckd-darwin-x64`、`agentdeckd-linux-x64-gnu`、`agentdeckd-win32-x64`。平台包用 `os` / `cpu` / `libc` 限制安装；无 postinstall，不自动启动服务。
+- `npm/platforms.mjs` 为平台映射；新增平台时同步 Release Rust matrix。用户需要 Node.js 22+；Linux 当前只支持 x64 glibc。
+- `node crates/daemon/npm/build.mjs <version> <artifacts目录> <输出目录>`：校验 Release archive SHA-256、生成五个包并 `npm pack`；在 macOS/Linux 上运行，需要 npm、tar、unzip。
+- `node --test crates/daemon/npm/distribution.test.mjs`：用临时本地 registry 验证真实 npm 全局安装、平台筛选、参数与退出码、信号转发、缺包提示和校验和失败；需要 zip。
+- `node crates/daemon/npm/verify.mjs <输出目录>`：从本地 registry 安装打包产物并执行当前平台二进制的 `--help`，不启动服务。
+- `release.yml` 在手动执行时只打包和验证 npm；推送 `v*` tag 后，以 tag 去掉 `v` 为 npm 版本，平台包先发布，主包最后发布。预发布版本使用 `next`，正式版本使用 `latest`；重跑跳过已发布版本，其他 registry 错误直接失败。
+- npm 发布 job 使用 GitHub-hosted runner、Node.js 24（npm >= 11.5.1）和 job 级 `id-token: write`，不配置 `NPM_TOKEN`。OIDC 同时生成 provenance。
+- 一次性配置：在 npm 上为上述五个包分别配置 Trusted Publisher：GitHub owner `mantou132`、repository `AgentDeck`、workflow filename `release.yml`、environment 留空，并允许直接 `npm publish`。包需先由维护者建立；首次发布可下载手动运行的 `npm-packages` artifact，在 `npm login` 后用 `node crates/daemon/npm/publish.mjs <解压目录>` 初始化，再配置信任关系。参考 https://docs.npmjs.com/trusted-publishers/ 。
+- 自启路径仍是二进制绝对路径。升级流程 `stop → npm install -g agentdeckd@latest → start`；切换 Node 环境后从新安装执行 `restart`，卸载前执行 `stop`。

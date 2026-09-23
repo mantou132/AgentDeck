@@ -13,6 +13,9 @@ AgentDeck (phone / extension) ⇄ Relay ⇄ agentdeckd (computer) ⇄ ACP agents
 Install the daemon on the computer where your agents run:
 
 ```sh
+# npm (Node.js 22+, macOS arm64/x64, Linux glibc x64, Windows x64)
+npm install -g agentdeckd
+
 # macOS / Linux
 brew install mantou132/tap/agentdeckd
 
@@ -25,6 +28,8 @@ cargo install --path crates/daemon
 ```
 
 Run `agentdeckd start`, then paste its **Pairing ID** into AgentDeck's Settings and select an agent.
+
+For npm upgrades, run `agentdeckd stop`, `npm install -g agentdeckd@latest`, then `agentdeckd start`. Stop the daemon before uninstalling as well. If you change Node installations or npm's global directory, run `agentdeckd restart` from the new installation to update the autostart path. npm installation does not start services automatically.
 
 **Keep the Pairing ID secret. Anyone with it can access your agent. Do not include it in screenshots or issue reports.** New installations use `adk1_` IDs with end-to-end encryption; the relay only forwards ciphertext. Legacy UUID IDs use plaintext transport.
 

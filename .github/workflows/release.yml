@@ -69,6 +69,72 @@ jobs:
             agentdeckd-${{ matrix.target }}.zip.sha256
           if-no-files-found: ignore
 
+  pack-npm:
+    name: Package and verify npm distribution
+    needs: build-rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: agentdeckd-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Test npm packaging and launcher
+        run: node --test crates/daemon/npm/distribution.test.mjs
+
+      - name: Package release binaries
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=0.0.0-dev
+          if [[ "$RELEASE_REF" == refs/tags/v* ]]; then
+            version="${RELEASE_TAG#v}"
+          fi
+          node crates/daemon/npm/build.mjs "$version" artifacts dist/npm
+
+      - name: Verify global install with Linux release binary
+        run: node crates/daemon/npm/verify.mjs dist/npm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages
+          path: |
+            dist/npm/*.tgz
+            dist/npm/publish.json
+          if-no-files-found: error
+
+  publish-npm:
+    name: Publish npm packages (OIDC)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [pack-npm, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-packages
+          path: dist/npm
+
+      - name: Publish platform packages, then entry package
+        run: node crates/daemon/npm/publish.mjs dist/npm
+
   build-extension:
     name: Build Browser Extensions
     runs-on: ubuntu-latest
@@ -111,7 +177,7 @@ jobs:
   release:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-rust, build-extension]
+    needs: [build-rust, build-extension, pack-npm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
