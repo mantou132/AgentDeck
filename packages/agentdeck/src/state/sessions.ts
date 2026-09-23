@@ -26,6 +26,7 @@ import {
 import { applyRemoteMode } from './modes';
 import {
   agentdeckStore,
+  clearSessionError,
   patchSession,
   setMessages,
   setSessionError,
@@ -254,6 +255,37 @@ export const deleteSession = async (sessionId: string) => {
     }
   } finally {
     if (isCurrentHost()) setSessionFlag('deletingSessionIds', sessionId, false);
+  }
+};
+
+export const closeSession = async (sessionId: string) => {
+  const session = getSession(sessionId);
+  sessionLoads.delete(sessionId);
+  failedSessionLoads.delete(sessionId);
+  openedSessionIds.delete(sessionId);
+  inFlightSessions.delete(sessionId);
+  setSessionFlag('loadedSessionIds', sessionId, false);
+  setSessionFlag('loadingSessionIds', sessionId, false);
+  setSessionFlag('pendingSessionIds', sessionId, false);
+  setSessionFlag('unreadSessionIds', sessionId, false);
+  setSessionFlag('changingModeSessionIds', sessionId, false);
+  resolvePermission(sessionId, null);
+  removeInFlight(sessionId);
+  setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
+  clearSessionError(sessionId);
+
+  if (session?.pendingCreation || sessionId === 'pending-session') {
+    setPendingSessionCanceled(true);
+    resetPendingSession();
+    return;
+  }
+
+  if (session && agentdeckStore.connection === 'connected') {
+    try {
+      await agentApi.closeSession(session.agent, sessionId);
+    } catch (error) {
+      console.error(error);
+    }
   }
 };
 

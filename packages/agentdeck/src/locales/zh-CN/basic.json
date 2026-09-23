@@ -198,5 +198,6 @@
   "changes.staged": "暂存",
   "changes.unstaged": "未暂存",
   "error.gitStatusTimeout": "获取 Git 状态超时，请重试。",
-  "error.gitDiffTimeout": "获取 Git 差异超时，请重试。"
+  "error.gitDiffTimeout": "获取 Git 差异超时，请重试。",
+  "session.backTitle": "返回（长按关闭会话）"
 }

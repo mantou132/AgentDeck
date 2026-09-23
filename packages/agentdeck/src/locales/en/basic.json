@@ -198,5 +198,6 @@
   "changes.staged": "Staged",
   "changes.unstaged": "Unstaged",
   "error.gitStatusTimeout": "Checking git status timed out. Please retry.",
-  "error.gitDiffTimeout": "Computing git diff timed out. Please retry."
+  "error.gitDiffTimeout": "Computing git diff timed out. Please retry.",
+  "session.backTitle": "Back (Long press to close session)"
 }

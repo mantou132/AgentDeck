@@ -90,7 +90,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
           class="menu-header flex items-center gap-4 bg-bg/90 px-5 pb-3.5 backdrop-blur-xl backdrop-saturate-125 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div class="flex min-w-0 flex-1 items-center gap-3">
-            <img class="size-11 shrink-0 rounded-[13px] shadow-card" src="/agentdeck-icon.png" alt="" />
+            <img class="size-11 shrink-0 rounded-[13px] shadow-card" src="/agentdeck-icon.png" alt="" draggable="false"/>
             <div class="min-w-0 flex-1">
               <h1 class="m-0 font-display text-xl font-bold leading-none tracking-[-0.025em] text-highlight">
                 AgentDeck

@@ -1,4 +1,5 @@
 import { history } from '@mantou/gem/lib/history';
+import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { reconnectTransport } from '../agent/transport';
@@ -6,6 +7,7 @@ import { draftKey, removeDraft, restoreDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
+import { hapticImpact } from '../lib/haptics';
 import { displayPath } from '../lib/path';
 import { openChanges, openSession, openSettings } from '../navigation';
 import { getModeSelection } from '../session/modes';
@@ -13,6 +15,7 @@ import type { Attachment, DeckSession } from '../session/types';
 import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
+  closeSession,
   createPendingSession,
   ensureSessionLoaded,
   getSession,
@@ -44,6 +47,13 @@ export class AgentDeckSessionPageElement extends GemElement {
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
   #following?: ReturnType<typeof followBottom>;
+
+  #onEnd = (evt: CustomEvent<EndEventDetail>) => {
+    if (evt.detail.pressed) {
+      closeSession(this.sessionId);
+      Stack.pop();
+    }
+  };
 
   #markRead = () => {
     if (
@@ -159,13 +169,18 @@ export class AgentDeckSessionPageElement extends GemElement {
         slot="header"
         class="session-header relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl backdrop-saturate-125"
       >
-        <button
-          class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
+        <tap-gesture
+          role="button"
+          class="grid size-11 cursor-pointer select-none touch-manipulation place-items-center rounded-[14px] border-0 bg-transparent text-highlight transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-primary-soft"
           aria-label=${i18n.get('session.backAria')}
+          title=${i18n.get('session.backTitle')}
+          @press=${() => hapticImpact('medium')}
           @click=${() => Stack.pop()}
+          @end=${this.#onEnd}
+          @contextmenu=${(e: Event) => e.preventDefault()}
         >
           <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
-        </button>
+        </tap-gesture>
         <div class="min-w-0 text-center">
           <div class="truncate font-display text-base leading-tight font-semibold text-highlight">${title}</div>
           <button
