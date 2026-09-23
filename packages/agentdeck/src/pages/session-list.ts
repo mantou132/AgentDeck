@@ -84,7 +84,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const isConnecting = connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching';
 
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" scroll-mask>
         <header
           slot="header"
           class="menu-header flex items-center gap-4 bg-bg/90 px-5 pb-3.5 backdrop-blur-xl backdrop-saturate-125 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
