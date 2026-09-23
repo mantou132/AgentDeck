@@ -42,6 +42,7 @@ export function documentFixture(previous, options = {}) {
   const requests = [];
   const heldMethods = new Set();
   const timers = new Map();
+  const haptics = [];
   let timerId = 0;
   let now = 0;
   let reloads = 0;
@@ -157,6 +158,26 @@ export function documentFixture(previous, options = {}) {
         if (name === '@noble/ciphers/chacha.js') return chacha;
         if (name === '@noble/hashes/hkdf.js') return hkdf;
         if (name === '@noble/hashes/sha2.js') return sha2;
+        if (name === '@tauri-apps/plugin-haptics') {
+          return {
+            notificationFeedback: async (type) => {
+              haptics.push({ type: 'notification', value: type });
+              return { status: 'ok', data: null };
+            },
+            selectionFeedback: async () => {
+              haptics.push({ type: 'selection' });
+              return { status: 'ok', data: null };
+            },
+            impactFeedback: async (style) => {
+              haptics.push({ type: 'impact', value: style });
+              return { status: 'ok', data: null };
+            },
+            vibrate: async (duration) => {
+              haptics.push({ type: 'vibrate', value: duration });
+              return { status: 'ok', data: null };
+            },
+          };
+        }
         if (name === '@mantou/tap-ui/lib/encode') {
           return load(path.join(root, 'node_modules/@mantou/tap-ui/lib/encode.js'));
         }
@@ -283,6 +304,7 @@ export function documentFixture(previous, options = {}) {
     sockets,
     requests,
     heldMethods,
+    haptics,
     deliver,
     reply,
     connect,

@@ -1,6 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { selectionFeedback } from '@tauri-apps/plugin-haptics';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
 import {
   createPasteReference,
@@ -9,6 +8,7 @@ import {
   syncPasteReferences,
 } from '../composer/references';
 import { i18n } from '../i18n';
+import { hapticSelection } from '../lib/haptics';
 import type { ModeSelection } from '../session/modes';
 import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
@@ -79,7 +79,7 @@ export class DeckComposerElement extends GemElement {
     const input: ComposerInput = { text: this.#state.draft.trim(), attachments: this.#state.attachments };
     this.#clearInput();
     this.#state({ submitting: true });
-    selectionFeedback();
+    void hapticSelection();
     try {
       await this.submit(input);
     } finally {

@@ -1,6 +1,7 @@
 import type { PermissionRequest, SessionEvent } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
+import { hapticWarning } from '../lib/haptics';
 import type { Attachment, DeckSession } from './types';
 
 const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
@@ -9,6 +10,7 @@ export const requestPermission = (request: PermissionRequest, onNotify: (request
   if (!request?.sessionId) return Promise.reject(new Error(i18n.get('error.permissionMissingSessionId')));
   permissionResolvers.get(request.sessionId)?.reject(new Error(i18n.get('error.permissionReplaced')));
   onNotify(request);
+  void hapticWarning();
   return new Promise<string>((resolve, reject) => permissionResolvers.set(request.sessionId, { resolve, reject }));
 };
 
