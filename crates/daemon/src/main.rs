@@ -100,16 +100,10 @@ fn load_or_init_config(cli_relay_id: Option<String>) -> Result<String> {
 }
 
 fn print_daemon_info(relay_id: &str) {
-    let default_url = if cfg!(debug_assertions) {
-        "ws://127.0.0.1:39371/ws"
-    } else {
-        "wss://agent-deck.xianqiao.wang/ws"
-    };
-
     println!("=======================================================");
     println!("  AgentDeck Daemon v{}", env!("CARGO_PKG_VERSION"));
     println!("=======================================================");
-    println!("  Relay URL : {default_url}");
+    println!("  Relay URL : {}", relay_client::RELAY_URL);
     println!("  Pairing ID: {relay_id}");
     println!("-------------------------------------------------------");
     println!("  Connect your AgentDeck Mobile App or Browser Extension");

@@ -18,8 +18,7 @@ export const DB_NAME = 'agentdeck-db';
 export const DB_VERSION = 1;
 export const STORE_NAME = 'in_flight_sessions';
 
-export const RELAY_URL =
-  process.env.NODE_ENV === 'development' ? 'ws://192.168.77.137:39371/ws' : 'wss://agent-deck.xianqiao.wang/ws';
+export const RELAY_URL = 'wss://agent-deck.xianqiao.wang/ws';
 
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
 export const popularAgents: { id: string; name: string }[] = [

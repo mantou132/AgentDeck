@@ -23,10 +23,7 @@ use crate::{
     relay_encryption::{RelayEncryption, is_plain_id},
 };
 
-#[cfg(debug_assertions)]
-const RELAY_URL: &str = "ws://127.0.0.1:39371/ws";
-#[cfg(not(debug_assertions))]
-const RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
+pub(crate) const RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
 
 const HOST_DEVICE_ID: &str = "host";
 const REMOTE_PEERS_FILE: &str = "remote_peers_v1.json";
