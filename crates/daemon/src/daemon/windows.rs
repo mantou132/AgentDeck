@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use anyhow::{Context, Result, anyhow, bail};
+use planif::com::ComRuntime;
 use planif::enums::TaskCreationFlags;
 use planif::schedule_builder::{Action, ScheduleBuilder};
 
@@ -9,8 +10,10 @@ use super::{singleton::InstanceLock, status::Status};
 pub const TASK_NAME: &str = "AgentDeck Daemon";
 
 pub fn install_daemon() -> Result<()> {
-    let sb = ScheduleBuilder::new()
-        .map_err(|e| anyhow!("failed to initialize TaskScheduler COM: {e}"))?;
+    let com =
+        ComRuntime::new().map_err(|e| anyhow!("failed to initialize TaskScheduler COM: {e}"))?;
+    let sb = ScheduleBuilder::new(&com)
+        .map_err(|e| anyhow!("failed to create TaskScheduler builder: {e}"))?;
 
     let exe = std::env::current_exe().context("failed to get current executable path")?;
     let exe_str = exe.to_string_lossy();
