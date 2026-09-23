@@ -2,7 +2,7 @@
 
 1. 遇到没有明确的事情不要自由发挥，应该询问确定。
 2. 始终根据目的站在全局视角下考虑问题，如果有更简洁的方案应该提出来。
-3. 结构、入口或构建方式变化时同步更新本文档及对应子目录 CLAUDE.md；外层只保留导航、公用运行约束和全局开发规范，各子项目的实现细节下沉到各子目录。
+3. 结构、入口或构建方式变化时同步更新本文档及对应子目录 CLAUDE.md；外层只保留导航、公用运行约束和全局开发规范，各子项目的实现细节下沉到各自目录。
 4. 只处理有实际依据的场景；不为不会发生的情况增加防御逻辑或不必要的复杂度。
 
 # 项目导航
@@ -21,7 +21,7 @@
 
 # 全局运行与通信约束
 
-- **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，browser4agent 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。
+- **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，agentdeckd 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。
 - **端到端加密（E2EE）**：普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - **会话状态机制**：新会话先建本地 draft，首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
 - **连接与重试**：host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
@@ -127,7 +127,7 @@ class DuoyunTestElement extends GemElement {
   #state = createState({ internalCount: 1 });
 
   // Attribute 不要赋初始值，因为 DOM 序列化会多出一些内容，如果需要默认值，可以定义一个 `getter`
-  // Property 可以赋初始值，但也可以同样用 `getter`
+  // Property 可以赋初始值，但也同样可以用 `getter`
   get #src() {
     return this.src || 'test';
   }

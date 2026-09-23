@@ -303,7 +303,7 @@ fn install_registry_binary(
 
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
-        .user_agent(format!("browser4agent/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("agentdeckd/{}", env!("CARGO_PKG_VERSION")))
         .build()
         .context("failed to create the managed agent downloader")?;
 
@@ -516,7 +516,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("browser4agent-archives-{unique}"));
+        let root = std::env::temp_dir().join(format!("agentdeck-archives-{unique}"));
         std::fs::create_dir_all(&root).unwrap();
         let content = b"agent fixture";
         let executable = "bin/agent.exe";
@@ -577,7 +577,7 @@ mod tests {
 
     #[test]
     fn managed_binary_command_stays_inside_runtime() {
-        let runtime = std::env::temp_dir().join("browser4agent-runtime-root");
+        let runtime = std::env::temp_dir().join("agentdeck-runtime-root");
         assert_eq!(
             safe_join(&runtime, "./dist-package/cursor-agent").expect("safe path"),
             runtime.join("dist-package").join("cursor-agent")
@@ -590,7 +590,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock should be after unix epoch")
             .as_nanos();
-        let runtime_dir = std::env::temp_dir().join(format!("browser4agent-cursor-{unique}"));
+        let runtime_dir = std::env::temp_dir().join(format!("agentdeck-cursor-{unique}"));
         let runtime = crate::app_data::AgentPaths::new(runtime_dir.clone());
         let binary_dir = runtime.version_dir("1.0.0");
         std::fs::create_dir_all(&binary_dir).expect("create binary directory");
