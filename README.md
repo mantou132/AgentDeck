@@ -130,6 +130,72 @@ agentdeckd --relay-id <YOUR_PAIRING_ID>
 
 ---
 
+## Troubleshooting (故障排查)
+
+If AgentDeck shows **Remote unavailable (远端未响应)**, **Connecting...**, or cannot establish a connection, check the following common causes and solutions:
+
+### 1. Pairing ID Mismatch (Pairing ID 不匹配)
+- **Cause**: The Pairing ID entered in the client doesn't match the one currently used by `agentdeckd` (e.g. after reinstalling or regenerating credentials), or an encrypted (`adk1_`) pairing key was mistyped/corrupted.
+- **Symptoms**: Client displays `Remote unavailable` or daemon logs `Rejected encrypted RPC with mismatched device identity`.
+- **Solution**:
+  1. On your host computer, run `agentdeckd status` to check the active Pairing ID.
+  2. In your mobile app or browser extension, open **设置 (Settings)**, re-paste the exact Pairing ID, and save.
+
+### 2. Stale Storage Cursor / Sequence Conflict (游标序号缓存冲突)
+- **Cause**: The client persists a message sequence cursor (`lastReceived`) to prevent duplicate processing. When switching between relays, restarting relay services, or reconnecting after server-side sequence resets, the client's stored cursor might be higher than the sequence sent by the server. The client's reliable transport (`relay-client-ts`) assumes incoming packets are stale duplicates, sends an ACK, and silently drops the handshake payload (`peer_attach` response).
+- **Symptoms**: WebSocket connects and frames are exchanged (visible in DevTools network tab), but the client UI remains on `Remote unavailable` until the 10s handshake timeout triggers.
+- **Solution**:
+  - **Mobile App / Web App**: Open **设置 (Settings)** → Tap **Reset App (重置应用)** (which clears local storage, cached sessions, and reloads). In a browser, you can also run in the DevTools Console:
+    ```js
+    localStorage.removeItem('relay-client.v1');
+    location.reload();
+    ```
+  - **Browser Extension (浏览器扩展)**: Open DevTools for the extension (inspect the Side Panel or Background page) and run in the Console:
+    ```js
+    chrome.storage.local.remove(['relay-client.v1', 'agentdeck.device_id.v1']);
+    location.reload();
+    ```
+
+### 3. Daemon Not Running or Stopped (桌面守护进程未运行)
+- **Cause**: The host computer went to sleep, rebooted, or `agentdeckd` crashed or was killed.
+- **Symptoms**: Client connects to the Relay server WebSocket successfully, but no response is received from the host, resulting in `Remote unavailable`.
+- **Solution**:
+  - Check daemon status on your computer:
+    ```sh
+    agentdeckd status
+    ```
+  - If stopped, start or restart it:
+    ```sh
+    agentdeckd start   # or: agentdeckd restart
+    ```
+
+### 4. Connection Preempted by Another Session (设备连接被抢占)
+- **Cause**: Multiple tabs, windows, or apps sharing the same Device ID connected to the same Relay endpoint simultaneously. The Relay protocol enforces single-connection exclusivity per device identity.
+- **Symptoms**: The indicator turns red with `Connection preempted (连接被抢占)` or an alert stating the session was preempted by a newer connection.
+- **Solution**: Close duplicate tabs or concurrent windows. If the conflict persists, execute **Reset App** in the client to generate a fresh, unique Device ID.
+
+### 5. Network / Firewall Restrictions (网络或防火墙阻拦)
+- **Cause**: Corporate firewall, strict proxy, or VPN blocking outbound WebSocket upgrades to the Relay server.
+- **Symptoms**: Client gets stuck on `Connecting...` or `Reconnecting...` without ever establishing a WebSocket connection.
+- **Solution**:
+  - Test WebSocket connectivity:
+    ```sh
+    curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" https://agent-deck.xianqiao.wang/ws
+    ```
+  - Ensure outbound HTTPS/WSS traffic on port 443 to `wss://agent-deck.xianqiao.wang/ws` is permitted.
+
+### 6. ACP Agent Process Failure (底层 Agent 执行异常)
+- **Cause**: The chosen agent binary (Claude Code, OpenCode, Antigravity, etc.) is not installed, not in `PATH`, or hung during session initialization.
+- **Symptoms**: Status indicator turns green (`Connected`), but sessions fail to load, or prompts hang indefinitely.
+- **Solution**:
+  - Inspect the daemon logs for error details:
+    - **macOS**: `tail -n 100 "$HOME/Library/Application Support/agentdeck/logs/agentdeckd.log"`
+    - **Linux**: `tail -n 100 "$HOME/.local/share/agentdeck/logs/agentdeckd.log"`
+    - **Windows**: `%LOCALAPPDATA%\agentdeck\logs\agentdeckd.log`
+  - Ensure the agent CLI runs properly when executed directly in your terminal.
+
+---
+
 ## Development
 
 ```sh
