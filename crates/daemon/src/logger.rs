@@ -2,10 +2,12 @@ use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
 use chrono::Local;
 
-use crate::app_data;
+use crate::app_data::{self, AppPaths};
 
 fn log_path() -> anyhow::Result<PathBuf> {
-    Ok(app_data::log_dir()?.join("agentdeckd.log"))
+    let paths = AppPaths::discover()?;
+    app_data::ensure_dir(&paths.logs_dir())?;
+    Ok(paths.log_file())
 }
 
 fn write(level: &str, msg: &str) {

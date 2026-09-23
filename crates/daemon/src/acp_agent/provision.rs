@@ -164,13 +164,13 @@ fn safe_join(root: &Path, relative: &str) -> Result<PathBuf> {
     Ok(path)
 }
 
-fn cached_managed_binary(runtime_dir: &Path, version: &str) -> Option<PreparedProgram> {
-    let manifest_bytes = fs::read(runtime_dir.join("managed-binary.json")).ok()?;
+fn cached_managed_binary(runtime: &app_data::AgentPaths, version: &str) -> Option<PreparedProgram> {
+    let manifest_bytes = fs::read(runtime.manifest_file()).ok()?;
     let manifest: ManagedBinaryManifest = serde_json::from_slice(&manifest_bytes).ok()?;
     if manifest.version != version {
         return None;
     }
-    let executable = safe_join(runtime_dir, &manifest.command).ok()?;
+    let executable = safe_join(runtime.root(), &manifest.command).ok()?;
     if !executable.is_file() {
         return None;
     }
@@ -263,7 +263,7 @@ fn extract_agent_archive(archive_path: &Path, archive_url: &str, destination: &P
 }
 
 fn install_registry_binary(
-    runtime_dir: &Path,
+    runtime: &app_data::AgentPaths,
     registry_id: &str,
     version: &str,
     binary: &RegistryBinaryTarget,
@@ -272,7 +272,7 @@ fn install_registry_binary(
         .lock()
         .expect("agent install lock poisoned");
 
-    if let Some(program) = cached_managed_binary(runtime_dir, version) {
+    if let Some(program) = cached_managed_binary(runtime, version) {
         logger::info(&format!("Reusing cached managed {registry_id} binary"));
         return Ok(program);
     }
@@ -280,9 +280,9 @@ fn install_registry_binary(
     let archive_url = reqwest::Url::parse(&binary.archive)
         .context("ACP registry returned an invalid agent archive URL")?;
 
-    let version_dir = runtime_dir.join("versions").join(version);
-    let install_root = runtime_dir
-        .join("install")
+    let version_dir = runtime.version_dir(version);
+    let install_root = runtime
+        .install_dir()
         .join(format!("{registry_id}-{version}"));
     let unpack_dir = install_root.join("unpack");
     let downloaded_archive = install_root.join(
@@ -363,7 +363,7 @@ fn install_registry_binary(
 
         let executable = safe_join(&version_dir, &binary.cmd)?;
         let relative_command = executable
-            .strip_prefix(runtime_dir)
+            .strip_prefix(runtime.root())
             .context("failed to construct the managed agent relative command")?
             .to_string_lossy()
             .into_owned();
@@ -374,7 +374,7 @@ fn install_registry_binary(
             args: binary.args.clone(),
             env: binary.env.clone(),
         };
-        let manifest_path = runtime_dir.join("managed-binary.json");
+        let manifest_path = runtime.manifest_file();
         fs::write(
             &manifest_path,
             serde_json::to_vec_pretty(&manifest)
@@ -415,13 +415,13 @@ fn prepare_native_command(
             env: binary.env.clone(),
         }
     } else {
-        let runtime_dir = app_data::agent_runtime_dir(&candidate.id)?;
+        let runtime = app_data::AppPaths::discover()?.agent(&candidate.id);
         logger::info(&format!(
             "Using managed {} CLI from {}",
             candidate.name,
-            runtime_dir.display()
+            runtime.root().display()
         ));
-        install_registry_binary(&runtime_dir, &candidate.id, version, binary)?
+        install_registry_binary(&runtime, &candidate.id, version, binary)?
     };
 
     let path_entries = user_path_entries();
@@ -591,7 +591,8 @@ mod tests {
             .expect("clock should be after unix epoch")
             .as_nanos();
         let runtime_dir = std::env::temp_dir().join(format!("browser4agent-cursor-{unique}"));
-        let binary_dir = runtime_dir.join("versions").join("1.0.0");
+        let runtime = crate::app_data::AgentPaths::new(runtime_dir.clone());
+        let binary_dir = runtime.version_dir("1.0.0");
         std::fs::create_dir_all(&binary_dir).expect("create binary directory");
         let executable = binary_dir.join(if cfg!(windows) {
             "cursor.cmd"
@@ -612,13 +613,13 @@ mod tests {
             "env": { "TEST_ENV": "1" }
         });
         std::fs::write(
-            runtime_dir.join("managed-binary.json"),
+            runtime.manifest_file(),
             serde_json::to_vec_pretty(&manifest).unwrap(),
         )
         .expect("write binary manifest");
 
-        let cached = cached_managed_binary(&runtime_dir, "1.0.0").expect("find cached binary");
-        assert!(cached_managed_binary(&runtime_dir, "2.0.0").is_none());
+        let cached = cached_managed_binary(&runtime, "1.0.0").expect("find cached binary");
+        assert!(cached_managed_binary(&runtime, "2.0.0").is_none());
         std::fs::remove_dir_all(&runtime_dir).expect("remove runtime directory");
 
         assert_eq!(cached.executable, executable);

@@ -4,8 +4,11 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 
 ## 关键入口与核心模块
 
-- `src/main.rs`：服务主入口；基于 `clap` 解析子命令及参数，单例锁校验，初始化 Tokio 异步运行时与日志。
+- `src/main.rs`：CLI 与前台运行入口；负责参数解析、命令分派和终端输出。
+- `src/app_data.rs`：唯一的本地存储布局定义；`AppPaths` 管理 Daemon 文件，`AgentPaths` 管理 Agent 安装文件。路径方法无文件系统副作用，写入方显式创建目录；清理复用相同路径定义。
+- `src/config.rs`：配对 ID 生成、Relay 默认值与配置持久化；普通启动合并已保存配置，reset 从默认值和显式参数构建全新配置，不读取旧配置。
 - `src/daemon/`：守护进程生命周期与开机自启服务管理。
+  - `reset.rs`：编排停止、持锁清理与配置重建、恢复原先服务状态；返回状态供 CLI 展示，不负责终端输出。
   - `singleton.rs`：跨平台运行时单例锁（基于 `fd-lock` 建议性文件锁与 PID 记录）以及进程安全终止辅助。
   - `status.rs`：统一服务状态枚举（`NotInstalled`、`Running`、`Stopped`）。
   - `service_mgr.rs`：macOS 与 Linux 用户级自启动服务统一实现（基于 `service-manager` 分别管理 LaunchAgent 与 systemd --user）。
@@ -32,6 +35,8 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
   - Windows: `planif` -> Windows Task Scheduler (Logon trigger)
   - `start` 即完成自启注册并在未运行状态下立即拉起服务。
   - `stop` 即注销自启并安全关闭当前所有运行中的实例。
+- **CLI 配置**：全局 `--relay-id` / `--relay-url` 在前台启动、`start`、`restart`、`reset` 时写入 `daemon.json`；默认 Relay URL 不变，自启读取保存的配置。运行中修改配置使用 `restart`。显示配对 ID 时必须包含安全警示边框。
+- **Daemon 重置**：`reset` 停止服务并持有单例锁后，删除 `remote_peers_v1.json`、`logs/` 和 `agents/*/install/` 临时下载目录；应用 `--relay-id` / `--relay-url` 参数，未传 ID 时生成新的 `adk1_` Pairing ID，未传 URL 时恢复默认 Relay 地址；保留锁文件、已安装 Agent 及历史。完成后恢复原先运行/停止状态并输出与 `status` 相同的信息（含新 ID），运行中的前台实例会恢复为后台服务。
 - **设备多路复用**：一台 Host 守护进程可服务多个远端 Peer，设备状态及 `peerId` 映射存储于系统应用数据目录。
 
 ## 常用命令
@@ -40,7 +45,9 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 - `agentdeckd start`：注册开机自启后台服务并在未运行状态下立即启动。
 - `agentdeckd stop`：注销开机自启后台服务并尝试关闭正在运行的进程。
 - `agentdeckd restart`：重启后台守护服务。
-- `agentdeckd status`：查看服务状态、运行 PID 及当前 Relay ID。
+- `agentdeckd status`：查看服务状态、运行 PID、Relay URL 及带安全警示的 Pairing ID。
+- `agentdeckd reset`：轮换 Pairing ID、清理本地连接状态、日志和临时下载，恢复服务状态并输出 status。
+- `agentdeckd start --relay-url wss://your-relay.example/ws`：指定并保存 Relay 服务器。
 - `cargo check -p agentdeck-daemon`：语法与类型快速检查。
 - `cargo test -p agentdeck-daemon`：运行 daemon 单元测试套件。
 - `cargo build --release -p agentdeck-daemon`：编译生产环境二进制包 `agentdeckd`。

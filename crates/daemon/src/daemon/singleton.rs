@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use fd_lock::RwLock;
 
-use crate::app_data;
+use crate::app_data::AppPaths;
 
 /// Ensures single instance of the daemon process at runtime using an advisory file lock.
 pub struct InstanceLock {
@@ -130,7 +130,7 @@ pub fn kill_process(pid: u32) {
 }
 
 pub fn lock_file_path() -> Result<PathBuf> {
-    Ok(app_data::root_dir()?.join("daemon.lock"))
+    Ok(AppPaths::discover()?.lock_file())
 }
 
 #[cfg(test)]

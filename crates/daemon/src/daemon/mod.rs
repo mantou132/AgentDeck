@@ -1,5 +1,8 @@
+mod reset;
 pub mod singleton;
 pub mod status;
+
+pub(crate) use reset::reset_daemon;
 
 pub use singleton::InstanceLock;
 pub use status::Status;

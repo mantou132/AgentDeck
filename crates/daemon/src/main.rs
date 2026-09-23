@@ -1,14 +1,12 @@
-use std::{fs, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
 use clap::{Parser, Subcommand};
-use serde::{Deserialize, Serialize};
 
 mod acp_agent;
 mod agent_rpc;
 mod app_data;
+mod config;
 pub mod daemon;
 mod logger;
 mod peer;
@@ -17,6 +15,8 @@ mod relay_client;
 mod relay_encryption;
 
 use agent_rpc::AgentService;
+use app_data::AppPaths;
+use config::{DaemonConfig, RelayOptions};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -31,108 +31,99 @@ struct Cli {
     /// Custom pairing ID (adk1_... or plain UUID)
     #[arg(long, global = true)]
     relay_id: Option<String>,
+
+    /// Relay WebSocket URL (saved for subsequent starts)
+    #[arg(long, global = true, value_parser = parse_relay_url)]
+    relay_url: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Run the daemon directly in the foreground (default when no subcommand is given)
-    Run {
-        /// Custom pairing ID (adk1_... or plain UUID)
-        #[arg(long)]
-        relay_id: Option<String>,
-    },
+    Run,
     /// Register autostart service and start the daemon if not already running
     Start,
     /// Unregister autostart service and stop any running daemon process
     Stop,
     /// Restart the background daemon service
     Restart,
-    /// Check daemon status and display Relay ID
+    /// Rotate the Pairing ID, clear local state and restore the previous service state
+    Reset,
+    /// Check daemon status and display Pairing ID
     Status,
 }
 
-#[derive(Serialize, Deserialize, Default)]
-struct DaemonConfig {
-    relay_id: Option<String>,
-}
-
-fn config_path() -> Result<PathBuf> {
-    Ok(app_data::root_dir()?.join("daemon.json"))
-}
-
-fn load_or_init_config(cli_relay_id: Option<String>) -> Result<String> {
-    let path = config_path()?;
-    let mut config: DaemonConfig = if path.exists() {
-        let content = fs::read_to_string(&path)
-            .with_context(|| format!("failed to read daemon config at {}", path.display()))?;
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        DaemonConfig::default()
-    };
-
-    let mut changed = false;
-
-    if let Some(id) = cli_relay_id {
-        config.relay_id = Some(id);
-        changed = true;
+fn parse_relay_url(value: &str) -> std::result::Result<String, String> {
+    let url = reqwest::Url::parse(value).map_err(|error| error.to_string())?;
+    if !matches!(url.scheme(), "ws" | "wss") || url.host_str().is_none() {
+        return Err("expected a ws:// or wss:// URL with a host".into());
     }
+    Ok(value.to_owned())
+}
 
-    let relay_id = match config.relay_id.take() {
-        Some(id) if !id.trim().is_empty() => id,
-        _ => {
-            let mut bytes = [0u8; 32];
-            OsRng.fill_bytes(&mut bytes);
-            let id = format!("adk1_{}", URL_SAFE_NO_PAD.encode(bytes));
-            config.relay_id = Some(id.clone());
-            changed = true;
-            id
+fn print_daemon_status(paths: &AppPaths) -> Result<()> {
+    let status = daemon::daemon_status()?;
+    let running_pid = daemon::InstanceLock::check_running_at(&paths.lock_file())?;
+    let config = DaemonConfig::load_or_init(paths, &RelayOptions::default())?;
+    print_daemon_info(&config, Some((status, running_pid)));
+    Ok(())
+}
+
+fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Option<u32>)>) {
+    println!("AgentDeck Daemon v{}", env!("CARGO_PKG_VERSION"));
+    if let Some((status, pid)) = status {
+        println!("Service: {status}");
+        if let Some(pid) = pid.filter(|pid| *pid > 0) {
+            println!("PID: {pid}");
         }
-    };
-
-    if changed {
-        config.relay_id = Some(relay_id.clone());
-        let content = serde_json::to_string_pretty(&config)?;
-        fs::write(&path, content)
-            .with_context(|| format!("failed to write daemon config to {}", path.display()))?;
     }
-
-    Ok(relay_id)
+    println!("Relay URL: {}", config.relay_url());
+    println!();
+    println!("{}", pairing_notice(config.relay_id()));
 }
 
-fn print_daemon_info(relay_id: &str) {
-    println!("=======================================================");
-    println!("  AgentDeck Daemon v{}", env!("CARGO_PKG_VERSION"));
-    println!("=======================================================");
-    println!("  Relay URL : {}", relay_client::RELAY_URL);
-    println!("  Pairing ID: {relay_id}");
-    println!("-------------------------------------------------------");
-    println!("  Connect your AgentDeck Mobile App or Browser Extension");
-    println!("  using the Pairing ID above.");
-    println!("=======================================================");
+fn pairing_notice(relay_id: &str) -> String {
+    let pairing = format!("Pairing ID: {relay_id}");
+    let lines = [
+        "⚠️  KEEP THIS SECRET: Anyone with this Pairing ID can access your agent.",
+        "Do not share this ID in screenshots, chats, or issue reports.",
+        "",
+        &pairing,
+        "",
+        "Paste into AgentDeck Settings to pair your device.",
+    ];
+    let width = lines.iter().map(|line| line.chars().count()).max().unwrap();
+    let border = "═".repeat(width + 2);
+    let mut output = format!("╔{border}╗\n");
+    for line in lines {
+        let padding = " ".repeat(width - line.chars().count());
+        output.push_str(&format!("║ {line}{padding} ║\n"));
+    }
+    output.push_str(&format!("╚{border}╝"));
+    output
 }
 
-async fn run_daemon(cli_relay_id: Option<String>) -> Result<()> {
+async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
     // 确保运行时单例
-    let _instance_lock = daemon::InstanceLock::acquire().context("cannot start daemon")?;
+    let _instance_lock =
+        daemon::InstanceLock::acquire_at(&paths.lock_file()).context("cannot start daemon")?;
 
     logger::info(&format!(
         "Starting AgentDeck daemon v{}",
         env!("CARGO_PKG_VERSION")
     ));
 
-    let relay_id = load_or_init_config(cli_relay_id)?;
+    let config = DaemonConfig::load_or_init(paths, options)?;
+    let relay_id = config.relay_id();
 
     let service = Arc::new(AgentService::new());
 
-    logger::info(&format!(
-        "Connecting to Relay with pairing ID prefix: {}",
-        &relay_id[..relay_id.len().min(10)]
-    ));
+    logger::info("Connecting to Relay");
 
-    let _remote_manager = relay_client::start(&relay_id, &service)
+    let _remote_manager = relay_client::start(config.relay_url(), relay_id, &service)
         .context("failed to start Relay remote peer manager")?;
 
-    print_daemon_info(&relay_id);
+    print_daemon_info(&config, None);
 
     tokio::signal::ctrl_c().await?;
     println!("\nShutting down AgentDeck daemon...");
@@ -144,47 +135,90 @@ async fn run_daemon(cli_relay_id: Option<String>) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let paths = AppPaths::discover()?;
+    let options = RelayOptions {
+        relay_id: cli.relay_id,
+        relay_url: cli.relay_url,
+    };
 
     match cli.command {
-        None => {
-            run_daemon(cli.relay_id).await?;
-        }
-        Some(Commands::Run { relay_id }) => {
-            run_daemon(relay_id.or(cli.relay_id)).await?;
+        None | Some(Commands::Run) => {
+            run_daemon(&paths, &options).await?;
         }
         Some(Commands::Start) => {
-            let relay_id = load_or_init_config(cli.relay_id)?;
+            if (options.relay_id.is_some() || options.relay_url.is_some())
+                && daemon::InstanceLock::check_running()?.is_some()
+            {
+                anyhow::bail!(
+                    "daemon is already running; use `agentdeckd restart` with these options to change its settings"
+                );
+            }
+            let config = DaemonConfig::load_or_init(&paths, &options)?;
             daemon::start_daemon()?;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            print_daemon_info(&relay_id);
+            print_daemon_info(&config, None);
         }
         Some(Commands::Stop) => {
             daemon::stop_daemon()?;
             println!("AgentDeck daemon service stopped.");
         }
         Some(Commands::Restart) => {
-            let relay_id = load_or_init_config(cli.relay_id)?;
+            let config = DaemonConfig::load_or_init(&paths, &options)?;
             let _ = daemon::stop_daemon();
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             daemon::start_daemon()?;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            print_daemon_info(&relay_id);
+            print_daemon_info(&config, None);
+        }
+        Some(Commands::Reset) => {
+            let previous_status = daemon::reset_daemon(&paths, &options)?;
+            println!("Previous service: {previous_status}");
+            println!(
+                "Reset complete. Cleared local connection state, logs and temporary downloads."
+            );
+            println!("Pair your devices again using the Pairing ID and Relay URL below.");
+            print_daemon_status(&paths)?;
         }
         Some(Commands::Status) => {
-            let status = daemon::daemon_status()?;
-            let running_pid = daemon::InstanceLock::check_running().ok().flatten();
-            let relay_id = load_or_init_config(None).unwrap_or_else(|_| "Unknown".to_string());
-
-            println!("AgentDeck Daemon Status:");
-            println!("  Service:    {status}");
-            if let Some(pid) = running_pid {
-                if pid > 0 {
-                    println!("  PID:        {pid}");
-                }
-            }
-            println!("  Relay ID:   {relay_id}");
+            print_daemon_status(&paths)?;
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relay_options_are_global() {
+        for command in ["run", "start", "restart", "status", "stop", "reset"] {
+            for args in [
+                vec![
+                    "agentdeckd",
+                    "--relay-url",
+                    "ws://localhost:8080/ws",
+                    "--relay-id",
+                    "test-id",
+                    command,
+                ],
+                vec![
+                    "agentdeckd",
+                    command,
+                    "--relay-url",
+                    "ws://localhost:8080/ws",
+                    "--relay-id",
+                    "test-id",
+                ],
+            ] {
+                let cli = Cli::try_parse_from(args).unwrap();
+                assert_eq!(cli.relay_url.as_deref(), Some("ws://localhost:8080/ws"));
+                assert_eq!(cli.relay_id.as_deref(), Some("test-id"));
+            }
+        }
+        for url in ["https://example.com/ws", "not-a-url", "ws://"] {
+            assert!(Cli::try_parse_from(["agentdeckd", "--relay-url", url]).is_err());
+        }
+    }
 }

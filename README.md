@@ -4,197 +4,67 @@ AgentDeck turns your coding agents (Claude Code, Codex, Cursor, pi) into remote 
 
 [![AgentDeck Demo](https://img.youtube.com/vi/_HWCKW9nfpE/maxresdefault.jpg)](https://www.youtube.com/watch?v=_HWCKW9nfpE)
 
-## How it works
+## Quick start
 
+```text
+AgentDeck (phone / extension) ⇄ Relay ⇄ agentdeckd (computer) ⇄ ACP agents
 ```
-AgentDeck (phone / extension) ⇄ Relay ⇄ agentdeckd (desktop daemon) ⇄ Claude Code / Codex / Cursor / pi
-```
 
-1. Run **`agentdeckd`** on the machine where your agents live.
-2. Copy the **Relay ID** (Pairing ID) printed by `agentdeckd` on startup. This ID pairs AgentDeck with your desktop: it is the credential for a private, durable WebSocket channel.
-3. Enter the Relay ID in AgentDeck's settings page. The app connects to the relay and lists the sessions of your selected agent, grouped by working directory.
-4. Open a session to replay its history, or tap **新建会话 (New session)** in the footer and pick a working directory from the agent's machine.
-
-The relay is protocol-agnostic and durable: if the phone goes offline, prompts sent from the other side keep their history and catch up when the app reconnects.
-
-AgentDeck supports **end-to-end encryption** between your phone and computer. With an `adk1_` pairing ID, only your paired devices can decrypt the messages; the relay forwards and queues ciphertext and cannot read your prompts, replies, attachments, or file contents. New installations generate encrypted pairing IDs by default; existing UUID pairing IDs retain the legacy plaintext mode.
-
----
-
-## AgentDeck Daemon (`agentdeckd`)
-
-`agentdeckd` is the native background daemon for macOS, Linux, and Windows. It hosts ACP agents, manages sessions and file access, and connects securely to the Relay with single-instance enforcement and autostart capabilities.
-
-### Installation
-
-#### macOS & Linux (Homebrew)
+Install the daemon on the computer where your agents run:
 
 ```sh
+# macOS / Linux
 brew install mantou132/tap/agentdeckd
-```
 
-#### Windows (Scoop)
-
-```sh
+# Windows
 scoop bucket add mantou https://github.com/mantou132/scoop-bucket
 scoop install agentdeckd
-```
 
-#### From Source (Cargo)
-
-```sh
-# Install directly to your Cargo bin path (~/.cargo/bin/agentdeckd)
+# From this repository
 cargo install --path crates/daemon
-
-# Or build the release binary manually
-cargo build --release -p agentdeck-daemon
-# The binary is located at target/release/agentdeckd
 ```
 
-### Usage & Commands
+Run `agentdeckd start`, then paste its **Pairing ID** into AgentDeck's Settings and select an agent.
+
+**Keep the Pairing ID secret. Anyone with it can access your agent. Do not include it in screenshots or issue reports.** New installations use `adk1_` IDs with end-to-end encryption; the relay only forwards ciphertext. Legacy UUID IDs use plaintext transport.
+
+## Daemon commands
 
 | Command | Description |
 | --- | --- |
-| `agentdeckd start` | **Register autostart service and start in background** (Recommended) |
-| `agentdeckd stop` | Unregister autostart service and terminate running background process |
-| `agentdeckd restart` | Restart background service and display current Pairing ID |
-| `agentdeckd status` | Display service status, running PID, and Pairing ID |
-| `agentdeckd` or `agentdeckd run` | Run directly in the foreground (useful for debugging and logs) |
+| `agentdeckd start` | Register autostart and start in the background |
+| `agentdeckd stop` | Stop the daemon and remove autostart |
+| `agentdeckd restart` | Restart the background service |
+| `agentdeckd status` | Show service status, PID, Relay URL and secret Pairing ID |
+| `agentdeckd reset` | Rotate Pairing ID, clear local state and show status; restart if previously running |
+| `agentdeckd` / `agentdeckd run` | Run in the foreground |
 
-#### 1. Start in Background (Autostart on boot)
+`reset` generates a new Pairing ID by default, invalidating the old ID. Use `--relay-id` to set a specific ID and `--relay-url` to change the relay; otherwise the default relay URL is used. Pair your devices again with the new ID shown in its status output. It clears local connection state, logs and temporary downloads while preserving installed agents and agent history. Running services restart; stopped services remain stopped.
 
-```sh
-agentdeckd start
-```
-
-Output:
-```text
-=======================================================
-  AgentDeck Daemon v0.1.0
-=======================================================
-  Relay URL : wss://agent-deck.xianqiao.wang/ws
-  Pairing ID: adk1_...
--------------------------------------------------------
-  Connect your AgentDeck Mobile App or Browser Extension
-  using the Pairing ID above.
-=======================================================
-```
-
-- **macOS**: Automatically registered as a user LaunchAgent (`~/Library/LaunchAgents/com.agentdeck.daemon.plist`).
-- **Linux**: Automatically registered as a systemd user service (`~/.config/systemd/user/com.agentdeck.daemon.service`).
-- **Windows**: Automatically registered as a Task Scheduler logon task.
-
-#### 2. Check Status & Pairing ID
+Global options can appear before or after the command:
 
 ```sh
-agentdeckd status
+agentdeckd start --relay-url wss://your-relay.example/ws
+agentdeckd restart --relay-id <YOUR_PAIRING_ID>
+agentdeckd reset --relay-id <NEW_PAIRING_ID> --relay-url wss://your-relay.example/ws
 ```
 
-Output:
-```text
-AgentDeck Daemon Status:
-  Service:    running
-  PID:        91859
-  Relay ID:   adk1_...
-```
+Both settings are saved for future starts. Use `restart` to change settings while the daemon is running, or `reset` to also clear local state. The default relay is `wss://agent-deck.xianqiao.wang/ws`; clients must use the same relay and Pairing ID.
 
-#### 3. Stop & Remove Autostart
+## Troubleshooting
 
-```sh
-agentdeckd stop
-```
+- **Cannot connect:** check `agentdeckd status`, confirm the client uses the same Pairing ID and relay, then try `agentdeckd restart`. Ensure your network permits WebSocket connections to the relay.
+- **Still stuck:** run `agentdeckd reset` and use **Reset App** in the client's Settings to clear local connection state.
+- **Connection preempted:** close duplicate clients sharing the same device identity.
+- **Connected, but an agent fails:** check that its CLI works locally and inspect `agentdeckd.log` under the data directory below. Save any useful logs before running `reset`.
 
-Unregisters the autostart service from the operating system and cleanly terminates any running `agentdeckd` instances.
+| OS | Daemon data directory |
+| --- | --- |
+| macOS | `~/Library/Application Support/agentdeck/` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/agentdeck/` |
+| Windows | `%LOCALAPPDATA%\agentdeck\` |
 
-#### 4. Custom Pairing ID
-
-You can specify a custom pairing ID (an `adk1_` encrypted key or UUID):
-
-```sh
-agentdeckd start --relay-id <YOUR_PAIRING_ID>
-# or in foreground:
-agentdeckd --relay-id <YOUR_PAIRING_ID>
-```
-
----
-
-## Pairing AgentDeck with your agents
-
-1. Start `agentdeckd` on your host computer:
-   ```sh
-   agentdeckd start
-   ```
-2. Copy the **Pairing ID** printed in the console (or check via `agentdeckd status`).
-3. In AgentDeck (mobile app or browser extension), open **设置 (Settings)**, paste the Pairing ID, and pick an agent.
-4. Save — the app connects to the relay (`wss://agent-deck.xianqiao.wang/ws` in production) and your agents/sessions are ready to use.
-
----
-
-## Troubleshooting (故障排查)
-
-If AgentDeck shows **Remote unavailable (远端未响应)**, **Connecting...**, or cannot establish a connection, check the following common causes and solutions:
-
-### 1. Pairing ID Mismatch (Pairing ID 不匹配)
-- **Cause**: The Pairing ID entered in the client doesn't match the one currently used by `agentdeckd` (e.g. after reinstalling or regenerating credentials), or an encrypted (`adk1_`) pairing key was mistyped/corrupted.
-- **Symptoms**: Client displays `Remote unavailable` or daemon logs `Rejected encrypted RPC with mismatched device identity`.
-- **Solution**:
-  1. On your host computer, run `agentdeckd status` to check the active Pairing ID.
-  2. In your mobile app or browser extension, open **设置 (Settings)**, re-paste the exact Pairing ID, and save.
-
-### 2. Stale Storage Cursor / Sequence Conflict (游标序号缓存冲突)
-- **Cause**: The client persists a message sequence cursor (`lastReceived`) to prevent duplicate processing. When switching between relays, restarting relay services, or reconnecting after server-side sequence resets, the client's stored cursor might be higher than the sequence sent by the server. The client's reliable transport (`relay-client-ts`) assumes incoming packets are stale duplicates, sends an ACK, and silently drops the handshake payload (`peer_attach` response).
-- **Symptoms**: WebSocket connects and frames are exchanged (visible in DevTools network tab), but the client UI remains on `Remote unavailable` until the 10s handshake timeout triggers.
-- **Solution**:
-  - **Mobile App / Web App**: Open **设置 (Settings)** → Tap **Reset App (重置应用)** (which clears local storage, cached sessions, and reloads). In a browser, you can also run in the DevTools Console:
-    ```js
-    localStorage.removeItem('relay-client.v1');
-    location.reload();
-    ```
-  - **Browser Extension (浏览器扩展)**: Open DevTools for the extension (inspect the Side Panel or Background page) and run in the Console:
-    ```js
-    chrome.storage.local.remove(['relay-client.v1', 'agentdeck.device_id.v1']);
-    location.reload();
-    ```
-
-### 3. Daemon Not Running or Stopped (桌面守护进程未运行)
-- **Cause**: The host computer went to sleep, rebooted, or `agentdeckd` crashed or was killed.
-- **Symptoms**: Client connects to the Relay server WebSocket successfully, but no response is received from the host, resulting in `Remote unavailable`.
-- **Solution**:
-  - Check daemon status on your computer:
-    ```sh
-    agentdeckd status
-    ```
-  - If stopped, start or restart it:
-    ```sh
-    agentdeckd start   # or: agentdeckd restart
-    ```
-
-### 4. Connection Preempted by Another Session (设备连接被抢占)
-- **Cause**: Multiple tabs, windows, or apps sharing the same Device ID connected to the same Relay endpoint simultaneously. The Relay protocol enforces single-connection exclusivity per device identity.
-- **Symptoms**: The indicator turns red with `Connection preempted (连接被抢占)` or an alert stating the session was preempted by a newer connection.
-- **Solution**: Close duplicate tabs or concurrent windows. If the conflict persists, execute **Reset App** in the client to generate a fresh, unique Device ID.
-
-### 5. Network / Firewall Restrictions (网络或防火墙阻拦)
-- **Cause**: Corporate firewall, strict proxy, or VPN blocking outbound WebSocket upgrades to the Relay server.
-- **Symptoms**: Client gets stuck on `Connecting...` or `Reconnecting...` without ever establishing a WebSocket connection.
-- **Solution**:
-  - Test WebSocket connectivity:
-    ```sh
-    curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" https://agent-deck.xianqiao.wang/ws
-    ```
-  - Ensure outbound HTTPS/WSS traffic on port 443 to `wss://agent-deck.xianqiao.wang/ws` is permitted.
-
-### 6. ACP Agent Process Failure (底层 Agent 执行异常)
-- **Cause**: The chosen agent binary (Claude Code, OpenCode, Antigravity, etc.) is not installed, not in `PATH`, or hung during session initialization.
-- **Symptoms**: Status indicator turns green (`Connected`), but sessions fail to load, or prompts hang indefinitely.
-- **Solution**:
-  - Inspect the daemon logs for error details:
-    - **macOS**: `tail -n 100 "$HOME/Library/Application Support/agentdeck/logs/agentdeckd.log"`
-    - **Linux**: `tail -n 100 "$HOME/.local/share/agentdeck/logs/agentdeckd.log"`
-    - **Windows**: `%LOCALAPPDATA%\agentdeck\logs\agentdeckd.log`
-  - Ensure the agent CLI runs properly when executed directly in your terminal.
-
----
+Logs are in `logs/agentdeckd.log`.
 
 ## Development
 
@@ -207,7 +77,7 @@ pnpm run tauri android dev  # Android device/emulator
 
 ```sh
 pnpm run lint         # Biome & TypeScript strict check
-pnpm test             # Regression tests
+pnpm -r test          # Workspace tests
 cargo check           # Rust workspace check
 cargo test -p agentdeck-daemon  # Daemon tests
 ```

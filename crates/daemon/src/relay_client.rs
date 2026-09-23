@@ -17,19 +17,17 @@ use serde_json::{Value, json};
 
 use crate::{
     agent_rpc::AgentService,
-    app_data, logger,
+    app_data::{self, AppPaths},
+    logger,
     peer::Peer,
     push,
     relay_encryption::{RelayEncryption, is_plain_id},
 };
 
-pub(crate) const RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
-
 const HOST_DEVICE_ID: &str = "host";
-const REMOTE_PEERS_FILE: &str = "remote_peers_v1.json";
 
-fn endpoint_url(relay_id: &str) -> String {
-    relay_client::transport::endpoint_url(RELAY_URL, relay_id, Endpoint::One, HOST_DEVICE_ID)
+fn endpoint_url(relay_url: &str, relay_id: &str) -> String {
+    relay_client::transport::endpoint_url(relay_url, relay_id, Endpoint::One, HOST_DEVICE_ID)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -41,7 +39,7 @@ pub(crate) struct RemoteDevice {
 }
 
 fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
-    let Ok(path) = app_data::root_dir().map(|dir| dir.join(REMOTE_PEERS_FILE)) else {
+    let Ok(path) = AppPaths::discover().map(|paths| paths.peers_file()) else {
         return HashMap::new();
     };
     let Ok(content) = std::fs::read_to_string(&path) else {
@@ -51,9 +49,13 @@ fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
 }
 
 fn save_persisted_peers(map: &HashMap<String, RemoteDevice>) {
-    let Ok(path) = app_data::root_dir().map(|dir| dir.join(REMOTE_PEERS_FILE)) else {
+    let Ok(paths) = AppPaths::discover() else {
         return;
     };
+    if app_data::ensure_dir(paths.root()).is_err() {
+        return;
+    }
+    let path = paths.peers_file();
     if let Ok(content) = serde_json::to_string_pretty(map) {
         let _ = std::fs::write(&path, content);
     }
@@ -338,9 +340,12 @@ impl ClientHandler for Handler {
     }
 }
 
-/// Start the remote RPC transport with the pairing id supplied by the
-/// extension. The service endpoint is the built-in local relay URL.
-pub fn start(relay_id: &str, service: &AgentService) -> Result<Arc<RemotePeerManager>> {
+/// Start the remote RPC transport with the configured relay URL and pairing ID.
+pub fn start(
+    relay_url: &str,
+    relay_id: &str,
+    service: &AgentService,
+) -> Result<Arc<RemotePeerManager>> {
     let encryption = if is_plain_id(relay_id) {
         None
     } else {
@@ -360,7 +365,7 @@ pub fn start(relay_id: &str, service: &AgentService) -> Result<Arc<RemotePeerMan
     let manager = Arc::new(RemotePeerManager::new(service.clone(), outbound_tx));
 
     let client = Client::new_with_ack_head(
-        endpoint_url(&route_id),
+        endpoint_url(relay_url, &route_id),
         true,
         store,
         Arc::new(Handler {
@@ -396,6 +401,7 @@ pub fn start(relay_id: &str, service: &AgentService) -> Result<Arc<RemotePeerMan
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DEFAULT_RELAY_URL;
 
     #[tokio::test]
     async fn repeated_attach_updates_fcm_token() {
@@ -521,8 +527,12 @@ mod tests {
     fn endpoint_url_adds_identity_to_built_in_url() {
         let relay_id = "01234567-89ab-cdef-0123-456789abcdef";
         assert_eq!(
-            endpoint_url(relay_id),
-            format!("{RELAY_URL}?id={relay_id}&endpoint=1&device_id=host")
+            endpoint_url(DEFAULT_RELAY_URL, relay_id),
+            format!("{DEFAULT_RELAY_URL}?id={relay_id}&endpoint=1&device_id=host")
+        );
+        assert_eq!(
+            endpoint_url("ws://localhost:8080/custom", relay_id),
+            format!("ws://localhost:8080/custom?id={relay_id}&endpoint=1&device_id=host")
         );
         assert!(is_plain_id(relay_id));
         assert!(!is_plain_id("not-a-uuid&endpoint=2"));
@@ -532,7 +542,7 @@ mod tests {
     async fn start_initializes_manager_and_handles_attach_and_routing() {
         let relay_id = "01234567-89ab-cdef-0123-456789abcdef";
         let service = AgentService::new();
-        let manager = start(relay_id, &service).expect("start relay manager");
+        let manager = start(DEFAULT_RELAY_URL, relay_id, &service).expect("start relay manager");
         let peer1 = manager.get_or_create_peer(1);
         peer1.notify("ping", serde_json::json!({ "ok": true }));
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;

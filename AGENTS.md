@@ -1,7 +1,7 @@
 # Agent Rules
 
 1. 遇到没有明确的事情不要自由发挥，应该询问确定。
-2. 始终根据目的考虑代码，如果有更简洁的方案应该提出来。
+2. 始终根据目的站在全局视角下考虑问题，如果有更简洁的方案应该提出来。
 3. 结构、入口或构建方式变化时同步更新本文档及对应子目录 CLAUDE.md；外层只保留导航、公用运行约束和全局开发规范，各子项目的实现细节下沉到各子目录。
 4. 只处理有实际依据的场景；不为不会发生的情况增加防御逻辑或不必要的复杂度。
 
@@ -11,7 +11,7 @@
 
 - `packages/agentdeck/`：AgentDeck 客户端前端工程与移动端适配。详情参见 [`packages/agentdeck/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/agentdeck/CLAUDE.md)。
 - `packages/extension/`：AgentDeck 浏览器扩展（Chrome & Firefox）。详情参见 [`packages/extension/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/extension/CLAUDE.md)。
-- `crates/daemon/`：独立后台守护服务 `agentdeckd`。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
+- `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
 - `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程。
 - `.github/workflows/`：
   - `release.yml`：Daemon 多平台构建、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）。
