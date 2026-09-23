@@ -1,5 +1,6 @@
 import { repeat } from '@mantou/gem/lib/element';
-
+import { sleep } from '@mantou/tap-ui/lib/timer';
+import { hapticWarning } from 'src/lib/haptics';
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
@@ -60,6 +61,15 @@ export class AgentDeckSessionListPageElement extends GemElement {
     openSession(session.sessionId);
   };
 
+  #onRefresh = async (event: CustomEvent<() => void>) => {
+    try {
+      await Promise.all([refreshSessions(), sleep(500)]);
+    } finally {
+      hapticWarning();
+      event.detail?.();
+    }
+  };
+
   @template()
   #render = () => {
     const { sheetOpen, newSessionError, selectedCwd, navigatingCwd } = this.#state;
@@ -84,7 +94,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const isConnecting = connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching';
 
     return html`
-      <tap-page class="bg-bg text-text" scroll-mask>
+      <tap-page
+        class="bg-bg text-text"
+        scroll-mask
+        refreshable
+        @refresh=${this.#onRefresh}
+      >
         <header
           slot="header"
           class="menu-header flex items-center gap-4 bg-bg/90 px-5 pb-3.5 backdrop-blur-xl backdrop-saturate-125 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
