@@ -115,6 +115,8 @@
   "settings.connectTitle": "Connect to Remote",
   "settings.connectDesc": "Enter the agentdeckd Relay ID from your computer to connect automatically upon saving.",
   "settings.howToGetRelayId": "How to get a Relay ID?",
+  "settings.showRelayId": "Show Relay ID",
+  "settings.hideRelayId": "Hide Relay ID",
   "settings.agentTitle": "Remote Agent",
   "settings.agentDesc": "Used to load sessions and execute tasks. Modes can be switched in the session composer.",
   "settings.saveFailed": "Failed to save settings",

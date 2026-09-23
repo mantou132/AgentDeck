@@ -13,6 +13,15 @@ const style = css`
   .settings-scroll {
     padding-bottom: calc(32px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
+
+  input[type='password'] {
+    letter-spacing: 0.2em;
+  }
+
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
 `;
 
 @customElement('agentdeck-settings-page')
@@ -26,6 +35,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
     agent: agentdeckStore.settings.agent,
     error: '',
     relayGuideOpen: !agentdeckStore.settings.relayId && !localStorage.getItem(RELAY_GUIDE_SEEN_KEY),
+    showRelayId: false,
   });
 
   @effect((i) => [i.#state.relayGuideOpen])
@@ -59,7 +69,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
   #render = () => {
     const { agents } = agentdeckStore;
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" @hide=${() => this.#state({ showRelayId: false })}>
         <header
           slot="header"
           class="settings-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl"
@@ -93,18 +103,36 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 </p>
               </div>
 
-              <label class="block">
+              <div class="relative block">
                 <input
-                  class="box-border h-12 w-full rounded-xl border border-border bg-bg px-3.5 font-mono text-base text-highlight outline-none placeholder:text-disabled"
+                  type=${this.#state.showRelayId ? 'text' : 'password'}
+                  class="box-border h-12 w-full rounded-xl border border-border bg-bg pr-11 pl-3.5 outline-none placeholder:text-disabled ${
+                    this.#state.showRelayId
+                      ? 'font-mono text-base text-highlight tracking-normal'
+                      : 'font-sans text-sm text-describe tracking-[0.2em]'
+                  }"
                   autocomplete="off"
                   autocapitalize="none"
                   spellcheck="false"
                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  aria-label=${i18n.get('settings.connectTitle')}
                   .value=${this.#state.relayId}
                   @input=${(event: InputEvent) =>
                     this.#state({ relayId: (event.target as HTMLInputElement).value, error: '' })}
                 />
-              </label>
+                <button
+                  type="button"
+                  class="absolute top-0 right-0 grid h-12 w-11 cursor-pointer place-items-center border-0 bg-transparent text-describe transition-colors hover:text-highlight active:opacity-70"
+                  aria-label=${i18n.get(this.#state.showRelayId ? 'settings.hideRelayId' : 'settings.showRelayId')}
+                  title=${i18n.get(this.#state.showRelayId ? 'settings.hideRelayId' : 'settings.showRelayId')}
+                  @click=${(event: MouseEvent) => {
+                    event.stopPropagation();
+                    this.#state({ showRelayId: !this.#state.showRelayId });
+                  }}
+                >
+                  <tap-use class="size-5" .element=${this.#state.showRelayId ? icons.visibilityOff : icons.visibility}></tap-use>
+                </button>
+              </div>
             </section>
 
             <section class="mb-5 rounded-2xl border border-border bg-bg-light p-5">

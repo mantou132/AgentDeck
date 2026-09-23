@@ -115,6 +115,8 @@
   "settings.connectTitle": "连接远端",
   "settings.connectDesc": "填入电脑端 agentdeckd 的 Relay ID，保存后自动连接。",
   "settings.howToGetRelayId": "如何获取 Relay ID？",
+  "settings.showRelayId": "查看 Relay ID",
+  "settings.hideRelayId": "隐藏 Relay ID",
   "settings.agentTitle": "远端 Agent",
   "settings.agentDesc": "用于加载会话和执行任务。模式可在会话输入区切换。",
   "settings.saveFailed": "保存设置失败",
