@@ -67,7 +67,7 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
-    void ensureSessionLoaded(this.sessionId);
+    ensureSessionLoaded(this.sessionId);
   };
 
   @effect((i) => [i.sessionId, i.#messagesRef.value, i.#messagesContentRef.value])
@@ -108,7 +108,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     };
     const restoreInput = () => {
       failed = true;
-      if (!preparing) void persistFailure();
+      if (!preparing) persistFailure();
     };
     let accepted = false;
     try {
@@ -141,7 +141,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   };
 
   #retryLoad = () => {
-    void retrySessionLoad(this.sessionId);
+    retrySessionLoad(this.sessionId);
   };
 
   #renderHeader = (title: string, cwd?: string, loading = false, loaded = false) => {
@@ -328,7 +328,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             .mode=${getModeSelection(agentdeckStore.optionsBySession[session.sessionId])}
             ?mode-busy=${changingMode}
             @mode-change=${(event: CustomEvent<string>) => {
-              void changeSessionMode(session, event.detail);
+              changeSessionMode(session, event.detail);
             }}
             .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get('session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
             .submit=${this.#send}

@@ -106,7 +106,7 @@ export class DeckComposerElement extends GemElement {
     const input: ComposerInput = { text: this.#state.draft.trim(), attachments: this.#state.attachments };
     this.#clearInput();
     this.#state({ submitting: true });
-    void hapticSelection();
+    hapticSelection();
     try {
       await this.submit(input);
     } finally {
@@ -120,7 +120,7 @@ export class DeckComposerElement extends GemElement {
       draft: value,
       attachments: syncPasteReferences(value, this.#state.attachments, this.#pastedAttachments.values()),
     });
-    void this.#saveDraft();
+    this.#saveDraft();
   };
 
   #clearInput = () => {
@@ -136,7 +136,7 @@ export class DeckComposerElement extends GemElement {
 
   restore = (message: { text: string; attachments?: Attachment[] }) => {
     this.#restoreInput(message, true);
-    void this.#saveDraft();
+    this.#saveDraft();
   };
 
   #restoreInput = (message: { text: string; attachments?: Attachment[] }, focus: boolean) => {
@@ -156,7 +156,7 @@ export class DeckComposerElement extends GemElement {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
-    void this.#addFiles(files);
+    this.#addFiles(files);
   };
 
   #addFiles = async (files: File[], selection?: InputSelection) => {
@@ -180,7 +180,7 @@ export class DeckComposerElement extends GemElement {
     }
     if (selection) this.#insertPastedAttachments(attachments, selection);
     else this.#state({ attachments: [...this.#state.attachments, ...attachments] });
-    void this.#saveDraft();
+    this.#saveDraft();
     this.#state({
       attachmentError: errors.length ? errors.join('\n') : this.#state.attachmentError,
       readingAttachments: false,
@@ -198,7 +198,7 @@ export class DeckComposerElement extends GemElement {
       return;
     }
     this.#state({ attachments: this.#state.attachments.filter((item) => item.id !== event.detail) });
-    void this.#saveDraft();
+    this.#saveDraft();
   };
 
   #replaceInputRange = (start: number, end: number, replacement: string) => {
@@ -255,7 +255,7 @@ export class DeckComposerElement extends GemElement {
     const images = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'));
     if (images.length) {
       event.preventDefault();
-      void this.#addFiles(images, selection);
+      this.#addFiles(images, selection);
       return;
     }
     const text = event.clipboardData?.getData('text/plain') ?? '';
@@ -265,7 +265,7 @@ export class DeckComposerElement extends GemElement {
       this.#state({ attachmentError: i18n.get('composer.pasteTooLarge') });
       return;
     }
-    void this.#addFiles([new File([text], 'Pasted text.txt', { type: 'text/plain' })], selection);
+    this.#addFiles([new File([text], 'Pasted text.txt', { type: 'text/plain' })], selection);
   };
 
   #onKeydown = (event: KeyboardEvent) => {

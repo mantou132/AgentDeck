@@ -17,7 +17,7 @@ export function mountBootstrap({ state }) {
   let active = true;
   const update = (patch) => active && state(patch);
 
-  void (async () => {
+  (async () => {
     try {
       try {
         const stored = await readAgentPanelState();

@@ -34,7 +34,7 @@ const handleTransportMessage = (message: TransportMessage) => {
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
       });
       if (connection === 'connected') {
-        void refreshSessions();
+        refreshSessions();
       }
       break;
     }
@@ -56,8 +56,8 @@ export const startApp = () => {
       resetWasPending = true;
       // Clear after reload: callbacks in the old document can no longer refill the outbox.
       clearTransportStorage();
-      void clearAllInFlight();
-      void clearDrafts().catch(console.error);
+      clearAllInFlight();
+      clearDrafts().catch(console.error);
       sessionStorage.removeItem(RESET_PENDING_KEY);
     }
   } catch (error) {
@@ -136,7 +136,7 @@ export const saveSettings = (settings: AppSettings) => {
   }
   if (relayChanged) startTransport(next.relayId, { ackHead: true });
   else if (notConnected) startTransport(next.relayId);
-  else if (agentChanged && agentdeckStore.connection === 'connected') void refreshSessions();
+  else if (agentChanged && agentdeckStore.connection === 'connected') refreshSessions();
 };
 
 /**

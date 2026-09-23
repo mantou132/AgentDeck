@@ -68,7 +68,7 @@ export class DeckFileBrowserElement extends GemElement {
 
   @effect((i) => [i.path, i.cwd])
   #init = () => {
-    void this.#navigateTo(this.path);
+    this.#navigateTo(this.path);
   };
 
   @effect(() => [agentdeckStore.connection])
@@ -77,7 +77,7 @@ export class DeckFileBrowserElement extends GemElement {
       agentdeckStore.connection === 'connected' &&
       (this.#state.browseError || (!this.#state.currentPath && !this.#state.entries.length))
     ) {
-      void this.#navigateTo(this.#state.currentPath || this.path);
+      this.#navigateTo(this.#state.currentPath || this.path);
     }
   };
 

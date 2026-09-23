@@ -4,13 +4,20 @@ import { i18n } from '../i18n';
 import { hapticWarning } from '../lib/haptics';
 import type { Attachment, DeckSession } from './types';
 
+type TurnHandlers = {
+  onEvent: (event: SessionEvent) => void | Promise<void>;
+  onAnswer: (answer: string) => void;
+  onError: (error: string) => void;
+  onDone: (completed: boolean) => void;
+};
+
 const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
 
 export const requestPermission = (request: PermissionRequest, onNotify: (request: PermissionRequest) => void) => {
   if (!request?.sessionId) return Promise.reject(new Error(i18n.get('error.permissionMissingSessionId')));
   permissionResolvers.get(request.sessionId)?.reject(new Error(i18n.get('error.permissionReplaced')));
   onNotify(request);
-  void hapticWarning();
+  hapticWarning();
   return new Promise<string>((resolve, reject) => permissionResolvers.set(request.sessionId, { resolve, reject }));
 };
 
@@ -40,12 +47,7 @@ export const isPendingSessionCanceled = () => pendingSessionCanceled;
 export const performTurn = async (
   session: DeckSession,
   text: string,
-  handlers: {
-    onEvent: (event: SessionEvent) => void | Promise<void>;
-    onAnswer: (answer: string) => void;
-    onError: (error: string) => void;
-    onDone: (completed: boolean) => void;
-  },
+  handlers: TurnHandlers,
   attachments: Attachment[] = [],
   callId?: string,
 ) => {

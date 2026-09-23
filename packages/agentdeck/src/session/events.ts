@@ -12,6 +12,12 @@ import type {
   ToolMessage,
 } from './types';
 
+type SessionEventContext = {
+  agent: string;
+  streaming: boolean;
+  options?: SessionOptions;
+};
+
 export const completeThought = (messages: ChatMessage[]) => {
   const last = messages.at(-1);
   if (!last || !('type' in last) || last.type !== 'thought' || !last.pending) return messages;
@@ -79,11 +85,7 @@ const getToolContent = (update: Record<string, unknown>) => {
 export const reduceSessionEvent = (
   current: ChatMessage[],
   event: SessionEvent,
-  context: {
-    agent: string;
-    streaming: boolean;
-    options?: SessionOptions;
-  },
+  context: SessionEventContext,
 ): EventReduction | null => {
   if (event.event === 'stop') {
     return { messages: finishStreaming(current) };

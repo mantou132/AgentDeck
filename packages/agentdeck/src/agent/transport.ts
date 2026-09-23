@@ -12,6 +12,22 @@ import { AgentApi, type PermissionRequest, type SessionEvent } from './api';
 import { createRelayEncryption, isPairingId, type RelayEncryption } from './encryption';
 import type { RpcId, RpcMessage } from './rpc';
 
+type HostSyncOptions = {
+  metadataOnly: boolean;
+  deviceId: string;
+  agentApi: AgentApi;
+  onStateChange: (state: ConnectionState, error?: string) => void;
+  onSynced?: (sentToken: string | null | undefined) => void;
+};
+
+type InitTransportOptions = {
+  initialRelayId: string;
+  onRequestPermission: (request: PermissionRequest) => Promise<string>;
+  onMessage: MessageHandler;
+  onBeforePayload?: () => Promise<unknown> | undefined;
+  ackHead?: boolean;
+};
+
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
 export const connectionLabels = new Proxy({} as Record<ConnectionState, string>, {
   get: (_, prop: ConnectionState) => getConnectionLabel(prop),
@@ -181,13 +197,7 @@ class HostSessionManager {
     }
   }
 
-  sync(options: {
-    metadataOnly: boolean;
-    deviceId: string;
-    agentApi: AgentApi;
-    onStateChange: (state: ConnectionState, error?: string) => void;
-    onSynced?: (sentToken: string | null | undefined) => void;
-  }): Promise<void> {
+  sync(options: HostSyncOptions): Promise<void> {
     if (this.#attaching) return this.#attaching;
 
     const version = ++this.#attachVersion;
@@ -330,7 +340,7 @@ class AgentTransport {
 
   updateFcmToken(token: string | null) {
     this.hostSession.updateFcmToken(token, () => {
-      if (this.#connectionState === 'connected') void this.syncHostConnection(true);
+      if (this.#connectionState === 'connected') this.syncHostConnection(true);
     });
   }
 
@@ -344,7 +354,7 @@ class AgentTransport {
       onStateChange: (state, error) => this.#emitConnection(state, error),
       onSynced: (sentToken) => {
         if (this.#connectionState === 'connected' && this.hostSession.fcmToken !== sentToken) {
-          void this.syncHostConnection(true);
+          this.syncHostConnection(true);
         }
       },
     });
@@ -414,7 +424,7 @@ class AgentTransport {
         clearTimeout(this.#connectTimer);
         if (connection === 'connected') {
           this.#relayConnected = true;
-          void this.syncHostConnection();
+          this.syncHostConnection();
           return;
         }
         this.#relayConnected = false;
@@ -450,14 +460,14 @@ class AgentTransport {
     };
 
     this.#relayClient = client;
-    void client.connect({ ackHead: options?.ackHead });
+    client.connect({ ackHead: options?.ackHead });
   }
 
   #scheduleRetry(client: RelayClient, relayId: string) {
     clearTimeout(this.#retryTimer);
     if (!this.#relayClient || this.#currentRelayId !== relayId) return;
     this.#retryTimer = setTimeout(() => {
-      if (this.#relayClient === client) void client.connect({ ackHead: false });
+      if (this.#relayClient === client) client.connect({ ackHead: false });
     }, 3000);
   }
 
@@ -467,7 +477,7 @@ class AgentTransport {
       return;
     }
     if (force) this.#relayClient.close();
-    void this.#relayClient.connect({ ackHead: false });
+    this.#relayClient.connect({ ackHead: false });
   }
 
   close() {
@@ -505,13 +515,7 @@ export const closeTransport = () => transport.close();
 export const clearTransportStorage = () => localStorage.removeItem(DEFAULT_STORAGE_KEY);
 
 let transportInitialized = false;
-export const initTransport = (options: {
-  initialRelayId: string;
-  onRequestPermission: (request: PermissionRequest) => Promise<string>;
-  onMessage: MessageHandler;
-  onBeforePayload?: () => Promise<unknown> | undefined;
-  ackHead?: boolean;
-}) => {
+export const initTransport = (options: InitTransportOptions) => {
   transport.addMessageHandler(options.onMessage);
   transport.setBeforePayloadHook(options.onBeforePayload);
   if (transportInitialized) return;

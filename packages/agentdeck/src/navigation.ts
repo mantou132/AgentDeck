@@ -82,7 +82,7 @@ export const openMessageLink = (event: MouseEvent, cwd: string) => {
   if (link.type === 'web') {
     openWebBrowser(link.url, anchor?.textContent?.trim() || link.url, stack);
   } else {
-    void openPath(link.path, cwd, link.line, stack);
+    openPath(link.path, cwd, link.line, stack);
   }
   return true;
 };

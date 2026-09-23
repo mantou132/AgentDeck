@@ -8,13 +8,13 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
     await old.connect();
     if (operation === 'loading') {
       old.heldMethods.add('agent_session_load');
-      void old.app.ensureSessionLoaded('s1');
+      old.app.ensureSessionLoaded('s1');
       await old.settleHost();
       assert.equal(old.app.agentdeckStore.loadingSessionIds.includes('s1'), true);
     } else if (operation === 'creating') {
       old.heldMethods.add('agent_session_create');
       const pendingSession = old.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
-      void old.app.promotePendingSession(pendingSession, 'old pending session');
+      old.app.promotePendingSession(pendingSession, 'old pending session');
       await tick();
       assert.equal(old.app.agentdeckStore.pendingSessionIds.includes('pending-session'), true);
     } else {

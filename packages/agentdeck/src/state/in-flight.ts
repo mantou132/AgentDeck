@@ -105,7 +105,7 @@ export const updateInFlightMessages = async (sessionId: string, messages: ChatMe
   if (!updater) {
     updater = throttle(
       (msgs: ChatMessage[]) => {
-        void writeMessagesToIndexedDb(sessionId, msgs);
+        writeMessagesToIndexedDb(sessionId, msgs);
       },
       300,
       { leading: true, maxWait: 1000 },

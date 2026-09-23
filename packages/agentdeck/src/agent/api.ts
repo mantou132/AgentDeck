@@ -2,6 +2,26 @@ import { i18n } from '../i18n';
 import type { RpcId, RpcMessage } from './rpc';
 import { RpcPeer } from './rpc';
 
+type CreateSessionOptions = {
+  agent: string;
+  cwd: string;
+  panelContext?: PanelContext | unknown;
+};
+
+type LoadSessionOptions = {
+  agent: string;
+  sessionId: string;
+  cwd?: string;
+  onEvent?: (event: SessionEvent) => void;
+  panelContext?: PanelContext | unknown;
+};
+
+type ResumePromptHandlers = {
+  onEvent?: (event: SessionEvent) => void | Promise<void>;
+  resolve?: (value: { answer?: string }) => void;
+  reject?: (error: Error) => void;
+};
+
 export type RemoteFile = { path: string } & (
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string }
@@ -201,15 +221,7 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.gitDiffTimeout'),
     });
 
-  createSession = ({
-    agent,
-    cwd,
-    panelContext,
-  }: {
-    agent: string;
-    cwd: string;
-    panelContext?: PanelContext | unknown;
-  }) =>
+  createSession = ({ agent, cwd, panelContext }: CreateSessionOptions) =>
     this.#peer.call<CreatedSession>(
       'agent_session_create',
       { agent, cwd, ...(panelContext ? { panelContext } : {}), timeoutSeconds: sessionTimeoutSeconds },
@@ -243,19 +255,7 @@ export class AgentApi {
     return sessions;
   };
 
-  loadSession = ({
-    agent,
-    sessionId,
-    cwd,
-    onEvent,
-    panelContext,
-  }: {
-    agent: string;
-    sessionId: string;
-    cwd?: string;
-    onEvent?: (event: SessionEvent) => void;
-    panelContext?: PanelContext | unknown;
-  }) =>
+  loadSession = ({ agent, sessionId, cwd, onEvent, panelContext }: LoadSessionOptions) =>
     this.#peer.call<LoadedSession>(
       'agent_session_load',
       {
@@ -303,14 +303,7 @@ export class AgentApi {
       callId,
     );
 
-  resumePrompt = (
-    rpcId: RpcId,
-    handlers: {
-      onEvent?: (event: SessionEvent) => void | Promise<void>;
-      resolve?: (value: { answer?: string }) => void;
-      reject?: (error: Error) => void;
-    },
-  ) =>
+  resumePrompt = (rpcId: RpcId, handlers: ResumePromptHandlers) =>
     this.#peer.resumeCall(rpcId, {
       onEvent: (event) => handlers.onEvent?.(event as SessionEvent),
       resolve: (value) => handlers.resolve?.(value as { answer?: string }),

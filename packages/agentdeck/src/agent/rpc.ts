@@ -1,3 +1,9 @@
+type ResumeCallHandlers = {
+  onEvent?: (event: unknown) => void | Promise<void>;
+  resolve?: (value: unknown) => void;
+  reject?: (error: Error) => void;
+};
+
 export type RpcId = string | number;
 
 export type CallOptions = { timeoutMs: number; timeoutMessage: string };
@@ -48,7 +54,7 @@ export class RpcPeer {
         pending.timer = setTimeout(() => {
           if (!this.#takePending(id)) return;
           reject(new Error(options.timeoutMessage));
-          void Promise.resolve()
+          Promise.resolve()
             .then(() => this.#onTimeout?.(id))
             .catch(console.error);
         }, options.timeoutMs);
@@ -57,21 +63,14 @@ export class RpcPeer {
         this.#takePending(id)?.reject(error instanceof Error ? error : new Error(String(error)));
       };
       try {
-        void Promise.resolve(this.#send({ id, method, params })).catch(failed);
+        Promise.resolve(this.#send({ id, method, params })).catch(failed);
       } catch (error) {
         failed(error);
       }
     });
   };
 
-  resumeCall = (
-    id: RpcId,
-    handlers: {
-      onEvent?: (event: unknown) => void | Promise<void>;
-      resolve?: (value: unknown) => void;
-      reject?: (error: Error) => void;
-    },
-  ) => {
+  resumeCall = (id: RpcId, handlers: ResumeCallHandlers) => {
     this.#pending.set(id, {
       resolve: handlers.resolve ?? (() => {}),
       reject: handlers.reject ?? (() => {}),
@@ -100,7 +99,7 @@ export class RpcPeer {
         return;
       }
 
-      void Promise.resolve(result).then(
+      Promise.resolve(result).then(
         (value) => this.#post({ id, result: value ?? null }),
         (error) => this.#post({ id, error: error instanceof Error ? error.message : String(error) }),
       );
@@ -133,7 +132,7 @@ export class RpcPeer {
         console.error(`RPC notification failed: ${method}`, error);
         return;
       }
-      void Promise.resolve(result).catch((error) => console.error(`RPC notification failed: ${method}`, error));
+      Promise.resolve(result).catch((error) => console.error(`RPC notification failed: ${method}`, error));
     }
   };
 
@@ -149,7 +148,7 @@ export class RpcPeer {
   };
 
   #post = (message: RpcMessage) => {
-    void Promise.resolve()
+    Promise.resolve()
       .then(() => this.#send(message))
       .catch(console.error);
   };

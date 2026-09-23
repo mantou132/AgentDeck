@@ -47,7 +47,7 @@ export const startPushNotifications = async () => {
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') void syncToken();
+      if (document.visibilityState === 'visible') syncToken();
     });
     await syncToken();
   } catch (error) {

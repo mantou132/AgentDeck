@@ -1,12 +1,11 @@
+type FollowBottomOptions = { onFollowingChange?: (following: boolean) => void; isActive?: () => boolean };
+
 const BOTTOM_THRESHOLD = 24;
 
 export const followBottom = (
   viewport: HTMLElement | null | undefined,
   content: HTMLElement | undefined,
-  {
-    onFollowingChange,
-    isActive = () => true,
-  }: { onFollowingChange?: (following: boolean) => void; isActive?: () => boolean } = {},
+  { onFollowingChange, isActive = () => true }: FollowBottomOptions = {},
 ) => {
   if (!viewport || !content) return;
 

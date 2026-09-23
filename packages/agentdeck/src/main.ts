@@ -14,4 +14,4 @@ initApp({
 });
 
 startApp();
-void startPushNotifications();
+startPushNotifications();

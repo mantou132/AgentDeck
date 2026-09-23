@@ -59,7 +59,7 @@ export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
   if (reduction.messages) {
     setMessages(sessionId, reduction.messages);
     if (streaming) {
-      void updateInFlightMessages(sessionId, reduction.messages);
+      updateInFlightMessages(sessionId, reduction.messages);
     }
   }
   if (reduction.sessionPatch) {
@@ -87,7 +87,7 @@ export const resetRemoteState = () => {
   localSessions.clear();
   inFlightSessions.clear();
   openedSessionIds.clear();
-  void clearAllInFlight();
+  clearAllInFlight();
   declineAllPermissions((id) => {
     const permissionsBySession = { ...agentdeckStore.permissionsBySession };
     delete permissionsBySession[id];
@@ -223,8 +223,8 @@ export const deleteSession = async (sessionId: string) => {
     localSessions.delete(sessionId);
     inFlightSessions.delete(sessionId);
     openedSessionIds.delete(sessionId);
-    void removeInFlight(sessionId);
-    void removeDraft(draftKey(session)).catch(console.error);
+    removeInFlight(sessionId);
+    removeDraft(draftKey(session)).catch(console.error);
     resolvePermission(sessionId, null);
     const sessions = agentdeckStore.sessions.filter((item) => item.sessionId !== sessionId);
     const messagesBySession = { ...agentdeckStore.messagesBySession };
@@ -386,7 +386,7 @@ const runPromptTurn = (
   const currentMessages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
   const activeSession: DeckSession = { ...session, updatedAt: now };
   recordInFlightSession(activeSession);
-  void saveInFlight({
+  saveInFlight({
     sessionId: session.sessionId,
     agent: session.agent,
     rpcId,
@@ -395,7 +395,7 @@ const runPromptTurn = (
     options: agentdeckStore.optionsBySession[session.sessionId],
     updatedAt: Date.now(),
   });
-  void performTurn(
+  performTurn(
     session,
     prompt.text,
     {
@@ -410,7 +410,7 @@ const runPromptTurn = (
         }
       },
       onError: (error) => {
-        void removeInFlight(session.sessionId);
+        removeInFlight(session.sessionId);
         setSessionError(session.sessionId, error);
         const messages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
         setMessages(
@@ -420,7 +420,7 @@ const runPromptTurn = (
         onFailed?.();
       },
       onDone: (completed) => {
-        void removeInFlight(session.sessionId);
+        removeInFlight(session.sessionId);
         resolvePermission(session.sessionId, null);
         setMessages(session.sessionId, finishStreaming(agentdeckStore.messagesBySession[session.sessionId] ?? []));
         if (completed && agentdeckStore.pendingSessionIds.includes(session.sessionId)) {
@@ -428,7 +428,7 @@ const runPromptTurn = (
         }
         setSessionFlag('pendingSessionIds', session.sessionId, false);
         if (completed) {
-          void hapticSuccess();
+          hapticSuccess();
         }
       },
     },
@@ -444,7 +444,7 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
   agentApi.resumePrompt(rpcId, {
     onEvent: (event) => applySessionEvent(sessionId, event),
     resolve: (result) => {
-      void removeInFlight(sessionId);
+      removeInFlight(sessionId);
       resolvePermission(sessionId, null);
       if (result?.answer) {
         const current = agentdeckStore.messagesBySession[sessionId] ?? [];
@@ -458,10 +458,10 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
         setSessionFlag('unreadSessionIds', sessionId, true);
       }
       setSessionFlag('pendingSessionIds', sessionId, false);
-      void hapticSuccess();
+      hapticSuccess();
     },
     reject: (error) => {
-      void removeInFlight(sessionId);
+      removeInFlight(sessionId);
       setSessionError(sessionId, error.message);
       setSessionFlag('pendingSessionIds', sessionId, false);
       setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
@@ -507,7 +507,7 @@ export const promotePendingSession = async (
 
   const sessionId = created.sessionId;
   if (isPendingSessionCanceled()) {
-    void agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
+    agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
     setMessages('pending-session', []);
     setSessionFlag('pendingSessionIds', 'pending-session', false);
     return null;
@@ -531,7 +531,7 @@ export const promotePendingSession = async (
       modeError = error instanceof Error ? error.message : i18n.get('error.switchModeFailed');
     }
     if (isPendingSessionCanceled()) {
-      void agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
+      agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
       setMessages('pending-session', []);
       setSessionFlag('pendingSessionIds', 'pending-session', false);
       return null;
@@ -607,10 +607,10 @@ export const cancelTurn = (sessionId: string) => {
     setSessionFlag('pendingSessionIds', sessionId, false);
     return;
   }
-  void cancelTurnPrompt(session).catch((error) => {
+  cancelTurnPrompt(session).catch((error) => {
     setSessionError(sessionId, error instanceof Error ? error.message : i18n.get('error.cancelTaskFailed'));
     setSessionFlag('pendingSessionIds', sessionId, false);
-    void removeInFlight(sessionId);
+    removeInFlight(sessionId);
     setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
   });
 };
@@ -622,5 +622,5 @@ export const endSession = (sessionId: string) => {
   openedSessionIds.delete(sessionId);
   resolvePermission(sessionId, null);
   setSessionError(sessionId, i18n.get('error.remoteSessionEnded'));
-  void removeInFlight(sessionId);
+  removeInFlight(sessionId);
 };
