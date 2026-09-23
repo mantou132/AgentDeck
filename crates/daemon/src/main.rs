@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 mod acp_agent;
 mod agent_rpc;
 mod app_data;
+mod awake;
 mod config;
 pub mod daemon;
 mod logger;
@@ -51,6 +52,66 @@ enum Commands {
     Reset,
     /// Check daemon status and display Pairing ID
     Status,
+    /// Configure automatic sleep prevention, or show its current status
+    #[command(arg(clap::Arg::new("relay_id").long("relay-id").hide(true)))]
+    #[command(arg(clap::Arg::new("relay_url").long("relay-url").hide(true)))]
+    Awake {
+        #[command(subcommand)]
+        command: Option<AwakeCommand>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AwakeCommand {
+    /// Always prevent automatic sleep while the daemon runs
+    Always,
+    /// Prevent automatic sleep on external power
+    #[command(alias = "on")]
+    Plugged,
+    /// Stay awake for one hour after the last RPC activity
+    Active,
+    /// Let the operating system sleep normally
+    Never,
+    /// Show the saved mode and actual runtime state
+    Status,
+}
+
+async fn awake_command(paths: &AppPaths, command: Option<AwakeCommand>) -> Result<()> {
+    let mode = match command {
+        Some(AwakeCommand::Always) => Some(awake::Mode::Always),
+        Some(AwakeCommand::Plugged) => Some(awake::Mode::Plugged),
+        Some(AwakeCommand::Active) => Some(awake::Mode::Active),
+        Some(AwakeCommand::Never) => Some(awake::Mode::Never),
+        None | Some(AwakeCommand::Status) => None,
+    };
+    let config = match mode {
+        Some(mode) => DaemonConfig::set_awake(paths, mode)?,
+        None => DaemonConfig::read(paths)?,
+    };
+    let Some(pid) = daemon::InstanceLock::check_running_at(&paths.lock_file())? else {
+        println!("Keep awake: {}", config.awake);
+        println!("Daemon is not running. Setting will take effect when it starts.");
+        return Ok(());
+    };
+    for _ in 0..40 {
+        if let Some(status) = awake::read_status(paths, pid, config.awake) {
+            println!(
+                "Keep awake: {} ({})",
+                status.mode,
+                if status.on { "on" } else { "off" }
+            );
+            if let Some(error) = status.error {
+                anyhow::bail!("Keep awake unavailable: {error}");
+            }
+            return Ok(());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    println!("Keep awake: {} (runtime status unavailable)", config.awake);
+    println!(
+        "Setting saved. The running daemon has not confirmed it; restart it if it predates awake support."
+    );
+    Ok(())
 }
 
 fn parse_relay_url(value: &str) -> std::result::Result<String, String> {
@@ -114,6 +175,7 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
     ));
 
     let config = DaemonConfig::load_or_init(paths, options)?;
+    let _awake_monitor = awake::Monitor::start(paths)?;
     let relay_id = config.relay_id();
 
     let service = Arc::new(AgentService::new());
@@ -179,6 +241,9 @@ async fn main() -> Result<()> {
             println!("Pair your devices again using the Pairing ID and Relay URL below.");
             print_daemon_status(&paths)?;
         }
+        Some(Commands::Awake { command }) => {
+            awake_command(&paths, command).await?;
+        }
         Some(Commands::Status) => {
             print_daemon_status(&paths)?;
         }
@@ -190,6 +255,56 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn awake_commands_parse() {
+        for command in ["always", "plugged", "on", "active", "never", "status"] {
+            assert!(matches!(
+                Cli::try_parse_from(["agentdeckd", "awake", command])
+                    .unwrap()
+                    .command,
+                Some(Commands::Awake { .. })
+            ));
+        }
+        assert!(matches!(
+            Cli::try_parse_from(["agentdeckd", "awake", "on"])
+                .unwrap()
+                .command,
+            Some(Commands::Awake {
+                command: Some(AwakeCommand::Plugged)
+            })
+        ));
+        assert!(Cli::try_parse_from(["agentdeckd", "awake"]).is_ok());
+        assert!(Cli::try_parse_from(["agentdeckd", "awake", "invalid"]).is_err());
+    }
+
+    #[test]
+    fn awake_hides_relay_options() {
+        for args in [
+            vec!["agentdeckd", "awake", "--help"],
+            vec!["agentdeckd", "awake", "active", "--help"],
+        ] {
+            let help = Cli::try_parse_from(args).unwrap_err();
+            assert_eq!(help.kind(), clap::error::ErrorKind::DisplayHelp);
+            assert!(!help.to_string().contains("--relay-"));
+        }
+    }
+
+    #[test]
+    fn awake_relay_options_are_local_and_do_not_validate_urls() {
+        for (option, value) in [("--relay-id", "test-id"), ("--relay-url", "not-a-url")] {
+            assert!(Cli::try_parse_from(["agentdeckd", "awake", option, value]).is_ok());
+            for command in ["always", "plugged", "on", "active", "never", "status"] {
+                assert!(
+                    Cli::try_parse_from(["agentdeckd", "awake", option, value, command]).is_ok()
+                );
+                let error = Cli::try_parse_from(["agentdeckd", "awake", command, option, value])
+                    .unwrap_err();
+                assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
+            }
+        }
+        assert!(Cli::try_parse_from(["agentdeckd", "--relay-url", "not-a-url", "awake"]).is_err());
+    }
 
     #[test]
     fn relay_options_are_global() {

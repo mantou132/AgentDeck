@@ -19,9 +19,37 @@ pub(crate) struct RelayOptions {
 pub(crate) struct DaemonConfig {
     relay_id: Option<String>,
     relay_url: Option<String>,
+    #[serde(default)]
+    pub awake: crate::awake::Mode,
 }
 
 impl DaemonConfig {
+    pub fn read(paths: &AppPaths) -> Result<Self> {
+        let path = paths.config_file();
+        let config: Self = match fs::read_to_string(&path) {
+            Ok(content) => serde_json::from_str(&content).with_context(|| {
+                format!(
+                    "invalid daemon config at {}; run `agentdeckd reset` to recover",
+                    path.display()
+                )
+            })?,
+            Err(error) if error.kind() == ErrorKind::NotFound => Self::default(),
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!("failed to read daemon config at {}", path.display())
+                });
+            }
+        };
+        Ok(config)
+    }
+
+    pub fn set_awake(paths: &AppPaths, mode: crate::awake::Mode) -> Result<Self> {
+        let mut config = Self::read(paths)?;
+        config.awake = mode;
+        config.save(paths)?;
+        Ok(config)
+    }
+
     pub fn relay_id(&self) -> &str {
         self.relay_id.as_deref().expect("initialized pairing ID")
     }
@@ -32,20 +60,7 @@ impl DaemonConfig {
 
     /// Normal starts reuse saved values unless explicitly overridden.
     pub fn load_or_init(paths: &AppPaths, options: &RelayOptions) -> Result<Self> {
-        let path = paths.config_file();
-        let mut config: Self = match fs::read_to_string(&path) {
-            Ok(content) => serde_json::from_str(&content).with_context(|| {
-                format!(
-                    "invalid daemon config at {}; run `agentdeckd reset` to recover",
-                    path.display()
-                )
-            })?,
-            Err(error) if error.kind() == ErrorKind::NotFound => Self::default(),
-            Err(error) => {
-                return Err(error)
-                    .with_context(|| format!("failed to read daemon config at {}", path.display()));
-            }
-        };
+        let mut config = Self::read(paths)?;
         let mut changed = false;
         if let Some(id) = &options.relay_id {
             config.relay_id = Some(id.clone());
@@ -72,6 +87,7 @@ impl DaemonConfig {
     /// Reset starts from defaults, never from the old configuration.
     pub fn reset(paths: &AppPaths, options: &RelayOptions) -> Result<Self> {
         let config = Self {
+            awake: crate::awake::Mode::Never,
             relay_id: Some(
                 options
                     .relay_id
@@ -93,8 +109,11 @@ impl DaemonConfig {
     fn save(&self, paths: &AppPaths) -> Result<()> {
         app_data::ensure_dir(paths.root())?;
         let path = paths.config_file();
-        fs::write(&path, serde_json::to_string_pretty(self)?)
-            .with_context(|| format!("failed to write daemon config to {}", path.display()))
+        let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+        fs::write(&temporary, serde_json::to_string_pretty(self)?)
+            .with_context(|| format!("failed to write daemon config to {}", temporary.display()))?;
+        fs::rename(&temporary, &path)
+            .with_context(|| format!("failed to replace daemon config at {}", path.display()))
     }
 }
 
@@ -227,8 +246,30 @@ mod tests {
     }
 
     #[test]
+    fn awake_persists_without_changing_relay_and_reset_restores_never() {
+        use crate::awake::Mode;
+        let root =
+            std::env::temp_dir().join(format!("agentdeck-awake-config-{}", std::process::id()));
+        let paths = AppPaths::new(root.clone());
+        assert_eq!(DaemonConfig::read(&paths).unwrap().awake, Mode::Never);
+        assert!(!root.exists());
+        let original = load_config(&paths, None, Some("wss://example.com".into())).unwrap();
+        for mode in [Mode::Always, Mode::Plugged, Mode::Active, Mode::Never] {
+            DaemonConfig::set_awake(&paths, mode).unwrap();
+            let saved = load_config(&paths, None, None).unwrap();
+            assert_eq!(saved.awake, mode);
+            assert_eq!(saved.relay_id, original.relay_id);
+            assert_eq!(saved.relay_url, original.relay_url);
+        }
+        DaemonConfig::set_awake(&paths, Mode::Always).unwrap();
+        assert_eq!(reset_config(&paths, None, None).unwrap().awake, Mode::Never);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn old_config_uses_default_relay() {
         let config: DaemonConfig = serde_json::from_str(r#"{"relay_id":"existing-id"}"#).unwrap();
+        assert_eq!(config.awake, crate::awake::Mode::Never);
         assert_eq!(config.relay_url(), DEFAULT_RELAY_URL);
         assert_eq!(config.relay_id.as_deref(), Some("existing-id"));
     }

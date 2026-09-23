@@ -31,6 +31,10 @@ impl AppPaths {
         self.root.join("daemon.json")
     }
 
+    pub fn awake_status_file(&self) -> PathBuf {
+        self.root.join("awake_status.json")
+    }
+
     pub fn lock_file(&self) -> PathBuf {
         self.root.join("daemon.lock")
     }
@@ -57,6 +61,7 @@ impl AppPaths {
 
     /// Caller must hold the instance lock. Configuration and installed agents are preserved.
     pub fn clear_runtime_state(&self) -> Result<()> {
+        remove_if_present(&self.awake_status_file(), |path| fs::remove_file(path))?;
         remove_if_present(&self.peers_file(), |path| fs::remove_file(path))?;
         remove_if_present(&self.logs_dir(), |path| fs::remove_dir_all(path))?;
         match fs::read_dir(self.agents_dir()) {

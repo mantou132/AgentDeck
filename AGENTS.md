@@ -11,7 +11,7 @@
 
 - `packages/agentdeck/`：AgentDeck 客户端前端工程与移动端适配。详情参见 [`packages/agentdeck/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/agentdeck/CLAUDE.md)。
 - `packages/extension/`：AgentDeck 浏览器扩展（Chrome & Firefox）。详情参见 [`packages/extension/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/extension/CLAUDE.md)。
-- `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
+- `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置、防自动睡眠与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
 - `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程。
 - `.github/workflows/`：
   - `release.yml`：Daemon 多平台构建、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）。

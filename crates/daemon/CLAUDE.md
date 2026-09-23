@@ -7,6 +7,7 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 - `src/main.rs`：CLI 与前台运行入口；负责参数解析、命令分派和终端输出。
 - `src/app_data.rs`：唯一的本地存储布局定义；`AppPaths` 管理 Daemon 文件，`AgentPaths` 管理 Agent 安装文件。路径方法无文件系统副作用，写入方显式创建目录；清理复用相同路径定义。
 - `src/config.rs`：配对 ID 生成、Relay 默认值与配置持久化；普通启动合并已保存配置，reset 从默认值和显式参数构建全新配置，不读取旧配置。
+- `src/awake.rs` / `src/awake/platform.rs`：防自动睡眠策略、活动计时与状态快照；通过 `keepawake` 的 idle 模式管理跨平台防睡眠，`platform.rs` 仅负责外接电源检测。
 - `src/daemon/`：守护进程生命周期与开机自启服务管理。
   - `reset.rs`：编排停止、持锁清理与配置重建、恢复原先服务状态；返回状态供 CLI 展示，不负责终端输出。
   - `singleton.rs`：跨平台运行时单例锁（基于 `fd-lock` 建议性文件锁与 PID 记录）以及进程安全终止辅助。
@@ -35,7 +36,8 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
   - Windows: `planif` -> Windows Task Scheduler (Logon trigger)
   - `start` 即完成自启注册并在未运行状态下立即拉起服务。
   - `stop` 即注销自启并安全关闭当前所有运行中的实例。
-- **CLI 配置**：全局 `--relay-id` / `--relay-url` 在前台启动、`start`、`restart`、`reset` 时写入 `daemon.json`；默认 Relay URL 不变，自启读取保存的配置。运行中修改配置使用 `restart`。显示配对 ID 时必须包含安全警示边框。
+- **CLI 配置**：命令与参数用法以 `agentdeckd --help` 及子命令 help 为准。配置保存在 `daemon.json`，自启读取保存值；Relay 配置变更需重启，awake 配置自动重载。显示配对 ID 时必须包含安全警示边框。
+- **防自动睡眠**：默认与 reset 均为 `never`，通过 `keepawake` 只阻止自动睡眠。`active` 按最后一次收发 RPC 的时间计时，一小时无 RPC 后释放；活动仅保存在内存。运行状态写入 `awake_status.json`，随 daemon 退出清理。
 - **Daemon 重置**：`reset` 停止服务并持有单例锁后，删除 `remote_peers_v1.json`、`logs/` 和 `agents/*/install/` 临时下载目录；应用 `--relay-id` / `--relay-url` 参数，未传 ID 时生成新的 `adk1_` Pairing ID，未传 URL 时恢复默认 Relay 地址；保留锁文件、已安装 Agent 及历史。完成后恢复原先运行/停止状态并输出与 `status` 相同的信息（含新 ID），运行中的前台实例会恢复为后台服务。
 - **设备多路复用**：一台 Host 守护进程可服务多个远端 Peer，设备状态及 `peerId` 映射存储于系统应用数据目录。
 
