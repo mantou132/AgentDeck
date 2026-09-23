@@ -4,8 +4,8 @@ import { onWebProxyState } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
 import { parseMessageLink } from './lib/links';
 
-export const openWebBrowser = async (url: string, title = '') => {
-  const result = Browser.open({ src: url, title });
+export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
+  const result = Browser.open({ src: url, title, stack });
   await new Promise((res) => requestAnimationFrame(res));
   onWebProxyState(result.browser.contentWindow, (state) => {
     const url = new URL(state.url);
@@ -14,7 +14,7 @@ export const openWebBrowser = async (url: string, title = '') => {
       return;
     }
     if (state.target === '_blank') {
-      openWebBrowser(state.url, state.title);
+      openWebBrowser(state.url, state.title, stack);
     } else {
       result.browser.title = state.title;
       result.browser.src = state.url;
@@ -23,14 +23,14 @@ export const openWebBrowser = async (url: string, title = '') => {
   return result;
 };
 
-export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement | null) => {
+export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement) => {
   (stack || Stack).push({
     content: html`<deck-file-browser-page .path=${path} .cwd=${cwd}></deck-file-browser-page>`,
     gesture: true,
   });
 };
 
-export const openFileViewer = (path: string, cwd: string, line?: number, stack?: TapStackElement | null) => {
+export const openFileViewer = (path: string, cwd: string, line?: number, stack?: TapStackElement) => {
   (stack || Stack).push({
     content: html`<deck-file-viewer .path=${path} .cwd=${cwd} .line=${line}></deck-file-viewer>`,
     gesture: true,
@@ -51,7 +51,7 @@ export const openChangesDiff = (path: string, cwd: string) => {
   });
 };
 
-export const openPath = async (path: string, cwd: string, line?: number, stack?: TapStackElement | null) => {
+export const openPath = async (path: string, cwd: string, line?: number, stack?: TapStackElement) => {
   if (path.endsWith('/') || path.endsWith('\\') || path === '.' || path === '..') {
     openFileBrowser(path, cwd, stack);
     return;
@@ -68,7 +68,7 @@ export const openPath = async (path: string, cwd: string, line?: number, stack?:
   }
 };
 
-export const openMessageLink = (event: MouseEvent, cwd: string, targetStack?: TapStackElement | null) => {
+export const openMessageLink = (event: MouseEvent, cwd: string) => {
   if (event.defaultPrevented || event.button !== 0) return false;
   const anchor = event
     .composedPath()
@@ -78,10 +78,10 @@ export const openMessageLink = (event: MouseEvent, cwd: string, targetStack?: Ta
   event.preventDefault();
   const link = parseMessageLink(href);
   if (!link) return false;
+  const stack = anchor ? Stack.getClosestStack(anchor) : undefined;
   if (link.type === 'web') {
-    openWebBrowser(link.url, anchor?.textContent?.trim() || link.url);
+    openWebBrowser(link.url, anchor?.textContent?.trim() || link.url, stack);
   } else {
-    const stack = targetStack || (anchor ? Stack.getClosestStack(anchor) : undefined);
     void openPath(link.path, cwd, link.line, stack);
   }
   return true;
