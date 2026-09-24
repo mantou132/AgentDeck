@@ -1,6 +1,8 @@
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { RELAY_GUIDE_SEEN_KEY } from '../config';
+import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
+import { hapticSuccess } from '../lib/haptics';
 import { hardResetApp, saveSettings } from '../state/app';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
@@ -45,6 +47,33 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   #closeRelayGuide = () => this.#state({ relayGuideOpen: false });
 
+  #openScanner = () => {
+    Stack.push({
+      content: html`
+        <deck-qr-scanner
+          .title=${i18n.get('settings.scanRelayId')}
+          .hint=${i18n.get('settings.scanHint')}
+          .cancelText=${i18n.get('global.cancel')}
+          @result=${this.#handleScanResult}
+          @cancel=${() => Stack.pop()}
+          @error=${this.#handleScanError}
+        ></deck-qr-scanner>
+      `,
+    });
+  };
+
+  #handleScanResult = async (event: CustomEvent<string>) => {
+    Stack.pop();
+    this.#state({ relayId: event.detail, error: '' });
+    hapticSuccess();
+  };
+
+  #handleScanError = (event: CustomEvent<DeckQrScannerError>) => {
+    this.#state({
+      error: i18n.get(event.detail === 'permission-denied' ? 'settings.scanPermissionDenied' : 'settings.scanFailed'),
+    });
+  };
+
   #save = () => {
     try {
       saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent });
@@ -86,7 +115,15 @@ export class AgentDeckSettingsPageElement extends GemElement {
             <h1 class="m-0 font-display text-base font-semibold text-highlight">${i18n.get('settings.title')}</h1>
             <p class="mt-0.5 mb-0 text-xs text-describe">${i18n.get('settings.subtitle')}</p>
           </div>
-          <span></span>
+          <button
+            type="button"
+            class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft"
+            aria-label=${i18n.get('settings.scanRelayId')}
+            title=${i18n.get('settings.scanRelayId')}
+            @click=${this.#openScanner}
+          >
+            <tap-use class="size-[20px]" .element=${icons.scan}></tap-use>
+          </button>
         </header>
 
         <main class="settings-scroll no-scrollbar h-full overflow-auto px-4 pt-6">

@@ -40,6 +40,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is needed to scan barcodes and QR codes</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the development server on your local network.</string>
 	<key>NSAppTransportSecurity</key>

@@ -295,4 +295,3 @@ test('a rejected atomic updater preserves the record and does not block subseque
   await records.set('s1', { text: 'Retry' });
   assert.deepEqual(await records.get('s1'), { text: 'Retry' });
 });
-
