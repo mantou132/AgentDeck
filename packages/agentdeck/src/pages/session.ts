@@ -75,6 +75,10 @@ export class AgentDeckSessionPageElement extends GemElement {
     return () => document.removeEventListener('visibilitychange', this.#markRead);
   };
 
+  #onAsk = (evt: CustomEvent<string>) => {
+    this.#composerRef.value?.quoteText(evt.detail);
+  };
+
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
     ensureSessionLoaded(this.sessionId);
@@ -281,6 +285,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 .messages=${messages}
                 ?pending=${pending}
                 @preview=${this.#previewAttachment}
+                @ask=${this.#onAsk}
               ></deck-session-timeline>
               <section
                 v-if=${!loading && loaded && !messages.length}

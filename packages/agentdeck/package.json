@@ -30,6 +30,7 @@
     "relay-client-ts": "^0.1.7",
     "tauri-plugin-edge-to-edge-api": "^0.1.1",
     "tauri-plugin-fcm": "^0.2.0",
+    "tauri-plugin-selection-menu-api": "^0.1.0",
     "tauri-plugin-webproxy-api": "^0.1.2"
   },
   "devDependencies": {

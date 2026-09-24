@@ -28,3 +28,4 @@ serde_json = "1"
 tauri-plugin-haptics = "2"
 tauri-plugin-fcm = { git = "https://github.com/mantou132/tauri-plugin-fcm" }
 tauri-plugin-barcode-scanner = "2"
+tauri-plugin-selection-menu = { git = "https://github.com/mantou132/tauri-plugin-selection-menu" }

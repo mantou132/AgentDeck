@@ -51,6 +51,7 @@ export class DeckComposerElement extends GemElement {
 
   #state = createState({
     draft: '',
+    quote: '',
     attachments: [] as Attachment[],
     attachmentError: '',
     readingAttachments: false,
@@ -80,7 +81,11 @@ export class DeckComposerElement extends GemElement {
   #saveDraft = async () => {
     if (!this.draftKey) return;
     try {
-      await saveDraft(this.draftKey, { text: this.#state.draft, attachments: this.#state.attachments });
+      await saveDraft(this.draftKey, {
+        text: this.#state.draft,
+        attachments: this.#state.attachments,
+        quote: this.#state.quote,
+      });
       this.#state({ draftError: '' });
     } catch {
       // 附件可能耗尽存储配额，需要提示用户草稿未保存。
@@ -94,7 +99,7 @@ export class DeckComposerElement extends GemElement {
       !this.#state.loadingDraft &&
       !this.pending &&
       !this.modeBusy &&
-      Boolean(this.#state.draft.trim() || this.#state.attachments.length) &&
+      Boolean(this.#state.draft.trim() || this.#state.quote.trim() || this.#state.attachments.length) &&
       this.#state.attachments.length <= MAX_ATTACHMENTS &&
       !this.#state.readingAttachments &&
       !this.#state.submitting
@@ -103,7 +108,10 @@ export class DeckComposerElement extends GemElement {
 
   #send = async () => {
     if (!this.#canSend || !this.submit) return;
-    const input: ComposerInput = { text: this.#state.draft.trim(), attachments: this.#state.attachments };
+    const draftText = this.#state.draft.trim();
+    const quoteText = this.#state.quote.trim();
+    const promptText = quoteText ? (draftText ? `"${quoteText}"\n\n${draftText}` : `"${quoteText}"`) : draftText;
+    const input: ComposerInput = { text: promptText, attachments: this.#state.attachments };
     this.#clearInput();
     this.#state({ submitting: true });
     hapticSelection();
@@ -126,26 +134,49 @@ export class DeckComposerElement extends GemElement {
   #clearInput = () => {
     this.#nextPasteReference = 1;
     this.#pastedAttachments.clear();
-    this.#state({ draft: '', attachments: [], attachmentError: '' });
+    this.#state({ draft: '', quote: '', attachments: [], attachmentError: '' });
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
   };
 
   restoreIfEmpty = (key: string, message: ComposerInput) => {
-    if (this.draftKey === key && !this.#state.draft && !this.#state.attachments.length) this.restore(message);
+    if (this.draftKey === key && !this.#state.draft && !this.#state.quote && !this.#state.attachments.length)
+      this.restore(message);
   };
 
-  restore = (message: { text: string; attachments?: Attachment[] }) => {
+  #setQuote = (quote: string) => {
+    this.draftChange();
+    this.#state({ quote });
+    this.#saveDraft();
+  };
+
+  quoteText = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    this.#setQuote(trimmed);
+    const textarea = this.#textareaRef.value;
+    if (textarea) {
+      textarea.focus?.();
+      textarea.scrollIntoView?.({ block: 'nearest' });
+    }
+  };
+
+  restore = (message: { text: string; attachments?: Attachment[]; quote?: string }) => {
     this.#restoreInput(message, true);
     this.#saveDraft();
   };
 
-  #restoreInput = (message: { text: string; attachments?: Attachment[] }, focus: boolean) => {
+  #restoreInput = (message: { text: string; attachments?: Attachment[]; quote?: string }, focus: boolean) => {
     this.#pastedAttachments.clear();
     for (const attachment of message.attachments ?? []) {
       if (attachment.marker) this.#pastedAttachments.set(attachment.id, attachment);
     }
     this.#nextPasteReference = Math.max(0, ...(message.attachments ?? []).map((item) => item.pasteReference ?? 0)) + 1;
-    this.#state({ draft: message.text, attachments: message.attachments ?? [], attachmentError: '' });
+    this.#state({
+      draft: message.text,
+      quote: message.quote ?? '',
+      attachments: message.attachments ?? [],
+      attachmentError: '',
+    });
     if (this.#textareaRef.value) {
       this.#textareaRef.value.value = message.text;
       if (focus) this.#textareaRef.value.focus();
@@ -309,6 +340,17 @@ export class DeckComposerElement extends GemElement {
                   @click=${() => this.#state({ attachmentError: '' })}
                 >
                   <tap-use class="size-4" .element=${icons.close}></tap-use>
+                </button>
+              </div>
+              <div v-if=${this.#state.quote} class="mx-3.5 mt-3 flex items-start gap-2 rounded-xl bg-bg/60 px-3 py-2 text-xs">
+                <div class="line-clamp-3 min-w-0 flex-1 whitespace-pre-wrap italic text-describe">${this.#state.quote}</div>
+                <button
+                  type="button"
+                  class="grid size-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-describe transition-colors hover:text-text"
+                  aria-label=${i18n.get('composer.removeQuoteAria')}
+                  @click=${() => this.#setQuote('')}
+                >
+                  <tap-use class="size-3.5" .element=${icons.close}></tap-use>
                 </button>
               </div>
               <div v-if=${this.#state.draftError} role="alert" class="select-text px-3.5 pt-3 text-sm text-negative">${this.#state.draftError}</div>

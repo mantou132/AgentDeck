@@ -1,6 +1,9 @@
+import { addListener } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
+import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
+import { setSelectionMenuItems } from 'src/lib/selection-menu';
 import { openMessageLink } from '../navigation';
 import {
   extractDataImageAttachments,
@@ -20,6 +23,7 @@ export class DeckSessionTimelineElement extends GemElement {
   @property messages: ChatMessage[] = [];
   @boolattribute pending: boolean;
   @emitter preview: Emitter<Attachment>;
+  @emitter ask: Emitter<string>;
 
   #renderMarkdown = (text: string, streamKey = '', streaming = false, user = false) => html`
     <deck-stream-markdown
@@ -88,7 +92,7 @@ export class DeckSessionTimelineElement extends GemElement {
     const attachments = [...(message.attachments ?? []), ...linkedAttachments];
 
     return html`
-      <article class="mb-5 min-w-0 text-base leading-[1.68] text-text">
+      <article @pointerdown=${this.#setSelectionMenu} class="agent-message mb-5 min-w-0 text-base leading-[1.68] text-text">
         <div v-if=${attachments.length} class="mb-2 flex flex-wrap gap-2">
           ${attachments.map(
             (attachment) => html`
@@ -99,6 +103,19 @@ export class DeckSessionTimelineElement extends GemElement {
         ${this.#renderMarkdown(markdown, `${this.sessionKey}:${message.id}`, message.streaming)}
       </article>
     `;
+  };
+
+  #setSelectionMenu = () => {
+    const selection = window.getSelection();
+    const ele = selection?.anchorNode?.parentElement;
+    if (!ele || !selection.toString().trim()) return;
+    if (!closestElement(ele, 'deck-session-timeline .agent-message')) return;
+    setSelectionMenuItems({ items: [{ label: 'Ask', onClick: ({ text }) => this.ask(text) }] });
+  };
+
+  @mounted()
+  #initSelectionChange = () => {
+    return addListener(document, 'selectionchange', this.#setSelectionMenu);
   };
 
   @template()

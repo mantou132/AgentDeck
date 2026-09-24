@@ -69,6 +69,7 @@
   "composer.attachmentReadFailed": "无法读取“$1”，请重新选择文件。",
   "composer.closeAlertAria": "关闭附件提示",
   "composer.sendMessageAria": "发送消息",
+  "composer.removeQuoteAria": "移除引用",
   "composer.inputFileAria": "附件文件",
   "composer.addAttachmentAria": "添加附件",
   "composer.addAttachmentTitle": "添加图片或文本文件，最多 10 个附件",

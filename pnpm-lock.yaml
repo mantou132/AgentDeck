@@ -82,6 +82,9 @@ importers:
       tauri-plugin-fcm:
         specifier: ^0.2.0
         version: 0.2.0
+      tauri-plugin-selection-menu-api:
+        specifier: ^0.1.0
+        version: 0.1.0
       tauri-plugin-webproxy-api:
         specifier: ^0.1.2
         version: 0.1.2
@@ -4343,6 +4346,9 @@ packages:
   tauri-plugin-fcm@0.2.0:
     resolution: {integrity: sha512-8GmSUlpjUKjDekqPaAKntxbzmt7P2kicAC55kGqdHILtwU25Ja1N7rhmWjp9XZJnybWmdaQqi0Wxx/YLQoEw3w==}
     engines: {node: '>=18'}
+
+  tauri-plugin-selection-menu-api@0.1.0:
+    resolution: {integrity: sha512-FpbxS3FyIqhs3gVXQzSN7626/1wZIwiB8X0SiGzzfxl9MAuLgflUSVhJMW4zwBGPE3CTWFPVERQxgDrJEUVUAA==}
 
   tauri-plugin-webproxy-api@0.1.2:
     resolution: {integrity: sha512-9F80wPJtfofRJxg5B0Yvn+u5alph+4PAOfh5DkDkBHOA7iQN3fnercaB3DQsNMTb/siInbC8B16WzoBJzDm9YQ==}
@@ -9199,6 +9205,10 @@ snapshots:
       '@tauri-apps/api': 2.11.1
 
   tauri-plugin-fcm@0.2.0:
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  tauri-plugin-selection-menu-api@0.1.0:
     dependencies:
       '@tauri-apps/api': 2.11.1
 

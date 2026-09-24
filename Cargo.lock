@@ -80,6 +80,7 @@ dependencies = [
  "tauri-plugin-edge-to-edge",
  "tauri-plugin-fcm",
  "tauri-plugin-haptics",
+ "tauri-plugin-selection-menu",
  "tauri-plugin-webproxy",
 ]
 
@@ -5173,6 +5174,17 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "tauri-plugin-selection-menu"
+version = "0.1.0"
+source = "git+https://github.com/mantou132/tauri-plugin-selection-menu#125b49914855b757a7154a0647fa1b2fd96d6694"
+dependencies = [
+ "serde",
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.20",

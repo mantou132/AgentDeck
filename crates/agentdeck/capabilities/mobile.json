@@ -8,6 +8,7 @@
     "haptics:allow-notification-feedback",
     "haptics:allow-selection-feedback",
     "haptics:allow-vibrate",
-    "barcode-scanner:default"
+    "barcode-scanner:default",
+    "selection-menu:default"
   ]
 }

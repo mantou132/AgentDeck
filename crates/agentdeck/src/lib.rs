@@ -8,6 +8,8 @@ pub fn run() {
             _app.handle().plugin(tauri_plugin_haptics::init())?;
             #[cfg(mobile)]
             _app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
+            #[cfg(mobile)]
+            _app.handle().plugin(tauri_plugin_selection_menu::init())?;
             Ok(())
         })
         .plugin(tauri_plugin_edge_to_edge::init())

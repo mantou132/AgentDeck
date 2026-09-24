@@ -69,6 +69,7 @@
   "composer.attachmentReadFailed": "Failed to read “$1”. Please choose another file.",
   "composer.closeAlertAria": "Close attachment alert",
   "composer.sendMessageAria": "Send message",
+  "composer.removeQuoteAria": "Remove quote",
   "composer.inputFileAria": "Attachment files",
   "composer.addAttachmentAria": "Add attachment",
   "composer.addAttachmentTitle": "Add image or text file, up to 10 attachments",
