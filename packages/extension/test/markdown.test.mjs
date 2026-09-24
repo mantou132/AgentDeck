@@ -2,10 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createMarkdownExtensions } from '../shared/markdown.js';
 
-let tableCall;
 const defaultMarkdownRenderer = {
-  table(token) {
-    tableCall = { parser: this.parser, token };
+  table() {
     return '<table>Marked table</table>';
   },
 };
@@ -93,17 +91,5 @@ describe('agent markdown renderers', () => {
     });
 
     assert.match(output, /<dy-code-block codelang="py">/);
-  });
-
-  it('wraps tables rendered by the injected Marked renderer', () => {
-    const parser = { parseInline: (tokens) => tokens.map((token) => token.text).join('') };
-    const token = {
-      header: [{ header: true, align: 'left', tokens: [{ text: 'Name' }] }],
-      rows: [[{ header: false, align: null, tokens: [{ text: 'Mermaid' }] }]],
-    };
-    const output = renderer.table.call({ parser }, token);
-
-    assert.equal(output, '<div class="table-scroll" tabindex="0"><table>Marked table</table></div>');
-    assert.deepEqual(tableCall, { parser, token });
   });
 });

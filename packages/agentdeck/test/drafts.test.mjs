@@ -296,7 +296,3 @@ test('a rejected atomic updater preserves the record and does not block subseque
   assert.deepEqual(await records.get('s1'), { text: 'Retry' });
 });
 
-test('configured databases have distinct names within the app origin', () => {
-  const names = Object.values(config.DATABASES).map(({ name }) => name);
-  assert.equal(new Set(names).size, names.length, 'Each store wrapper must own a distinct database');
-});

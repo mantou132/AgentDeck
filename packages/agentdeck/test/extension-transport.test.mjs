@@ -5,27 +5,26 @@ import { documentFixture } from './helpers/app-fixture.mjs';
 test('custom createStore and deviceId options work through startTransport', async () => {
   const { transport } = documentFixture();
 
-  const storage = {};
+  let createdRouteId = null;
   const mockStore = {
     outbox: async () => [],
-    enqueue: async (msg) => {
-      storage[msg.messageId] = msg;
-    },
-    removeFromOutbox: async (id) => {
-      delete storage[id];
-    },
+    enqueue: async () => {},
+    removeFromOutbox: async () => {},
     lastReceived: async () => undefined,
     markReceived: async () => {},
     deviceId: async () => 'custom-device-id',
   };
 
-  // startTransport with custom createStore and deviceId
   transport.startTransport('01234567-89ab-cdef-0123-456789abcdef', {
     deviceId: 'custom-device-id',
-    createStore: () => mockStore,
+    createStore: (routeId) => {
+      createdRouteId = routeId;
+      return mockStore;
+    },
   });
 
   assert.equal(transport.getDeviceId(), 'custom-device-id');
+  assert.ok(createdRouteId, 'createStore hook should be called with routeId');
   transport.closeTransport();
 });
 
@@ -39,5 +38,14 @@ test('addTransportMessageHandler receives transport events and allows unsubscrib
 
   assert.equal(typeof unsubscribe, 'function');
 
+  // Trigger a transport event and verify it is received
+  transport.closeTransport();
+  assert.equal(received.length, 1);
+  assert.equal(received[0].type, 'connection');
+  assert.equal(received[0].connection, 'disconnected');
+
+  // After unsubscribe, further events must not be delivered
   unsubscribe();
+  transport.closeTransport();
+  assert.equal(received.length, 1);
 });

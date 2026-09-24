@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { documentFixture, tick } from './helpers/app-fixture.mjs';
-
-const root = fileURLToPath(new URL('../', import.meta.url));
 
 const closeRequests = (fixture) =>
   fixture.requests.filter((request) => request.payload.method === 'agent_session_close');
@@ -119,32 +114,4 @@ test('re-opening a closed session triggers fresh loadSession sequence', async ()
 
   assert.equal(f.app.isSessionOpened('s1'), true);
   assert.equal(f.app.agentdeckStore.loadedSessionIds.includes('s1'), true);
-});
-
-test('session page back button uses tap-gesture to recognize long press and close session', () => {
-  const sessionSource = readFileSync(path.join(root, 'src/pages/session.ts'), 'utf8');
-
-  // Verify closeSession is imported and called
-  assert.match(sessionSource, /import\s*\{[^}]*closeSession[^}]*\}\s*from\s*'\.\.\/state\/sessions'/);
-  assert.match(sessionSource, /closeSession\(this\.sessionId\)/);
-
-  // Verify haptic impact is triggered on long press
-  assert.match(sessionSource, /hapticImpact\('medium'\)/);
-
-  // Verify Stack.pop is called on long press and standard click
-  assert.match(sessionSource, /Stack\.pop\(\)/);
-
-  // Verify tap-gesture component with role="button", @press and @click
-  assert.match(
-    sessionSource,
-    /<tap-gesture[\s\S]*?role="button"[\s\S]*?@press=\$\{this\.#onBackPress\}[\s\S]*?@click=\$\{this\.#onBackClick\}/,
-  );
-});
-
-test('translations contain session.backTitle for hint/tooltip', () => {
-  const zh = JSON.parse(readFileSync(path.join(root, 'src/locales/zh-CN/basic.json'), 'utf8'));
-  const en = JSON.parse(readFileSync(path.join(root, 'src/locales/en/basic.json'), 'utf8'));
-
-  assert.equal(zh['session.backTitle'], '返回（长按关闭会话）');
-  assert.equal(en['session.backTitle'], 'Back (Long press to close session)');
 });

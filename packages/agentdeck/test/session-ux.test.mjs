@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { documentFixture, tick } from './helpers/app-fixture.mjs';
-
-const root = fileURLToPath(new URL('../', import.meta.url));
 
 async function running() {
   const fixture = documentFixture();
@@ -164,21 +159,6 @@ test('createSession and loadSession pass remote_app panelContext', async () => {
   const createReq = f.requests.find((r) => r.payload.method === 'agent_session_create');
   assert.ok(createReq);
   assert.deepEqual(createReq.payload.params.panelContext, { surface: 'remote_app' });
-});
-
-test('session list page supports pull to refresh via tap-page refreshable and @refresh', () => {
-  const sessionListSource = readFileSync(path.join(root, 'src/pages/session-list.ts'), 'utf8');
-
-  // Verify refreshSessions is imported
-  assert.match(sessionListSource, /refreshSessions/);
-
-  // Verify tap-page has refreshable and @refresh handler
-  assert.match(sessionListSource, /<tap-page[\s\S]*?refreshable[\s\S]*?@refresh=\$\{this\.#onRefresh\}/);
-
-  // Verify #onRefresh calls refreshSessions and ends refresh indicator
-  assert.match(sessionListSource, /#onRefresh\s*=\s*async\s*\((?:event|evt)/);
-  assert.match(sessionListSource, /await\s+refreshSessions\(\)/);
-  assert.match(sessionListSource, /(?:event|evt)\.detail\?\.?\(\)/);
 });
 
 test('pull-to-refresh triggers session refresh and updates sessions in store', async () => {
