@@ -65,8 +65,16 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   #handleScanResult = async (event: CustomEvent<string>) => {
     Stack.pop();
-    this.#state({ relayId: event.detail, error: '' });
-    hapticSuccess();
+    try {
+      const url = new URL(event.detail);
+      if (url.protocol !== 'agentdeck:') throw new Error();
+      const relayId = url.searchParams.get('relayId');
+      if (!relayId) throw new Error();
+      this.#state({ relayId, error: '' });
+      hapticSuccess();
+    } catch {
+      this.#state({ error: i18n.get('settings.scanFailed') });
+    }
   };
 
   #handleScanError = (event: CustomEvent<DeckQrScannerError>) => {

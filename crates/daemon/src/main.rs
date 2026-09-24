@@ -140,29 +140,15 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
         }
     }
     println!("Relay URL: {}", config.relay_url());
+    println!("Relay ID : {}", config.relay_id());
     println!();
-    println!("{}", pairing_notice(config.relay_id()));
-}
-
-fn pairing_notice(relay_id: &str) -> String {
-    let pairing = format!("Pairing ID: {relay_id}");
-    let lines = [
-        "⚠️  KEEP THIS SECRET: Anyone with this Pairing ID can access your agent.",
-        "Do not share this ID in screenshots, chats, or issue reports.",
-        "",
-        &pairing,
-        "",
-        "Paste into AgentDeck Settings to pair your device.",
-    ];
-    let width = lines.iter().map(|line| line.chars().count()).max().unwrap();
-    let border = "═".repeat(width + 2);
-    let mut output = format!("╔{border}╗\n");
-    for line in lines {
-        let padding = " ".repeat(width - line.chars().count());
-        output.push_str(&format!("║ {line}{padding} ║\n"));
+    let uri = format!("agentdeck://connect?relayId={}", config.relay_id());
+    if let Err(error) = qr2term::print_qr(&uri) {
+        crate::logger::log(&format!("Cannot print QR code: {error}"));
+        println!("URI: {uri}");
     }
-    output.push_str(&format!("╚{border}╝"));
-    output
+    println!();
+    println!("⚠️  KEEP THIS SECRET: Anyone with this output can access your agent.");
 }
 
 async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {

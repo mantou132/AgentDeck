@@ -14,7 +14,7 @@
   "error.readFileTimeout": "Reading the remote file timed out. Please retry.",
   "connection.connecting": "Connecting to Relay",
   "connection.connected": "Remote connected",
-  "connection.attaching": "Relay connected, attaching to remote",
+  "connection.attaching": "Attaching to remote",
   "connection.unavailable": "Remote unavailable",
   "connection.reconnecting": "Reconnecting",
   "connection.disconnected": "Disconnected",
