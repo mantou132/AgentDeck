@@ -1,4 +1,4 @@
-use crate::{app_data::AppPaths, config::DaemonConfig};
+use crate::{app_data::AppPaths, config::DaemonConfig, power};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -7,7 +7,6 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-mod platform;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -84,7 +83,7 @@ impl Monitor {
                         mode = DaemonConfig::read(&paths)?.awake;
                         let wanted = match mode {
                             Mode::Always => true,
-                            Mode::Plugged => platform::plugged()?,
+                            Mode::Plugged => power::plugged()?,
                             Mode::Active => activity().lock().unwrap().active(Instant::now()),
                             Mode::Never => false,
                         };
@@ -172,7 +171,7 @@ mod tests {
                     assert_eq!(
                         status.on,
                         mode == Mode::Always
-                            || (mode == Mode::Plugged && platform::plugged().unwrap())
+                            || (mode == Mode::Plugged && power::plugged().unwrap())
                     );
                     break;
                 }

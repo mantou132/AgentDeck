@@ -11,6 +11,7 @@ mod config;
 pub mod daemon;
 mod logger;
 mod peer;
+mod power;
 mod push;
 mod relay_client;
 mod relay_encryption;

@@ -101,4 +101,4 @@ mod native {
         bail!("Power detection is unsupported on this platform")
     }
 }
-pub(super) use native::plugged;
+pub(crate) use native::plugged;
