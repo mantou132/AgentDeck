@@ -12,7 +12,7 @@
     "@gem-bind/latex": "^0.0.3",
     "@gem-bind/marked": "^0.0.7",
     "@gem-bind/mermaid": "^0.0.5",
-    "@mantou/gem": "^2.2.11",
+    "@mantou/gem": "^2.2.12",
     "@swc/helpers": "^0.5.23",
     "agentdeck": "workspace:*",
     "diff": "^8.0.4",

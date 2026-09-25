@@ -153,8 +153,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Strip manifest key (Web Store rejects packages containing it)
-        run: jq 'del(.key)' packages/extension/manifest.json > packages/extension/manifest.tmp && mv packages/extension/manifest.tmp packages/extension/manifest.json
+      - name: Sync manifest version from tag and strip key
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            version="${{ github.ref_name }}"
+            version="${version#v}"
+            echo "Setting extension manifest version from tag to $version"
+            jq --arg v "$version" '.version = $v | del(.key)' packages/extension/manifest.json > packages/extension/manifest.tmp && mv packages/extension/manifest.tmp packages/extension/manifest.json
+          else
+            jq 'del(.key)' packages/extension/manifest.json > packages/extension/manifest.tmp && mv packages/extension/manifest.tmp packages/extension/manifest.json
+          fi
 
       - name: Build extensions
         run: pnpm --filter agentdeck-extension build --browser chrome,firefox --zip

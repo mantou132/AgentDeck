@@ -162,6 +162,11 @@ export const isPlaceholderTitle = (title?: string) => {
     return true;
   }
 
+  // Matches "Session", "Session 123", "Session #1", "Session: <id>", "Session <hex/uuid>"
+  if (/^session([:_\s#-]+([0-9a-f]{4,}(-?[0-9a-f]+)*|\d+))?$/i.test(lower)) {
+    return true;
+  }
+
   return false;
 };
 

@@ -89,24 +89,6 @@ cargo test -p agentdeck-daemon  # Daemon tests
 
 Husky runs Biome on staged files via lint-staged; install dependencies once to enable it.
 
-## Android releases
-
-The **Release Android** GitHub Actions workflow builds signed universal APK and AAB files for all four Android architectures. Run it manually to verify a build and download the artifacts without publishing.
-
-Configure these repository Actions Secrets once:
-
-| Secret | Value |
-| --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | Base64 of the existing Google Play upload keystore |
-| `ANDROID_KEY_ALIAS` | Upload key alias |
-| `ANDROID_KEY_PASSWORD` | Upload key password |
-| `ANDROID_STORE_PASSWORD` | Keystore password |
-| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | JSON credentials for a service account authorized to release AgentDeck in Play Console |
-
-For a release, increase `version` in `crates/agentdeck/tauri.conf.json`, update all files in `distribution/whatsnew/` (at most 500 characters each), commit the changes, and push the matching `vX.Y.Z` tag. Tauri derives Android's version code from this version, so each upload needs a new version. The workflow attaches APK/AAB files to a GitHub Release and **submits the production release for Google Play review**, including the release notes. Google review still applies; if managed publishing is enabled in Play Console, publish the approved changes there when ready.
-
-The GitHub APK uses the upload key; Google Play may use a different app signing key, so test updates to a Play-installed app through a Play testing track.
-
 ## Project structure
 
 This repository is structured as a monorepo (pnpm workspace + Cargo workspace):
@@ -115,6 +97,52 @@ This repository is structured as a monorepo (pnpm workspace + Cargo workspace):
 - `packages/extension/` — AgentDeck browser extension.
 - `crates/agentdeck/` — Tauri 2 native shell, capabilities, Android and iOS projects.
 - `crates/daemon/` — Standalone daemon service (`agentdeckd`).
+
+## Releases
+
+All components (Daemon, Browser Extension, and Android App) are released automatically by pushing a version tag. The release workflows extract the version directly from the tag and handle packaging, building, and store submissions:
+
+```sh
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+### What happens on tag push
+
+- **Daemon (`agentdeckd`)**: Builds multi-platform release binaries (macOS arm64/x64, Linux x64, Windows x64), publishes packages to npm via OIDC, updates Homebrew Formula (`mantou132/homebrew-tap`) and Scoop Bucket (`mantou132/scoop-bucket`), and attaches archives with SHA256 sums to the GitHub Release.
+- **Browser Extension**: Automatically syncs `version` in `manifest.json`, strips development keys, builds packages for Chrome and Firefox, and publishes to:
+  - Chrome Web Store
+  - Microsoft Edge Add-ons
+  - Firefox Add-ons (AMO)
+- **Android App**: Automatically syncs `version` in `tauri.conf.json` (deriving Android `versionCode`), builds signed universal APK and AAB bundles, attaches them to the GitHub Release, and submits the AAB to **Google Play Production** for review.
+
+*(Optional)* Before pushing the tag, you can update `distribution/whatsnew/` (at most 500 characters per language) to customize the release notes displayed in Google Play.
+
+### Required Actions Secrets
+
+For automated publishing across all platforms, configure these repository Secrets once:
+
+#### Android (Google Play)
+| Secret | Description |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | Base64-encoded Google Play upload keystore (`.jks`) |
+| `ANDROID_KEY_ALIAS` | Upload key alias |
+| `ANDROID_KEY_PASSWORD` | Upload key password |
+| `ANDROID_STORE_PASSWORD` | Keystore password |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Google Play Console API service account JSON key |
+
+#### Browser Extensions
+| Secret | Description |
+| --- | --- |
+| `CHROME_EXTENSION_ID` | Chrome Web Store item ID |
+| `CHROME_CLIENT_ID` / `CHROME_CLIENT_SECRET` / `CHROME_REFRESH_TOKEN` | Google Cloud API credentials for Chrome Web Store upload |
+| `EDGE_PRODUCT_ID` / `EDGE_CLIENT_ID` / `EDGE_API_KEY` | Microsoft Partner Center API credentials for Edge Add-ons |
+| `FIREFOX_ADDON_GUID` / `FIREFOX_JWT_ISSUER` / `FIREFOX_JWT_SECRET` | Mozilla Add-ons (AMO) API credentials for Firefox signing |
+
+#### Package Managers
+| Secret | Description |
+| --- | --- |
+| `TAP_TOKEN` | GitHub PAT with write access to `mantou132/homebrew-tap` and `mantou132/scoop-bucket` |
 
 ## Privacy Policy
 

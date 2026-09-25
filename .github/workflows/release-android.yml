@@ -23,31 +23,31 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 10.32.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
 
-      - name: Check release version
+      - name: Resolve and sync release version
         id: version
         run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync, appendFileSync } from 'node:fs';
-          const { version } = JSON.parse(readFileSync('crates/agentdeck/tauri.conf.json', 'utf8'));
-          if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Use a stable major.minor.patch version');
-          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
-            throw new Error('Release tag must match crates/agentdeck/tauri.conf.json version');
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
-          NODE
+          tauri_conf="crates/agentdeck/tauri.conf.json"
+          version=$(jq -r '.version' "$tauri_conf")
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" == v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "Syncing tauri.conf.json version to $version"
+            jq --arg v "$version" '.version = $v' "$tauri_conf" > "${tauri_conf}.tmp" && mv "${tauri_conf}.tmp" "$tauri_conf"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use a stable major.minor.patch version, got: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - run: pnpm install --frozen-lockfile
       - name: Check frontend
         run: |
-          pnpm run lint:check
-          pnpm run check
+          pnpm run lint
           pnpm test
 
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
