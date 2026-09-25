@@ -57,7 +57,7 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 
 ## npm 分发
 
-- 主包 `agentdeckd` 使用 `bin` 启动器和精确版本 `optionalDependencies` 引用四个平台包：`agentdeckd-darwin-arm64`、`agentdeckd-darwin-x64`、`agentdeckd-linux-x64-gnu`、`agentdeckd-win32-x64`。平台包用 `os` / `cpu` / `libc` 限制安装；无 postinstall，不自动启动服务。
+- 主包 `agentdeckd` 使用 `bin` 启动器和精确版本 `optionalDependencies` 引用四个平台包：`agentdeckd-darwin-arm64`、`agentdeckd-darwin-x64`、`agentdeckd-linux-x64-gnu`、`agentdeckd-windows-x64`。平台包用 `os` / `cpu` / `libc` 限制安装；无 postinstall，不自动启动服务。
 - `npm/platforms.mjs` 为平台映射；新增平台时同步 Release Rust matrix。用户需要 Node.js 22+；Linux 当前只支持 x64 glibc。
 - `node crates/daemon/npm/build.mjs <version> <artifacts目录> <输出目录>`：校验 Release archive SHA-256、生成五个包并 `npm pack`；在 macOS/Linux 上运行，需要 npm、tar、unzip。
 - `node --test crates/daemon/npm/distribution.test.mjs`：用临时本地 registry 验证真实 npm 全局安装、平台筛选、参数与退出码、信号转发、缺包提示和校验和失败；需要 zip。

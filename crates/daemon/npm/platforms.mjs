@@ -2,7 +2,7 @@ export const platforms = [
   { suffix: 'darwin-arm64', os: 'darwin', cpu: 'arm64', target: 'aarch64-apple-darwin' },
   { suffix: 'darwin-x64', os: 'darwin', cpu: 'x64', target: 'x86_64-apple-darwin' },
   { suffix: 'linux-x64-gnu', os: 'linux', cpu: 'x64', libc: 'glibc', target: 'x86_64-unknown-linux-gnu' },
-  { suffix: 'win32-x64', os: 'win32', cpu: 'x64', target: 'x86_64-pc-windows-msvc' },
+  { suffix: 'windows-x64', os: 'win32', cpu: 'x64', target: 'x86_64-pc-windows-msvc' },
 ];
 
 export function currentPlatform() {

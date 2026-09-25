@@ -166,8 +166,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 aria-label=${i18n.get('settings.connectTitle')}
                 .value=${this.#state.relayId}
-                @input=${(event: InputEvent) =>
-                  this.#state({ relayId: (event.target as HTMLInputElement).value })}
+                @input=${(event: InputEvent) => this.#state({ relayId: (event.target as HTMLInputElement).value })}
               />
               <button
                 type="button"
@@ -196,8 +195,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 <select
                   class="box-border h-12 w-full appearance-none rounded-xl border border-border bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
                   .value=${this.#state.agent}
-                  @change=${(event: Event) =>
-                    this.#state({ agent: (event.target as HTMLSelectElement).value })}
+                  @change=${(event: Event) => this.#state({ agent: (event.target as HTMLSelectElement).value })}
                 >
                   ${agents.map(
                     (agent) =>
