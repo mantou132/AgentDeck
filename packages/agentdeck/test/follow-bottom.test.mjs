@@ -215,3 +215,31 @@ test('rapid content streaming and intermediate scroll events do not break follow
   f.flush();
   assert.equal(f.viewport.scrollTop, 1800);
 });
+
+test('scroll tracking remains active while stream text is outputting even after pending becomes false', () => {
+  const f = fixture({ active: true });
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 800);
+
+  // During turn: content grows, pending is true
+  f.viewport.scrollHeight = 1200;
+  f.resize();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 1000);
+
+  // Still active (pending is false, but stream text is still outputting)
+  f.viewport.scrollHeight = 1500;
+  f.resize();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 1300);
+
+  // Stream text finishes outputting: active becomes false
+  f.setActive(false);
+
+  // Subsequent resize after stream ended:
+  f.viewport.scrollHeight = 2000;
+  f.resize();
+  f.flush();
+  // Must NOT follow anymore, stays at 1300
+  assert.equal(f.viewport.scrollTop, 1300);
+});

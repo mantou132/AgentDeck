@@ -4,6 +4,7 @@ import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
+import { hasActiveStream } from '../lib/stream-text';
 import { getToolStatus, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
@@ -121,7 +122,7 @@ export class DeckProcessDetailElement extends GemElement {
     followBottom(
       this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>(`[part=${TapPageElement.main}]`),
       this.#contentRef.value,
-      { isActive: () => Boolean(this.#group?.pending) },
+      { isActive: () => Boolean(this.#group?.pending || hasActiveStream(`${this.sessionId}:${this.groupId}`)) },
     )?.disconnect;
 
   @memo((i) => [

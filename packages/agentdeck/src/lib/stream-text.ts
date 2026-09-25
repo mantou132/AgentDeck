@@ -39,3 +39,27 @@ export function nextStreamingText(displayText: string, targetText: string): stri
 
   return displayText + pending.slice(0, endOffset);
 }
+
+const activeStreams = new Set<string>();
+
+export function registerActiveStream(key: string) {
+  if (!key) return;
+  activeStreams.add(key);
+}
+
+export function unregisterActiveStream(key: string) {
+  if (!key) return;
+  activeStreams.delete(key);
+}
+
+export function hasActiveStream(prefix?: string): boolean {
+  if (!prefix) return activeStreams.size > 0;
+  for (const key of activeStreams) {
+    if (key === prefix || key.startsWith(`${prefix}:`)) return true;
+  }
+  return false;
+}
+
+export function clearActiveStreams() {
+  activeStreams.clear();
+}

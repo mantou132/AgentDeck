@@ -5,6 +5,7 @@ import { i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
 import { followBottom } from '../lib/follow-bottom';
 import { diffColorScheme, markdownStyle } from '../lib/markdown';
+import { hasActiveStream } from '../lib/stream-text';
 import { openMessageLink } from '../navigation';
 import {
   getToolCommand,
@@ -141,10 +142,11 @@ export class DeckProcessStepElement extends GemElement {
 
   get #updating() {
     const item = this.#item;
-    if (!this.#group?.pending || !item) return false;
-    if (item.type === 'thought') return item.pending;
+    const streamActive = hasActiveStream(`${this.sessionId}:${this.groupId}:${this.itemId}`);
+    if (!this.#group?.pending || !item) return streamActive;
+    if (item.type === 'thought') return item.pending || streamActive;
     const status = getToolStatus(item.data, true);
-    return status === 'pending' || status === 'in_progress';
+    return status === 'pending' || status === 'in_progress' || streamActive;
   }
 
   #openLink = (event: MouseEvent) => {
