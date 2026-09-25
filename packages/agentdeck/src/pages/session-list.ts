@@ -93,6 +93,11 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const isConnected = connection === 'connected';
     const isConnecting = connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching';
 
+    const unreadSessionSet = new Set(agentdeckStore.unreadSessionIds);
+    const pendingSessionSet = new Set(agentdeckStore.pendingSessionIds);
+    const permissionSessionSet = new Set(Object.keys(agentdeckStore.permissionsBySession));
+    const deletingSessionSet = new Set(agentdeckStore.deletingSessionIds);
+
     return html`
       <tap-page
         class="bg-bg text-text"
@@ -172,10 +177,10 @@ export class AgentDeckSessionListPageElement extends GemElement {
                 <deck-session-group
                   .cwd=${group.cwd}
                   .sessions=${group.sessions}
-                  .unreadSessionIds=${agentdeckStore.unreadSessionIds}
-                  .pendingSessionIds=${agentdeckStore.pendingSessionIds}
-                  .permissionSessionIds=${Object.keys(agentdeckStore.permissionsBySession)}
-                  .deletingSessionIds=${agentdeckStore.deletingSessionIds}
+                  .unreadSessionSet=${unreadSessionSet}
+                  .pendingSessionSet=${pendingSessionSet}
+                  .permissionSessionSet=${permissionSessionSet}
+                  .deletingSessionSet=${deletingSessionSet}
                   ?deletion-disabled=${!isConnected}
                   @select=${(event: CustomEvent<string>) => openSession(event.detail)}
                   @request-delete=${(event: CustomEvent<string>) => deleteSession(event.detail)}
