@@ -157,7 +157,6 @@
   "error.cancelTaskTimeout": "Cancelling task timed out. Please retry; if it continues failing, reset the app in settings.",
   "error.closeSessionTimeout": "Closing session timed out. Please retry; if it continues failing, reset the app in settings.",
   "error.deleteSessionTimeout": "Deleting session timed out. Please reload the list to check the result, or retry.",
-  "error.deleteSessionFailed": "Failed to delete session",
   "error.resetLocalFailed": "Failed to reset local connection: $1",
   "error.permissionTaskExpired": "Task for this permission request is no longer active",
   "error.encryptionFailed": "Failed to encrypt or save this message. Please check local storage and retry.",

@@ -25,6 +25,7 @@ import {
   updateInFlightMessages,
 } from './in-flight';
 import { applyRemoteMode } from './modes';
+import { getSessionMeta, isSessionDeleted, markSessionDeleted, saveSessionMeta } from './session-meta';
 import {
   agentdeckStore,
   clearSessionError,
@@ -158,7 +159,16 @@ export const refreshSessions = async () => {
     if (request !== sessionsRequest || agent !== agentdeckStore.settings.agent) return;
     const normalized = sessions
       .filter((session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string')
-      .map((session) => ({ ...session, agent }));
+      .filter((session) => !isSessionDeleted(session.sessionId))
+      .map((session) => {
+        const meta = getSessionMeta(session.sessionId);
+        return {
+          ...session,
+          agent,
+          title: session.title || meta?.title,
+          updatedAt: session.updatedAt || meta?.updatedAt,
+        };
+      });
     const merged = mergeSessionsWithInFlight(normalized, inFlightSessions.values());
     const prevGroups = agentdeckStore.sessionsLoaded ? agentdeckStore.sessionGroups : [];
     const groups = getSortedSessionGroups(merged, prevGroups);
@@ -210,12 +220,12 @@ export const deleteSession = async (sessionId: string) => {
   const isCurrentHost = () => agent === agentdeckStore.settings.agent && relayId === agentdeckStore.settings.relayId;
   setSessionFlag('deletingSessionIds', sessionId, true);
   try {
-    const [{ deleted }] = await Promise.all([
-      agentApi.deleteSession(session.agent, sessionId),
-      TapSwipeoutElement.activeSwipeout?.dismiss(),
-    ]);
+    agentApi.deleteSession(session.agent, sessionId).catch(() => {});
+    await TapSwipeoutElement.activeSwipeout?.dismiss();
+
     if (!isCurrentHost()) return;
-    if (!deleted) throw new Error(i18n.get('error.deleteSessionFailed'));
+
+    markSessionDeleted(sessionId);
 
     // A list request started before deletion must not restore the removed row.
     sessionsRequest += 1;
@@ -249,7 +259,7 @@ export const deleteSession = async (sessionId: string) => {
     });
   } catch (error) {
     if (isCurrentHost()) {
-      Toast.open('error', error instanceof Error ? error.message : i18n.get('error.deleteSessionFailed'));
+      Toast.open('error', error instanceof Error ? error.message : String(error));
     }
   } finally {
     if (isCurrentHost()) setSessionFlag('deletingSessionIds', sessionId, false);
@@ -377,9 +387,13 @@ export const ensureSessionLoaded = async (sessionId: string) => {
     setSessionFlag('loadingSessionIds', sessionId, false);
     setSessionFlag('loadedSessionIds', sessionId, true);
     updateSessionOptions(sessionId, { modes: loaded.modes, configOptions: loaded.configOptions ?? [] });
+
+    const meta = getSessionMeta(sessionId);
+    const title = loaded.title || meta?.title;
+    const updatedAt = loaded.updatedAt || meta?.updatedAt;
     patchSession(sessionId, {
-      ...(loaded.title ? { title: loaded.title } : {}),
-      ...(loaded.updatedAt ? { updatedAt: loaded.updatedAt } : {}),
+      ...(title ? { title } : {}),
+      ...(updatedAt ? { updatedAt } : {}),
     });
   } catch (error) {
     if (sessionLoads.get(sessionId) !== token) return;
@@ -551,6 +565,10 @@ export const promotePendingSession = async (
     title: created.title || text.slice(0, 30) || attachments[0]?.name,
     updatedAt: typeof created.updatedAt === 'string' && created.updatedAt ? created.updatedAt : now,
   };
+  saveSessionMeta(sessionId, {
+    title: liveSession.title,
+    updatedAt: liveSession.updatedAt,
+  });
 
   let options: SessionOptions = { modes: created.modes, configOptions: created.configOptions };
   let modeError = '';

@@ -157,7 +157,6 @@
   "error.cancelTaskTimeout": "停止任务超时，请重试；持续失败可在设置中重置 App。",
   "error.closeSessionTimeout": "关闭会话超时，请重试；持续失败可在设置中重置 App。",
   "error.deleteSessionTimeout": "删除会话超时，请重新加载列表确认结果，或重试。",
-  "error.deleteSessionFailed": "删除会话失败",
   "error.resetLocalFailed": "重置本地连接失败：$1",
   "error.permissionTaskExpired": "权限请求对应的任务已失效",
   "error.encryptionFailed": "无法加密或保存消息，请检查本地存储后重试。",

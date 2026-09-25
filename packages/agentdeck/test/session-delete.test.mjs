@@ -38,30 +38,26 @@ test('deletion waits for the host and removes the session, empty group, and cach
   assert.equal(f.app.isSessionOpened('s1'), false);
 });
 
-test('a failed deletion retains the session and can be retried', async () => {
+test('a failed deletion removes the session locally and ignores it in subsequent refresh', async () => {
   const f = documentFixture();
   await f.connect();
   const deleting = f.app.deleteSession('s1');
   await tick();
   f.deliver({ id: deleteRequests(f).at(-1).payload.id, peerId: 1, error: 'Session is busy' });
   await deleting;
-  assert.ok(f.app.getSession('s1'));
-  assert.equal(f.app.agentdeckStore.deletingSessionIds.length, 0);
-
-  const retry = f.app.deleteSession('s1');
-  await tick();
-  f.reply(deleteRequests(f).at(-1), { deleted: true });
-  await retry;
   assert.equal(f.app.getSession('s1'), undefined);
+  assert.equal(f.app.agentdeckStore.sessions.length, 0);
+  assert.equal(f.app.agentdeckStore.deletingSessionIds.length, 0);
 });
 
-test('a timed out deletion preserves the item and offers list refresh recovery', async () => {
+test('a timed out deletion removes the session locally and ignores it in subsequent refresh', async () => {
   const f = documentFixture();
   await f.connect();
   const deleting = f.app.deleteSession('s1');
   await f.advance(65_000);
   await deleting;
-  assert.ok(f.app.getSession('s1'));
+  assert.equal(f.app.getSession('s1'), undefined);
+  assert.equal(f.app.agentdeckStore.sessions.length, 0);
   assert.equal(f.app.agentdeckStore.deletingSessionIds.length, 0);
 });
 
