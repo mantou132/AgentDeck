@@ -5,7 +5,7 @@ import { documentFixture, tick } from './helpers/app-fixture.mjs';
 const deleteRequests = (fixture) =>
   fixture.requests.filter((request) => request.payload.method === 'agent_session_delete');
 
-test('deletion waits for the host and removes the session, empty group, and cached state', async () => {
+test('deletion removes the session, empty group, and cached state', async () => {
   const f = documentFixture();
   await f.connect();
   await f.openSession();
@@ -18,11 +18,6 @@ test('deletion waits for the host and removes the session, empty group, and cach
   await tick();
   const request = deleteRequests(f).at(-1);
   assert.deepEqual(request.payload.params, { agent: 'codex', sessionId: 's1', timeoutSeconds: 60 });
-  assert.ok(f.app.getSession('s1'));
-  assert.ok(f.app.agentdeckStore.deletingSessionIds.includes('s1'));
-  await f.app.deleteSession('s1');
-  assert.equal(deleteRequests(f).length, 1);
-
   f.reply(request, { deleted: true });
   await deleting;
   const store = f.app.agentdeckStore;

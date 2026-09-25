@@ -206,4 +206,7 @@ test('inline base64 images in message text become attachments instead of links',
   ]);
   assert.equal(extractDataImageAttachments('no images here').attachments.length, 0);
   assert.equal(extractDataImageAttachments('no images here').markdown, 'no images here');
+  const cached = extractDataImageAttachments(markdown);
+  assert.equal(cached.attachments, attachments);
+  assert.equal(cached.attachments[0].id, attachments[0].id);
 });

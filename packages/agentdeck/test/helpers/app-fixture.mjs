@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+
+const require = createRequire(import.meta.url);
+
 import * as chacha from '@noble/ciphers/chacha.js';
 import * as hkdf from '@noble/hashes/hkdf.js';
 import * as sha2 from '@noble/hashes/sha2.js';
@@ -200,6 +204,10 @@ export function documentFixture(previous, options = {}) {
         }
         if (name === '@mantou/tap-ui/elements/swipeout') {
           return { TapSwipeoutElement: { activeSwipeout: undefined } };
+        }
+        if (name === '@mantou/tap-ui/lib/cache') {
+          const { Cache } = require('@mantou/tap-ui/lib/cache');
+          return { Cache };
         }
         if (name === '@mantou/tap-ui/lib/timer') {
           return { throttle: (fn) => fn };

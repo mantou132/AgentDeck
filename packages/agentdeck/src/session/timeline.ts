@@ -1,3 +1,4 @@
+import { Cache } from '@mantou/tap-ui/lib/cache';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { i18n } from '../i18n';
 import type { Attachment, ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
@@ -86,21 +87,30 @@ export const parseToolOutputs = (data: ToolCallData): ToolParsedOutputs => {
 // 历史消息里的内联 base64 图片不再渲染为链接，还原成消息附件展示
 const dataImageLinkPattern = /!?\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
 
+const dataImageCache = new Cache<{ attachments: Attachment[]; markdown: string }>({ max: 100 });
+
 export const extractDataImageAttachments = (text: string): { attachments: Attachment[]; markdown: string } => {
-  const attachments: Attachment[] = [];
-  const markdown = text.replace(dataImageLinkPattern, (_, name: string, previewUrl: string) => {
-    const [header, data = ''] = previewUrl.split(',');
-    attachments.push({
-      id: crypto.randomUUID(),
-      kind: 'image',
-      name: name || i18n.get('attachment.imageDefaultName'),
-      mimeType: /^data:([^;]+);/.exec(header)?.[1] || 'image/png',
-      data,
-      previewUrl,
+  if (!text?.includes('data:image/')) {
+    return { attachments: [], markdown: text };
+  }
+
+  const parsed = dataImageCache.get(text, () => {
+    const attachments: Attachment[] = [];
+    const markdown = text.replace(dataImageLinkPattern, (_, name: string, previewUrl: string) => {
+      const [header, data = ''] = previewUrl.split(',');
+      attachments.push({
+        id: crypto.randomUUID(),
+        kind: 'image',
+        name: name || i18n.get('attachment.imageDefaultName'),
+        mimeType: /^data:([^;]+);/.exec(header)?.[1] || 'image/png',
+        data,
+        previewUrl,
+      });
+      return '';
     });
-    return '';
+    return { attachments, markdown };
   });
-  return { attachments, markdown };
+  return parsed ?? { attachments: [], markdown: text };
 };
 
 export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean): TimelineItem[] => {
