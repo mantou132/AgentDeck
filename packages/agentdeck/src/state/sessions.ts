@@ -146,6 +146,25 @@ export const mergeSessionsWithInFlight = (
   return merged;
 };
 
+export const isPlaceholderTitle = (title?: string) => {
+  const lower = title?.trim().toLowerCase();
+  if (!lower) return true;
+
+  // Generic untitled / default titles
+  if (
+    lower === 'untitled' ||
+    lower === 'untitled session' ||
+    lower === 'default session' ||
+    lower === '未命名' ||
+    lower === '未命名会话' ||
+    lower === '新建会话'
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
 export const refreshSessions = async () => {
   if (agentdeckStore.connection !== 'connected') {
     reconnectTransport(true);
@@ -162,10 +181,11 @@ export const refreshSessions = async () => {
       .filter((session) => !isSessionDeleted(session.sessionId))
       .map((session) => {
         const meta = getSessionMeta(session.sessionId);
+        const title = isPlaceholderTitle(session.title) && meta?.title ? meta.title : session.title || meta?.title;
         return {
           ...session,
           agent,
-          title: session.title || meta?.title,
+          title,
           updatedAt: session.updatedAt || meta?.updatedAt,
         };
       });
@@ -389,7 +409,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
     updateSessionOptions(sessionId, { modes: loaded.modes, configOptions: loaded.configOptions ?? [] });
 
     const meta = getSessionMeta(sessionId);
-    const title = loaded.title || meta?.title;
+    const title = isPlaceholderTitle(loaded.title) && meta?.title ? meta.title : loaded.title || meta?.title;
     const updatedAt = loaded.updatedAt || meta?.updatedAt;
     patchSession(sessionId, {
       ...(title ? { title } : {}),
@@ -558,11 +578,12 @@ export const promotePendingSession = async (
   }
 
   const now = new Date().toISOString();
+  const createdTitle = isPlaceholderTitle(created.title) ? undefined : created.title;
   const liveSession: DeckSession = {
     agent: pendingSession.agent,
     sessionId,
     cwd: pendingSession.cwd,
-    title: created.title || text.slice(0, 30) || attachments[0]?.name,
+    title: createdTitle || text.slice(0, 30) || attachments[0]?.name,
     updatedAt: typeof created.updatedAt === 'string' && created.updatedAt ? created.updatedAt : now,
   };
   saveSessionMeta(sessionId, {
