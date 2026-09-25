@@ -1,4 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { readDraft, saveDraft } from '../composer/drafts';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
@@ -53,11 +54,9 @@ export class DeckComposerElement extends GemElement {
     draft: '',
     quote: '',
     attachments: [] as Attachment[],
-    attachmentError: '',
     readingAttachments: false,
     submitting: false,
     loadingDraft: false,
-    draftError: '',
   });
   #textareaRef = createRef<HTMLTextAreaElement>();
   #fileInputRef = createRef<HTMLInputElement>();
@@ -67,7 +66,7 @@ export class DeckComposerElement extends GemElement {
   @effect((i) => [i.sessionKey, i.draftKey])
   #resetInput = async () => {
     this.#clearInput();
-    this.#state({ loadingDraft: Boolean(this.draftKey), draftError: '', readingAttachments: false });
+    this.#state({ loadingDraft: Boolean(this.draftKey), readingAttachments: false });
     if (!this.draftKey) return;
     // 不处理本地草稿读取期间快速切换会话的竞态。
     try {
@@ -86,10 +85,9 @@ export class DeckComposerElement extends GemElement {
         attachments: this.#state.attachments,
         quote: this.#state.quote,
       });
-      this.#state({ draftError: '' });
     } catch {
       // 附件可能耗尽存储配额，需要提示用户草稿未保存。
-      this.#state({ draftError: i18n.get('composer.draftSaveFailed') });
+      Toast.open('error', i18n.get('composer.draftSaveFailed'));
     }
   };
 
@@ -107,6 +105,10 @@ export class DeckComposerElement extends GemElement {
   }
 
   #send = async () => {
+    if (this.#state.attachments.length > MAX_ATTACHMENTS) {
+      Toast.open('warning', i18n.get('composer.tooManyAttachments'));
+      return;
+    }
     if (!this.#canSend || !this.submit) return;
     const draftText = this.#state.draft.trim();
     const quoteText = this.#state.quote.trim();
@@ -134,7 +136,7 @@ export class DeckComposerElement extends GemElement {
   #clearInput = () => {
     this.#nextPasteReference = 1;
     this.#pastedAttachments.clear();
-    this.#state({ draft: '', quote: '', attachments: [], attachmentError: '' });
+    this.#state({ draft: '', quote: '', attachments: [] });
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
   };
 
@@ -175,7 +177,6 @@ export class DeckComposerElement extends GemElement {
       draft: message.text,
       quote: message.quote ?? '',
       attachments: message.attachments ?? [],
-      attachmentError: '',
     });
     if (this.#textareaRef.value) {
       this.#textareaRef.value.value = message.text;
@@ -193,14 +194,14 @@ export class DeckComposerElement extends GemElement {
   #addFiles = async (files: File[], selection?: InputSelection) => {
     if (!files.length || this.#state.loadingDraft) return;
     if (this.#state.readingAttachments) {
-      this.#state({ attachmentError: i18n.get('composer.readingAttachments') });
+      Toast.open('info', i18n.get('composer.readingAttachments'));
       return;
     }
     if (files.length + this.#state.attachments.length > MAX_ATTACHMENTS) {
-      this.#state({ attachmentError: i18n.get('composer.maxAttachments') });
+      Toast.open('warning', i18n.get('composer.maxAttachments'));
       return;
     }
-    this.#state({ readingAttachments: true, attachmentError: '' });
+    this.#state({ readingAttachments: true });
     // 附件读取期间切换会话不做额外隔离。
     const results = await Promise.allSettled(files.map(readAttachment));
     const attachments: Attachment[] = [];
@@ -212,10 +213,10 @@ export class DeckComposerElement extends GemElement {
     if (selection) this.#insertPastedAttachments(attachments, selection);
     else this.#state({ attachments: [...this.#state.attachments, ...attachments] });
     this.#saveDraft();
-    this.#state({
-      attachmentError: errors.length ? errors.join('\n') : this.#state.attachmentError,
-      readingAttachments: false,
-    });
+    if (errors.length) {
+      Toast.open('error', errors.join('\n'));
+    }
+    this.#state({ readingAttachments: false });
   };
 
   #removeAttachment = (event: CustomEvent<string>) => {
@@ -293,7 +294,7 @@ export class DeckComposerElement extends GemElement {
     if (text.length < LONG_PASTE_CHAR_THRESHOLD) return;
     event.preventDefault();
     if (new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) {
-      this.#state({ attachmentError: i18n.get('composer.pasteTooLarge') });
+      Toast.open('warning', i18n.get('composer.pasteTooLarge'));
       return;
     }
     this.#addFiles([new File([text], 'Pasted text.txt', { type: 'text/plain' })], selection);
@@ -310,10 +311,6 @@ export class DeckComposerElement extends GemElement {
   @template()
   #render = () => {
     const canSend = this.#canSend;
-    const attachmentError =
-      this.#state.attachments.length > MAX_ATTACHMENTS
-        ? i18n.get('composer.tooManyAttachments')
-        : this.#state.attachmentError;
     return html`
           <div class="composer-shell bg-bg/90 px-2.5 pt-2 backdrop-blur-xl backdrop-saturate-125">
             <div class="composer-surface mx-auto max-w-[760px] overflow-hidden border border-primary/15 bg-bg-light shadow-card">
@@ -330,18 +327,7 @@ export class DeckComposerElement extends GemElement {
                   `,
                 )}
               </div>
-              <div v-if=${attachmentError} role="alert" class="flex items-start gap-2 px-3.5 pt-3 text-sm leading-relaxed text-negative">
-                <span class="select-text min-w-0 flex-1 whitespace-pre-line">${attachmentError}</span>
-                <button
-                  type="button"
-                  class="grid size-6 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-negative"
-                  aria-label=${i18n.get('composer.closeAlertAria')}
-                  v-if=${this.#state.attachments.length <= MAX_ATTACHMENTS}
-                  @click=${() => this.#state({ attachmentError: '' })}
-                >
-                  <tap-use class="size-4" .element=${icons.close}></tap-use>
-                </button>
-              </div>
+
               <div v-if=${this.#state.quote} class="mx-3.5 mt-3 flex items-start gap-2 rounded-xl bg-bg/60 px-3 py-2 text-xs">
                 <div class="line-clamp-3 min-w-0 flex-1 whitespace-pre-wrap italic text-describe">${this.#state.quote}</div>
                 <button
@@ -353,7 +339,6 @@ export class DeckComposerElement extends GemElement {
                   <tap-use class="size-3.5" .element=${icons.close}></tap-use>
                 </button>
               </div>
-              <div v-if=${this.#state.draftError} role="alert" class="select-text px-3.5 pt-3 text-sm text-negative">${this.#state.draftError}</div>
               <textarea
                 ${this.#textareaRef}
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"

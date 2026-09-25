@@ -1,4 +1,5 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { draftKey, removeDraft } from '../composer/drafts';
@@ -202,13 +203,12 @@ export const deleteSession = async (sessionId: string) => {
   const session = getSession(sessionId);
   if (!session || session.pendingCreation || agentdeckStore.deletingSessionIds.includes(sessionId)) return;
   if (agentdeckStore.connection !== 'connected') {
-    agentdeckStore({ sessionsError: i18n.get('error.remoteNotConnected') });
+    Toast.open('error', i18n.get('error.remoteNotConnected'));
     return;
   }
   const { agent, relayId } = agentdeckStore.settings;
   const isCurrentHost = () => agent === agentdeckStore.settings.agent && relayId === agentdeckStore.settings.relayId;
   setSessionFlag('deletingSessionIds', sessionId, true);
-  agentdeckStore({ sessionsError: '' });
   try {
     const [{ deleted }] = await Promise.all([
       agentApi.deleteSession(session.agent, sessionId),
@@ -249,9 +249,7 @@ export const deleteSession = async (sessionId: string) => {
     });
   } catch (error) {
     if (isCurrentHost()) {
-      agentdeckStore({
-        sessionsError: error instanceof Error ? error.message : i18n.get('error.deleteSessionFailed'),
-      });
+      Toast.open('error', error instanceof Error ? error.message : i18n.get('error.deleteSessionFailed'));
     }
   } finally {
     if (isCurrentHost()) setSessionFlag('deletingSessionIds', sessionId, false);
@@ -640,7 +638,7 @@ export const cancelTurn = (sessionId: string) => {
     return;
   }
   cancelTurnPrompt(session).catch((error) => {
-    setSessionError(sessionId, error instanceof Error ? error.message : i18n.get('error.cancelTaskFailed'));
+    Toast.open('error', error instanceof Error ? error.message : i18n.get('error.cancelTaskFailed'));
     setSessionFlag('pendingSessionIds', sessionId, false);
     removeInFlight(sessionId);
     setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));

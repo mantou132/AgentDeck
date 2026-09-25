@@ -195,6 +195,9 @@ export function documentFixture(previous, options = {}) {
         if (name === '@mantou/tap-ui/lib/locale') {
           return { loadLocale: () => Promise.resolve() };
         }
+        if (name === '@mantou/tap-ui/elements/toast') {
+          return { Toast: { open: () => {} } };
+        }
         if (name === '@mantou/tap-ui/elements/swipeout') {
           return { TapSwipeoutElement: { activeSwipeout: undefined } };
         }

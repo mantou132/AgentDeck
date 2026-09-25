@@ -46,12 +46,10 @@ test('a failed deletion retains the session and can be retried', async () => {
   f.deliver({ id: deleteRequests(f).at(-1).payload.id, peerId: 1, error: 'Session is busy' });
   await deleting;
   assert.ok(f.app.getSession('s1'));
-  assert.equal(f.app.agentdeckStore.sessionsError, 'Session is busy');
   assert.equal(f.app.agentdeckStore.deletingSessionIds.length, 0);
 
   const retry = f.app.deleteSession('s1');
   await tick();
-  assert.equal(f.app.agentdeckStore.sessionsError, '');
   f.reply(deleteRequests(f).at(-1), { deleted: true });
   await retry;
   assert.equal(f.app.getSession('s1'), undefined);
@@ -65,7 +63,6 @@ test('a timed out deletion preserves the item and offers list refresh recovery',
   await deleting;
   assert.ok(f.app.getSession('s1'));
   assert.equal(f.app.agentdeckStore.deletingSessionIds.length, 0);
-  assert.match(f.app.agentdeckStore.sessionsError, /reload the list/i);
 });
 
 test('a stale list response cannot bring back a deleted session', async () => {
@@ -93,5 +90,4 @@ test('offline deletion sends no request and preserves the session', async () => 
   await f.app.deleteSession('s1');
   assert.equal(deleteRequests(f).length, 0);
   assert.ok(f.app.getSession('s1'));
-  assert.match(f.app.agentdeckStore.sessionsError, /not connected/i);
 });

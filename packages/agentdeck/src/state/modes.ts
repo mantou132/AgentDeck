@@ -1,8 +1,9 @@
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { getModeSelection, withCurrentMode } from '../session/modes';
 import type { DeckSession, SessionOptions } from '../session/types';
-import { agentdeckStore, setSessionError, setSessionFlag, updateSessionOptions } from './store';
+import { agentdeckStore, setSessionFlag, updateSessionOptions } from './store';
 
 export const applyRemoteMode = async (
   session: DeckSession,
@@ -31,13 +32,12 @@ export const changeSessionMode = async (session: DeckSession, modeId: string) =>
   }
   if (agentdeckStore.connection !== 'connected' || !agentdeckStore.loadedSessionIds.includes(sessionId)) return false;
   setSessionFlag('changingModeSessionIds', sessionId, true);
-  setSessionError(sessionId, '');
   try {
     const patch = await applyRemoteMode(session, options, modeId);
     updateSessionOptions(sessionId, patch);
     return true;
   } catch (error) {
-    setSessionError(sessionId, error instanceof Error ? error.message : i18n.get('error.switchModeFailed'));
+    Toast.open('error', error instanceof Error ? error.message : i18n.get('error.switchModeFailed'));
     return false;
   } finally {
     setSessionFlag('changingModeSessionIds', sessionId, false);

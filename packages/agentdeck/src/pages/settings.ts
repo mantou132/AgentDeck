@@ -1,9 +1,9 @@
 import { Dialog } from '@mantou/tap-ui/elements/dialog';
 import { Stack } from '@mantou/tap-ui/elements/stack';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { RELAY_GUIDE_SEEN_KEY } from '../config';
 import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
-import { hapticSuccess } from '../lib/haptics';
 import { hardResetApp, saveSettings } from '../state/app';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
@@ -36,7 +36,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
   #state = createState({
     relayId: agentdeckStore.settings.relayId,
     agent: agentdeckStore.settings.agent,
-    error: '',
     relayGuideOpen: !agentdeckStore.settings.relayId && !localStorage.getItem(RELAY_GUIDE_SEEN_KEY),
     showRelayId: false,
   });
@@ -70,28 +69,29 @@ export class AgentDeckSettingsPageElement extends GemElement {
       if (url.protocol !== 'agentdeck:') throw new Error();
       const relayId = url.searchParams.get('relayId');
       if (!relayId) throw new Error();
-      this.#state({ relayId, error: '' });
-      hapticSuccess();
+      this.#state({ relayId });
+      Toast.open('success', i18n.get('settings.relayIdUpdated'));
     } catch {
-      this.#state({ error: i18n.get('settings.scanFailed') });
+      Toast.open('error', i18n.get('settings.scanFailed'));
     }
   };
 
   #handleScanError = (event: CustomEvent<DeckQrScannerError>) => {
-    this.#state({
-      error: i18n.get(event.detail === 'permission-denied' ? 'settings.scanPermissionDenied' : 'settings.scanFailed'),
-    });
+    Stack.pop();
+    Toast.open(
+      'error',
+      i18n.get(event.detail === 'permission-denied' ? 'settings.scanPermissionDenied' : 'settings.scanFailed'),
+    );
   };
 
   #save = () => {
     try {
       saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent });
-      this.#state({ error: '' });
       if (this.canGoBack) {
         Stack.pop();
       }
     } catch (error) {
-      this.#state({ error: error instanceof Error ? error.message : i18n.get('settings.saveFailed') });
+      Toast.open('error', error instanceof Error ? error.message : i18n.get('settings.saveFailed'));
     }
   };
 
@@ -103,7 +103,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
     try {
       hardResetApp();
     } catch (error) {
-      this.#state({ error: error instanceof Error ? error.message : i18n.get('settings.resetFailed') });
+      Toast.open('error', error instanceof Error ? error.message : i18n.get('settings.resetFailed'));
     }
   };
 
@@ -167,7 +167,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 aria-label=${i18n.get('settings.connectTitle')}
                 .value=${this.#state.relayId}
                 @input=${(event: InputEvent) =>
-                  this.#state({ relayId: (event.target as HTMLInputElement).value, error: '' })}
+                  this.#state({ relayId: (event.target as HTMLInputElement).value })}
               />
               <button
                 type="button"
@@ -197,7 +197,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
                   class="box-border h-12 w-full appearance-none rounded-xl border border-border bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
                   .value=${this.#state.agent}
                   @change=${(event: Event) =>
-                    this.#state({ agent: (event.target as HTMLSelectElement).value, error: '' })}
+                    this.#state({ agent: (event.target as HTMLSelectElement).value })}
                 >
                   ${agents.map(
                     (agent) =>
@@ -208,13 +208,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
               </span>
             </label>
           </section>
-
-          <div
-            v-if=${this.#state.error}
-            class="select-text mb-3 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm text-negative"
-          >
-            ${this.#state.error}
-          </div>
 
           <div class="flex-1"></div>
 
