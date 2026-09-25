@@ -1,5 +1,6 @@
 import { addListener } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import { repeat } from '@mantou/gem/lib/element';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
@@ -125,7 +126,12 @@ export class DeckSessionTimelineElement extends GemElement {
       this.pending,
     );
     return html`
-      ${timelineItems.map((item) => (item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message)))}
+      ${repeat(
+        timelineItems,
+        (item) => (item.type === 'group' ? item.group.id : item.message.id),
+        (item) =>
+          item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message),
+      )}
     `;
   };
 }
