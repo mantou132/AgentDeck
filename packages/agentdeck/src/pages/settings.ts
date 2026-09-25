@@ -67,9 +67,9 @@ export class AgentDeckSettingsPageElement extends GemElement {
     try {
       const url = new URL(event.detail);
       if (url.protocol !== 'agentdeck:') throw new Error();
-      const relayId = url.searchParams.get('relayId');
-      if (!relayId) throw new Error();
-      this.#state({ relayId });
+      const pairingId = url.searchParams.get('pairingId');
+      if (!pairingId) throw new Error();
+      this.#state({ relayId: pairingId });
       Toast.open('success', i18n.get('settings.relayIdUpdated'));
     } catch {
       Toast.open('error', i18n.get('settings.scanFailed'));
@@ -163,7 +163,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 autocomplete="off"
                 autocapitalize="none"
                 spellcheck="false"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                placeholder="adk1_..."
                 aria-label=${i18n.get('settings.connectTitle')}
                 .value=${this.#state.relayId}
                 @input=${(event: InputEvent) => this.#state({ relayId: (event.target as HTMLInputElement).value })}

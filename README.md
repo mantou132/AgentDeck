@@ -44,14 +44,14 @@ For npm upgrades, run `agentdeckd stop`, `npm install -g agentdeckd@latest`, the
 | `agentdeckd reset` | Rotate Pairing ID, clear local state and show status; restart if previously running |
 | `agentdeckd` / `agentdeckd run` | Run in the foreground |
 
-`reset` generates a new Pairing ID by default, invalidating the old ID. Use `--relay-id` to set a specific ID and `--relay-url` to change the relay; otherwise the default relay URL is used. Pair your devices again with the new ID shown in its status output. It clears local connection state, logs and temporary downloads while preserving installed agents and agent history. Running services restart; stopped services remain stopped.
+`reset` generates a new Pairing ID by default, invalidating the old ID. Use `--pairing-id` to set a specific ID and `--relay-url` to change the relay; otherwise the default relay URL is used. Pair your devices again with the new ID shown in its status output. It clears local connection state, logs and temporary downloads while preserving installed agents and agent history. Running services restart; stopped services remain stopped.
 
 Global options can appear before or after the command:
 
 ```sh
 agentdeckd start --relay-url wss://your-relay.example/ws
-agentdeckd restart --relay-id <YOUR_PAIRING_ID>
-agentdeckd reset --relay-id <NEW_PAIRING_ID> --relay-url wss://your-relay.example/ws
+agentdeckd restart --pairing-id <YOUR_PAIRING_ID>
+agentdeckd reset --pairing-id <NEW_PAIRING_ID> --relay-url wss://your-relay.example/ws
 ```
 
 Both settings are saved for future starts. Use `restart` to change settings while the daemon is running, or `reset` to also clear local state. The default relay is `wss://agent-deck.xianqiao.wang/ws`; clients must use the same relay and Pairing ID.

@@ -24,11 +24,11 @@ export class AgentRelaySettingsElement extends GemElement {
     return html`
       <section class="w-full rounded-lg border border-border bg-bg shadow-lg">
         <header class="border-b border-border px-4 py-3">
-          <h2 class="m-0 text-sm font-semibold text-highlight">AgentDeck Relay Settings</h2>
+          <h2 class="m-0 text-sm font-semibold text-highlight">AgentDeck Pairing Settings</h2>
         </header>
         <div class="px-4 py-3">
           <div class="mb-3 text-xs leading-relaxed text-describe">
-            Enter the Relay Pairing ID printed by <code>agentdeckd</code> on your computer:
+            Enter the Pairing ID printed by <code>agentdeckd</code> on your computer:
           </div>
           <dy-input
             autofocus

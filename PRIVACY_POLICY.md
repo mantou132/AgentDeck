@@ -8,7 +8,7 @@ AgentDeck is an open-source mobile client for Agent Client Protocol (ACP) develo
 AgentDeck does not collect, store, track, or share any personal information, location data, device identifiers, or analytics data.
 
 ## 2. Network Communication & Relay
-- **Relay ID & WebSocket Connection**: AgentDeck uses a private Relay ID provided by the user to establish end-to-end WebSocket communication (`wss://agent-deck.xianqiao.wang/ws` or your self-hosted relay) with your desktop agent service (`agentdeckd`).
+- **Pairing ID & WebSocket Connection**: AgentDeck uses a private Pairing ID provided by the user to establish end-to-end WebSocket communication (`wss://agent-deck.xianqiao.wang/ws` or your self-hosted relay) with your desktop agent service (`agentdeckd`).
 - **Session Data**: Prompts, session logs, and messages are relayed directly between your desktop agents and your mobile device. We do not inspect, log, sell, or monetize the contents of your prompts or coding sessions.
 
 ## 3. Third-Party Services

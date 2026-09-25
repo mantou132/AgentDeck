@@ -32,7 +32,7 @@ struct Cli {
 
     /// Custom pairing ID (adk1_... or plain UUID)
     #[arg(long, global = true)]
-    relay_id: Option<String>,
+    pairing_id: Option<String>,
 
     /// Relay WebSocket URL (saved for subsequent starts)
     #[arg(long, global = true, value_parser = parse_relay_url)]
@@ -54,7 +54,7 @@ enum Commands {
     /// Check daemon status and display Pairing ID
     Status,
     /// Configure automatic sleep prevention, or show its current status
-    #[command(arg(clap::Arg::new("relay_id").long("relay-id").hide(true)))]
+    #[command(arg(clap::Arg::new("pairing_id").long("pairing-id").hide(true)))]
     #[command(arg(clap::Arg::new("relay_url").long("relay-url").hide(true)))]
     Awake {
         #[command(subcommand)]
@@ -139,10 +139,10 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
             println!("PID: {pid}");
         }
     }
-    println!("Relay URL: {}", config.relay_url());
-    println!("Relay ID : {}", config.relay_id());
+    println!("Relay URL : {}", config.relay_url());
+    println!("Pairing ID: {}", config.relay_id());
     println!();
-    let uri = format!("agentdeck://connect?relayId={}", config.relay_id());
+    let uri = format!("agentdeck://connect?pairingId={}", config.relay_id());
     if let Err(error) = qr2term::print_qr(&uri) {
         crate::logger::log(&format!("Cannot print QR code: {error}"));
         println!("URI: {uri}");
@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let paths = AppPaths::discover()?;
     let options = RelayOptions {
-        relay_id: cli.relay_id,
+        relay_id: cli.pairing_id,
         relay_url: cli.relay_url,
     };
 
@@ -273,13 +273,14 @@ mod tests {
         ] {
             let help = Cli::try_parse_from(args).unwrap_err();
             assert_eq!(help.kind(), clap::error::ErrorKind::DisplayHelp);
-            assert!(!help.to_string().contains("--relay-"));
+            assert!(!help.to_string().contains("--relay-url"));
+            assert!(!help.to_string().contains("--pairing-id"));
         }
     }
 
     #[test]
     fn awake_relay_options_are_local_and_do_not_validate_urls() {
-        for (option, value) in [("--relay-id", "test-id"), ("--relay-url", "not-a-url")] {
+        for (option, value) in [("--pairing-id", "test-id"), ("--relay-url", "not-a-url")] {
             assert!(Cli::try_parse_from(["agentdeckd", "awake", option, value]).is_ok());
             for command in ["always", "plugged", "on", "active", "never", "status"] {
                 assert!(
@@ -301,7 +302,7 @@ mod tests {
                     "agentdeckd",
                     "--relay-url",
                     "ws://localhost:8080/ws",
-                    "--relay-id",
+                    "--pairing-id",
                     "test-id",
                     command,
                 ],
@@ -310,13 +311,13 @@ mod tests {
                     command,
                     "--relay-url",
                     "ws://localhost:8080/ws",
-                    "--relay-id",
+                    "--pairing-id",
                     "test-id",
                 ],
             ] {
                 let cli = Cli::try_parse_from(args).unwrap();
                 assert_eq!(cli.relay_url.as_deref(), Some("ws://localhost:8080/ws"));
-                assert_eq!(cli.relay_id.as_deref(), Some("test-id"));
+                assert_eq!(cli.pairing_id.as_deref(), Some("test-id"));
             }
         }
         for url in ["https://example.com/ws", "not-a-url", "ws://"] {

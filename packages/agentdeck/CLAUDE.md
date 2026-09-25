@@ -4,8 +4,8 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 ## 关键入口与目录结构
 
-- `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Relay ID 时打开 settings，否则打开 session-list。
-- `src/pages/`：`session-list`、`session`、`settings` 三页面；settings 提供 Relay 获取指南 sheet，首次未配对使用时自动展示一次；`navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
+- `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Pairing ID 时打开 settings，否则打开 session-list。
+- `src/pages/`：`session-list`、`session`、`settings` 三页面；settings 提供配对指南 sheet，首次未配对使用时自动展示一次；`navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
 - `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
 - `src/agent/`：`transport.ts` 管理 Relay 连接与 host 握手，`api.ts` 提供远端接口，`rpc.ts` 负责双向流式通信，`encryption.ts` 提供由 ID 识别的可选端到端加密；`config.ts` 保存配置读取与连接常量。
 - `src/agent/push.ts`：移动端 FCM 注册与同步；使用 `tauri-plugin-fcm` 插件管理通知权限、渠道和 token 刷新。
