@@ -38,6 +38,25 @@ test('nextStreamingText reveals text progressively', () => {
   assert.equal(displayed, target);
 });
 
+test('nextStreamingText handles long text with emoji and unicode grapheme clusters', () => {
+  const emojiSequence = '🚀👨‍👩‍👧‍👦🇨🇳🎉';
+  const target = `Hello world! ${emojiSequence} 这是一个超长文本测试。`.repeat(500); // ~20k chars
+  let displayed = '';
+
+  const start = Date.now();
+  let stepCount = 0;
+  while (displayed !== target) {
+    const next = nextStreamingText(displayed, target);
+    assert.ok(next.length > displayed.length);
+    assert.ok(target.startsWith(next));
+    displayed = next;
+    stepCount++;
+  }
+  const duration = Date.now() - start;
+  assert.equal(displayed, target);
+  assert.ok(duration < 1000, `Streaming took too long: ${duration}ms for ${stepCount} steps`);
+});
+
 test('active stream registry tracks active streams and prefix matching', () => {
   clearActiveStreams();
   assert.equal(hasActiveStream(), false);
