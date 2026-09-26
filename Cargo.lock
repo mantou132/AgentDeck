@@ -89,6 +89,8 @@ name = "agentdeck-daemon"
 version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
+ "anstream",
+ "anstyle",
  "anyhow",
  "axum",
  "base64 0.22.1",

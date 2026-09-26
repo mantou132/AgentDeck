@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anstream::println;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
@@ -15,6 +16,7 @@ mod power;
 mod push;
 mod relay_client;
 mod relay_encryption;
+mod ui;
 
 use agent_rpc::AgentService;
 use app_data::AppPaths;
@@ -72,6 +74,7 @@ enum AwakeCommand {
     /// Stay awake for one hour after the last RPC activity
     Active,
     /// Let the operating system sleep normally
+    #[command(alias = "off")]
     Never,
     /// Show the saved mode and actual runtime state
     Status,
@@ -90,17 +93,21 @@ async fn awake_command(paths: &AppPaths, command: Option<AwakeCommand>) -> Resul
         None => DaemonConfig::read(paths)?,
     };
     let Some(pid) = daemon::InstanceLock::check_running_at(&paths.lock_file())? else {
-        println!("Keep awake: {}", config.awake);
-        println!("Daemon is not running. Setting will take effect when it starts.");
+        ui::kv("Keep awake", config.awake);
+        println!(
+            "{}",
+            ui::dim("Daemon is not running. Setting will take effect when it starts.")
+        );
         return Ok(());
     };
     for _ in 0..40 {
         if let Some(status) = awake::read_status(paths, pid, config.awake) {
-            println!(
-                "Keep awake: {} ({})",
-                status.mode,
-                if status.on { "on" } else { "off" }
-            );
+            let state = if status.on {
+                ui::green("on")
+            } else {
+                ui::dim("off")
+            };
+            ui::kv("Keep awake", format!("{} ({state})", status.mode));
             if let Some(error) = status.error {
                 anyhow::bail!("Keep awake unavailable: {error}");
             }
@@ -108,9 +115,19 @@ async fn awake_command(paths: &AppPaths, command: Option<AwakeCommand>) -> Resul
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
-    println!("Keep awake: {} (runtime status unavailable)", config.awake);
+    ui::kv(
+        "Keep awake",
+        format!(
+            "{} ({})",
+            config.awake,
+            ui::yellow("runtime status unavailable")
+        ),
+    );
     println!(
-        "Setting saved. The running daemon has not confirmed it; restart it if it predates awake support."
+        "{}",
+        ui::dim(
+            "Setting saved. The running daemon has not confirmed it; restart it if it predates awake support."
+        )
     );
     Ok(())
 }
@@ -132,23 +149,34 @@ fn print_daemon_status(paths: &AppPaths) -> Result<()> {
 }
 
 fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Option<u32>)>) {
-    println!("AgentDeck Daemon v{}", env!("CARGO_PKG_VERSION"));
+    println!(
+        "{} {}",
+        ui::cyan("AgentDeck Daemon"),
+        ui::dim(format!("v{}", env!("CARGO_PKG_VERSION")))
+    );
     if let Some((status, pid)) = status {
-        println!("Service: {status}");
-        if let Some(pid) = pid.filter(|pid| *pid > 0) {
-            println!("PID: {pid}");
-        }
+        let status_desc = match status {
+            daemon::Status::Running => ui::green(format!("● {status}")),
+            daemon::Status::Stopped(_) => ui::yellow(format!("○ {status}")),
+            daemon::Status::NotInstalled => ui::red(format!("× {status}")),
+        };
+        let pid_str = if let Some(pid) = pid.filter(|pid| *pid > 0) {
+            format!(" {}", ui::dim(format!("(PID: {pid})")))
+        } else {
+            String::new()
+        };
+        ui::kv("Service", format!("{status_desc}{pid_str}"));
     }
-    println!("Relay URL : {}", config.relay_url());
-    println!("Pairing ID: {}", config.relay_id());
+    ui::kv("Relay URL", ui::underline(config.relay_url()));
+    ui::kv("Pairing ID", ui::cyan(config.relay_id()));
     println!();
     let uri = format!("agentdeck://connect?pairingId={}", config.relay_id());
     if let Err(error) = qr2term::print_qr(&uri) {
         crate::logger::log(&format!("Cannot print QR code: {error}"));
-        println!("URI: {uri}");
+        ui::kv("URI", uri);
     }
     println!();
-    println!("⚠️  KEEP THIS SECRET: Anyone with this output can access your agent.");
+    ui::print_security_warning();
 }
 
 async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
@@ -175,7 +203,7 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
     print_daemon_info(&config, None);
 
     tokio::signal::ctrl_c().await?;
-    println!("\nShutting down AgentDeck daemon...");
+    println!("\n{}", ui::dim("Shutting down AgentDeck daemon..."));
     logger::info("AgentDeck daemon stopped");
 
     Ok(())
@@ -209,7 +237,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Stop) => {
             daemon::stop_daemon()?;
-            println!("AgentDeck daemon service stopped.");
+            ui::note("AgentDeck daemon service stopped.");
         }
         Some(Commands::Restart) => {
             let config = DaemonConfig::load_or_init(&paths, &options)?;
@@ -221,11 +249,11 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Reset) => {
             let previous_status = daemon::reset_daemon(&paths, &options)?;
-            println!("Previous service: {previous_status}");
-            println!(
-                "Reset complete. Cleared local connection state, logs and temporary downloads."
+            println!("{}: {previous_status}", ui::bold("Previous service"));
+            ui::success(
+                "Reset complete. Cleared local connection state, logs and temporary downloads.",
             );
-            println!("Pair your devices again using the Pairing ID and Relay URL below.");
+            println!("Pair your devices again using the Pairing ID and Relay URL below.\n");
             print_daemon_status(&paths)?;
         }
         Some(Commands::Awake { command }) => {
@@ -245,7 +273,9 @@ mod tests {
 
     #[test]
     fn awake_commands_parse() {
-        for command in ["always", "plugged", "on", "active", "never", "status"] {
+        for command in [
+            "always", "plugged", "on", "active", "never", "off", "status",
+        ] {
             assert!(matches!(
                 Cli::try_parse_from(["agentdeckd", "awake", command])
                     .unwrap()
@@ -259,6 +289,14 @@ mod tests {
                 .command,
             Some(Commands::Awake {
                 command: Some(AwakeCommand::Plugged)
+            })
+        ));
+        assert!(matches!(
+            Cli::try_parse_from(["agentdeckd", "awake", "off"])
+                .unwrap()
+                .command,
+            Some(Commands::Awake {
+                command: Some(AwakeCommand::Never)
             })
         ));
         assert!(Cli::try_parse_from(["agentdeckd", "awake"]).is_ok());
@@ -282,7 +320,9 @@ mod tests {
     fn awake_relay_options_are_local_and_do_not_validate_urls() {
         for (option, value) in [("--pairing-id", "test-id"), ("--relay-url", "not-a-url")] {
             assert!(Cli::try_parse_from(["agentdeckd", "awake", option, value]).is_ok());
-            for command in ["always", "plugged", "on", "active", "never", "status"] {
+            for command in [
+                "always", "plugged", "on", "active", "never", "off", "status",
+            ] {
                 assert!(
                     Cli::try_parse_from(["agentdeckd", "awake", option, value, command]).is_ok()
                 );
