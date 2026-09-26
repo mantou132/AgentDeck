@@ -43,9 +43,9 @@ export const readSettings = (): AppSettings => {
     const relayId = typeof value?.relayId === 'string' && isPairingId(value.relayId) ? value.relayId : '';
     return {
       relayId,
-      agent: typeof value?.agent === 'string' && value.agent ? value.agent : 'codex',
+      agent: typeof value?.agent === 'string' && value.agent ? value.agent : popularAgents[0].id,
     };
   } catch {
-    return { relayId: '', agent: 'codex' };
+    return { relayId: '', agent: popularAgents[0].id };
   }
 };

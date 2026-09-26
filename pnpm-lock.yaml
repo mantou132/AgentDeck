@@ -70,6 +70,9 @@ importers:
       '@tauri-apps/plugin-haptics':
         specifier: ~2.3.3
         version: 2.3.3
+      '@vnidrop/tauri-plugin-share':
+        specifier: 1.0.0-rc.2
+        version: 1.0.0-rc.2
       diff:
         specifier: ^8.0.4
         version: 8.0.4
@@ -1456,6 +1459,9 @@ packages:
 
   '@upsetjs/venn.js@2.0.0':
     resolution: {integrity: sha512-WbBhLrooyePuQ1VZxrJjtLvTc4NVfpOyKx0sKqioq9bX1C1m7Jgykkn8gLrtwumBioXIqam8DLxp88Adbue6Hw==}
+
+  '@vnidrop/tauri-plugin-share@1.0.0-rc.2':
+    resolution: {integrity: sha512-1glLutNRQ0VbARidn9dSaPc9xBx8u4OleJR89mvPzKy6o2jDkNXif0tsdO78I9KeRIZUGpYcEDl2uxI+E9OiFg==}
 
   '@vue/compiler-core@3.5.26':
     resolution: {integrity: sha512-vXyI5GMfuoBCnv5ucIT7jhHKl55Y477yxP6fc4eUswjP8FG3FFVFd41eNDArR+Uk3QKn2Z85NavjaxLxOC19/w==}
@@ -6077,6 +6083,10 @@ snapshots:
     optionalDependencies:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
+
+  '@vnidrop/tauri-plugin-share@1.0.0-rc.2':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
 
   '@vue/compiler-core@3.5.26':
     dependencies:

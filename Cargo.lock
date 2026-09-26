@@ -81,6 +81,7 @@ dependencies = [
  "tauri-plugin-fcm",
  "tauri-plugin-haptics",
  "tauri-plugin-selection-menu",
+ "tauri-plugin-vnidrop-share",
  "tauri-plugin-webproxy",
 ]
 
@@ -3169,9 +3170,17 @@ checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
  "bitflags 2.13.2",
  "block2",
+ "libc",
  "objc2",
+ "objc2-cloud-kit",
+ "objc2-core-data",
  "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-core-image",
+ "objc2-core-text",
+ "objc2-core-video",
  "objc2-foundation",
+ "objc2-quartz-core",
 ]
 
 [[package]]
@@ -3191,6 +3200,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b402a653efbb5e82ce4df10683b6b28027616a2715e90009947d50b8dd298fa"
 dependencies = [
+ "bitflags 2.13.2",
  "objc2",
  "objc2-foundation",
 ]
@@ -3254,6 +3264,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-core-video"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d425caf1df73233f29fd8a5c3e5edbc30d2d4307870f802d18f00d83dc5141a6"
+dependencies = [
+ "bitflags 2.13.2",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-io-surface",
+]
+
+[[package]]
 name = "objc2-encode"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3276,6 +3299,7 @@ checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
  "bitflags 2.13.2",
  "block2",
+ "libc",
  "objc2",
  "objc2-core-foundation",
 ]
@@ -3986,7 +4010,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "rustix 1.1.5",
- "windows 0.62.2",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -5193,9 +5217,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-vnidrop-share"
+version = "1.0.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb8e260dc0786e6506838d2e37454c96a730cd9366768f1515e65f93f5f73daa"
+dependencies = [
+ "base64 0.22.1",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "raw-window-handle",
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "tempfile",
+ "thiserror 2.0.20",
+ "uuid",
+ "windows 0.61.3",
+ "windows-collections 0.2.0",
+ "windows-core 0.61.2",
+]
+
+[[package]]
 name = "tauri-plugin-webproxy"
 version = "0.1.0"
-source = "git+https://github.com/mantou132/tauri-plugin-webproxy#66ecadd4c5750e252e5248d9af9b48f30d0e03f7"
+source = "git+https://github.com/mantou132/tauri-plugin-webproxy#002862541b120c580845c65d2a002610d77bd12c"
 dependencies = [
  "http-cache-reqwest",
  "reqwest 0.12.28",

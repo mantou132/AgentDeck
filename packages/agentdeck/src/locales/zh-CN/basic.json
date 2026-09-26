@@ -204,5 +204,8 @@
   "error.gitStatusTimeout": "获取 Git 状态超时，请重试。",
   "error.gitDiffTimeout": "获取 Git 差异超时，请重试。",
   "session.backTitle": "返回（长按关闭会话）",
-  "settings.relayIdUpdated": "配对码已更新"
+  "settings.relayIdUpdated": "配对码已更新",
+  "browser.share": "分享",
+  "browser.copy": "复制",
+  "browser.copied": "已复制"
 }

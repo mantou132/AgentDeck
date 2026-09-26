@@ -1,11 +1,37 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
 import { Stack, type TapStackElement } from '@mantou/tap-ui/elements/stack';
-import { onWebProxyState } from 'tauri-plugin-webproxy-api';
+import { Toast } from '@mantou/tap-ui/elements/toast';
+import { share } from '@vnidrop/tauri-plugin-share';
+import { onWebProxyState, toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
+import { i18n } from './i18n';
 import { parseMessageLink } from './lib/links';
 
 export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
-  const result = Browser.open({ src: url, title, stack });
+  let currentUrl = url
+  const result = Browser.open({
+    src: toWebproxyUrl(url),
+    title,
+    stack,
+    actions: [
+      {
+        label: i18n.get('browser.share'),
+        handler: async () => {
+          (navigator.canShare?.() ? navigator.share : share)({
+            title: result.browser.title || title,
+            url: currentUrl,
+          });
+        },
+      },
+      {
+        label: i18n.get('browser.copy'),
+        handler: async () => {
+          await navigator.clipboard.writeText(currentUrl);
+          Toast.open('success', i18n.get('browser.copied'));
+        },
+      },
+    ],
+  });
   await new Promise((res) => requestAnimationFrame(res));
   onWebProxyState(result.browser.contentWindow, (state) => {
     const url = new URL(state.url);
@@ -17,7 +43,8 @@ export const openWebBrowser = async (url: string, title = '', stack?: TapStackEl
       openWebBrowser(state.url, state.title, stack);
     } else {
       result.browser.title = state.title;
-      result.browser.src = state.url;
+      result.browser.src = toWebproxyUrl(state.url);
+      currentUrl = state.url;
     }
   });
   return result;

@@ -9,6 +9,7 @@
     "haptics:allow-selection-feedback",
     "haptics:allow-vibrate",
     "barcode-scanner:default",
-    "selection-menu:default"
+    "selection-menu:default",
+    "vnidrop-share:default"
   ]
 }

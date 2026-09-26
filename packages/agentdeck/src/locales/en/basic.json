@@ -204,5 +204,8 @@
   "error.gitStatusTimeout": "Checking git status timed out. Please retry.",
   "error.gitDiffTimeout": "Computing git diff timed out. Please retry.",
   "session.backTitle": "Back (Long press to close session)",
-  "settings.relayIdUpdated": "Pairing ID updated"
+  "settings.relayIdUpdated": "Pairing ID updated",
+  "browser.share": "Share",
+  "browser.copy": "Copy",
+  "browser.copied": "Copied"
 }

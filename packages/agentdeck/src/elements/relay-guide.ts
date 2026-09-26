@@ -1,7 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { CarouselItem } from '@mantou/tap-ui/elements/carousel';
 import { blockContainer, focusStyle } from '@mantou/tap-ui/lib/styles';
-import { toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { i18n } from '../i18n';
 import { openWebBrowser } from '../navigation';
 
@@ -13,7 +12,7 @@ export class DeckRelayGuideElement extends GemElement {
 
   #goRepo = () => {
     this.close();
-    openWebBrowser(toWebproxyUrl('https://github.com/mantou132/AgentDeck'), 'AgentDeck');
+    openWebBrowser('https://github.com/mantou132/AgentDeck', 'AgentDeck');
   };
 
   get #items(): CarouselItem[] {
