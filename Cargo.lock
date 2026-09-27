@@ -5208,7 +5208,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-selection-menu"
 version = "0.1.0"
-source = "git+https://github.com/mantou132/tauri-plugin-selection-menu#125b49914855b757a7154a0647fa1b2fd96d6694"
+source = "git+https://github.com/mantou132/tauri-plugin-selection-menu#24157314f60e05365bf95a99426563553966c771"
 dependencies = [
  "serde",
  "tauri",

@@ -9,7 +9,7 @@ async function runningSession() {
   return fixture;
 }
 
-test('triggers success notification haptic when agent completes turn answering', async () => {
+test('does not trigger haptic when agent completes turn answering', async () => {
   const f = await runningSession();
   assert.equal(f.haptics.length, 0);
 
@@ -17,15 +17,14 @@ test('triggers success notification haptic when agent completes turn answering',
   await tick();
   const prompt = f.requests.at(-1);
 
-  // Still streaming/processing - no success haptic yet
-  assert.equal(f.haptics.filter((h) => h.type === 'notification' && h.value === 'success').length, 0);
+  // Still streaming/processing - no haptic
+  assert.equal(f.haptics.length, 0);
 
   // Complete prompt reply
   f.reply(prompt, { answer: 'Hello user' });
   await tick();
 
-  const successHaptics = f.haptics.filter((h) => h.type === 'notification' && h.value === 'success');
-  assert.equal(successHaptics.length, 1);
+  assert.equal(f.haptics.length, 0);
 });
 
 test('triggers warning notification haptic when agent encounters permission request requiring approval', async () => {
@@ -58,7 +57,7 @@ test('triggers warning notification haptic when agent encounters permission requ
   assert.equal(warningHaptics.length, 1);
 });
 
-test('does not trigger success haptic when turn fails or is cancelled', async () => {
+test('does not trigger haptic when turn fails or is cancelled', async () => {
   const f = await runningSession();
   f.app.sendPrompt('s1', 'Do something that fails');
   await tick();
@@ -68,8 +67,7 @@ test('does not trigger success haptic when turn fails or is cancelled', async ()
   f.deliver({ id: prompt.payload.id, peerId: 1, error: 'Command failed' });
   await tick();
 
-  const successHaptics = f.haptics.filter((h) => h.type === 'notification' && h.value === 'success');
-  assert.equal(successHaptics.length, 0);
+  assert.equal(f.haptics.length, 0);
 
   // Cancelled prompt
   f.app.sendPrompt('s1', 'Cancel this');
@@ -77,5 +75,5 @@ test('does not trigger success haptic when turn fails or is cancelled', async ()
   f.app.cancelTurn('s1');
   await tick();
 
-  assert.equal(f.haptics.filter((h) => h.type === 'notification' && h.value === 'success').length, 0);
+  assert.equal(f.haptics.length, 0);
 });

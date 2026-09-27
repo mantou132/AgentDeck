@@ -4,7 +4,6 @@ import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { draftKey, removeDraft } from '../composer/drafts';
 import { i18n } from '../i18n';
-import { hapticSuccess } from '../lib/haptics';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
 import { getModeSelection, withCurrentMode } from '../session/modes';
@@ -496,9 +495,6 @@ const runPromptTurn = (
           setSessionFlag('unreadSessionIds', session.sessionId, true);
         }
         setSessionFlag('pendingSessionIds', session.sessionId, false);
-        if (completed) {
-          hapticSuccess();
-        }
       },
     },
     prompt.attachments,
@@ -527,7 +523,6 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
         setSessionFlag('unreadSessionIds', sessionId, true);
       }
       setSessionFlag('pendingSessionIds', sessionId, false);
-      hapticSuccess();
     },
     reject: (error) => {
       removeInFlight(sessionId);
