@@ -8,7 +8,7 @@ import { i18n } from './i18n';
 import { parseMessageLink } from './lib/links';
 
 export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
-  let currentUrl = url
+  let currentUrl = url;
   const result = Browser.open({
     src: toWebproxyUrl(url),
     title,
