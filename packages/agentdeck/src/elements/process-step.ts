@@ -4,7 +4,7 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
 import { followBottom } from '../lib/follow-bottom';
-import { diffColorScheme, markdownStyle } from '../lib/markdown';
+import { diffColorScheme, markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { hasActiveStream } from '../lib/stream-text';
 import { openMessageLink } from '../navigation';
 import {
@@ -163,6 +163,7 @@ export class DeckProcessStepElement extends GemElement {
           .streamKey=${`${this.sessionId}:${this.groupId}:${item.id}`}
           ?streaming=${Boolean(this.#group?.pending && item.pending)}
           .mdStyle=${markdownStyle}
+          .extensions=${unfoldedMarkdownExtensions}
           @click=${this.#openLink}
         ></deck-stream-markdown>
       `;
@@ -207,6 +208,7 @@ export class DeckProcessStepElement extends GemElement {
             .streamKey=${`${this.sessionId}:${this.groupId}:${item.id}:output`}
             ?streaming=${this.#updating}
             .mdStyle=${markdownStyle}
+            .extensions=${unfoldedMarkdownExtensions}
             @click=${this.#openLink}
           ></deck-stream-markdown>
           <tap-code-block

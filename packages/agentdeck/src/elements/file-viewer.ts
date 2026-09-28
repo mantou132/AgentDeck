@@ -4,7 +4,7 @@ import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
-import { fileViewerMarkdownStyle, markdownExtensions } from '../lib/markdown';
+import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { openMessageLink, openSettings } from '../navigation';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
@@ -149,7 +149,7 @@ export class DeckFileViewerElement extends GemElement {
             v-else-if=${markdown && !source}
             class="select-text mx-auto block max-w-[760px] p-5"
             .mdStyle=${fileViewerMarkdownStyle}
-            .extensions=${markdownExtensions}
+            .extensions=${unfoldedMarkdownExtensions}
             @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
           >${text}</gem-bind-marked>
           <tap-code-block

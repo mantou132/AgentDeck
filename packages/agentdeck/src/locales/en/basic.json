@@ -181,8 +181,9 @@
   "error.relayNotConfigured": "Relay is not configured",
   "error.remoteNotConnectedRetry": "Host is not connected. Please reconnect and retry.",
   "attachment.imageDefaultName": "Image",
-  "timeline.expandMessage": "Expand",
-  "timeline.collapseMessage": "Collapse",
+  "timeline.viewAll": "View all",
+  "timeline.userMessage": "User Message",
+  "timeline.code": "Code",
   "changes.title": "Changes",
   "changes.diffTitle": "Changes Diff",
   "changes.viewChanges": "View changes",
@@ -206,6 +207,6 @@
   "session.backTitle": "Back (Long press to close session)",
   "settings.relayIdUpdated": "Pairing ID updated",
   "browser.share": "Share",
-  "browser.copy": "Copy",
-  "browser.copied": "Copied"
+  "global.copy": "Copy",
+  "global.copied": "Copied"
 }

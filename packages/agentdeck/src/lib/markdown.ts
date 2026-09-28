@@ -70,7 +70,9 @@ export const isCodeBlockClosed = (raw = '') => {
   return new RegExp(`\\n[ \\t]{0,3}${fenceChar}{${fenceLen},}[ \\t]*\\n?$`).test(raw);
 };
 
-const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): MarkedExtension[] => [
+type MarkdownOptions = { codeBlock?: boolean; foldCode?: boolean };
+
+const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtension[] => [
   {
     gfm: true,
     breaks: true,
@@ -93,10 +95,13 @@ const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): Marked
         if (closed && ['latex', 'tex', 'math'].includes(language)) {
           return `<gem-bind-latex block tabindex="0">${source}</gem-bind-latex>`;
         }
-        if (closed && options.codeBlock && isSmallTextFile(text)) {
-          return `<tap-code-block codelang="${escapeHtml(language)}" tabindex="0">${source}</tap-code-block>`;
-        }
-        return `<pre tabindex="0"><code data-language="${escapeHtml(language)}">${source}</code></pre>`;
+        const block =
+          closed && options.codeBlock && isSmallTextFile(text)
+            ? `<tap-code-block codelang="${escapeHtml(language)}" tabindex="0">${source}</tap-code-block>`
+            : `<pre tabindex="0"><code data-language="${escapeHtml(language)}">${source}</code></pre>`;
+        if (closed && options.foldCode)
+          return `<deck-foldable codelang="${escapeHtml(language)}">${block}</deck-foldable>`;
+        return block;
       },
       table(token) {
         return `<div class="table-scroll" tabindex="0">${defaultRenderer.table.call(this, token)}</div>`;
@@ -105,7 +110,8 @@ const createMarkdownExtensions = (options: { codeBlock?: boolean } = {}): Marked
   },
 ];
 
-export const markdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true });
+export const markdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true, foldCode: true });
+export const unfoldedMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true });
 export const userMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: false });
 
 const baseMarkdownStyle = `
@@ -150,7 +156,7 @@ const baseMarkdownStyle = `
     margin: .7rem 0;
     border: 1px solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.backgroundColor};
+    background: ${agentDeckTheme.lightBackgroundColor};
     color: ${agentDeckTheme.textColor};
     line-height: 1.55;
   }
@@ -163,13 +169,14 @@ const baseMarkdownStyle = `
   }
   pre code { background: none; padding: 0; }
   pre, tap-code-block, .table-scroll { outline: none; }
+  deck-foldable { margin: .7rem 0; }
+  deck-foldable > :is(pre, tap-code-block) { margin: 0; }
   .table-scroll {
     max-width: 100%;
     margin: .7rem 0;
     overflow-x: auto;
     border: 1px solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.backgroundColor};
   }
   table { width: 100%; border-collapse: collapse; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }

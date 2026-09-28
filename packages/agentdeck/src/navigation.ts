@@ -24,10 +24,10 @@ export const openWebBrowser = async (url: string, title = '', stack?: TapStackEl
         },
       },
       {
-        label: i18n.get('browser.copy'),
+        label: i18n.get('global.copy'),
         handler: async () => {
           await navigator.clipboard.writeText(currentUrl);
-          Toast.open('success', i18n.get('browser.copied'));
+          Toast.open('success', i18n.get('global.copied'));
         },
       },
     ],

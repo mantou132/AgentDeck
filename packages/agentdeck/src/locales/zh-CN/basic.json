@@ -181,8 +181,9 @@
   "error.relayNotConfigured": "Relay 尚未配置",
   "error.remoteNotConnectedRetry": "远端尚未连接，请重新连接后重试",
   "attachment.imageDefaultName": "图片",
-  "timeline.expandMessage": "展开",
-  "timeline.collapseMessage": "收起",
+  "timeline.viewAll": "查看全部",
+  "timeline.userMessage": "用户消息",
+  "timeline.code": "代码",
   "changes.title": "更改",
   "changes.diffTitle": "更改差异",
   "changes.viewChanges": "查看更改",
@@ -206,6 +207,6 @@
   "session.backTitle": "返回（长按关闭会话）",
   "settings.relayIdUpdated": "配对码已更新",
   "browser.share": "分享",
-  "browser.copy": "复制",
-  "browser.copied": "已复制"
+  "global.copy": "复制",
+  "global.copied": "已复制"
 }

@@ -5,6 +5,7 @@ import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { setSelectionMenuItems } from 'src/lib/selection-menu';
+import { i18n } from '../i18n';
 import { openMessageLink } from '../navigation';
 import {
   extractDataImageAttachments,
@@ -54,6 +55,7 @@ export class DeckSessionTimelineElement extends GemElement {
       (item) => item.type === 'tool' && getToolStatus(item.data, group.pending) === 'failed',
     );
     const icon = group.pending ? icons.loading : hasFailed ? icons.error : hasTools ? icons.terminal : icons.sparkles;
+
     return html`
       <div class="mb-3 flex min-w-0 items-center">
         <button
@@ -78,19 +80,37 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderTextMessage = (message: TextMessage) => {
-    if (message.role === 'user') {
-      return html`
-        <deck-user-message
-          .sessionKey=${this.sessionKey}
-          .cwd=${this.cwd}
-          .message=${message}
-          @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}
-        ></deck-user-message>
-      `;
-    }
-
     const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(message.text);
     const attachments = [...(message.attachments ?? []), ...linkedAttachments];
+
+    if (message.role === 'user') {
+      return html`
+        <div class="mb-[18px] flex justify-end">
+          <div class="max-w-[min(86%,560px)]">
+            <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary">
+              <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
+                ${attachments.map(
+                  (attachment) => html`
+                    <deck-attachment
+                      .attachment=${attachment}
+                      @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}
+                    ></deck-attachment>
+                  `,
+                )}
+              </div>
+              <deck-foldable
+                size="small"
+                label=${i18n.get('timeline.userMessage')}
+                .markdown=${markdown}
+                ?disabled=${message.streaming}
+              >
+                ${this.#renderMarkdown(markdown, `${this.sessionKey}:${message.id}`, message.streaming, true)}
+              </deck-foldable>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     return html`
       <article @pointerdown=${this.#setSelectionMenu} class="agent-message mb-5 min-w-0 text-base leading-[1.68] text-text">
@@ -125,6 +145,7 @@ export class DeckSessionTimelineElement extends GemElement {
       this.messages.filter((message) => !('failed' in message && message.failed)),
       this.pending,
     );
+
     return html`
       ${repeat(
         timelineItems,
