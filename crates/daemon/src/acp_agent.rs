@@ -12,10 +12,10 @@ use agent_client_protocol::{
     schema::{
         ProtocolVersion,
         v1::{
-            CancelNotification, CloseSessionRequest, ContentBlock, ContentChunk,
-            DeleteSessionRequest, ImageContent, InitializeRequest, ListSessionsRequest,
-            LoadSessionRequest, NewSessionRequest, PermissionOptionId, PromptRequest,
-            PromptResponse, RequestPermissionOutcome, RequestPermissionRequest,
+            AgentCapabilities, CancelNotification, CloseSessionRequest, ContentBlock, ContentChunk,
+            DeleteSessionRequest, ImageContent, Implementation, InitializeRequest,
+            ListSessionsRequest, LoadSessionRequest, NewSessionRequest, PermissionOptionId,
+            PromptRequest, PromptResponse, RequestPermissionOutcome, RequestPermissionRequest,
             RequestPermissionResponse, ResourceLink, SelectedPermissionOutcome, SessionConfigId,
             SessionConfigValueId, SessionId, SessionModeId, SessionNotification, SessionUpdate,
             SetSessionConfigOptionRequest, SetSessionModeRequest, TextContent,
@@ -67,13 +67,29 @@ pub struct SessionReady {
     pub config_options: Option<serde_json::Value>,
 }
 
+/// An initialized ACP connection and the capabilities the agent advertised.
+#[derive(Clone)]
+struct AgentConnection {
+    connection: ConnectionTo<Agent>,
+    capabilities: Arc<AgentCapabilities>,
+}
+
 /// Lazily starts one ACP subprocess and shares its connection across sessions.
 /// A failed connection is discarded and started again on the next API call.
 struct RuntimeState {
-    connection: Option<ConnectionTo<Agent>>,
+    connection: Option<AgentConnection>,
     connecting: bool,
     generation: u64,
-    waiters: Vec<oneshot::Sender<Result<ConnectionTo<Agent>, String>>>,
+    waiters: Vec<oneshot::Sender<Result<AgentConnection, String>>>,
+}
+
+struct StartedSession {
+    session: ActiveSession<'static, Agent>,
+    ready: SessionReady,
+    cancel: watch::Sender<bool>,
+    disconnects: watch::Receiver<u64>,
+    generation: u64,
+    close_supported: bool,
 }
 
 #[derive(Clone)]
@@ -104,7 +120,7 @@ impl AcpRuntime {
         }
     }
 
-    async fn connection(&self) -> Result<ConnectionTo<Agent>> {
+    async fn connection(&self) -> Result<AgentConnection> {
         let (reply_tx, reply_rx) = oneshot::channel();
         let generation = {
             let mut state = self.state.lock().await;
@@ -218,17 +234,25 @@ impl AcpRuntime {
                 agent_client_protocol::on_receive_request!(),
             )
             .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
-                let response = connection
-                    .send_request(InitializeRequest::new(ProtocolVersion::V1))
-                    .block_task()
-                    .await?;
+                let request = InitializeRequest::new(ProtocolVersion::V1).client_info(
+                    Implementation::new("agentdeck", env!("CARGO_PKG_VERSION")).title("AgentDeck"),
+                );
+                let response = connection.send_request(request).block_task().await?;
+                if response.protocol_version != ProtocolVersion::V1 {
+                    return Err(agent_client_protocol::Error::internal_error().data(format!(
+                        "Unsupported ACP protocol version: {:?}",
+                        response.protocol_version
+                    )));
+                }
                 logger::info(&format!(
                     "ACP agent capabilities: {:?}",
                     response.agent_capabilities
                 ));
-                runtime
-                    .connection_ready(generation, connection.clone())
-                    .await;
+                let agent_connection = AgentConnection {
+                    connection: connection.clone(),
+                    capabilities: Arc::new(response.agent_capabilities),
+                };
+                runtime.connection_ready(generation, agent_connection).await;
                 // The SDK can keep a connect_with foreground task alive after EOF.
                 // End ours explicitly so the runtime discards the dead connection.
                 connection.incoming_closed().await;
@@ -239,7 +263,7 @@ impl AcpRuntime {
             .context("ACP agent connection failed")
     }
 
-    async fn connection_ready(&self, generation: u64, connection: ConnectionTo<Agent>) {
+    async fn connection_ready(&self, generation: u64, connection: AgentConnection) {
         let waiters = {
             let mut state = self.state.lock().await;
             if state.generation != generation {
@@ -274,17 +298,17 @@ impl AcpRuntime {
         cwd: PathBuf,
         load: Option<SessionId>,
         system_prompt: Option<String>,
-    ) -> Result<(
-        ActiveSession<'static, Agent>,
-        SessionReady,
-        watch::Sender<bool>,
-        watch::Receiver<u64>,
-        u64,
-    )> {
-        let connection = self.connection().await?;
+    ) -> Result<StartedSession> {
+        let AgentConnection {
+            connection,
+            capabilities,
+        } = self.connection().await?;
         let generation = self.state.lock().await.generation;
         let (session, ready): (ActiveSession<'static, Agent>, SessionReady) = match load {
             Some(session_id) => {
+                if !capabilities.load_session {
+                    anyhow::bail!("{} does not support loading sessions", self.agent);
+                }
                 let mut request = LoadSessionRequest::new(session_id.clone(), cwd);
                 if let Some(system_prompt) = &system_prompt {
                     request = request.meta(system_prompt_meta(system_prompt));
@@ -332,13 +356,14 @@ impl AcpRuntime {
             anyhow::bail!("ACP agent session is already active: {}", ready.session_id);
         }
         permission_cancels.insert(ready.session_id.clone(), cancel.clone());
-        Ok((
+        Ok(StartedSession {
             session,
             ready,
             cancel,
-            self.disconnects.subscribe(),
+            disconnects: self.disconnects.subscribe(),
             generation,
-        ))
+            close_supported: capabilities.session_capabilities.close.is_some(),
+        })
     }
 
     async fn set_session_resolver(&self, session_id: &str, resolver: PermissionResolver) {
@@ -839,7 +864,13 @@ impl AgentSessionManager {
         cwd: Option<PathBuf>,
         cursor: Option<String>,
     ) -> Result<serde_json::Value> {
-        let connection = self.runtime(agent)?.connection().await?;
+        let AgentConnection {
+            connection,
+            capabilities,
+        } = self.runtime(agent)?.connection().await?;
+        if capabilities.session_capabilities.list.is_none() {
+            anyhow::bail!("{agent} does not support listing sessions");
+        }
         let mut request = ListSessionsRequest::new();
         if let Some(cwd) = cwd {
             request = request.cwd(cwd);
@@ -855,7 +886,13 @@ impl AgentSessionManager {
     }
 
     pub async fn delete_session(&self, agent: &str, session_id: &str) -> Result<()> {
-        let connection = self.runtime(agent)?.connection().await?;
+        let AgentConnection {
+            connection,
+            capabilities,
+        } = self.runtime(agent)?.connection().await?;
+        if capabilities.session_capabilities.delete.is_none() {
+            anyhow::bail!("{agent} does not support deleting sessions");
+        }
         connection
             .send_request_to(
                 Agent,
@@ -882,14 +919,20 @@ async fn run_session_actor_inner(
         result = runtime.start_session(cwd, load, system_prompt) => result,
         _ = closing.cancelled() => return Ok(()),
     };
-    let (mut session, mut ready, cancel_flag, mut disconnects, connection_generation) =
-        match started {
-            Ok(session) => session,
-            Err(err) => {
-                let _ = ready_tx.send(Err(err.to_string()));
-                return Err(err);
-            }
-        };
+    let StartedSession {
+        mut session,
+        mut ready,
+        cancel: cancel_flag,
+        mut disconnects,
+        generation: connection_generation,
+        close_supported,
+    } = match started {
+        Ok(started) => started,
+        Err(err) => {
+            let _ = ready_tx.send(Err(err.to_string()));
+            return Err(err);
+        }
+    };
     let session_id = ready.session_id.clone();
     let run = async {
         // The load-time history replay is routed to the session before the load
@@ -976,7 +1019,9 @@ async fn run_session_actor_inner(
         // This also interrupts a stuck mode/config request or permission wait;
         // close must not queue behind the operation the user is resetting.
         cancel_prompt(&session, &cancel_flag);
-        close_session_gracefully(&session).await;
+        if close_supported {
+            close_session_gracefully(&session).await;
+        }
     }
     runtime.unregister_session(&session_id).await;
 

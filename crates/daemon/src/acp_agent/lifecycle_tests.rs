@@ -13,6 +13,10 @@ fn frame_json(frame: TransportFrame) -> Value {
     serde_json::from_str(&frame.to_json().unwrap()).unwrap()
 }
 
+fn full_capabilities() -> Value {
+    json!({"loadSession": true, "sessionCapabilities": {"close": {}}})
+}
+
 // The real manager, actors and ACP SDK run against an in-memory ACP transport.
 // No user agent, browser or Relay process is started or stopped.
 struct MockAcp {
@@ -23,8 +27,12 @@ struct MockAcp {
 
 impl MockAcp {
     async fn new() -> Self {
+        Self::with_capabilities(full_capabilities()).await
+    }
+
+    async fn with_capabilities(capabilities: Value) -> Self {
         let manager = AgentSessionManager::new(None);
-        let (peer, connection) = Self::connect(&manager).await;
+        let (peer, connection) = Self::connect(&manager, capabilities).await;
         Self {
             manager,
             peer,
@@ -32,7 +40,10 @@ impl MockAcp {
         }
     }
 
-    async fn connect(manager: &AgentSessionManager) -> (Channel, JoinHandle<()>) {
+    async fn connect(
+        manager: &AgentSessionManager,
+        capabilities: Value,
+    ) -> (Channel, JoinHandle<()>) {
         let runtime = manager.runtime("codex-acp").unwrap();
         let generation = {
             let mut state = runtime.state.lock().await;
@@ -52,7 +63,7 @@ impl MockAcp {
         peer.tx
             .unbounded_send(frame(json!({
                 "jsonrpc": "2.0", "id": request["id"], "result": {
-                    "protocolVersion": 1, "agentCapabilities": {"loadSession": true}
+                    "protocolVersion": 1, "agentCapabilities": capabilities
                 }
             })))
             .unwrap();
@@ -355,7 +366,7 @@ async fn acp_disconnect_cleans_old_actor_before_reconnecting_and_loading() {
         .unwrap();
     assert!(prompt.await.unwrap().is_err());
     assert!(!mock.manager.close_session("codex-acp", "session").await);
-    let (peer, connection) = MockAcp::connect(&mock.manager).await;
+    let (peer, connection) = MockAcp::connect(&mock.manager, full_capabilities()).await;
     mock.peer = peer;
     mock.connection = connection;
     mock.load("session").await;
@@ -431,4 +442,43 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
     assert!(close.await.unwrap());
     assert!(prompt.await.unwrap().is_err());
     mock.load("session").await;
+}
+
+#[tokio::test]
+async fn unadvertised_session_methods_are_not_sent_to_acp() {
+    let mut mock = MockAcp::with_capabilities(json!({})).await;
+    let manager = mock.manager.clone();
+    let load = manager
+        .load_session("codex-acp", "old", None, None, None)
+        .await;
+    assert!(
+        load.err()
+            .unwrap()
+            .to_string()
+            .contains("does not support loading")
+    );
+    let list = manager.list_sessions("codex-acp", None, None).await;
+    assert!(
+        list.unwrap_err()
+            .to_string()
+            .contains("does not support listing")
+    );
+    let delete = manager.delete_session("codex-acp", "old").await;
+    assert!(
+        delete
+            .unwrap_err()
+            .to_string()
+            .contains("does not support deleting")
+    );
+
+    mock.create("session").await;
+    let close = mock.close("session");
+    mock.next("session/cancel").await;
+    assert!(close.await.unwrap());
+    // Nothing else, in particular no session/close, reached the agent.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(30), mock.peer.rx.next())
+            .await
+            .is_err()
+    );
 }
