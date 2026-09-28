@@ -27,7 +27,7 @@ serde_json = "1"
 tar = "0.4"
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
-agent-client-protocol = "1.0.0"
+agent-client-protocol = "2.2.0"
 relay-client = { git = "https://github.com/mantou132/relay.git" }
 zip = { version = "2", default-features = false, features = ["deflate-flate2", "flate2"] }
 git2 = { version = "0.21.0", default-features = false }

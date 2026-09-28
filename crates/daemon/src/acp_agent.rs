@@ -14,8 +14,8 @@ use agent_client_protocol::{
         v1::{
             CancelNotification, CloseSessionRequest, ContentBlock, ContentChunk,
             DeleteSessionRequest, ImageContent, InitializeRequest, ListSessionsRequest,
-            LoadSessionRequest, NewSessionRequest, NewSessionResponse, PermissionOptionId,
-            PromptRequest, PromptResponse, RequestPermissionOutcome, RequestPermissionRequest,
+            LoadSessionRequest, NewSessionRequest, PermissionOptionId, PromptRequest,
+            PromptResponse, RequestPermissionOutcome, RequestPermissionRequest,
             RequestPermissionResponse, ResourceLink, SelectedPermissionOutcome, SessionConfigId,
             SessionConfigValueId, SessionId, SessionModeId, SessionNotification, SessionUpdate,
             SetSessionConfigOptionRequest, SetSessionModeRequest, TextContent,
@@ -289,10 +289,12 @@ impl AcpRuntime {
                 if let Some(system_prompt) = &system_prompt {
                     request = request.meta(system_prompt_meta(system_prompt));
                 }
-                let response = connection
-                    .send_request_to(Agent, request)
+                let (session, response) = connection
+                    .load_session_from(request)
                     .block_task()
-                    .await?;
+                    .start_session()
+                    .await?
+                    .into_parts();
                 let (title, updated_at) = session_metadata_from_meta(response.meta.as_ref());
                 let ready = SessionReady {
                     session_id: session_id.to_string(),
@@ -301,8 +303,6 @@ impl AcpRuntime {
                     modes: response.modes.as_ref().map(to_json),
                     config_options: response.config_options.as_ref().map(to_json),
                 };
-                let session = connection
-                    .attach_session(NewSessionResponse::new(session_id), Default::default())?;
                 (session, ready)
             }
             None => {
@@ -310,19 +310,19 @@ impl AcpRuntime {
                 if let Some(system_prompt) = &system_prompt {
                     request = request.meta(system_prompt_meta(system_prompt));
                 }
-                let response = connection
-                    .send_request_to(Agent, request)
+                let session = connection
+                    .build_session_from(request)
                     .block_task()
+                    .start_session()
                     .await?;
-                let (title, updated_at) = session_metadata_from_meta(response.meta.as_ref());
+                let (title, updated_at) = session_metadata_from_meta(session.meta());
                 let ready = SessionReady {
-                    session_id: response.session_id.to_string(),
+                    session_id: session.session_id().to_string(),
                     title,
                     updated_at,
-                    modes: response.modes.as_ref().map(to_json),
-                    config_options: response.config_options.as_ref().map(to_json),
+                    modes: session.modes().map(to_json),
+                    config_options: session.config_options().map(to_json),
                 };
-                let session = connection.attach_session(response, Default::default())?;
                 (session, ready)
             }
         };
@@ -892,9 +892,9 @@ async fn run_session_actor_inner(
         };
     let session_id = ready.session_id.clone();
     let run = async {
-        // The load-time history replay is queued before attach; forward it
-        // before reporting ready so the client sees the events before the
-        // load call resolves.
+        // The load-time history replay is routed to the session before the load
+        // response; forward it before reporting ready so the client sees the
+        // events before the load call resolves.
         if let Some(replay_tx) = &replay_tx {
             let metadata = drain_replay(&mut session, replay_tx).await?;
             ready.title = metadata.title.or(ready.title);
@@ -1016,7 +1016,7 @@ async fn close_session_gracefully(session: &ActiveSession<'_, Agent>) {
     }
 }
 
-/// Forward the session updates queued before the session attached (the
+/// Forward the session updates routed before the load response (the
 /// `session/load` history replay) to `event_tx`. The replay is complete by the
 /// time the load response arrives, so once the queue is quiet for a moment the
 /// drain is done; dropping the pending `read_update` on timeout loses nothing.

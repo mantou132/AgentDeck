@@ -1,9 +1,17 @@
 use super::*;
-use agent_client_protocol::Channel;
+use agent_client_protocol::{Channel, TransportFrame};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
 use std::{future, time::Duration};
 use tokio::task::JoinHandle;
+
+fn frame(message: Value) -> TransportFrame {
+    TransportFrame::parse_json(&message.to_string())
+}
+
+fn frame_json(frame: TransportFrame) -> Value {
+    serde_json::from_str(&frame.to_json().unwrap()).unwrap()
+}
 
 // The real manager, actors and ACP SDK run against an in-memory ACP transport.
 // No user agent, browser or Relay process is started or stopped.
@@ -39,15 +47,14 @@ impl MockAcp {
                 .connection_stopped(generation, "mock ACP disconnected".into())
                 .await;
         });
-        let request = to_json(peer.rx.next().await.unwrap().unwrap());
+        let request = frame_json(peer.rx.next().await.unwrap());
         assert_eq!(request["method"], "initialize");
         peer.tx
-            .unbounded_send(Ok(serde_json::from_value(json!({
+            .unbounded_send(frame(json!({
                 "jsonrpc": "2.0", "id": request["id"], "result": {
                     "protocolVersion": 1, "agentCapabilities": {"loadSession": true}
                 }
-            }))
-            .unwrap()))
+            })))
             .unwrap();
         tokio::time::timeout(Duration::from_secs(1), async {
             while runtime.state.lock().await.connection.is_none() {
@@ -62,7 +69,7 @@ impl MockAcp {
     async fn next(&mut self, method: &str) -> Value {
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                let message = to_json(self.peer.rx.next().await.unwrap().unwrap());
+                let message = frame_json(self.peer.rx.next().await.unwrap());
                 // Dropping an in-flight SDK request emits this transport-level cancellation.
                 if message["method"] == "$/cancel_request" {
                     continue;
@@ -78,10 +85,9 @@ impl MockAcp {
     fn respond(&self, request: &Value, result: Value) {
         self.peer
             .tx
-            .unbounded_send(Ok(serde_json::from_value(json!({
+            .unbounded_send(frame(json!({
                 "jsonrpc": "2.0", "id": request["id"], "result": result,
-            }))
-            .unwrap()))
+            })))
             .unwrap();
     }
 
@@ -248,11 +254,10 @@ async fn close_interrupts_a_stuck_mode_request_and_unsupported_close_is_recovera
     let request = mock.next("session/close").await;
     mock.peer
         .tx
-        .unbounded_send(Ok(serde_json::from_value(json!({
+        .unbounded_send(frame(json!({
             "jsonrpc": "2.0", "id": request["id"],
             "error": {"code": -32601, "message": "Method not found"},
-        }))
-        .unwrap()))
+        })))
         .unwrap();
     assert!(close.await.unwrap());
     assert!(mode.await.unwrap().is_err());
@@ -305,13 +310,13 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     })
     .await
     .unwrap();
-    mock.peer.tx.unbounded_send(Ok(serde_json::from_value(json!({
+    mock.peer.tx.unbounded_send(frame(json!({
         "jsonrpc": "2.0", "method": "session/update", "params": {
             "sessionId": "session", "update": {
                 "sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "history"}
             }
         }
-    })).unwrap())).unwrap();
+    }))).unwrap();
     tokio::time::timeout(Duration::from_secs(1), replay_rx.recv())
         .await
         .unwrap()
@@ -386,15 +391,14 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
     mock.next("session/prompt").await;
     mock.peer
         .tx
-        .unbounded_send(Ok(serde_json::from_value(json!({
+        .unbounded_send(frame(json!({
             "jsonrpc": "2.0", "id": "permission", "method": "session/request_permission",
             "params": {
                 "sessionId": "session",
                 "toolCall": {"toolCallId": "tool", "title": "Test permission", "status": "pending"},
                 "options": [{"optionId": "allow", "name": "Allow once", "kind": "allow_once"}]
             }
-        }))
-        .unwrap()))
+        })))
         .unwrap();
     let permission = tokio::time::timeout(Duration::from_secs(1), permission_rx.recv())
         .await
@@ -406,7 +410,7 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
     tokio::time::timeout(Duration::from_secs(1), async {
         let (mut cancelled, mut closed, mut permission_cancelled) = (false, false, false);
         while !(cancelled && closed && permission_cancelled) {
-            let message = to_json(mock.peer.rx.next().await.unwrap().unwrap());
+            let message = frame_json(mock.peer.rx.next().await.unwrap());
             match message["method"].as_str() {
                 Some("$/cancel_request") => {}
                 Some("session/cancel") => cancelled = true,
