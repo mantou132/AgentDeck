@@ -24,7 +24,7 @@
     "@types/chrome": "^0.1.42",
     "extension": "^3.16.0",
     "postcss": "^8.5.14",
-    "swc-plugin-gem": "^0.1.18",
-    "tailwindcss": "^4.3.0"
+    "tailwindcss": "^4.3.0",
+    "unplugin-gem": "^0.1.11"
   }
 }

@@ -35,8 +35,6 @@ struct Pending {
     on_event: Option<Arc<dyn Fn(Value) + Send + Sync>>,
 }
 
-/// Symmetric duplex RPC peer over native messaging.
-///
 /// Every message is a JSON object, classified by shape:
 /// - request:      `{ id, method, params? }`
 /// - response:     `{ id, result }` or `{ id, error }`

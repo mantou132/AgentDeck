@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  swc-plugin-gem: 0.1.18-beta
+
 patchedDependencies:
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
@@ -153,12 +156,12 @@ importers:
       postcss:
         specifier: ^8.5.14
         version: 8.5.26
-      swc-plugin-gem:
-        specifier: ^0.1.18
-        version: 0.1.18
       tailwindcss:
         specifier: ^4.3.0
         version: 4.3.3(patch_hash=3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882)
+      unplugin-gem:
+        specifier: ^0.1.11
+        version: 0.1.11(@mantou/gem@2.2.12)(@rspack/core@2.1.8(@swc/helpers@0.5.23))(webpack@5.111.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(postcss@8.5.26))
 
 packages:
 
@@ -4324,11 +4327,8 @@ packages:
     resolution: {integrity: sha512-Uqj49lWKB+iSSnneuwiYYJ7MZgkB+eXr0LXBhv4uDuAkXqnWmq65Sxflfvp0Lc6MdKjMUxGaeOKWJqz5SNiVIA==}
     engines: {node: '>=18'}
 
-  swc-plugin-gem@0.1.17-beta:
-    resolution: {integrity: sha512-txFeD0y7aU/+/gObqPyYZfTKofvonlg6DOxycOm4RAm2iDLf6R00X8jmifi4APZWTax5RiOQ9Qd2mPj0Vw2scw==}
-
-  swc-plugin-gem@0.1.18:
-    resolution: {integrity: sha512-U9LYY2Z05oGYdP2ba3oyPOrOiYZfK3KgFHM1ltX6fpXq1FbMKiuNfhJM9W8g5ckWQiyE8G3M4G0bdpexELLDzg==}
+  swc-plugin-gem@0.1.18-beta:
+    resolution: {integrity: sha512-ZMNV88kimtfPqQeOklE6D/Kh/AbB+D+hwb9TollXPvrRircWRGRqF1576AWgGTuLkuCNu5yOMhL4opZW5sg63g==}
 
   tailwindcss@4.3.3:
     resolution: {integrity: sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==}
@@ -9185,9 +9185,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  swc-plugin-gem@0.1.17-beta: {}
-
-  swc-plugin-gem@0.1.18: {}
+  swc-plugin-gem@0.1.18-beta: {}
 
   tailwindcss@4.3.3(patch_hash=3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882): {}
 
@@ -9325,7 +9323,7 @@ snapshots:
     dependencies:
       '@swc/core': 1.15.47(@swc/helpers@0.5.23)
       '@swc/helpers': 0.5.23
-      swc-plugin-gem: 0.1.17-beta
+      swc-plugin-gem: 0.1.18-beta
       unplugin: 3.3.0(@rspack/core@2.1.8(@swc/helpers@0.5.23))(webpack@5.111.1(@swc/core@1.15.47(@swc/helpers@0.5.23))(postcss@8.5.26))
     optionalDependencies:
       '@mantou/gem': 2.2.12

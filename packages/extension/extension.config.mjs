@@ -1,3 +1,5 @@
+import unpluginGem from 'unplugin-gem/rspack';
+
 /** @type {import('extension').FileConfig} */
 
 const profile = (name) => `./dist/extension-profile-${name}`;
@@ -62,44 +64,23 @@ export default {
       include: (filename) => /[\\/]@gem-bind[\\/]diff2html[\\/]dist[\\/]index\.js$/.test(filename),
       use: [{ loader: new URL('./loaders/diff2html-local.mjs', import.meta.url).pathname }],
     });
-    config.module.rules.unshift({
-      test: /\.js$/,
-      enforce: 'pre',
-      include: (filename) => !filename.includes('node_modules'),
-      use: [
-        {
-          loader: 'builtin:swc-loader',
-          options: {
-            jsc: {
-              target: 'es2024',
-              parser: { syntax: 'typescript', decorators: true, explicitResourceManagement: true },
-              transform: { decoratorVersion: '2023-11' },
-              externalHelpers: true,
-              experimental: {
-                plugins: [
-                  [
-                    'swc-plugin-gem',
-                    {
-                      styleMinify: true,
-                      selectorCompatible: true,
-                      autoImport: {
-                        extends: 'gem',
-                        elements: {
-                          'pages/elements': {
-                            'agent-*': '/*',
-                          },
-                        },
-                      },
-                      autoImportDts: 'auto-import.d.ts',
-                    },
-                  ],
-                ],
-              },
+    config.plugins ??= [];
+    config.plugins.push(
+      unpluginGem({
+        include: /^(?!.*[\\/]node_modules[\\/]).*\.js$/,
+        styleMinify: true,
+        selectorCompatible: true,
+        autoImport: {
+          extends: 'gem',
+          elements: {
+            'pages/elements': {
+              'agent-*': '/*',
             },
           },
         },
-      ],
-    });
+        autoImportDts: 'auto-import.d.ts',
+      }),
+    );
     return config;
   },
 };

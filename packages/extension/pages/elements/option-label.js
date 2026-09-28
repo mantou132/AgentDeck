@@ -22,7 +22,7 @@ const style = css`
 @customElement('agent-option-label')
 @adoptedStyle(style)
 @shadow()
-export class AgentOptionLabelElement extends GemElement {
+class AgentOptionLabelElement extends GemElement {
   @property agent;
   @property name;
   @property icon;

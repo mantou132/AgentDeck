@@ -1,5 +1,5 @@
 @customElement('agent-relay-settings')
-export class AgentRelaySettingsElement extends GemElement {
+class AgentRelaySettingsElement extends GemElement {
   @property value;
 
   @emitter confirm;

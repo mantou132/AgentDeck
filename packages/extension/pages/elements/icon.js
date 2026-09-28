@@ -20,7 +20,7 @@ const style = css`
 @customElement('agent-icon')
 @adoptedStyle(style)
 @shadow()
-export class AgentIconElement extends GemElement {
+class AgentIconElement extends GemElement {
   @property src;
   @property agent;
 

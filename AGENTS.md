@@ -34,7 +34,7 @@
 
 - 对象参数的内联类型较长、导致参数声明多行展开时，提取为命名类型。
 - 函数调用前不加无必要的 `void`；需要等待时使用 `await`，错误处理保持显式。
-- `unplugin-gem` / `swc-plugin-gem` 自动导入 Gem 成员与项目自定义元素，无需手动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`。
+- `unplugin-gem` 自动导入 Gem 成员与项目自定义元素，无需手动导入；开发期 HMR 由插件处理，不配置 Gem helper `preEntry`。
 - 布局优先 Tailwind utility，Shadow DOM 内不能使用。Light DOM 样式用 `:scope`，Shadow DOM 用 `:host`；通过 `css` / `@adoptedStyle` 共享样式，避免模板内联样式。
 - 元素文件名去前缀的标签名，继承 `GemElement`；使用 ES 装饰器（2023-11 标准），不使用已弃用的生命周期函数，也不额外声明自定义元素类型。
 - 用 `@property` / attribute 装饰器定义输入；不要在元素内部修改输入，attribute 不赋默认值。内部数据用 `createState`，CSS 状态用 `@state`；优先使用 `#` 私有字段。

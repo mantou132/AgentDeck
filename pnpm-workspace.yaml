@@ -3,3 +3,6 @@ packages:
 
 patchedDependencies:
   tailwindcss: patches/tailwindcss.patch
+
+overrides:
+  swc-plugin-gem: 0.1.18-beta

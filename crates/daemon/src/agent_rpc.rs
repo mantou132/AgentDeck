@@ -567,8 +567,6 @@ fn browse_files(
     }))
 }
 
-/// Max bytes of a file served to the remote panel; the native messaging
-/// transport itself caps messages at 10 MB.
 const FILE_READ_MAX_BYTES: u64 = 8 * 1024 * 1024;
 
 fn read_remote_file(path: &str, cwd: Option<&Path>) -> Result<Value, String> {
