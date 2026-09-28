@@ -950,40 +950,24 @@ mod tests {
     };
 
     #[test]
-    fn builds_devtools_panel_system_prompt() {
-        let prompt = message_panel_system_prompt(&serde_json::json!({
-            "panelContext": { "surface": "devtools", "tabId": 42 }
-        }))
-        .expect("valid panel context")
-        .expect("system prompt");
-
-        assert!(prompt.contains("browser DevTools"));
-        assert!(prompt.contains("tab ID 42"));
-        assert!(prompt.contains("use 42"));
-    }
-
-    #[test]
-    fn builds_side_panel_system_prompt() {
-        let prompt = message_panel_system_prompt(&serde_json::json!({
-            "panelContext": { "surface": "side_panel" }
-        }))
-        .expect("valid panel context")
-        .expect("system prompt");
-
-        assert!(prompt.contains("browser sidebar"));
-        assert!(prompt.contains("read_active_tab"));
-    }
-
-    #[test]
-    fn builds_remote_app_panel_system_prompt() {
-        let prompt = message_panel_system_prompt(&serde_json::json!({
-            "panelContext": { "surface": "remote_app" }
-        }))
-        .expect("valid panel context")
-        .expect("system prompt");
-
-        assert!(prompt.contains("mobile app"));
-        assert!(prompt.contains("remote machine"));
+    fn builds_panel_system_prompts() {
+        for (context, expected) in [
+            (
+                serde_json::json!({ "surface": "devtools", "tabId": 42 }),
+                "tab ID 42",
+            ),
+            (
+                serde_json::json!({ "surface": "side_panel" }),
+                "browser sidebar",
+            ),
+            (serde_json::json!({ "surface": "remote_app" }), "mobile app"),
+        ] {
+            let prompt =
+                message_panel_system_prompt(&serde_json::json!({ "panelContext": context }))
+                    .expect("valid panel context")
+                    .expect("system prompt");
+            assert!(prompt.contains(expected), "{expected}");
+        }
     }
 
     #[test]

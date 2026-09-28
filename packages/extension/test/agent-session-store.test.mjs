@@ -1,11 +1,23 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
 const { agentSessionKey, readAgentPanelState, updateAgentPanelState, upsertStoredSession } = await import(
   '../shared/agent-session-store.js'
 );
 
 describe('agent session storage', () => {
+  beforeEach(() => {
+    const storage = {};
+    globalThis.chrome = {
+      storage: {
+        local: {
+          get: async (key) => ({ [key]: storage[key] }),
+          set: async (patch) => Object.assign(storage, patch),
+        },
+      },
+    };
+  });
+
   it('keeps agent session keys distinct', () => {
     const sessions = [
       { agent: 'claude-acp', sessionId: 'same' },
@@ -19,32 +31,12 @@ describe('agent session storage', () => {
   });
 
   it('never persists an in-memory draft session', async () => {
-    const storage = {};
-    globalThis.chrome = {
-      storage: {
-        local: {
-          get: async (key) => ({ [key]: storage[key] }),
-          set: async (patch) => Object.assign(storage, patch),
-        },
-      },
-    };
-
     await updateAgentPanelState((state) => upsertStoredSession(state, { agent: 'claude-acp', title: '', draft: true }));
 
     assert.deepEqual((await readAgentPanelState()).sessions, []);
   });
 
   it('persists sessions and per-agent defaults together', async () => {
-    const storage = {};
-    globalThis.chrome = {
-      storage: {
-        local: {
-          get: async (key) => ({ [key]: storage[key] }),
-          set: async (patch) => Object.assign(storage, patch),
-        },
-      },
-    };
-
     await updateAgentPanelState((state) =>
       upsertStoredSession(state, { agent: 'claude-acp', sessionId: 'one', title: 'First' }),
     );
@@ -66,16 +58,6 @@ describe('agent session storage', () => {
   });
 
   it('persists and normalizes relayId', async () => {
-    const storage = {};
-    globalThis.chrome = {
-      storage: {
-        local: {
-          get: async (key) => ({ [key]: storage[key] }),
-          set: async (patch) => Object.assign(storage, patch),
-        },
-      },
-    };
-
     assert.equal((await readAgentPanelState()).relayId, '');
 
     await updateAgentPanelState((state) => ({ ...state, relayId: 'adk1_test123' }));

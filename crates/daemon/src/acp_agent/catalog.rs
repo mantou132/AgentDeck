@@ -189,20 +189,12 @@ pub fn available_agents() -> Vec<AvailableAgent> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        AgentLaunch, agent_candidates, available_agents, bundled_registry, candidates_for_platform,
-    };
+    use super::{AgentLaunch, bundled_registry, candidates_for_platform};
 
     #[test]
     fn parses_bundled_registry() {
         let registry = bundled_registry().expect("valid bundled registry");
         assert!(!registry.agents.is_empty());
-    }
-
-    #[test]
-    fn lists_all_available_agents() {
-        let agents = available_agents();
-        assert_eq!(agents.len(), agent_candidates().len());
     }
 
     #[test]

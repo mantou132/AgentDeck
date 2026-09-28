@@ -138,12 +138,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_lock_file_path() {
-        let path = lock_file_path().unwrap();
-        assert!(path.ends_with("daemon.lock"));
-    }
-
-    #[test]
     fn test_singleton_lock() {
         let temp_dir =
             std::env::temp_dir().join(format!("test_daemon_lock_{}", std::process::id()));

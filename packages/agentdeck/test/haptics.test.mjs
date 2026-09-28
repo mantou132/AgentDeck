@@ -9,19 +9,21 @@ async function runningSession() {
   return fixture;
 }
 
-test('does not trigger haptic when agent completes turn answering', async () => {
+test('does not trigger haptic when a turn completes, fails or is cancelled', async () => {
   const f = await runningSession();
-  assert.equal(f.haptics.length, 0);
-
   f.app.sendPrompt('s1', 'Hello agent');
   await tick();
-  const prompt = f.requests.at(-1);
+  f.reply(f.requests.at(-1), { answer: 'Hello user' });
+  await tick();
 
-  // Still streaming/processing - no haptic
-  assert.equal(f.haptics.length, 0);
+  f.app.sendPrompt('s1', 'Do something that fails');
+  await tick();
+  f.deliver({ id: f.requests.at(-1).payload.id, peerId: 1, error: 'Command failed' });
+  await tick();
 
-  // Complete prompt reply
-  f.reply(prompt, { answer: 'Hello user' });
+  f.app.sendPrompt('s1', 'Cancel this');
+  await tick();
+  f.app.cancelTurn('s1');
   await tick();
 
   assert.equal(f.haptics.length, 0);
@@ -55,25 +57,4 @@ test('triggers warning notification haptic when agent encounters permission requ
   assert.ok(f.app.agentdeckStore.permissionsBySession.s1);
   const warningHaptics = f.haptics.filter((h) => h.type === 'notification' && h.value === 'warning');
   assert.equal(warningHaptics.length, 1);
-});
-
-test('does not trigger haptic when turn fails or is cancelled', async () => {
-  const f = await runningSession();
-  f.app.sendPrompt('s1', 'Do something that fails');
-  await tick();
-  const prompt = f.requests.at(-1);
-
-  // Deliver error
-  f.deliver({ id: prompt.payload.id, peerId: 1, error: 'Command failed' });
-  await tick();
-
-  assert.equal(f.haptics.length, 0);
-
-  // Cancelled prompt
-  f.app.sendPrompt('s1', 'Cancel this');
-  await tick();
-  f.app.cancelTurn('s1');
-  await tick();
-
-  assert.equal(f.haptics.length, 0);
 });

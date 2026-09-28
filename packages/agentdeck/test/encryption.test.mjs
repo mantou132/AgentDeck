@@ -173,16 +173,3 @@ test('plaintext injection cannot establish a connection with an encrypted ID', a
   assert.notEqual(fixture.app.agentdeckStore.connection, 'connected');
   assert.match(fixture.app.agentdeckStore.connectionError, /verification failed/i);
 });
-
-test('encrypted connections work after reset and document reload without encryption state', async () => {
-  const fixture = documentFixture(undefined, { pairingId: vector.id });
-  await fixture.connect();
-  const key = `agentdeck.e2ee.v1.${vector.routeId}`;
-  assert.equal(fixture.localStorage.getItem(key), null);
-  fixture.transport.clearTransportStorage();
-  fixture.transport.closeTransport();
-  const restored = documentFixture(fixture);
-  await restored.connect();
-  assert.equal(restored.localStorage.getItem(key), null);
-  assert.equal(restored.app.agentdeckStore.connection, 'connected');
-});

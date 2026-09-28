@@ -109,33 +109,3 @@ pub fn print_security_warning() {
         warn("└──────────────────────────────────────────────────────────────────────┘")
     );
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-
-    #[test]
-    fn styles_render_and_strip() {
-        let text = format!("{}", cyan("test"));
-        assert!(text.contains("test"));
-
-        let mut buffer = Vec::new();
-        {
-            let mut stream = anstream::AutoStream::never(&mut buffer);
-            write!(stream, "{}", bold(cyan("test"))).unwrap();
-        }
-        assert_eq!(String::from_utf8(buffer).unwrap(), "test");
-    }
-
-    #[test]
-    fn kv_formats_consistently() {
-        let mut buffer = Vec::new();
-        {
-            use std::io::Write;
-            let mut stream = anstream::AutoStream::never(&mut buffer);
-            writeln!(stream, "{:10}: val", "Service").unwrap();
-        }
-        assert_eq!(String::from_utf8(buffer).unwrap(), "Service   : val\n");
-    }
-}

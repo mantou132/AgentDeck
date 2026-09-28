@@ -40,5 +40,4 @@ qr2term = "0.3"
 planif = "1.0.0"
 
 [dev-dependencies]
-axum = "0.8"
 futures-util = "0.3"

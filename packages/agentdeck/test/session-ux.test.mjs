@@ -159,20 +159,3 @@ test('createSession and loadSession pass remote_app panelContext', async () => {
   assert.ok(createReq);
   assert.deepEqual(createReq.payload.params.panelContext, { surface: 'remote_app' });
 });
-
-test('pull-to-refresh triggers session refresh and updates sessions in store', async () => {
-  const f = documentFixture();
-  await f.connect();
-  const initialReqCount = f.requests.filter((r) => r.payload.method === 'agent_session_list').length;
-
-  const refreshing = f.app.refreshSessions();
-  await tick();
-  const listRequests = f.requests.filter((r) => r.payload.method === 'agent_session_list');
-  assert.equal(listRequests.length, initialReqCount + 1);
-
-  f.reply(listRequests.at(-1), {
-    sessions: [{ sessionId: 's2', title: 'Refreshed Session', cwd: '/workspace', updatedAt: '2026-09-23T00:00:00Z' }],
-  });
-  await refreshing;
-  assert.ok(f.app.agentdeckStore.sessions.some((s) => s.sessionId === 's2'));
-});

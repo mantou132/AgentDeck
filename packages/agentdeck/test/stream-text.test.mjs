@@ -18,8 +18,7 @@ vm.runInNewContext(outputText, {
   Set,
 });
 
-const { nextStreamingText, registerActiveStream, unregisterActiveStream, hasActiveStream, clearActiveStreams } =
-  exports;
+const { nextStreamingText, registerActiveStream, unregisterActiveStream, hasActiveStream } = exports;
 
 test('nextStreamingText reveals text progressively', () => {
   const target = 'Hello world, this is a streaming response.';
@@ -58,7 +57,6 @@ test('nextStreamingText handles long text with emoji and unicode grapheme cluste
 });
 
 test('active stream registry tracks active streams and prefix matching', () => {
-  clearActiveStreams();
   assert.equal(hasActiveStream(), false);
   assert.equal(hasActiveStream('sess-1'), false);
 

@@ -72,7 +72,3 @@ export function hasActiveStream(prefix?: string): boolean {
   }
   return false;
 }
-
-export function clearActiveStreams() {
-  activeStreams.clear();
-}

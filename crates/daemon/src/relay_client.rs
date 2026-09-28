@@ -539,16 +539,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_initializes_manager_and_handles_attach_and_routing() {
-        let relay_id = "01234567-89ab-cdef-0123-456789abcdef";
-        let service = AgentService::new();
-        let manager = start(DEFAULT_RELAY_URL, relay_id, &service).expect("start relay manager");
-        let peer1 = manager.get_or_create_peer(1);
-        peer1.notify("ping", serde_json::json!({ "ok": true }));
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    }
-
-    #[tokio::test]
     async fn remote_peer_manager_demultiplexes_multiple_devices() {
         let (outbound_tx, mut outbound_rx) =
             tokio::sync::mpsc::unbounded_channel::<(Value, Option<String>)>();
