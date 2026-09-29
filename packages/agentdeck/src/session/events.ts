@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   DeckSession,
   SessionOptions,
+  TextMessage,
   ToolCallContent,
   ToolCallData,
   ToolCallStatus,
@@ -69,6 +70,80 @@ export const appendImage = (
   return next;
 };
 
+// codex-acp 回放从其他 Agent 导入的历史时，工具调用和结果以文本标记输出，还原为工具消息以收拢到过程分组
+const externalToolPattern =
+  /\[external_agent_tool_call: ([^\]\n]+)\]\n?([\s\S]*?)\n?\[\/external_agent_tool_call\]|\[external_agent_tool_result(: error)?\]\n?([\s\S]*?)\n?\[\/external_agent_tool_result\]/g;
+const externalToolPrefix = 'external-';
+
+const parseExternalToolInput = (body: string): unknown => {
+  const input: Record<string, string> = {};
+  let key = '';
+  for (const line of body.split('\n')) {
+    const match = /^(\w+):(?: (.*))?$/.exec(line);
+    if (match) {
+      key = match[1];
+      input[key] = match[2] ?? '';
+    } else if (key) {
+      input[key] += `\n${line}`;
+    }
+  }
+  if (Object.keys(input).length !== 1 || input.input === undefined) return input;
+  try {
+    return JSON.parse(input.input);
+  } catch {
+    return input.input;
+  }
+};
+
+const extractExternalTools = (messages: ChatMessage[]) => {
+  const last = messages.at(-1) as TextMessage;
+  if (!last.text.includes('[/external_agent_tool_')) return messages;
+  const next = messages.slice(0, -1);
+  const pushText = (text: string) => {
+    if (next.length === messages.length - 1 && (text.trim() || last.attachments?.length)) {
+      next.push({ ...last, text });
+    } else if (text.trim()) {
+      next.push({ id: crypto.randomUUID(), role: last.role, text, streaming: last.streaming });
+    }
+  };
+  let rest = 0;
+  for (const match of last.text.matchAll(externalToolPattern)) {
+    pushText(last.text.slice(rest, match.index));
+    rest = match.index + match[0].length;
+    const [, name, body, error, output] = match;
+    if (name) {
+      const rawInput = parseExternalToolInput(body);
+      const file = rawInput && typeof rawInput === 'object' && 'file' in rawInput ? rawInput.file : '';
+      next.push({
+        id: crypto.randomUUID(),
+        type: 'tool',
+        data: {
+          toolCallId: `${externalToolPrefix}${crypto.randomUUID()}`,
+          title: [name, file].join(' ').trim(),
+          rawInput,
+        },
+      });
+      continue;
+    }
+    const index = next.findLastIndex(
+      (message) =>
+        'type' in message && message.type === 'tool' && message.data.toolCallId.startsWith(externalToolPrefix),
+    );
+    const tool = next[index] as ToolMessage | undefined;
+    if (!tool || tool.data.status) continue;
+    next[index] = {
+      ...tool,
+      data: {
+        ...tool.data,
+        status: error ? 'failed' : 'completed',
+        content: [{ type: 'content', content: { type: 'text', text: output } }],
+      },
+    };
+  }
+  pushText(last.text.slice(rest));
+  return next;
+};
+
 export type EventReduction = {
   messages?: ChatMessage[];
   sessionPatch?: Partial<DeckSession>;
@@ -105,7 +180,8 @@ export const reduceSessionEvent = (
     if (agent === 'claude-acp' && role === 'user' && content.text.trim() === '[Request interrupted by user]') {
       return messages !== current ? { messages } : null;
     }
-    return { messages: appendContent(messages, role, content.text, streaming) };
+    const next = appendContent(messages, role, content.text, streaming);
+    return { messages: agent === 'codex-acp' && role === 'agent' ? extractExternalTools(next) : next };
   }
 
   if (role && content.type === 'image') {

@@ -210,3 +210,41 @@ test('inline base64 images in message text become attachments instead of links',
   assert.equal(cached.attachments, attachments);
   assert.equal(cached.attachments[0].id, attachments[0].id);
 });
+
+test('codex imported history turns external agent tool markers into grouped tool calls', () => {
+  let messages = [{ id: 'user', role: 'user', text: 'Add an element' }];
+  const apply = (text, agent = 'codex-acp') => {
+    messages = reduceSessionEvent(
+      messages,
+      { event: 'session_update', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } },
+      { agent, streaming: false },
+    ).messages;
+  };
+  apply('Look first:');
+  apply(
+    '[external_agent_tool_call: Bash]\ndescription: List files\ncommand: ls && cat package.json\n[/external_agent_tool_call]',
+  );
+  apply('[external_agent_tool_result]\nLICENSE\nREADME.md\n[/external_agent_tool_result]');
+  apply('[external_agent_tool_call: Read]\nfile: /repo/a.ts\n[/external_agent_tool_call]');
+  apply('[external_agent_tool_result: error]\nFile not found\n[/external_agent_tool_result]');
+  apply('[external_agent_tool_call: Skill]\ninput: {"skill":"run"}\n[/external_agent_tool_call]Done.');
+
+  const items = groupTimelineMessages(messages, false);
+  assert.deepEqual(
+    plain(items.map((item) => (item.type === 'message' ? item.message.text : item.group.items.length))),
+    ['Add an element', 'Look first:', 3, 'Done.'],
+  );
+  const [bash, read, skill] = items[2].group.items.map((item) => plain(item.data));
+  assert.equal(bash.status, 'completed');
+  assert.equal(getToolCommand(bash), 'ls && cat package.json');
+  assert.deepEqual(plain(parseToolOutputs(bash).texts), ['LICENSE\nREADME.md']);
+  assert.equal(read.title, 'Read /repo/a.ts');
+  assert.equal(read.status, 'failed');
+  assert.deepEqual(skill.rawInput, { skill: 'run' });
+  assert.equal(skill.status, undefined);
+
+  messages = [];
+  apply('[external_agent_tool_call: Bash]\ncommand: ls\n[/external_agent_tool_call]', 'claude-acp');
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].role, 'agent');
+});
