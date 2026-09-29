@@ -57,10 +57,10 @@ export class DeckSessionTimelineElement extends GemElement {
     const icon = group.pending ? icons.loading : hasFailed ? icons.error : hasTools ? icons.terminal : icons.sparkles;
 
     return html`
-      <div class="mb-3 flex min-w-0 items-center">
+      <div class="mb-2 flex min-w-0 items-center">
         <button
           type="button"
-          class="inline-flex min-h-11 max-w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border-0 bg-transparent py-2 pr-2 text-left text-sm text-describe outline-none transition-colors active:bg-bg-hover"
+          class="-mx-2 inline-flex min-h-10 max-w-[calc(100%+1rem)] min-w-0 cursor-pointer items-center gap-2 rounded-xl border-0 bg-transparent px-2 py-1.5 text-left text-sm text-describe outline-none transition-colors hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline-focus active:bg-bg-hover"
           title=${summary}
           @click=${() => this.#openProcessSheet(group)}
         >
@@ -85,7 +85,7 @@ export class DeckSessionTimelineElement extends GemElement {
 
     if (message.role === 'user') {
       return html`
-        <div class="mb-[18px] flex justify-end">
+        <div class="mt-8 mb-4 flex justify-end first:mt-0">
           <div class="max-w-[min(86%,560px)]">
             <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary">
               <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
@@ -114,7 +114,7 @@ export class DeckSessionTimelineElement extends GemElement {
     }
 
     return html`
-      <article @pointerdown=${this.#setSelectionMenu} class="agent-message mb-5 min-w-0 text-base leading-[1.68] text-text">
+      <article @pointerdown=${this.#setSelectionMenu} class="agent-message mb-4 min-w-0 text-base leading-[1.68] text-text">
         <div v-if=${attachments.length} class="mb-2 flex flex-wrap gap-2">
           ${attachments.map(
             (attachment) => html`
@@ -146,6 +146,7 @@ export class DeckSessionTimelineElement extends GemElement {
       this.messages.filter((message) => !('failed' in message && message.failed)),
       this.pending,
     );
+    const last = timelineItems.at(-1);
 
     return html`
       ${repeat(
@@ -154,6 +155,14 @@ export class DeckSessionTimelineElement extends GemElement {
         (item) =>
           item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message),
       )}
+      <div
+        v-if=${this.pending && last?.type === 'message' && last.message.role === 'user'}
+        role="status"
+        class="mb-2 flex min-h-10 items-center gap-2 text-sm text-describe"
+      >
+        <tap-use class="size-4 shrink-0 text-primary-strong" .element=${icons.loading}></tap-use>
+        ${i18n.get('timeline.thinking')}
+      </div>
     `;
   };
 }

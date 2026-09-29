@@ -153,5 +153,9 @@ export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: b
     }
   }
 
+  // 任务仍在执行时末尾分组即使工具都已结束也还在等待后续事件
+  const last = result.at(-1);
+  if (sessionPending && last?.type === 'group') last.group.pending = true;
+
   return result;
 };

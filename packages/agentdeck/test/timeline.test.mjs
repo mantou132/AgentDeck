@@ -248,3 +248,14 @@ test('codex imported history turns external agent tool markers into grouped tool
   assert.equal(messages.length, 1);
   assert.equal(messages[0].role, 'agent');
 });
+
+test('the trailing process group stays pending while the task is still running', () => {
+  const messages = [
+    { id: 'user', role: 'user', text: 'Task' },
+    { id: 'done', type: 'tool', data: { toolCallId: 'done', title: 'Done command', status: 'completed' } },
+  ];
+  const [, running] = groupTimelineMessages(messages, true);
+  assert.equal(running.group.pending, true);
+  assert.equal(getProcessSummary(running.group), 'Thinking…');
+  assert.equal(groupTimelineMessages(messages, false)[1].group.pending, false);
+});
