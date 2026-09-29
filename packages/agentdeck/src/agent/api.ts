@@ -137,6 +137,9 @@ export type PanelContext =
 
 export const REMOTE_APP_PANEL_CONTEXT: PanelContext = { surface: 'remote_app' };
 
+/** Output the client can render; the host loads matching skills into agent sessions (e.g. `render: ['chart']`). */
+export type ClientCapabilities = { render?: string[] };
+
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 
 // Allow ACP startup/history work more time than the lightweight host handshake.
@@ -164,8 +167,8 @@ export class AgentApi {
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());
 
-  attachPeer = async (deviceId: string, fcmToken?: string | null) => {
-    return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId, fcmToken }, undefined, {
+  attachPeer = async (deviceId: string, fcmToken?: string | null, capabilities?: ClientCapabilities) => {
+    return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId, fcmToken, capabilities }, undefined, {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.connectHostTimeout'),
     });

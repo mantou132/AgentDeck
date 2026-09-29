@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@gem-bind/diff2html": "^0.0.5",
+    "@gem-bind/echarts": "^0.0.2",
     "@gem-bind/latex": "^0.0.3",
     "@gem-bind/marked": "^0.0.7",
     "@gem-bind/mermaid": "^0.0.5",
@@ -28,6 +29,7 @@
     "@tauri-apps/plugin-haptics": "~2.3.3",
     "@vnidrop/tauri-plugin-share": "1.0.0-rc.2",
     "diff": "^8.0.4",
+    "duoyun-ui": "^2.2.14",
     "relay-client-ts": "^0.1.7",
     "tauri-plugin-edge-to-edge-api": "^0.1.1",
     "tauri-plugin-fcm": "^0.2.0",

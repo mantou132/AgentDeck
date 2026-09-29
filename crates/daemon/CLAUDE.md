@@ -18,9 +18,10 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
   - `fallback.rs`：非主流系统的回退桩。
 - `src/acp_agent/`：
   - `acp_agent.rs`：ACP 协议客户端；管理 Agent 子进程、标准输入输出流与会话状态机。
-  - `catalog.rs`：本地与内置 Agent 注册表（如 Claude, Codex）；管理不同平台的启动命令与 npx 回退规则。
+  - `catalog.rs`：本地与内置 Agent 注册表（如 Claude, Codex）；管理不同平台的启动命令与 npx 回退规则；`agentdeck_env` 叠加 AgentDeck 专属启动环境（Codex 通过 `CODEX_CONFIG` 关闭只有 Codex App 能渲染的 `visualize` 插件）。
   - `provision.rs`：下载、缓存与解压分发各平台预编译 Agent 二进制包（`.tar.gz`、`.zip` 及独立可执行程序）。
   - `lifecycle_tests.rs`：会话生命周期、取消、清理与并发重连单元测试。
+- `src/render_skills.rs`：客户端渲染能力对应的输出格式 skill（`src/render_skills/<能力>/SKILL.md`）；每个进程首次使用时写入 `AppPaths::skills_dir()/<能力>/` 下的 `.agents/skills`（Codex）与 `.claude/skills`（Claude Code）。
 - `src/agent_rpc.rs`：Agent RPC 服务端实现；提供安全目录限制下的文件读取、目录浏览、路径展开及 Git status / diff 支持。
 - `src/relay_client.rs`：Relay WebSocket 通信层；`RemotePeerManager` 负责在单一 Relay 连接上多路复用多台远端设备（手机、浏览器扩展等），维护 `peerId` 分配与映射。
 - `src/relay_encryption.rs`：ChaCha20-Poly1305 + HKDF-SHA256 端到端加密；确保无共享凭据的中继服务器无法窥探消息内容。
@@ -41,6 +42,7 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
 - **防自动睡眠**：默认与 reset 均为 `never`，通过 `keepawake` 只阻止自动睡眠。`active` 按最后一次收发 RPC 的时间计时，一小时无 RPC 后释放；活动仅保存在内存。运行状态写入 `awake_status.json`，随 daemon 退出清理。
 - **Daemon 重置**：`reset` 停止服务并持有单例锁后，删除 `remote_peers_v1.json`、`logs/` 和 `agents/*/install/` 临时下载目录；应用 `--pairing-id` / `--relay-url` 参数，未传 ID 时生成新的 `adk1_` Pairing ID，未传 URL 时恢复默认 Relay 地址；保留锁文件、已安装 Agent 及历史。完成后恢复原先运行/停止状态并输出与 `status` 相同的信息（含新 ID），运行中的前台实例会恢复为后台服务。
 - **会话指令**：面板上下文等指令总是通过 `session/new` / `session/load` 的 `_meta.systemPrompt.append` 下发，不做能力判断；不支持的 Agent 会忽略。不用 MCP instructions 承载客户端上下文：语义不符，且 Codex 等不会把它当作指令；ACP 正式字段见 RFD agent-client-protocol#1237。
+- **渲染 skill**：客户端在 `peer_attach` 的 `capabilities`（如 `{ "render": ["chart"] }`）声明可渲染的 Markdown 代码块，daemon 按 peer 保存；Agent 声明 `sessionCapabilities.additionalDirectories` 时，该 peer 的 `session/new` / `session/load` 把对应 skill 目录作为 `additionalDirectories` 传入，skill 教 Agent 输出代码块（如 `agentdeck-chart`），不走工具调用。未声明的 Agent（如 opencode）不注入。
 - **设备多路复用**：一台 Host 守护进程可服务多个远端 Peer，设备状态及 `peerId` 映射存储于系统应用数据目录。
 
 ## 常用命令

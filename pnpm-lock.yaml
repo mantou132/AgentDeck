@@ -43,6 +43,9 @@ importers:
       '@gem-bind/diff2html':
         specifier: ^0.0.5
         version: 0.0.5(@mantou/gem@2.2.12)(duoyun-ui@2.2.14(@mantou/gem@2.2.12))
+      '@gem-bind/echarts':
+        specifier: ^0.0.2
+        version: 0.0.2(@mantou/gem@2.2.12)(duoyun-ui@2.2.14(@mantou/gem@2.2.12))
       '@gem-bind/latex':
         specifier: ^0.0.3
         version: 0.0.3(@mantou/gem@2.2.12)(duoyun-ui@2.2.14(@mantou/gem@2.2.12))
@@ -79,6 +82,9 @@ importers:
       diff:
         specifier: ^8.0.4
         version: 8.0.4
+      duoyun-ui:
+        specifier: ^2.2.14
+        version: 2.2.14(@mantou/gem@2.2.12)
       relay-client-ts:
         specifier: ^0.1.7
         version: 0.1.7
@@ -573,6 +579,12 @@ packages:
 
   '@gem-bind/diff2html@0.0.5':
     resolution: {integrity: sha512-sweoEGTd0w2GRygmoR8t++IWAM0Kx0UkrDimkfcejKIZjYwgut/v6wV6Se/ClGfkFApUlqD4IN/xxztsd9t1pQ==}
+    peerDependencies:
+      '@mantou/gem': ^2.0.0
+      duoyun-ui: ^2.0.0
+
+  '@gem-bind/echarts@0.0.2':
+    resolution: {integrity: sha512-1v4/v01zjlkNlEmAQjvaOsOOSa9ULvp8DtN9YSRC+HBn897eEj3hIevYtepfw5X7bHTvMKEVIdFqdLpjQZSHEg==}
     peerDependencies:
       '@mantou/gem': ^2.0.0
       duoyun-ui: ^2.0.0
@@ -2286,6 +2298,9 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
+
+  echarts@6.1.0:
+    resolution: {integrity: sha512-q0yaFPggC9FUdsWH4blavRWFmxdrIodbkoKNAjJudAI6CA9gNPxHtV2RcZNEepZVlk4yvBYkOkbk6HIVpIyHZA==}
 
   edge-location@2.2.0:
     resolution: {integrity: sha512-BU2OaQcOOaHXNwIAdwSd/dSiZEkG5dWDw/sf3AjNE5fZ/MlBl2RptNbr2MDSLNN2yGbf/b23bhOBJRHd8cGu2A==}
@@ -4416,6 +4431,9 @@ packages:
     resolution: {integrity: sha512-NoZ4roiN7LnbKn9QqE1amc9DJfzvZXxF4xDavcOWt1BPkdx+m+0gJuPM+S0vCe7zTJMYUP0R8pO2XMr+Y8oLIg==}
     engines: {node: '>=6'}
 
+  tslib@2.3.0:
+    resolution: {integrity: sha512-N82ooyxVNm6h1riLCoyS9e3fuJ3AMG2zIZs2Gd1ATcSFjSA23Q0fzjjZeh0jbJvWVDZ0cJT8yaNNaaXHzueNjg==}
+
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
@@ -4744,6 +4762,9 @@ packages:
 
   zimmerframe@1.1.5:
     resolution: {integrity: sha512-msJxIvYDYcoNL+PJsu+7qmpDWsYmAxTY+2TNYXXF0hzBzBk0BMecOqDOG/EckUoKCuKwObfbugIl8QpqHDXeFA==}
+
+  zrender@6.1.0:
+    resolution: {integrity: sha512-oEGMDB6pOP2S6OwRR4PdVv610zrjnA3Bh+JnSG12fYJlBKjtNAoEb5fSUoCOOINlH96I2fU38/A2UpRKs67xYQ==}
 
 snapshots:
 
@@ -5148,6 +5169,13 @@ snapshots:
       diff2html: 3.4.56
       duoyun-ui: 2.2.14(@mantou/gem@2.2.12)
       highlight.js: 11.12.0
+
+  '@gem-bind/echarts@0.0.2(@mantou/gem@2.2.12)(duoyun-ui@2.2.14(@mantou/gem@2.2.12))':
+    dependencies:
+      '@mantou/gem': 2.2.12
+      '@swc/helpers': 0.5.23
+      duoyun-ui: 2.2.14(@mantou/gem@2.2.12)
+      echarts: 6.1.0
 
   '@gem-bind/latex@0.0.3(@mantou/gem@2.2.12)(duoyun-ui@2.2.14(@mantou/gem@2.2.12))':
     dependencies:
@@ -6934,6 +6962,11 @@ snapshots:
       deep-query-selector: 1.0.2
 
   eastasianwidth@0.2.0: {}
+
+  echarts@6.1.0:
+    dependencies:
+      tslib: 2.3.0
+      zrender: 6.1.0
 
   edge-location@2.2.0:
     dependencies:
@@ -9274,6 +9307,8 @@ snapshots:
       minimist: 1.2.8
       strip-bom: 3.0.0
 
+  tslib@2.3.0: {}
+
   tslib@2.8.1: {}
 
   tuf-js@2.2.1:
@@ -9569,3 +9604,7 @@ snapshots:
       fd-slicer: 1.1.0
 
   zimmerframe@1.1.5: {}
+
+  zrender@6.1.0:
+    dependencies:
+      tslib: 2.3.0

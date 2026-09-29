@@ -13,6 +13,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - `src/elements/`：
   - `composer.ts`：管理输入和附件；App 传入 draftKey 启用草稿持久化，正式会话使用全局唯一 sessionId，草稿跨 Relay 配置保留，扩展不启用。
   - `session-timeline.ts`：展示消息并通过 `Sheet.open` 打开过程弹层。
+  - `chart.ts`：Markdown 中已闭合的 `agentdeck-chart` 代码块由 `lib/markdown.ts` 渲染为 `deck-chart`，代码块内容即 ECharts option，挂载时动态加载 `@gem-bind/echarts`，JSON 无效时显示原文；渲染能力在 `config.ts` 的 `RENDER_CAPABILITIES` 声明，经 `peer_attach` 告知 host。
   - `foldable.ts`：超高内容折叠，点击通过 Sheet 查看全部；用于用户消息和 Agent Markdown 中已闭合的代码块。
   - `process-detail.ts`：按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step。
   - `process-step.ts`：按 sessionId / groupId / itemId 自行订阅详情更新。

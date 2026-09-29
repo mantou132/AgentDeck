@@ -100,16 +100,37 @@ fn registry_platform() -> String {
     format!("{os}-{}", std::env::consts::ARCH)
 }
 
+/// AgentDeck launch env layered over the registry's for an agent.
+fn agentdeck_env(id: &str) -> &'static [(&'static str, &'static str)] {
+    match id {
+        // Codex's bundled visualize plugin answers chart requests with `visualize{...}`
+        // references only the Codex app renders.
+        "codex-acp" => &[(
+            "CODEX_CONFIG",
+            r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}}}"#,
+        )],
+        _ => &[],
+    }
+}
+
+fn with_agentdeck_env(id: &str, mut env: HashMap<String, String>) -> HashMap<String, String> {
+    for (name, value) in agentdeck_env(id) {
+        env.insert(name.to_string(), value.to_string());
+    }
+    env
+}
+
 /// Select a distribution for the host before deriving its CLI or launch args.
 fn candidates_for_platform(platform: &str) -> Vec<AgentCandidate> {
     let mut candidates = Vec::new();
     if let Ok(registry) = bundled_registry() {
         for agent in registry.agents {
-            if let Some(binary) = agent
+            if let Some(mut binary) = agent
                 .distribution
                 .binary
                 .and_then(|mut targets| targets.remove(platform))
             {
+                binary.env = with_agentdeck_env(&agent.id, binary.env);
                 // Registry Windows paths can mix '/' and '\\', including when
                 // inspecting another platform's catalog in a test.
                 let cmd_name = binary.cmd.rsplit(['/', '\\']).next().unwrap_or_default();
@@ -138,25 +159,27 @@ fn candidates_for_platform(platform: &str) -> Vec<AgentCandidate> {
                     },
                 });
             } else if let Some(npx) = agent.distribution.npx {
+                let id = agent.id;
                 candidates.push(AgentCandidate {
-                    id: agent.id,
+                    id: id.clone(),
                     name: agent.name,
                     cli: None,
                     launch: AgentLaunch::Npx {
                         package: npx.package,
                         args: npx.args,
-                        env: npx.env,
+                        env: with_agentdeck_env(&id, npx.env),
                     },
                 });
             } else if let Some(uvx) = agent.distribution.uvx {
+                let id = agent.id;
                 candidates.push(AgentCandidate {
-                    id: agent.id,
+                    id: id.clone(),
                     name: agent.name,
                     cli: None,
                     launch: AgentLaunch::Uvx {
                         package: uvx.package,
                         args: uvx.args,
-                        env: uvx.env,
+                        env: with_agentdeck_env(&id, uvx.env),
                     },
                 });
             }
@@ -228,5 +251,21 @@ mod tests {
         );
         assert!(kilo.cli.is_none());
         assert!(!candidates.iter().any(|candidate| candidate.id == "goose"));
+    }
+
+    #[test]
+    fn codex_launch_disables_the_visualize_plugin() {
+        let codex = candidates_for_platform("darwin-aarch64")
+            .into_iter()
+            .find(|candidate| candidate.id == "codex-acp")
+            .unwrap();
+        let AgentLaunch::Npx { env, .. } = codex.launch else {
+            panic!("codex-acp launches through npx");
+        };
+        let config: serde_json::Value = serde_json::from_str(&env["CODEX_CONFIG"]).unwrap();
+        assert_eq!(
+            config["plugins"]["visualize@openai-bundled"]["enabled"],
+            false
+        );
     }
 }

@@ -104,8 +104,11 @@ impl MockAcp {
 
     async fn create(&mut self, id: &str) {
         let manager = self.manager.clone();
-        let call =
-            tokio::spawn(async move { manager.create_session("codex-acp", None, None).await });
+        let call = tokio::spawn(async move {
+            manager
+                .create_session("codex-acp", None, Default::default())
+                .await
+        });
         let request = self.next("session/new").await;
         self.respond(&request, json!({"sessionId": id}));
         assert_eq!(call.await.unwrap().unwrap().session_id, id);
@@ -116,7 +119,7 @@ impl MockAcp {
         let id = id.to_string();
         let call = tokio::spawn(async move {
             manager
-                .load_session("codex-acp", &id, None, None, None)
+                .load_session("codex-acp", &id, None, Default::default(), None)
                 .await
         });
         let request = self.next("session/load").await;
@@ -234,7 +237,7 @@ async fn concurrent_close_and_load_wait_for_one_cleanup() {
     let manager = mock.manager.clone();
     let load = tokio::spawn(async move {
         manager
-            .load_session("codex-acp", "session", None, None, None)
+            .load_session("codex-acp", "session", None, Default::default(), None)
             .await
     });
     assert!(
@@ -286,7 +289,7 @@ async fn loading_an_active_session_is_rejected_before_contacting_acp() {
     mock.create("session").await;
     let result = mock
         .manager
-        .load_session("codex-acp", "session", None, None, None)
+        .load_session("codex-acp", "session", None, Default::default(), None)
         .await;
     assert!(result.err().unwrap().to_string().contains("already active"));
     let prompt = mock.prompt("session");
@@ -302,7 +305,13 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     let (replay_tx, mut replay_rx) = mpsc::unbounded_channel();
     let load = tokio::spawn(async move {
         manager
-            .load_session("codex-acp", "session", None, None, Some(replay_tx))
+            .load_session(
+                "codex-acp",
+                "session",
+                None,
+                Default::default(),
+                Some(replay_tx),
+            )
             .await
     });
     let request = mock.next("session/load").await;
@@ -449,7 +458,7 @@ async fn unadvertised_session_methods_are_not_sent_to_acp() {
     let mut mock = MockAcp::with_capabilities(json!({})).await;
     let manager = mock.manager.clone();
     let load = manager
-        .load_session("codex-acp", "old", None, None, None)
+        .load_session("codex-acp", "old", None, Default::default(), None)
         .await;
     assert!(
         load.err()

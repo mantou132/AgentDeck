@@ -2,7 +2,7 @@ import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
-import { type AppSettings, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
+import { type AppSettings, RENDER_CAPABILITIES, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
 import { requestPermission as requestTurnPermission } from '../session/turn';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
@@ -106,6 +106,7 @@ export const startApp = () => {
   initTransport({
     initialRelayId: agentdeckStore.settings.relayId,
     ackHead: shouldAckHead,
+    capabilities: RENDER_CAPABILITIES,
     onRequestPermission: (request) => {
       const session = getSession(request.sessionId);
       if (session?.agent !== request.agent || !agentdeckStore.pendingSessionIds.includes(request.sessionId)) {
@@ -134,8 +135,8 @@ export const saveSettings = (settings: AppSettings) => {
   if (relayChanged || agentChanged) {
     resetRemoteState();
   }
-  if (relayChanged) startTransport(next.relayId, { ackHead: true });
-  else if (notConnected) startTransport(next.relayId);
+  if (relayChanged) startTransport(next.relayId, { ackHead: true, capabilities: RENDER_CAPABILITIES });
+  else if (notConnected) startTransport(next.relayId, { capabilities: RENDER_CAPABILITIES });
   else if (agentChanged && agentdeckStore.connection === 'connected') refreshSessions();
 };
 

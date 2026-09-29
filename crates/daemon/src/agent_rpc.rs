@@ -9,9 +9,10 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::{
-    acp_agent::{self, AgentEvent, AgentSessionManager, SessionEndCallback},
+    acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
     logger,
     peer::{CallCtx, Peer},
+    render_skills::ClientCapabilities,
 };
 
 /// Stream agent events as `{ id, event }` frames while a request runs.
@@ -51,6 +52,9 @@ async fn settle_forwarder(
 
 pub type PromptCompletion = Arc<dyn Fn(&str, &str) + Send + Sync>;
 
+/// Capabilities the peer declared in its latest `peer_attach`.
+pub type PeerCapabilities = Arc<Mutex<ClientCapabilities>>;
+
 /// Central host service managing ACP agent sessions and exposing RPC routes.
 #[derive(Clone)]
 pub struct AgentService {
@@ -83,10 +87,15 @@ impl AgentService {
     /// Attach this service's RPC handlers to a duplex Peer endpoint.
     #[allow(dead_code)]
     pub fn attach(&self, peer: &Peer) {
-        self.attach_with_completion(peer, None);
+        self.attach_with_completion(peer, None, PeerCapabilities::default());
     }
 
-    pub fn attach_with_completion(&self, peer: &Peer, on_complete: Option<PromptCompletion>) {
+    pub fn attach_with_completion(
+        &self,
+        peer: &Peer,
+        on_complete: Option<PromptCompletion>,
+        capabilities: PeerCapabilities,
+    ) {
         let notify_peer = peer.clone();
         self.end_listeners
             .lock()
@@ -178,16 +187,18 @@ impl AgentService {
         });
 
         let create_sessions = sessions.clone();
+        let create_capabilities = capabilities.clone();
         peer.handle("agent_session_create", move |params, _ctx| {
             let sessions = create_sessions.clone();
+            let capabilities = create_capabilities.clone();
             async move {
                 let agent = required_agent(&params, "agent_session_create")?;
                 let cwd = message_cwd(&params);
-                let system_prompt = message_panel_system_prompt(&params)?;
+                let context = session_context(&params, &capabilities)?;
                 let timeout_secs = message_timeout_secs(&params);
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
-                    sessions.create_session(agent, cwd, system_prompt),
+                    sessions.create_session(agent, cwd, context),
                 )
                 .await
                 {
@@ -208,10 +219,11 @@ impl AgentService {
         let load_sessions = sessions.clone();
         peer.handle("agent_session_load", move |params, ctx| {
             let sessions = load_sessions.clone();
+            let capabilities = capabilities.clone();
             async move {
                 let (agent, session_id) = required_agent_session(&params, "agent_session_load")?;
                 let cwd = message_cwd(&params);
-                let system_prompt = message_panel_system_prompt(&params)?;
+                let context = session_context(&params, &capabilities)?;
                 let timeout_secs = message_timeout_secs(&params);
 
                 // The actor drains the load-time history replay into this channel
@@ -227,7 +239,7 @@ impl AgentService {
 
                 let result = match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
-                    sessions.load_session(agent, session_id, cwd, system_prompt, replay_tx),
+                    sessions.load_session(agent, session_id, cwd, context, replay_tx),
                 )
                 .await
                 {
@@ -840,6 +852,16 @@ fn required_agent_session<'a>(
 
 fn message_cwd(params: &Value) -> Option<PathBuf> {
     non_empty_str(params, "cwd").map(PathBuf::from)
+}
+
+fn session_context(
+    params: &Value,
+    capabilities: &PeerCapabilities,
+) -> Result<SessionContext, String> {
+    Ok(SessionContext {
+        system_prompt: message_panel_system_prompt(params)?,
+        client_capabilities: capabilities.lock().expect("lock poisoned").clone(),
+    })
 }
 
 fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String> {

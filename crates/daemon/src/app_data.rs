@@ -51,6 +51,11 @@ impl AppPaths {
         self.logs_dir().join("agentdeckd.log")
     }
 
+    /// Generated render skills mounted as ACP additional directories.
+    pub fn skills_dir(&self) -> PathBuf {
+        self.root.join("skills")
+    }
+
     fn agents_dir(&self) -> PathBuf {
         self.root.join("agents")
     }

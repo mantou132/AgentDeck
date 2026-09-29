@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    agent_rpc::AgentService,
+    agent_rpc::{AgentService, PeerCapabilities},
     app_data::{self, AppPaths},
     logger,
     peer::Peer,
@@ -67,7 +67,7 @@ pub struct RemotePeerManager {
     service: AgentService,
     outbound_tx: tokio::sync::mpsc::UnboundedSender<(Value, Option<String>)>,
     devices: Arc<Mutex<HashMap<String, RemoteDevice>>>,
-    peers: Arc<Mutex<HashMap<u64, Peer>>>,
+    peers: Arc<Mutex<HashMap<u64, (Peer, PeerCapabilities)>>>,
     next_peer_id: Arc<AtomicU64>,
     push_client: reqwest::Client,
 }
@@ -101,9 +101,13 @@ impl RemotePeerManager {
     }
 
     pub fn get_or_create_peer(&self, peer_id: u64) -> Peer {
+        self.peer_entry(peer_id).0
+    }
+
+    fn peer_entry(&self, peer_id: u64) -> (Peer, PeerCapabilities) {
         let mut peers = self.peers.lock().expect("lock poisoned");
-        if let Some(peer) = peers.get(&peer_id) {
-            return peer.clone();
+        if let Some(entry) = peers.get(&peer_id) {
+            return entry.clone();
         }
 
         let outbound_tx = self.outbound_tx.clone();
@@ -123,10 +127,14 @@ impl RemotePeerManager {
                 ));
             }
         });
-        self.service
-            .attach_with_completion(&peer, Some(self.completion_handler(peer_id)));
-        peers.insert(peer_id, peer.clone());
-        peer
+        let capabilities = PeerCapabilities::default();
+        self.service.attach_with_completion(
+            &peer,
+            Some(self.completion_handler(peer_id)),
+            capabilities.clone(),
+        );
+        peers.insert(peer_id, (peer.clone(), capabilities.clone()));
+        (peer, capabilities)
     }
 
     fn completion_handler(&self, peer_id: u64) -> crate::agent_rpc::PromptCompletion {
@@ -222,7 +230,13 @@ impl RemotePeerManager {
         let requested_peer_id = params.get("peerId").and_then(Value::as_u64);
 
         let peer_id = self.resolve_peer_id(&device_id, requested_peer_id, params.get("fcmToken"));
-        let _peer = self.get_or_create_peer(peer_id);
+        let (_peer, capabilities) = self.peer_entry(peer_id);
+        // Every attach re-declares the client's capabilities; later sessions use them.
+        *capabilities.lock().expect("lock poisoned") = params
+            .get("capabilities")
+            .cloned()
+            .and_then(|value| serde_json::from_value(value).ok())
+            .unwrap_or_default();
 
         let response = match id {
             Some(req_id) => json!({

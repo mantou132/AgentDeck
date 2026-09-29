@@ -8,13 +8,14 @@ import {
 } from 'relay-client-ts';
 import { DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
-import { AgentApi, type PermissionRequest, type SessionEvent } from './api';
+import { AgentApi, type ClientCapabilities, type PermissionRequest, type SessionEvent } from './api';
 import { createRelayEncryption, isPairingId, type RelayEncryption } from './encryption';
 import type { RpcId, RpcMessage } from './rpc';
 
 type HostSyncOptions = {
   metadataOnly: boolean;
   deviceId: string;
+  capabilities?: ClientCapabilities;
   agentApi: AgentApi;
   onStateChange: (state: ConnectionState, error?: string) => void;
   onSynced?: (sentToken: string | null | undefined) => void;
@@ -26,6 +27,7 @@ type InitTransportOptions = {
   onMessage: MessageHandler;
   onBeforePayload?: () => Promise<unknown> | undefined;
   ackHead?: boolean;
+  capabilities?: ClientCapabilities;
 };
 
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
@@ -46,6 +48,8 @@ export type TransportOptions = {
   relayUrl?: string;
   createStore?: (routeId: string) => RelayStore;
   deviceId?: string;
+  /** Rendering capabilities declared to the host; they decide the skills loaded into sessions. */
+  capabilities?: ClientCapabilities;
 };
 
 // ---------------------------------------------------------------------------
@@ -207,7 +211,7 @@ class HostSessionManager {
     if (!silent) options.onStateChange('attaching');
 
     this.#attaching = options.agentApi
-      .attachPeer(options.deviceId, sentToken)
+      .attachPeer(options.deviceId, sentToken, options.capabilities)
       .then((result) => {
         if (version !== this.#attachVersion) return;
         if (!Number.isSafeInteger(result?.peerId) || result.peerId <= 0) {
@@ -265,7 +269,6 @@ class AgentTransport {
 
   #relayClient: RelayClient | undefined;
   #encryptedStore: EncryptedRelayStore | undefined;
-  #encryption: RelayEncryption | undefined;
 
   #connectTimer: ReturnType<typeof setTimeout> | undefined;
   #retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -350,6 +353,7 @@ class AgentTransport {
     return this.hostSession.sync({
       metadataOnly: metadataOnly && this.#connectionState === 'connected',
       deviceId: this.getDeviceId(),
+      capabilities: this.#currentOptions?.capabilities,
       agentApi: this.agentApi,
       onStateChange: (state, error) => this.#emitConnection(state, error),
       onSynced: (sentToken) => {
@@ -374,7 +378,6 @@ class AgentTransport {
 
     const deviceId = this.getDeviceId();
     const encryption = createRelayEncryption(relayId, deviceId);
-    this.#encryption = encryption;
     const routeId = encryption?.routeId ?? relayId;
 
     const baseStore = options?.createStore ? options.createStore(routeId) : localStorageStore(routeId);
@@ -485,7 +488,6 @@ class AgentTransport {
     this.#relayClient = undefined;
     this.#encryptedStore?.dispose();
     this.#encryptedStore = undefined;
-    this.#encryption = undefined;
     this.#relayConnected = false;
     this.#currentDeviceId = undefined;
     this.hostSession.reset();
@@ -523,5 +525,6 @@ export const initTransport = (options: InitTransportOptions) => {
   agentApi.setPermissionHandler(options.onRequestPermission);
   agentApi.setSessionEndedHandler(({ sessionId }) => transport.dispatchMessage({ type: 'session_ended', sessionId }));
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
-  if (isPairingId(options.initialRelayId)) startTransport(options.initialRelayId, { ackHead: options.ackHead });
+  if (isPairingId(options.initialRelayId))
+    startTransport(options.initialRelayId, { ackHead: options.ackHead, capabilities: options.capabilities });
 };

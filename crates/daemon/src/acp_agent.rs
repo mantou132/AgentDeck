@@ -28,7 +28,11 @@ use serde::Serialize;
 use tokio::sync::{Mutex, mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
-use crate::{logger, peer::BoxFuture};
+use crate::{
+    logger,
+    peer::BoxFuture,
+    render_skills::{self, ClientCapabilities},
+};
 
 mod catalog;
 mod provision;
@@ -52,6 +56,13 @@ fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
 /// `None` cancels the pending tool call.
 pub type PermissionResolver =
     Arc<dyn Fn(serde_json::Value) -> BoxFuture<'static, Option<String>> + Send + Sync>;
+
+/// Client-specific setup sent with `session/new` / `session/load`.
+#[derive(Clone, Default)]
+pub struct SessionContext {
+    pub system_prompt: Option<String>,
+    pub client_capabilities: ClientCapabilities,
+}
 
 /// Snapshot returned after an ACP session actor is ready.
 pub struct SessionReady {
@@ -297,22 +308,31 @@ impl AcpRuntime {
         &self,
         cwd: PathBuf,
         load: Option<SessionId>,
-        system_prompt: Option<String>,
+        context: SessionContext,
     ) -> Result<StartedSession> {
         let AgentConnection {
             connection,
             capabilities,
         } = self.connection().await?;
         let generation = self.state.lock().await.generation;
+        let meta = context.system_prompt.as_deref().map(system_prompt_meta);
+        let directories = if capabilities
+            .session_capabilities
+            .additional_directories
+            .is_some()
+        {
+            render_skills::skill_directories(&context.client_capabilities)
+        } else {
+            Vec::new()
+        };
         let (session, ready): (ActiveSession<'static, Agent>, SessionReady) = match load {
             Some(session_id) => {
                 if !capabilities.load_session {
                     anyhow::bail!("{} does not support loading sessions", self.agent);
                 }
-                let mut request = LoadSessionRequest::new(session_id.clone(), cwd);
-                if let Some(system_prompt) = &system_prompt {
-                    request = request.meta(system_prompt_meta(system_prompt));
-                }
+                let request = LoadSessionRequest::new(session_id.clone(), cwd)
+                    .additional_directories(directories)
+                    .meta(meta);
                 let (session, response) = connection
                     .load_session_from(request)
                     .block_task()
@@ -330,10 +350,9 @@ impl AcpRuntime {
                 (session, ready)
             }
             None => {
-                let mut request = NewSessionRequest::new(cwd);
-                if let Some(system_prompt) = &system_prompt {
-                    request = request.meta(system_prompt_meta(system_prompt));
-                }
+                let request = NewSessionRequest::new(cwd)
+                    .additional_directories(directories)
+                    .meta(meta);
                 let session = connection
                     .build_session_from(request)
                     .block_task()
@@ -542,10 +561,9 @@ impl AgentSessionManager {
         &self,
         agent: &str,
         cwd: Option<PathBuf>,
-        system_prompt: Option<String>,
+        context: SessionContext,
     ) -> Result<SessionReady> {
-        self.start_session(agent, cwd, None, system_prompt, None)
-            .await
+        self.start_session(agent, cwd, None, context, None).await
     }
 
     /// Resume a persisted session by its ACP session id (requires the agent to
@@ -557,7 +575,7 @@ impl AgentSessionManager {
         agent: &str,
         session_id: &str,
         cwd: Option<PathBuf>,
-        system_prompt: Option<String>,
+        context: SessionContext,
         replay_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     ) -> Result<SessionReady> {
         let key = AgentSessionKey::new(agent, session_id);
@@ -572,7 +590,7 @@ impl AgentSessionManager {
             agent,
             cwd,
             Some(SessionId::from(session_id.to_string())),
-            system_prompt,
+            context,
             replay_tx,
         )
         .await
@@ -583,7 +601,7 @@ impl AgentSessionManager {
         agent: &str,
         cwd: Option<PathBuf>,
         load: Option<SessionId>,
-        system_prompt: Option<String>,
+        context: SessionContext,
         replay_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     ) -> Result<SessionReady> {
         let cwd = resolve_cwd(cwd)?;
@@ -603,7 +621,7 @@ impl AgentSessionManager {
             if let Err(err) = run_session_actor_inner(
                 cwd,
                 load,
-                system_prompt,
+                context,
                 runtime,
                 replay_tx,
                 rx,
@@ -908,7 +926,7 @@ impl AgentSessionManager {
 async fn run_session_actor_inner(
     cwd: PathBuf,
     load: Option<SessionId>,
-    system_prompt: Option<String>,
+    context: SessionContext,
     runtime: AcpRuntime,
     replay_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     mut rx: mpsc::Receiver<SessionCommand>,
@@ -916,7 +934,7 @@ async fn run_session_actor_inner(
     closing: CancellationToken,
 ) -> Result<()> {
     let started = tokio::select! {
-        result = runtime.start_session(cwd, load, system_prompt) => result,
+        result = runtime.start_session(cwd, load, context) => result,
         _ = closing.cancelled() => return Ok(()),
     };
     let StartedSession {

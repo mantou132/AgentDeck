@@ -16,6 +16,7 @@ mod power;
 mod push;
 mod relay_client;
 mod relay_encryption;
+mod render_skills;
 mod ui;
 
 use agent_rpc::AgentService;

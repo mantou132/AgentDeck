@@ -6,6 +6,7 @@ import '@gem-bind/diff2html';
 import '@gem-bind/latex';
 import '@gem-bind/marked';
 import '@gem-bind/mermaid';
+import '../elements/chart';
 
 const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -89,6 +90,7 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
         const closed = isCodeBlockClosed(raw);
         if (closed && language === 'mermaid')
           return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
+        if (closed && language === 'agentdeck-chart') return `<deck-chart source="${source}"></deck-chart>`;
         if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }
