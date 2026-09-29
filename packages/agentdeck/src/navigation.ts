@@ -6,6 +6,7 @@ import { onWebProxyState, toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
 import { i18n } from './i18n';
 import { parseMessageLink } from './lib/links';
+import { toPreviewUrl } from './lib/preview';
 
 export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
   let currentUrl = url;
@@ -49,6 +50,9 @@ export const openWebBrowser = async (url: string, title = '', stack?: TapStackEl
   });
   return result;
 };
+
+export const openPreview = (path: string, stack?: TapStackElement) =>
+  Browser.open({ src: toPreviewUrl(path), title: path.split(/[\\/]/).pop(), stack });
 
 export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement) => {
   (stack || Stack).push({

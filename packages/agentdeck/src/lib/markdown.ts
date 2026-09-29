@@ -1,12 +1,15 @@
 import { type MarkedExtension, Renderer } from '@gem-bind/marked';
 import { agentDeckTheme } from '../styles/theme';
 import { isSmallTextFile } from './file-preview';
+import { parseMessageLink } from './links';
+import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
 
 import '@gem-bind/diff2html';
 import '@gem-bind/latex';
 import '@gem-bind/marked';
 import '@gem-bind/mermaid';
 import '../elements/chart';
+import '../elements/preview';
 
 const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -71,7 +74,16 @@ export const isCodeBlockClosed = (raw = '') => {
   return new RegExp(`\\n[ \\t]{0,3}${fenceChar}{${fenceLen},}[ \\t]*\\n?$`).test(raw);
 };
 
-type MarkdownOptions = { codeBlock?: boolean; foldCode?: boolean };
+/** `baseDir` resolves relative images, e.g. a Markdown file's own directory. */
+type MarkdownOptions = { codeBlock?: boolean; foldCode?: boolean; baseDir?: string };
+
+/** Host path of an image source, loaded through the preview protocol. */
+const hostImagePath = (src: string, baseDir?: string) => {
+  const link = parseMessageLink(src);
+  if (link?.type !== 'file') return;
+  if (isAbsoluteHostPath(link.path)) return link.path;
+  if (baseDir) return `${baseDir}${link.path.replace(/^\.[\\/]/, '')}`;
+};
 
 const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtension[] => [
   {
@@ -91,6 +103,7 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
         if (closed && language === 'mermaid')
           return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
         if (closed && language === 'agentdeck-chart') return `<deck-chart source="${source}"></deck-chart>`;
+        if (closed && language === 'agentdeck-preview') return `<deck-preview path="${source}"></deck-preview>`;
         if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }
@@ -105,6 +118,11 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
           return `<deck-foldable codelang="${escapeHtml(language)}">${block}</deck-foldable>`;
         return block;
       },
+      // Host images (e.g. screenshots taken by the agent) load through the preview protocol.
+      image(token) {
+        const path = previewSupported ? hostImagePath(token.href, options.baseDir) : undefined;
+        return defaultRenderer.image.call(this, { ...token, href: path ? toPreviewUrl(path) : token.href });
+      },
       table(token) {
         return `<div class="table-scroll" tabindex="0">${defaultRenderer.table.call(this, token)}</div>`;
       },
@@ -115,6 +133,7 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
 export const markdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true, foldCode: true });
 export const unfoldedMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true });
 export const userMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: false });
+export const fileMarkdownExtensions = (baseDir: string) => createMarkdownExtensions({ codeBlock: true, baseDir });
 
 const baseMarkdownStyle = `
   :host {
@@ -201,8 +220,9 @@ markdownStyle.replaceSync(baseMarkdownStyle);
 export const fileViewerMarkdownStyle = new CSSStyleSheet();
 fileViewerMarkdownStyle.replaceSync(`
   ${baseMarkdownStyle}
-  :where(img, video)[src]:not([src^="http"]):not([src^="//"]) {
-    display: none;
+  ${
+    // Without the preview protocol, local images would resolve against the client's own URL.
+    previewSupported ? '' : `:where(img, video)[src]:not([src^="http"]):not([src^="//"]) { display: none; }`
   }
 `);
 

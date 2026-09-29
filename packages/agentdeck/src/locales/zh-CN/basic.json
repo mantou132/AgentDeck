@@ -208,5 +208,6 @@
   "settings.relayIdUpdated": "配对码已更新",
   "browser.share": "分享",
   "global.copy": "复制",
-  "global.copied": "已复制"
+  "global.copied": "已复制",
+  "preview.open": "打开预览"
 }

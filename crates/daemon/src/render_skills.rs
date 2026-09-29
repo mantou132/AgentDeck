@@ -28,10 +28,16 @@ struct RenderSkill {
     skill_md: &'static str,
 }
 
-const SKILLS: &[RenderSkill] = &[RenderSkill {
-    capability: "chart",
-    skill_md: include_str!("render_skills/chart/SKILL.md"),
-}];
+const SKILLS: &[RenderSkill] = &[
+    RenderSkill {
+        capability: "chart",
+        skill_md: include_str!("render_skills/chart/SKILL.md"),
+    },
+    RenderSkill {
+        capability: "preview",
+        skill_md: include_str!("render_skills/preview/SKILL.md"),
+    },
+];
 
 /// Skill locations agents scan in additional directories: Codex reads
 /// `.agents/skills`, Claude Code reads `.claude/skills`.

@@ -182,6 +182,7 @@ export function documentFixture(previous, options = {}) {
             },
           };
         }
+        if (name === '@tauri-apps/api/core') return { isTauri: () => false };
         if (name === '@mantou/tap-ui/lib/encode') {
           return load(path.join(root, 'node_modules/@mantou/tap-ui/lib/encode.js'));
         }

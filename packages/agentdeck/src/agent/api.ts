@@ -174,6 +174,13 @@ export class AgentApi {
     });
   };
 
+  /** Any host file as base64 bytes, for serving it verbatim. */
+  readRawFile = (path: string) =>
+    this.#peer.call<{ path: string; data: string }>('file_read', { path, raw: true }, undefined, {
+      timeoutMs: 30_000,
+      timeoutMessage: i18n.get('error.readFileTimeout'),
+    });
+
   readFile = (path: string, cwd: string) =>
     this.#peer.call<RemoteFile>('file_read', { path, cwd }, undefined, {
       timeoutMs: 15_000,

@@ -1,3 +1,5 @@
+mod preview;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -12,6 +14,9 @@ pub fn run() {
             _app.handle().plugin(tauri_plugin_selection_menu::init())?;
             Ok(())
         })
+        .manage(preview::PreviewRequests::default())
+        .register_asynchronous_uri_scheme_protocol(preview::SCHEME, preview::handle)
+        .invoke_handler(tauri::generate_handler![preview::preview_respond])
         .plugin(tauri_plugin_edge_to_edge::init())
         .plugin(tauri_plugin_webproxy::init())
         .plugin(tauri_plugin_vnidrop_share::init())

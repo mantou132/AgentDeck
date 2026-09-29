@@ -208,5 +208,6 @@
   "settings.relayIdUpdated": "Pairing ID updated",
   "browser.share": "Share",
   "global.copy": "Copy",
-  "global.copied": "Copied"
+  "global.copied": "Copied",
+  "preview.open": "Open preview"
 }

@@ -4,7 +4,7 @@ import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
-import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
+import { fileMarkdownExtensions, fileViewerMarkdownStyle } from '../lib/markdown';
 import { openMessageLink, openSettings } from '../navigation';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
@@ -41,6 +41,12 @@ export class DeckFileViewerElement extends GemElement {
   #mainRef = createRef<HTMLElement>();
   #lineRef = createRef<HTMLElement>();
   #codeBlockRef = createRef<TapCodeBlockElement>();
+
+  // Relative images resolve against the host file's directory.
+  @memo((i) => [i.#state.file?.path])
+  get #markdownExtensions() {
+    return fileMarkdownExtensions(this.#state.file?.path.replace(/[^\\/]+$/, '') || '');
+  }
 
   @effect((i) => [i.path, i.cwd, i.#state.revision])
   #read = () => {
@@ -149,7 +155,7 @@ export class DeckFileViewerElement extends GemElement {
             v-else-if=${markdown && !source}
             class="select-text mx-auto block max-w-[760px] p-5"
             .mdStyle=${fileViewerMarkdownStyle}
-            .extensions=${unfoldedMarkdownExtensions}
+            .extensions=${this.#markdownExtensions}
             @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
           >${text}</gem-bind-marked>
           <tap-code-block

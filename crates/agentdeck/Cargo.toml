@@ -24,6 +24,8 @@ tauri-plugin-webproxy = { git = "https://github.com/mantou132/tauri-plugin-webpr
 tauri-plugin-vnidrop-share = "1.0.0-rc"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.22"
+mime_guess = "2"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 tauri-plugin-haptics = "2"
