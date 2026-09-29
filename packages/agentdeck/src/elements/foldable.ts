@@ -1,7 +1,10 @@
+import { connect } from '@mantou/gem';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
+import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
+import { openMessageLink } from '../navigation';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -64,6 +67,8 @@ export class DeckFoldableElement extends GemElement {
   @attribute size: string;
   @attribute label: string;
   @attribute codelang: string;
+  /** Sheet 内链接相对该目录打开 */
+  @attribute cwd: string;
   /** 不折叠，如流式输出期间 */
   @boolattribute disabled: boolean;
   @property markdown?: string;
@@ -87,15 +92,22 @@ export class DeckFoldableElement extends GemElement {
     const text = this.markdown ?? this.textContent ?? '';
     const longestTicks = Math.max(0, ...(text.match(/`+/g) ?? []).map((ticks) => ticks.length));
     const fence = '`'.repeat(Math.max(3, longestTicks + 1));
-    Sheet.open({
+    const result = Sheet.open({
       maskClosable: true,
       header: this.label || this.codelang.toUpperCase() || i18n.get('timeline.code'),
       body: html`
-        <gem-bind-marked .mdStyle=${markdownStyle} .extensions=${unfoldedMarkdownExtensions}
+        <gem-bind-marked
+          .mdStyle=${markdownStyle}
+          .extensions=${unfoldedMarkdownExtensions}
+          @click=${(event: MouseEvent) => openMessageLink(event, this.cwd)}
           >${this.markdown ?? `${fence}${this.codelang}\n${text}\n${fence}`}</gem-bind-marked
         >
       `,
     });
+    // Sheet 盖在页面栈之上，内容触发页面栈变化（打开文件、网页、预览等）时关闭
+    const { store } = Stack.instance!;
+    const top = store.pages.at(-1);
+    result.finally(connect(store, () => store.pages.at(-1) !== top && result.sheet.close(null)));
   };
 
   @template()

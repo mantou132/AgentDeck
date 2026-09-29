@@ -100,6 +100,7 @@ export class DeckSessionTimelineElement extends GemElement {
               </div>
               <deck-foldable
                 size="small"
+                cwd=${this.cwd}
                 label=${i18n.get('timeline.userMessage')}
                 .markdown=${markdown}
                 ?disabled=${message.streaming}
