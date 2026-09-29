@@ -42,6 +42,10 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is needed to scan barcodes and QR codes</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is needed for voice input</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition is needed to convert voice input into text</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the development server on your local network.</string>
 	<key>NSAppTransportSecurity</key>

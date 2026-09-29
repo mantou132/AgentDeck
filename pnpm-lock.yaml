@@ -95,8 +95,11 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
       tauri-plugin-selection-menu-api:
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
+      tauri-plugin-stt-api:
+        specifier: ^0.2.2
+        version: 0.2.2
       tauri-plugin-webproxy-api:
         specifier: ^0.1.2
         version: 0.1.2
@@ -4368,8 +4371,11 @@ packages:
     resolution: {integrity: sha512-8GmSUlpjUKjDekqPaAKntxbzmt7P2kicAC55kGqdHILtwU25Ja1N7rhmWjp9XZJnybWmdaQqi0Wxx/YLQoEw3w==}
     engines: {node: '>=18'}
 
-  tauri-plugin-selection-menu-api@0.1.1:
-    resolution: {integrity: sha512-cS4ynTB9wqx3/mrCQojc164UBFaETIdxbVeHmHZGWuAB4fcCzdVnYJr2nuIEKTexMXKCU2QcRVw1s6DVeGcaSA==}
+  tauri-plugin-selection-menu-api@0.1.2:
+    resolution: {integrity: sha512-BDOcpRzQ+bXJAkfPD3zSSiHXrdTwC/+Iun9UPa1Bip3LFwAE1QcwRWyGjRKu29Vwo/8v7S6VbUg4EtlIdGjfog==}
+
+  tauri-plugin-stt-api@0.2.2:
+    resolution: {integrity: sha512-wSrNLxQqrpUFAad0LggQqzf81vsf7xbDkXfmowghAlfwwtC8oH9zcyamDju88Bl9yvFwxEwvkeYOv9eRBFkwaQ==}
 
   tauri-plugin-webproxy-api@0.1.2:
     resolution: {integrity: sha512-9F80wPJtfofRJxg5B0Yvn+u5alph+4PAOfh5DkDkBHOA7iQN3fnercaB3DQsNMTb/siInbC8B16WzoBJzDm9YQ==}
@@ -9249,7 +9255,11 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
-  tauri-plugin-selection-menu-api@0.1.1:
+  tauri-plugin-selection-menu-api@0.1.2:
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  tauri-plugin-stt-api@0.2.2:
     dependencies:
       '@tauri-apps/api': 2.11.1
 

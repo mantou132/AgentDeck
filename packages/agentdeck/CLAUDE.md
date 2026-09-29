@@ -9,9 +9,10 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
 - `src/agent/`：`transport.ts` 管理 Relay 连接与 host 握手，`api.ts` 提供远端接口，`rpc.ts` 负责双向流式通信，`encryption.ts` 提供由 ID 识别的可选端到端加密；`config.ts` 保存配置读取与连接常量。
 - `src/agent/push.ts`：移动端 FCM 注册与同步；使用 `tauri-plugin-fcm` 插件管理通知权限、渠道和 token 刷新。
+- `src/lib/voice.ts`：移动端语音输入；使用 `tauri-plugin-stt` 插件调用系统原生语音识别引擎（iOS `SFSpeechRecognizer` / Android `SpeechRecognizer`），桌面端未注册该插件。
 - `src/session/`：`types.ts` 为会话类型，`events.ts` 为 ACP reducer，`groups.ts` / `timeline.ts` 为列表与消息分组，`turn.ts` 控制流式任务和权限决断，`modes.ts` 适配 ACP 模式信息。
 - `src/elements/`：
-  - `composer.ts`：管理输入和附件；App 传入 draftKey 启用草稿持久化，正式会话使用全局唯一 sessionId，草稿跨 Relay 配置保留，扩展不启用。
+  - `composer.ts`：管理输入和附件；App 传入 draftKey 启用草稿持久化，正式会话使用全局唯一 sessionId，草稿跨 Relay 配置保留，扩展不启用。`lib/voice.ts` 的 `voiceSupported` 为真时在发送按钮左侧显示常驻麦克风按钮，识别结果流式写回输入框，发送按钮本身状态不受影响，发送或切换会话时自动停止录音。
   - `session-timeline.ts`：展示消息并通过 `Sheet.open` 打开过程弹层。
   - `chart.ts`：Markdown 中已闭合的 `agentdeck-chart` 代码块由 `lib/markdown.ts` 渲染为 `deck-chart`，代码块内容即 ECharts option，挂载时动态加载 `@gem-bind/echarts`，JSON 无效时显示原文；渲染能力在 `config.ts` 的 `RENDER_CAPABILITIES` 声明，经 `peer_attach` 告知 host。
   - `preview.ts`：`agentdeck-preview` 代码块（内容为入口 HTML 绝对路径）渲染为卡片，点击用 `openPreview` 在 Browser 中打开；仅 Tauri 声明 `preview` 能力。

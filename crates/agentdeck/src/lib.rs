@@ -12,6 +12,8 @@ pub fn run() {
             _app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
             #[cfg(mobile)]
             _app.handle().plugin(tauri_plugin_selection_menu::init())?;
+            #[cfg(mobile)]
+            _app.handle().plugin(tauri_plugin_stt::init())?;
             Ok(())
         })
         .manage(preview::PreviewRequests::default())

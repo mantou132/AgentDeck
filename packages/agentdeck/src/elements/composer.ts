@@ -11,6 +11,15 @@ import {
 } from '../composer/references';
 import { i18n } from '../i18n';
 import { hapticSelection } from '../lib/haptics';
+import {
+  ensureVoicePermission,
+  listenVoiceError,
+  listenVoiceResult,
+  type RecognitionResult,
+  startVoiceListening,
+  stopVoiceListening,
+  voiceSupported,
+} from '../lib/voice';
 import type { ModeSelection } from '../session/modes';
 import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
@@ -57,11 +66,14 @@ export class DeckComposerElement extends GemElement {
     readingAttachments: false,
     submitting: false,
     loadingDraft: false,
+    listening: false,
   });
   #textareaRef = createRef<HTMLTextAreaElement>();
   #fileInputRef = createRef<HTMLInputElement>();
   #nextPasteReference = 1;
   #pastedAttachments = new Map<string, Attachment>();
+  #voiceUnlisten = () => {};
+  #voiceBaseText = '';
 
   @effect((i) => [i.sessionKey, i.draftKey])
   #resetInput = async () => {
@@ -138,7 +150,52 @@ export class DeckComposerElement extends GemElement {
     this.#pastedAttachments.clear();
     this.#state({ draft: '', quote: '', attachments: [] });
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
+    this.#stopVoice();
   };
+
+  #applyVoiceTranscript = (result: RecognitionResult) => {
+    const base = this.#voiceBaseText ? `${this.#voiceBaseText} ` : '';
+    this.#setDraft(base + result.transcript);
+    if (result.isFinal) this.#voiceBaseText = base + result.transcript;
+  };
+
+  #stopVoice = () => {
+    if (!this.#state.listening) return;
+    this.#voiceUnlisten();
+    this.#state({ listening: false });
+    stopVoiceListening().catch(() => {
+      // Recognition session may already have ended (e.g. after an error event).
+    });
+  };
+
+  #toggleVoice = async () => {
+    if (this.#state.listening) return this.#stopVoice();
+    try {
+      if (!(await ensureVoicePermission())) {
+        Toast.open('warning', i18n.get('composer.voicePermissionDenied'));
+        return;
+      }
+      this.#voiceBaseText = this.#state.draft.trim();
+      const unlistenResult = await listenVoiceResult(this.#applyVoiceTranscript);
+      const unlistenError = await listenVoiceError(() => {
+        Toast.open('error', i18n.get('composer.voiceFailed'));
+        this.#stopVoice();
+      });
+      this.#voiceUnlisten = () => {
+        unlistenResult();
+        unlistenError();
+      };
+      hapticSelection();
+      await startVoiceListening();
+      this.#state({ listening: true });
+    } catch {
+      this.#voiceUnlisten();
+      Toast.open('error', i18n.get('composer.voiceUnavailable'));
+    }
+  };
+
+  @unmounted()
+  #stopVoiceOnUnmount = () => this.#stopVoice();
 
   restoreIfEmpty = (key: string, message: ComposerInput) => {
     if (this.draftKey === key && !this.#state.draft && !this.#state.quote && !this.#state.attachments.length)
@@ -387,23 +444,36 @@ export class DeckComposerElement extends GemElement {
                     <tap-use v-if=${this.modeBusy} class="size-3.5 shrink-0" .element=${icons.loading}></tap-use>
                   </div>
                 </div>
-                <button
-                  v-if=${this.pending}
-                  class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-transform duration-150 active:scale-[0.92]"
-                  aria-label=${i18n.get('composer.stopAria')}
-                  @click=${() => this.cancel()}
-                >
-                  <span class="size-2.5 rounded-[3px] bg-current"></span>
-                </button>
-                <button
-                  v-else
-                  class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-[transform,background-color] duration-150 active:scale-[0.92] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:active:scale-100"
-                  ?disabled=${!canSend}
-                  aria-label=${i18n.get('composer.sendAria')}
-                  @click=${this.#send}
-                >
-                  <tap-use class="size-[17px]" .element=${icons.arrowUp}></tap-use>
-                </button>
+                <div class="flex shrink-0 items-center gap-2">
+                  <button
+                    v-if=${voiceSupported}
+                    type="button"
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent active:bg-bg-hover disabled:cursor-default disabled:opacity-45 ${this.#state.listening ? 'text-primary' : 'text-describe'}"
+                    aria-label=${this.#state.listening ? i18n.get('composer.stopVoiceAria') : i18n.get('composer.startVoiceAria')}
+                    title=${this.#state.listening ? i18n.get('composer.stopVoiceAria') : i18n.get('composer.startVoiceAria')}
+                    ?disabled=${this.#state.loadingDraft || this.#state.readingAttachments || this.#state.submitting}
+                    @click=${this.#toggleVoice}
+                  >
+                    <tap-use class="size-5" .element=${this.#state.listening ? icons.stop : icons.mic}></tap-use>
+                  </button>
+                  <button
+                    v-if=${this.pending}
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-transform duration-150 active:scale-[0.92]"
+                    aria-label=${i18n.get('composer.stopAria')}
+                    @click=${() => this.cancel()}
+                  >
+                    <span class="size-2.5 rounded-[3px] bg-current"></span>
+                  </button>
+                  <button
+                    v-else
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-[transform,background-color] duration-150 active:scale-[0.92] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:active:scale-100"
+                    ?disabled=${!canSend}
+                    aria-label=${i18n.get('composer.sendAria')}
+                    @click=${this.#send}
+                  >
+                    <tap-use class="size-[17px]" .element=${icons.arrowUp}></tap-use>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

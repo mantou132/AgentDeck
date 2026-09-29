@@ -208,6 +208,7 @@ function composerFixture() {
     boolattribute: noop,
     emitter: () => () => noop,
     effect: fieldHook(effects),
+    unmounted: () => noop,
     template: fieldHook(templates),
     createState: (initial) => {
       state = Object.assign((next) => Object.assign(state, next), initial);
