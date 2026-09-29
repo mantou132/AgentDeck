@@ -9,7 +9,7 @@ import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { hapticImpact } from '../lib/haptics';
 import { displayPath } from '../lib/path';
-import { openChanges, openSession, openSettings } from '../navigation';
+import { openChanges, openSettings, replaceSession } from '../navigation';
 import { getModeSelection } from '../session/modes';
 import type { Attachment, DeckSession } from '../session/types';
 import { changeSessionMode } from '../state/modes';
@@ -215,7 +215,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           @click=${() => {
             if (!cwd) return;
             const pendingSession = createPendingSession({ agent: agentdeckStore.settings.agent, cwd });
-            openSession(pendingSession.sessionId);
+            replaceSession(pendingSession.sessionId);
           }}
         >
           <tap-use class="size-[20px]" .element=${icons.add}></tap-use>

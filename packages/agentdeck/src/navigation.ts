@@ -121,11 +121,17 @@ export const openSettings = () => {
   });
 };
 
-export const openSession = (sessionId: string) => {
-  Stack.push({
+export const openSession = (sessionId: string, options?: { replace?: boolean }) => {
+  const method = options?.replace ? Stack.replace : Stack.push;
+  method({
+    animated: true,
     content: html`
       <agentdeck-session-page class="block h-full" .sessionId=${sessionId}></agentdeck-session-page>
     `,
     gesture: true,
   });
+};
+
+export const replaceSession = (sessionId: string) => {
+  openSession(sessionId, { replace: true });
 };
