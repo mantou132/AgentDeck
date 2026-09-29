@@ -62,10 +62,10 @@ export class AgentDeckSessionListPageElement extends GemElement {
   };
 
   #onRefresh = async (event: CustomEvent<() => void>) => {
+    hapticWarning();
     try {
       await Promise.all([refreshSessions(), sleep(500)]);
     } finally {
-      hapticWarning();
       event.detail?.();
     }
   };

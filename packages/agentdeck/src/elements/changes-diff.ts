@@ -68,16 +68,15 @@ export class DeckChangesDiffPageElement extends GemElement {
             <tap-use class="size-4" .element=${icons.refresh}></tap-use>
           </button>
         </tap-navbar>
+        <div slot="header" class="flex items-center gap-2 border-b border-border bg-bg-light px-4 py-2 font-mono text-xs">
+          <deck-file-path class="min-w-0 flex-1 text-describe" path=${this.path}></deck-file-path>
+          <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5">
+            ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
+            ${stats?.deletions ? html`<span class="font-medium text-negative">-${stats.deletions}</span>` : ''}
+          </div>
+        </div>
 
         <main class="h-full overflow-auto overscroll-contain">
-          <!-- File Path and Stats bar -->
-          <div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-bg-light/95 px-4 py-2 text-xs backdrop-blur-md">
-            <span class="select-text truncate font-mono text-describe" title=${this.path}>${this.path}</span>
-            <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5 font-mono text-xs">
-              ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
-              ${stats?.deletions ? html`<span class="font-medium text-negative">-${stats.deletions}</span>` : ''}
-            </div>
-          </div>
 
           <!-- Loading state -->
           <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe">

@@ -101,31 +101,29 @@ export class DeckChangesPageElement extends GemElement {
             <tap-use class="size-4" .element=${icons.refresh}></tap-use>
           </button>
         </tap-navbar>
-
-        <main class="h-full overflow-auto overscroll-contain">
-          <!-- Summary Header -->
-          <div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-bg-light/95 px-4 py-2.5 backdrop-blur-md">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="truncate font-mono text-xs font-medium text-text">${repoName}</span>
-              <span
-                v-if=${branch}
-                class="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-xs font-medium text-primary-strong"
-              >
-                <tap-use class="size-3" .element=${icons.gitBranch}></tap-use>
-                ${branch}
-              </span>
-            </div>
-            <div v-if=${!loading && !error} class="flex items-center gap-2 text-xs">
-              <span class="text-describe">
-                ${files.length === 1 ? i18n.get('changes.fileChanged') : i18n.get('changes.filesChanged', String(files.length))}
-              </span>
-              <div v-if=${!!stats} class="flex items-center gap-1.5 font-mono text-xs">
-                ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
-                ${stats?.deletions ? html`<span class="font-medium text-negative">-${stats.deletions}</span>` : ''}
-              </div>
+        <div slot="header" class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-bg-light px-4 py-2.5">
+          <div class="flex min-w-0 items-center gap-2">
+            <span class="truncate font-mono text-xs font-medium text-text">${repoName}</span>
+            <span
+              v-if=${branch}
+              class="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-xs font-medium text-primary-strong"
+            >
+              <tap-use class="size-3" .element=${icons.gitBranch}></tap-use>
+              ${branch}
+            </span>
+          </div>
+          <div v-if=${!loading && !error} class="flex items-center gap-2 text-xs">
+            <span class="text-describe">
+              ${files.length === 1 ? i18n.get('changes.fileChanged') : i18n.get('changes.filesChanged', String(files.length))}
+            </span>
+            <div v-if=${!!stats} class="flex items-center gap-1.5 font-mono text-xs">
+              ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
+              ${stats?.deletions ? html`<span class="font-medium text-negative">-${stats.deletions}</span>` : ''}
             </div>
           </div>
+        </div>
 
+        <main class="h-full overflow-auto overscroll-contain">
           <!-- Loading state -->
           <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe">
             <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
