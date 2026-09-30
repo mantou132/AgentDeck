@@ -7,6 +7,7 @@ import { agentApi } from './agent/transport';
 import { i18n } from './i18n';
 import { parseMessageLink } from './lib/links';
 import { toPreviewUrl } from './lib/preview';
+import { icons } from './styles/icons';
 
 export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
   let currentUrl = url;
@@ -51,8 +52,23 @@ export const openWebBrowser = async (url: string, title = '', stack?: TapStackEl
   return result;
 };
 
-export const openPreview = (path: string, stack?: TapStackElement) =>
-  Browser.open({ src: toPreviewUrl(path), title: path.split(/[\\/]/).pop(), stack });
+export const openPreview = (path: string, stack?: TapStackElement) => {
+  const result = Browser.open({
+    src: toPreviewUrl(path),
+    title: path.split(/[\\/]/).pop(),
+    stack,
+    actions: [
+      {
+        label: i18n.get('global.reload'),
+        icon: icons.refresh,
+        handler: () => {
+          result.browser.reload();
+        },
+      },
+    ],
+  });
+  return result;
+};
 
 export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement) => {
   (stack || Stack).push({
