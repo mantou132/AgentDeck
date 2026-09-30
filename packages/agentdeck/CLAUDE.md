@@ -21,7 +21,8 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
   - `process-step.ts`：按 sessionId / groupId / itemId 自行订阅详情更新。
   - `attachment.ts` / `attachment-preview.ts`：展示附件。
   - `file-viewer.ts`：通过 `file_read` 浏览远端文件。
-  - `file-path.ts`：单行路径，默认目录部分省略、保留文件名，点击切换为可横向滚动的完整路径；file-viewer、changes、changes-diff 的路径栏放在页面 header slot 中，不随内容滚动。
+  - `file-path.ts`：单行路径，默认目录部分省略、保留文件名，点击切换为可横向滚动的完整路径（changes 列表项用 `pointer-events-none` 禁用）；file-viewer、changes、changes-diff 的路径栏放在页面 header slot 中，不随内容滚动。
+  - `changes.ts` / `changes-diff.ts`：工作区更改列表与单文件 diff，传入 `commit` 时改为展示该提交相对首个父提交的更改；列表项显示每个文件的 +/- 行数。点击分支进入 `git-log.ts` 提交记录（daemon 返回最近 200 条），点击提交进入 commit 模式的 changes。
   - `file-browser.ts`：通过 `file_browse` 浏览远端目录与文件，在新建会话弹窗及独立页面栈中复用。
   - `sheet.ts`：封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域。
 - 预览虚拟服务器：`crates/agentdeck/src/preview.rs` 注册 `agentdeck-preview` 协议，请求 emit 给 webview；`agent/preview.ts` 经 `lib/preview.ts` 把 URL host 映射到站点根目录（入口文件所在目录），用 `file_read` raw 读取后以 base64 字符串调用 `preview_respond`（Android IPC 会把原始字节序列化为数字数组）。Markdown 中的主机绝对路径图片也经此协议加载，file-viewer 另按文件所在目录解析相对图片；无此协议的客户端（扩展）在 file-viewer 中隐藏本地图片。单文件受 Relay 10 MiB 帧与两次 base64 限制，约 5 MB。

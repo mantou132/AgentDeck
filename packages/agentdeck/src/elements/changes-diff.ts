@@ -21,6 +21,7 @@ const pageStyle = css`
 export class DeckChangesDiffPageElement extends GemElement {
   @property path = '';
   @property cwd = '';
+  @property commit?: string;
 
   #state = createState({
     loading: true,
@@ -29,11 +30,11 @@ export class DeckChangesDiffPageElement extends GemElement {
     revision: 0,
   });
 
-  @effect((i) => [i.path, i.cwd, i.#state.revision])
+  @effect((i) => [i.path, i.cwd, i.commit, i.#state.revision])
   #load = () => {
     let active = true;
     this.#state({ loading: true, error: '' });
-    agentApi.gitDiff(this.cwd, this.path).then(
+    agentApi.gitDiff(this.cwd, this.path, this.commit).then(
       (result) => {
         if (active) this.#state({ result, loading: false });
       },
@@ -102,10 +103,10 @@ export class DeckChangesDiffPageElement extends GemElement {
             <p class="m-0">${i18n.get('changes.noDiff')}</p>
           </div>
 
-          <!-- Diff output -->
+          <!-- Diff output: fill the page so short diffs still scroll horizontally anywhere -->
           <tap-code-block
             v-else
-            class="select-text m-0 w-full bg-transparent text-sm rounded-none"
+            class="select-text m-0 grid min-h-full w-full grid-rows-1 bg-transparent text-sm rounded-none"
             codelang="diff"
           >${diff || ''}</tap-code-block>
         </main>

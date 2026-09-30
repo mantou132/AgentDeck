@@ -68,16 +68,24 @@ export const openFileViewer = (path: string, cwd: string, line?: number, stack?:
   });
 };
 
-export const openChanges = (cwd: string) => {
+/** 不传 commit 时展示工作区更改 */
+export const openChanges = (cwd: string, commit?: string) => {
   Stack.push({
-    content: html`<deck-changes-page .cwd=${cwd}></deck-changes-page>`,
+    content: html`<deck-changes-page .cwd=${cwd} .commit=${commit}></deck-changes-page>`,
     gesture: true,
   });
 };
 
-export const openChangesDiff = (path: string, cwd: string) => {
+export const openChangesDiff = (path: string, cwd: string, commit?: string) => {
   Stack.push({
-    content: html`<deck-changes-diff-page .path=${path} .cwd=${cwd}></deck-changes-diff-page>`,
+    content: html`<deck-changes-diff-page .path=${path} .cwd=${cwd} .commit=${commit}></deck-changes-diff-page>`,
+    gesture: true,
+  });
+};
+
+export const openGitLog = (cwd: string) => {
+  Stack.push({
+    content: html`<deck-git-log-page .cwd=${cwd}></deck-git-log-page>`,
     gesture: true,
   });
 };

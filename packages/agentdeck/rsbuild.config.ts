@@ -39,7 +39,7 @@ export default defineConfig(({ command }) => ({
                 'tap-*': '/elements/*',
               },
               'src/elements': {
-                'deck-(sheet|file-browser|changes-diff|changes)-*': '/$1',
+                'deck-(sheet|file-browser|changes-diff|changes|git-log)-*': '/$1',
                 'deck-*': '/*',
               },
             },

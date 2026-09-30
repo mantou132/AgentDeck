@@ -165,7 +165,7 @@ export class DeckFileViewerElement extends GemElement {
           <tap-code-block
             v-else-if=${isText && isSmall}
             ${this.#codeBlockRef}
-            class="select-text m-0 w-full text-sm bg-transparent rounded-none"
+            class="select-text m-0 grid min-h-full w-full grid-rows-1 text-sm bg-transparent rounded-none"
             codelang=${getCodeLang(path)}
             highlight=${this.line ? String(this.line) : ''}
           >${text}</tap-code-block>

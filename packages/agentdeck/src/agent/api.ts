@@ -48,8 +48,8 @@ export type FileBrowseOptions = {
 export type GitFileStatus = {
   path: string;
   status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed' | 'typechange' | 'conflicted' | string;
-  staged: boolean;
-  unstaged: boolean;
+  insertions: number;
+  deletions: number;
 };
 
 export type GitDiffStats = {
@@ -61,6 +61,28 @@ export type GitDiffStats = {
 export type GitStatusResult = {
   repo: string;
   branch?: string;
+  files: GitFileStatus[];
+  stats?: GitDiffStats | null;
+};
+
+export type GitCommit = {
+  id: string;
+  shortId: string;
+  summary: string;
+  author: string;
+  /** 毫秒时间戳 */
+  time: number;
+};
+
+export type GitLogResult = {
+  repo: string;
+  branch?: string;
+  commits: GitCommit[];
+};
+
+export type GitShowResult = {
+  repo: string;
+  commit: GitCommit;
   files: GitFileStatus[];
   stats?: GitDiffStats | null;
 };
@@ -225,8 +247,25 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.gitStatusTimeout'),
     });
 
-  gitDiff = (cwd: string, path?: string) =>
-    this.#peer.call<GitDiffResult>('git_diff', { cwd, ...(path ? { path } : {}) }, undefined, {
+  gitDiff = (cwd: string, path?: string, commit?: string) =>
+    this.#peer.call<GitDiffResult>(
+      'git_diff',
+      { cwd, ...(path ? { path } : {}), ...(commit ? { commit } : {}) },
+      undefined,
+      {
+        timeoutMs: 15_000,
+        timeoutMessage: i18n.get('error.gitDiffTimeout'),
+      },
+    );
+
+  gitLog = (cwd: string) =>
+    this.#peer.call<GitLogResult>('git_log', { cwd }, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: i18n.get('error.gitLogTimeout'),
+    });
+
+  gitShow = (cwd: string, commit: string) =>
+    this.#peer.call<GitShowResult>('git_show', { cwd, commit }, undefined, {
       timeoutMs: 15_000,
       timeoutMessage: i18n.get('error.gitDiffTimeout'),
     });
