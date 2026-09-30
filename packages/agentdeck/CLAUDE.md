@@ -1,52 +1,35 @@
 # AgentDeck Client (`packages/agentdeck`)
 
-AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS）及桌面端体验。
+AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS）及桌面端体验；扩展复用其 `agent/transport` 与部分元素。
 
-## 关键入口与目录结构
+## 代码导航
 
-- `src/main.ts` → `src/app.ts`：加载主题、挂载 App、启动 transport；未配置 Pairing ID 时打开 settings，否则打开 session-list。
-- `src/pages/`：`session-list`、`session`、`settings` 三页面；settings 提供配对指南 sheet，首次未配对使用时自动展示一次；自定义 Relay URL 只能通过扫描配对二维码设置，UI 不展示，手动修改 Pairing ID 即恢复默认 Relay；`navigation.ts` 提供 Stack 入口，通过 property 传递 sessionId。
-- `src/state/store.ts`：单一全局状态与基础更新；`state/sessions.ts` 管理会话生命周期，`state/app.ts` 负责启动、设置、重置及 transport 消息消费；`state/modes.ts` 执行模式切换。
-- `src/agent/`：`transport.ts` 管理 Relay 连接与 host 握手，`api.ts` 提供远端接口，`rpc.ts` 负责双向流式通信，`encryption.ts` 提供由 ID 识别的可选端到端加密；`config.ts` 保存配置读取与连接常量。
-- `src/agent/push.ts`：移动端 FCM 注册与同步；使用 `tauri-plugin-fcm` 插件管理通知权限、渠道和 token 刷新。
-- `src/lib/voice.ts`：移动端语音输入；使用 `tauri-plugin-stt` 插件调用系统原生语音识别引擎（iOS `SFSpeechRecognizer` / Android `SpeechRecognizer`），桌面端未注册该插件。
-- `src/session/`：`types.ts` 为会话类型，`events.ts` 为 ACP reducer，`groups.ts` / `timeline.ts` 为列表与消息分组，`turn.ts` 控制流式任务和权限决断，`modes.ts` 适配 ACP 模式信息。
-- `src/elements/`：
-  - `composer.ts`：管理输入和附件；App 传入 draftKey 启用草稿持久化，正式会话使用全局唯一 sessionId，草稿跨 Relay 配置保留，扩展不启用。`lib/voice.ts` 的 `voiceSupported` 为真时在发送按钮左侧显示常驻麦克风按钮，识别结果流式写回输入框，发送按钮本身状态不受影响，发送或切换会话时自动停止录音。
-  - `session-timeline.ts`：展示消息并通过 `Sheet.open` 打开过程弹层。
-  - `chart.ts`：Markdown 中已闭合的 `agentdeck-chart` 代码块由 `lib/markdown.ts` 渲染为 `deck-chart`，代码块内容即 ECharts option，挂载时动态加载 `@gem-bind/echarts`，JSON 无效时显示原文；渲染能力在 `config.ts` 的 `RENDER_CAPABILITIES` 声明，经 `peer_attach` 告知 host。
-  - `preview.ts`：`agentdeck-preview` 代码块（内容为入口 HTML 绝对路径）渲染为卡片，点击用 `openPreview` 在 Browser 中打开；仅 Tauri 声明 `preview` 能力。
-  - `foldable.ts`：超高内容折叠，点击通过 Sheet 查看全部；用于用户消息和 Agent Markdown 中已闭合的代码块。Sheet 内链接按 cwd 打开，全局 Stack 变化时关闭 Sheet。
-  - `process-detail.ts`：按 sessionId / groupId 从 store 读取过程分组，使用内部 Stack 导航到 process-step。
-  - `process-step.ts`：按 sessionId / groupId / itemId 自行订阅详情更新。
-  - `attachment.ts` / `attachment-preview.ts`：展示附件。
-  - `file-viewer.ts`：通过 `file_read` 浏览远端文件。
-  - `file-path.ts`：单行路径，默认目录部分省略、保留文件名，点击切换为可横向滚动的完整路径（changes 列表项用 `pointer-events-none` 禁用）；file-viewer、changes、changes-diff 的路径栏放在页面 header slot 中，不随内容滚动。
-  - `changes.ts` / `changes-diff.ts`：工作区更改列表与单文件 diff，传入 `commit` 时改为展示该提交相对首个父提交的更改；列表项显示每个文件的 +/- 行数。点击分支进入 `git-log.ts` 提交记录（daemon 返回最近 200 条），点击提交进入 commit 模式的 changes。
-  - `file-browser.ts`：通过 `file_browse` 浏览远端目录与文件，在新建会话弹窗及独立页面栈中复用。
-  - `sheet.ts`：封装普通弹层及内部 sheet-layer，通过 tap-reflect 映射到 body 并保留样式作用域。
-- 预览虚拟服务器：`crates/agentdeck/src/preview.rs` 注册 `agentdeck-preview` 协议，请求 emit 给 webview；`agent/preview.ts` 经 `lib/preview.ts` 把 URL host 映射到站点根目录（入口文件所在目录），用 `file_read` raw 读取后以 base64 字符串调用 `preview_respond`（Android IPC 会把原始字节序列化为数字数组）。Markdown 中的主机绝对路径图片也经此协议加载，file-viewer 另按文件所在目录解析相对图片；无此协议的客户端（扩展）在 file-viewer 中隐藏本地图片。单文件受 Relay 10 MiB 帧与两次 base64 限制，约 5 MB。
-- `src/lib/database.ts`：轻量 IndexedDB Store API，统一连接缓存、打开超时、事务提交、顺序读写与原子更新；drafts 和 in-flight 共用；数据库名称、版本、store 和 keyPath 统一在 `src/config.ts` 的 `DATABASES` 中声明，保留各自原数据库与对象仓库。in-flight 的 localStorage 降级与节流仍由业务层负责。
-- `src/composer/drafts.ts`：IndexedDB 保存未发送文字和附件；新会话按 agent + 工作目录恢复，正式会话按 sessionId 恢复。提交交给 in-flight 持久化后清除草稿，失败时回填且保留新输入；删除会话和 settings 重置清理对应草稿。
-- `src/composer/`：`files.ts` 读取文件并检查限制，`references.ts` 管理粘贴引用与编辑范围；`lib/` 提供 Markdown、diff2html 输入转换与路径显示；`follow-bottom.ts` 提供 session、process-detail、process-step 共用的滚动跟底逻辑。
-- `src/styles/`：`tailwind.css` 共享主题 token，`theme.ts` 桥接 Tap UI。
+- 启动：`main.ts` → `app.ts`；未配置 Pairing ID 时打开 settings，否则打开 session-list。页面在 `pages/`，Stack 入口在 `navigation.ts`。
+- 状态：`state/store.ts` 为单一全局 store；`state/sessions.ts` 会话生命周期；`state/app.ts` 启动、设置保存、重置与 transport 消息消费。
+- 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/encryption.ts`（`adk1_` 端到端加密）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
+- ACP 事件：`session/events.ts` 为 reducer，`session/turn.ts` 控制流式任务与权限决断。
+- 持久化：`lib/database.ts` 为 drafts 与 in-flight 共用的 IndexedDB Store API；新增库或 store 在 `DATABASES` 声明，已有名称不得改动。
+- 原生插件：推送 `agent/push.ts`（`tauri-plugin-fcm`）；语音 `lib/voice.ts`（`tauri-plugin-stt`，桌面端未注册，以 `voiceSupported` 判断）。
 
-## 运行与平台约束
+## 行为约束
 
-- 新会话先建本地 pending session（待创建会话），首次发送才向远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
-- Android 客户端配置在 `crates/agentdeck/gen/android/app/google-services.json`，禁止放入服务账号私钥。FCM token 经 `peer_attach` 同步，更新不切换连接状态，通知由 FCM 在后台显示。
-- Android identifier / namespace / applicationId / MainActivity package 保持 `com.mantou.agentdeck` 一致；对应 `crates/agentdeck/tauri.conf.json`、`crates/agentdeck/gen/android/app/build.gradle.kts` 和 `MainActivity.kt`。
-- iOS 原生资源位于 `crates/agentdeck/`；更新应用图标时需同步更新 `LaunchIcon`。
+- **会话**：新会话先建本地 pending session，首次发送才向远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
+- **设置**：自定义 Relay URL 只能通过扫描配对二维码设置，UI 不展示；手动修改 Pairing ID 即恢复默认 Relay。
+- **草稿**（`composer/drafts.ts`）：仅 App 启用（composer 传入 draftKey），扩展不启用。新会话按 agent + 工作目录恢复，正式会话按 sessionId 恢复，跨 Relay 配置保留。提交交给 in-flight 持久化后清除；失败时回填且不覆盖新输入；删除会话和 settings 重置时清理。
+- **渲染能力**：Markdown 中已闭合的 `agentdeck-chart`（内容为 ECharts option，JSON 无效时显示原文）和 `agentdeck-preview`（内容为入口 HTML 绝对路径）代码块由 `lib/markdown.ts` 转成元素。能力在 `RENDER_CAPABILITIES` 声明，经 `peer_attach` 告知 host；只有 Tauri 声明 `preview`。
+- **预览协议**：`crates/agentdeck/src/preview.rs` 注册 `agentdeck-preview` 协议，请求 emit 给 webview；`agent/preview.ts` 把 URL host 映射到入口所在目录，用 `file_read` raw 读取后以 base64 字符串调用 `preview_respond`（Android IPC 会把原始字节序列化成数字数组）。Markdown 中的主机绝对路径图片也走此协议；扩展没有该协议，会在 file-viewer 中隐藏本地图片。单文件受 Relay 10 MiB 帧和两次 base64 限制，约 5 MB。
+- **弹层**：`elements/sheet.ts` 通过 tap-reflect 映射到 body 并保留样式作用域；`foldable.ts` 的 Sheet 在全局 Stack 变化时关闭。
+- **Android**：`crates/agentdeck/gen/android/app/google-services.json` 禁止放入服务账号私钥。identifier / namespace / applicationId / MainActivity package 统一为 `com.mantou.agentdeck`（`tauri.conf.json`、`build.gradle.kts`、`MainActivity.kt`）。FCM token 经 `peer_attach` 同步，更新 token 不切换连接状态。
+- **iOS**：原生资源在 `crates/agentdeck/`；更新应用图标时同步更新 `LaunchIcon`。
+
+## 命名
+
+- `pendingSession` / `pendingCreation`：尚未在远端创建的会话，本地 sessionId 为 `pending-session`，首次发送时由 `promotePendingSession` 转为正式会话。
+- `pendingSessionIds`：正在执行任务的会话 ID 列表，和 `pendingCreation` 无关。
+- `draft` / `ComposerDraft`：只指未发送的输入文字和附件。
 
 ## 常用命令
 
-- `pnpm run dev`：启动 Rsbuild 前端本地开发服务器。
-- `pnpm run build`：Rsbuild 生产环境打包。
-- `pnpm run test`：Node 单元测试 (`test/*.test.mjs`)。
-- `pnpm run tauri android dev`：原生应用 Android 联调开发。
-
-## 会话与输入命名
-
-- `pendingSession` / `pendingCreation` 表示尚未创建到远端的会话，首次发送通过 `promotePendingSession` 创建正式会话；本地 sessionId 为 `pending-session`。
-- `draft` / `ComposerDraft` 仅表示未发送的输入文字和附件。
-- `pendingSessionIds` 仍表示正在执行任务的会话 ID 列表，与待创建会话标记 `pendingCreation` 不同。
+- `pnpm run dev` / `pnpm run build`：Rsbuild 开发服务器 / 生产打包。
+- `pnpm run test`：Node 单元测试（`test/*.test.mjs`）。
+- `pnpm run tauri android dev`：Android 联调。

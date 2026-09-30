@@ -36,7 +36,6 @@ export const popularAgents: { id: string; name: string }[] = [
   { id: 'codex-acp', name: 'Codex' },
   { id: 'cursor', name: 'Cursor' },
   { id: 'pi-acp', name: 'pi' },
-  { id: 'gemini', name: 'Gemini CLI' },
   { id: 'antigravity-acp', name: 'Google Antigravity' },
   { id: 'github-copilot-cli', name: 'GitHub Copilot' },
   { id: 'opencode', name: 'OpenCode' },

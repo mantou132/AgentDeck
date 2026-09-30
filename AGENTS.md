@@ -141,7 +141,7 @@ class DuoyunTestElement extends GemElement {
   // 基于 `@memo` 实现了 `@willMount`
   @memo((i) => [i.src])
   get #text() {
-    return i.src.repeat(10);
+    return this.src.repeat(10);
   }
 
   // 每次渲染后的副作用，参数和 `@memo` 一样，没有参数时每次都执行
@@ -189,3 +189,11 @@ class DuoyunTestElement extends GemElement {
 - `pnpm run lint`：Biome 全局代码风格检查；`pnpm run lint --write`：检查并修复。
 - `cargo check`：Rust Workspace 全局类型检查。
 - `pnpm -r test`：运行全工作区前端与扩展自动化测试。
+- `cargo test -p agentdeck-daemon`：Daemon 单元测试。
+- 提交前依次运行上述检查；Husky 通过 lint-staged 对暂存文件执行 Biome（`pnpm install` 后生效）。
+
+# 发布
+
+- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核。
+- 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 更新说明。
+- 所需 Secrets 以各 workflow 文件中的引用为准。

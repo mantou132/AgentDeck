@@ -4,6 +4,16 @@ AgentDeck turns your coding agents (Claude Code, Codex, Cursor, pi) into remote 
 
 [![AgentDeck Demo](https://img.youtube.com/vi/_HWCKW9nfpE/maxresdefault.jpg)](https://www.youtube.com/watch?v=_HWCKW9nfpE)
 
+## Features
+
+- **Any ACP agent**: Claude Code, Codex, Cursor, Google Antigravity, GitHub Copilot, OpenCode, Qwen Code, Kimi CLI and more. Switch agents and session modes from the client.
+- **Phone and browser**: Android app, plus a Chrome / Edge / Firefox extension (side panel and DevTools panel).
+- **End-to-end encrypted**: the relay only forwards ciphertext; your code and agents stay on your own computer.
+- **Self-hosted relay**: run your own [relay][relay] and pair by scanning the QR code from `agentdeckd status`.
+- **Review work on the go**: approve permission requests, browse remote files, and view Git changes, diffs and history.
+- **Rich input and output**: image and text attachments, voice input, charts and HTML previews rendered in the client.
+- **Keeps running**: completion push notifications on Android, drafts preserved across restarts, and optional keep-awake on the host.
+
 ## Quick start
 
 ```text
@@ -31,7 +41,7 @@ Run `agentdeckd start`, then paste its **Pairing ID** into AgentDeck's Settings 
 
 For npm upgrades, run `agentdeckd stop`, `npm install -g agentdeckd@latest`, then `agentdeckd start`. Stop the daemon before uninstalling as well. If you change Node installations or npm's global directory, run `agentdeckd restart` from the new installation to update the autostart path. npm installation does not start services automatically.
 
-**Keep the Pairing ID secret. Anyone with it can access your agent. Do not include it in screenshots or issue reports.** New installations use `adk1_` IDs with end-to-end encryption; the relay only forwards ciphertext. Legacy UUID IDs use plaintext transport.
+**Keep the Pairing ID secret. Anyone with it can access your agent. Do not include it in screenshots or issue reports.** New installations use `adk1_` IDs with end-to-end encryption; the relay only forwards ciphertext. Legacy UUID IDs use plaintext transport. Android completion notifications are sent by the daemon through a forwarder (`agent-deck.xianqiao.wang/push`) to Firebase Cloud Messaging; the payload contains only the agent and session IDs, with no prompts or replies.
 
 ## Daemon commands
 
@@ -71,78 +81,9 @@ Both settings are saved for future starts. Use `restart` to change settings whil
 
 Logs are in `logs/agentdeckd.log`.
 
-## Development
+## Enterprise
 
-```sh
-pnpm install
-pnpm run tauri android dev  # Android device/emulator
-```
-
-### Checks before commit
-
-```sh
-pnpm run lint         # Biome & TypeScript strict check
-pnpm -r test          # Workspace tests
-cargo check           # Rust workspace check
-cargo test -p agentdeck-daemon  # Daemon tests
-```
-
-Husky runs Biome on staged files via lint-staged; install dependencies once to enable it.
-
-## Project structure
-
-This repository is structured as a monorepo (pnpm workspace + Cargo workspace):
-
-- `packages/agentdeck/` — Gem + Tap UI frontend application (`src/`, `public/`, `test/`).
-- `packages/extension/` — AgentDeck browser extension.
-- `crates/agentdeck/` — Tauri 2 native shell, capabilities, Android and iOS projects.
-- `crates/daemon/` — Standalone daemon service (`agentdeckd`).
-
-## Releases
-
-All components (Daemon, Browser Extension, and Android App) are released automatically by pushing a version tag. The release workflows extract the version directly from the tag and handle packaging, building, and store submissions:
-
-```sh
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-### What happens on tag push
-
-- **Daemon (`agentdeckd`)**: Builds multi-platform release binaries (macOS arm64/x64, Linux x64, Windows x64), publishes packages to npm via OIDC, updates Homebrew Formula (`mantou132/homebrew-tap`) and Scoop Bucket (`mantou132/scoop-bucket`), and attaches archives with SHA256 sums to the GitHub Release.
-- **Browser Extension**: Automatically syncs `version` in `manifest.json`, strips development keys, builds packages for Chrome and Firefox, and publishes to:
-  - Chrome Web Store
-  - Microsoft Edge Add-ons
-  - Firefox Add-ons (AMO)
-- **Android App**: Automatically syncs `version` in `tauri.conf.json` (deriving Android `versionCode`), builds signed universal APK and AAB bundles, attaches them to the GitHub Release, and submits the AAB to **Google Play Production** for review.
-
-*(Optional)* Before pushing the tag, you can update `distribution/whatsnew/` (at most 500 characters per language) to customize the release notes displayed in Google Play.
-
-### Required Actions Secrets
-
-For automated publishing across all platforms, configure these repository Secrets once:
-
-#### Android (Google Play)
-| Secret | Description |
-| --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | Base64-encoded Google Play upload keystore (`.jks`) |
-| `ANDROID_KEY_ALIAS` | Upload key alias |
-| `ANDROID_KEY_PASSWORD` | Upload key password |
-| `ANDROID_STORE_PASSWORD` | Keystore password |
-| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Google Play Console API service account JSON key |
-
-#### Browser Extensions
-| Secret | Description |
-| --- | --- |
-| `CHROME_EXTENSION_ID` | Chrome Web Store item ID |
-| `CHROME_CLIENT_ID` / `CHROME_CLIENT_SECRET` / `CHROME_REFRESH_TOKEN` | Google Cloud API credentials for Chrome Web Store upload |
-| `EDGE_PRODUCT_ID` / `EDGE_CLIENT_ID` / `EDGE_API_KEY` | Microsoft Partner Center API credentials for Edge Add-ons |
-| `FIREFOX_ADDON_GUID` / `FIREFOX_JWT_ISSUER` / `FIREFOX_JWT_SECRET` | Mozilla Add-ons (AMO) API credentials for Firefox signing |
-
-#### Package Managers
-| Secret | Description |
-| --- | --- |
-| `TAP_TOKEN` | GitHub PAT with write access to `mantou132/homebrew-tap` and `mantou132/scoop-bucket` |
+We are exploring a team / enterprise edition: self-hosted relay, SSO, an approved-agent allowlist, audit logs and device management. If your team is interested, email [contact@xianqiao.wang](mailto:contact@xianqiao.wang) and tell us which agents you use and what your security review requires.
 
 ## Privacy Policy
 
