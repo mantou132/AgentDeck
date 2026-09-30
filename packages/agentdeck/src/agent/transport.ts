@@ -23,6 +23,7 @@ type HostSyncOptions = {
 
 type InitTransportOptions = {
   initialRelayId: string;
+  initialRelayUrl?: string;
   onRequestPermission: (request: PermissionRequest) => Promise<string>;
   onMessage: MessageHandler;
   onBeforePayload?: () => Promise<unknown> | undefined;
@@ -366,7 +367,8 @@ class AgentTransport {
 
   start(relayId: string, options?: TransportOptions) {
     if (!isPairingId(relayId)) return;
-    if (this.#relayClient && this.#currentRelayId === relayId) {
+    const sameRelay = (this.#currentOptions?.relayUrl || '') === (options?.relayUrl || '');
+    if (this.#relayClient && this.#currentRelayId === relayId && sameRelay) {
       this.reconnect(true);
       return;
     }
@@ -526,5 +528,9 @@ export const initTransport = (options: InitTransportOptions) => {
   agentApi.setSessionEndedHandler(({ sessionId }) => transport.dispatchMessage({ type: 'session_ended', sessionId }));
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
   if (isPairingId(options.initialRelayId))
-    startTransport(options.initialRelayId, { ackHead: options.ackHead, capabilities: options.capabilities });
+    startTransport(options.initialRelayId, {
+      ackHead: options.ackHead,
+      relayUrl: options.initialRelayUrl,
+      capabilities: options.capabilities,
+    });
 };

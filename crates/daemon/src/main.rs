@@ -149,6 +149,17 @@ fn print_daemon_status(paths: &AppPaths) -> Result<()> {
     Ok(())
 }
 
+/// The QR pairing URI; `relayUrl` is only included for a non-default relay so default QR codes stay unchanged.
+fn pairing_uri(relay_id: &str, relay_url: &str) -> String {
+    let mut params = vec![("pairingId", relay_id)];
+    if relay_url != config::DEFAULT_RELAY_URL {
+        params.push(("relayUrl", relay_url));
+    }
+    reqwest::Url::parse_with_params("agentdeck://connect", params)
+        .expect("valid pairing URI")
+        .into()
+}
+
 fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Option<u32>)>) {
     println!(
         "{} {}",
@@ -171,7 +182,7 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
     ui::kv("Relay URL", ui::underline(config.relay_url()));
     ui::kv("Pairing ID", ui::cyan(config.relay_id()));
     println!();
-    let uri = format!("agentdeck://connect?pairingId={}", config.relay_id());
+    let uri = pairing_uri(config.relay_id(), config.relay_url());
     if let Err(error) = qr2term::print_qr(&uri) {
         crate::logger::log(&format!("Cannot print QR code: {error}"));
         ui::kv("URI", uri);
@@ -271,6 +282,18 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pairing_uri_includes_custom_relay_only() {
+        assert_eq!(
+            pairing_uri("adk1_abc", config::DEFAULT_RELAY_URL),
+            "agentdeck://connect?pairingId=adk1_abc"
+        );
+        assert_eq!(
+            pairing_uri("adk1_abc", "wss://relay.example/ws?a=1"),
+            "agentdeck://connect?pairingId=adk1_abc&relayUrl=wss%3A%2F%2Frelay.example%2Fws%3Fa%3D1"
+        );
+    }
 
     #[test]
     fn awake_commands_parse() {

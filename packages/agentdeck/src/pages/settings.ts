@@ -1,7 +1,7 @@
 import { Dialog } from '@mantou/tap-ui/elements/dialog';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { RELAY_GUIDE_SEEN_KEY } from '../config';
+import { isRelayUrl, RELAY_GUIDE_SEEN_KEY } from '../config';
 import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
 import { hardResetApp, saveSettings } from '../state/app';
@@ -35,6 +35,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   #state = createState({
     relayId: agentdeckStore.settings.relayId,
+    relayUrl: agentdeckStore.settings.relayUrl,
     agent: agentdeckStore.settings.agent,
     relayGuideOpen: !agentdeckStore.settings.relayId && !localStorage.getItem(RELAY_GUIDE_SEEN_KEY),
     showRelayId: false,
@@ -68,8 +69,9 @@ export class AgentDeckSettingsPageElement extends GemElement {
       const url = new URL(event.detail);
       if (url.protocol !== 'agentdeck:') throw new Error();
       const pairingId = url.searchParams.get('pairingId');
-      if (!pairingId) throw new Error();
-      this.#state({ relayId: pairingId });
+      const relayUrl = url.searchParams.get('relayUrl') || '';
+      if (!pairingId || (relayUrl && !isRelayUrl(relayUrl))) throw new Error();
+      this.#state({ relayId: pairingId, relayUrl });
       Toast.open('success', i18n.get('settings.relayIdUpdated'));
     } catch {
       Toast.open('error', i18n.get('settings.scanFailed'));
@@ -86,7 +88,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   #save = () => {
     try {
-      saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent });
+      saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent, relayUrl: this.#state.relayUrl });
       if (this.canGoBack) {
         Stack.pop();
       }
@@ -166,7 +168,9 @@ export class AgentDeckSettingsPageElement extends GemElement {
                 placeholder="adk1_..."
                 aria-label=${i18n.get('settings.connectTitle')}
                 .value=${this.#state.relayId}
-                @input=${(event: InputEvent) => this.#state({ relayId: (event.target as HTMLInputElement).value })}
+                @input=${(event: InputEvent) =>
+                  // Relay URL only comes from a scanned QR code; manual edits fall back to the default relay.
+                  this.#state({ relayId: (event.target as HTMLInputElement).value, relayUrl: '' })}
               />
               <button
                 type="button"

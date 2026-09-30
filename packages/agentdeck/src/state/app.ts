@@ -105,6 +105,7 @@ export const startApp = () => {
   const shouldAckHead = resetWasPending || !hasActiveInFlightMarker();
   initTransport({
     initialRelayId: agentdeckStore.settings.relayId,
+    initialRelayUrl: agentdeckStore.settings.relayUrl,
     ackHead: shouldAckHead,
     capabilities: RENDER_CAPABILITIES,
     onRequestPermission: (request) => {
@@ -124,10 +125,11 @@ export const startApp = () => {
 };
 
 export const saveSettings = (settings: AppSettings) => {
-  const next = { relayId: settings.relayId.trim(), agent: settings.agent.trim() };
+  const next = { relayId: settings.relayId.trim(), agent: settings.agent.trim(), relayUrl: settings.relayUrl || '' };
   if (!isPairingId(next.relayId)) throw new Error(i18n.get('error.invalidRelayId'));
   if (!next.agent) throw new Error(i18n.get('error.selectRemoteAgent'));
-  const relayChanged = next.relayId !== agentdeckStore.settings.relayId;
+  const relayChanged =
+    next.relayId !== agentdeckStore.settings.relayId || next.relayUrl !== agentdeckStore.settings.relayUrl;
   const agentChanged = next.agent !== agentdeckStore.settings.agent;
   const notConnected = agentdeckStore.connection !== 'connected';
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
@@ -135,8 +137,9 @@ export const saveSettings = (settings: AppSettings) => {
   if (relayChanged || agentChanged) {
     resetRemoteState();
   }
-  if (relayChanged) startTransport(next.relayId, { ackHead: true, capabilities: RENDER_CAPABILITIES });
-  else if (notConnected) startTransport(next.relayId, { capabilities: RENDER_CAPABILITIES });
+  const { relayUrl } = next;
+  if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, capabilities: RENDER_CAPABILITIES });
+  else if (notConnected) startTransport(next.relayId, { relayUrl, capabilities: RENDER_CAPABILITIES });
   else if (agentChanged && agentdeckStore.connection === 'connected') refreshSessions();
 };
 

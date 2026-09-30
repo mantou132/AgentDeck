@@ -5,6 +5,8 @@ import { previewSupported } from './lib/preview';
 export type AppSettings = {
   relayId: string;
   agent: string;
+  /** Custom relay from a scanned pairing QR code; empty means `RELAY_URL`. */
+  relayUrl?: string;
 };
 
 // Storage Keys (localStorage / sessionStorage)
@@ -42,6 +44,15 @@ export const popularAgents: { id: string; name: string }[] = [
   { id: 'kimi', name: 'Kimi CLI' },
 ];
 
+export const isRelayUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'ws:' || url.protocol === 'wss:') && !!url.host;
+  } catch {
+    return false;
+  }
+};
+
 export const readSettings = (): AppSettings => {
   try {
     const value = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') as Partial<AppSettings> | null;
@@ -49,8 +60,9 @@ export const readSettings = (): AppSettings => {
     return {
       relayId,
       agent: typeof value?.agent === 'string' && value.agent ? value.agent : popularAgents[0].id,
+      relayUrl: typeof value?.relayUrl === 'string' && isRelayUrl(value.relayUrl) ? value.relayUrl : '',
     };
   } catch {
-    return { relayId: '', agent: popularAgents[0].id };
+    return { relayId: '', agent: popularAgents[0].id, relayUrl: '' };
   }
 };

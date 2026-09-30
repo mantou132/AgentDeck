@@ -38,7 +38,7 @@ AgentDeck 独立后台守护服务 `agentdeckd`，负责本地 ACP Agent 生命�
   - Windows: `planif` -> Windows Task Scheduler (Logon trigger)
   - `start` 即完成自启注册并在未运行状态下立即拉起服务。
   - `stop` 即注销自启并安全关闭当前所有运行中的实例。
-- **CLI 配置**：命令与参数用法以 `agentdeckd --help` 及子命令 help 为准。配置保存在 `daemon.json`，自启读取保存值；Relay 配置变更需重启，awake 配置自动重载。显示配对 ID 时必须包含安全警示边框。
+- **CLI 配置**：命令与参数用法以 `agentdeckd --help` 及子命令 help 为准。配置保存在 `daemon.json`，自启读取保存值；Relay 配置变更需重启，awake 配置自动重载。显示配对 ID 时必须包含安全警示边框。配对二维码为 `agentdeck://connect?pairingId=…`，使用非默认 Relay 时追加 `relayUrl`。
 - **防自动睡眠**：默认与 reset 均为 `never`，通过 `keepawake` 只阻止自动睡眠。`active` 按最后一次收发 RPC 的时间计时，一小时无 RPC 后释放；活动仅保存在内存。运行状态写入 `awake_status.json`，随 daemon 退出清理。
 - **Daemon 重置**：`reset` 停止服务并持有单例锁后，删除 `remote_peers_v1.json`、`logs/` 和 `agents/*/install/` 临时下载目录；应用 `--pairing-id` / `--relay-url` 参数，未传 ID 时生成新的 `adk1_` Pairing ID，未传 URL 时恢复默认 Relay 地址；保留锁文件、已安装 Agent 及历史。完成后恢复原先运行/停止状态并输出与 `status` 相同的信息（含新 ID），运行中的前台实例会恢复为后台服务。
 - **会话指令**：面板上下文等指令总是通过 `session/new` / `session/load` 的 `_meta.systemPrompt.append` 下发，不做能力判断；不支持的 Agent 会忽略。不用 MCP instructions 承载客户端上下文：语义不符，且 Codex 等不会把它当作指令；ACP 正式字段见 RFD agent-client-protocol#1237。

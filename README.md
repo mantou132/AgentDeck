@@ -54,7 +54,7 @@ agentdeckd restart --pairing-id <YOUR_PAIRING_ID>
 agentdeckd reset --pairing-id <NEW_PAIRING_ID> --relay-url wss://your-relay.example/ws
 ```
 
-Both settings are saved for future starts. Use `restart` to change settings while the daemon is running, or `reset` to also clear local state. The default relay is `wss://agent-deck.xianqiao.wang/ws`; clients must use the same relay and Pairing ID.
+Both settings are saved for future starts. Use `restart` to change settings while the daemon is running, or `reset` to also clear local state. The default relay is `wss://agent-deck.xianqiao.wang/ws`; clients must use the same relay and Pairing ID. With a custom relay, scan the QR code shown by `agentdeckd status` in the app; it carries both the Pairing ID and the relay URL. Typing the Pairing ID manually uses the default relay.
 
 ## Troubleshooting
 

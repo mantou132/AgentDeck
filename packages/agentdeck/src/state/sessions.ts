@@ -240,8 +240,11 @@ export const deleteSession = async (sessionId: string) => {
     Toast.open('error', i18n.get('error.remoteNotConnected'));
     return;
   }
-  const { agent, relayId } = agentdeckStore.settings;
-  const isCurrentHost = () => agent === agentdeckStore.settings.agent && relayId === agentdeckStore.settings.relayId;
+  const { agent, relayId, relayUrl } = agentdeckStore.settings;
+  const isCurrentHost = () =>
+    agent === agentdeckStore.settings.agent &&
+    relayId === agentdeckStore.settings.relayId &&
+    relayUrl === agentdeckStore.settings.relayUrl;
   setSessionFlag('deletingSessionIds', sessionId, true);
   try {
     agentApi.deleteSession(session.agent, sessionId).catch(() => {});
