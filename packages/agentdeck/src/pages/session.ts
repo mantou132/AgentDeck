@@ -30,8 +30,7 @@ import { icons } from '../styles/icons';
 
 const style = css`
   .session-header {
-    min-height: calc(62px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
-    padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   }
 `;
 
@@ -166,12 +165,12 @@ export class AgentDeckSessionPageElement extends GemElement {
     retrySessionLoad(this.sessionId);
   };
 
-  #renderHeader = (title: string, cwd?: string, loading = false, loaded = false) => {
+  #renderHeader = (title: string, cwd?: string) => {
     const connected = agentdeckStore.connection === 'connected';
     return html`
       <header
         slot="header"
-        class="session-header relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl backdrop-saturate-125"
+        class="session-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong px-3 pb-1.5"
       >
         <tap-gesture
           role="button"
@@ -185,26 +184,18 @@ export class AgentDeckSessionPageElement extends GemElement {
         >
           <tap-use class="size-[20px]" .element=${icons.back}></tap-use>
         </tap-gesture>
-        <div class="min-w-0 text-center">
-          <div class="truncate font-display text-base leading-tight font-semibold text-highlight">${title}</div>
+        <div class="flex min-w-0 flex-col items-center text-center">
+          <div class="max-w-full truncate font-display text-base font-semibold text-highlight">${title}</div>
           <button
             v-if=${cwd}
             type="button"
-            class="group mt-0.5 inline-flex max-w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border-0 bg-transparent px-2 py-0.5 text-sm font-medium text-describe transition-[background-color,transform] duration-150 hover:bg-bg-hover hover:text-text active:scale-[0.97]"
+            class="group mt-0.5 flex max-w-full cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent px-2 text-xs text-describe transition-[background-color,transform] duration-150 active:scale-[0.97]"
             title=${i18n.get('changes.viewChanges')}
             @click=${() => {
               if (!cwd) return;
               openChanges(cwd);
             }}
           >
-            <span
-              class=${classMap({
-                'size-1.5 shrink-0 rounded-full': true,
-                'bg-positive': connected && loaded,
-                'animate-pulse bg-informative': loading,
-                'bg-disabled': !connected || (!loaded && !loading),
-              })}
-            ></span>
             <span class="truncate font-mono">${displayPath(cwd || '')}</span>
           </button>
         </div>
@@ -258,7 +249,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     const connected = agentdeckStore.connection === 'connected';
     return html`
       <tap-page class="bg-bg text-text">
-        ${this.#renderHeader(session.title || (session.pendingCreation ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd, loading, loaded)}
+        ${this.#renderHeader(session.title || (session.pendingCreation ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd)}
 
         <div class="relative h-full">
           <main
@@ -269,7 +260,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           >
             <div
               ${this.#messagesContentRef}
-              class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-[22px] pb-7 sm:px-6"
+              class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-4 pb-5 sm:px-6"
             >
               <section v-if=${loading} class="grid flex-1 place-items-center content-center px-6 py-12 text-center">
                 <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">

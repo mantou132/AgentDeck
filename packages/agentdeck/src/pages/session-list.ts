@@ -107,7 +107,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
       >
         <header
           slot="header"
-          class="menu-header flex items-center gap-4 bg-bg/90 px-5 pb-3.5 backdrop-blur-xl backdrop-saturate-125 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
+          class="menu-header flex items-center gap-4 bg-bg/90 px-5 pb-2.5 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div class="flex min-w-0 flex-1 items-center gap-3">
             <img class="size-11 shrink-0 rounded-[13px] shadow-card" src="/agentdeck-icon.png" alt="" draggable="false"/>
@@ -130,7 +130,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
           </div>
         </header>
 
-        <main class="menu-scroll px-4 pt-2 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]">
+        <main class="menu-scroll px-4 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]">
           <div
             v-if=${hasGroups && hasError}
             class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-negative/20 bg-negative/[0.06] px-4 py-3 text-xs leading-relaxed text-negative"
@@ -147,7 +147,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
             </button>
           </div>
 
-          <div v-if=${showSkeleton} class="flex flex-col gap-5" aria-label=${i18n.get('sessionList.loading')}>
+          <div v-if=${showSkeleton} class="flex flex-col gap-5 pt-2" aria-label=${i18n.get('sessionList.loading')}>
             ${[3, 2].map(
               (rows) => html`
                 <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
@@ -240,7 +240,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
         <footer
           v-if=${!showErrorState && !showSkeleton}
           slot="footer"
-          class="menu-footer bg-bg/90 px-4 pt-2.5 backdrop-blur-xl backdrop-saturate-125 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
+          class="menu-footer bg-bg/90 px-4 pt-2 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div class="flex items-center justify-between gap-3">
             <button

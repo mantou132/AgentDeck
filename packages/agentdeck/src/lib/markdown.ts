@@ -175,7 +175,7 @@ const baseMarkdownStyle = `
   pre, tap-code-block {
     max-width: 100%;
     margin: .7rem 0;
-    border: 1px solid ${agentDeckTheme.borderColor};
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.lightBackgroundColor};
     color: ${agentDeckTheme.textColor};
@@ -196,14 +196,14 @@ const baseMarkdownStyle = `
     max-width: 100%;
     margin: .7rem 0;
     overflow-x: auto;
-    border: 1px solid ${agentDeckTheme.borderColor};
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
   }
   table { width: 100%; border-collapse: collapse; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }
   th { background: ${agentDeckTheme.hoverBackgroundColor}; color: ${agentDeckTheme.highlightColor}; text-align: left; }
-  tr + tr td, tbody td { border-top: 1px solid ${agentDeckTheme.borderColor}; }
-  hr { margin: .9rem 0; border: 0; border-top: 1px solid ${agentDeckTheme.borderColor}; }
+  tr + tr td, tbody td { border-top: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; }
+  hr { margin: .9rem 0; border: 0; border-top: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; }
   img { max-width: 100%; height: auto; border-radius: ${agentDeckTheme.normalRound}; }
   gem-bind-diff2html {
     margin: .7rem 0;
@@ -234,12 +234,12 @@ userMarkdownStyle.replaceSync(`
   p:not(:first-child) { margin-top: .4rem; }
   ul, ol { margin: .35rem 0; padding-left: 1.3rem; }
   blockquote { margin: .5rem 0; border-left: 2px solid currentColor; padding-left: .65rem; opacity: .85; }
-  a, a:visited { color: inherit; text-underline-offset: 2px; }
-  code { border-radius: ${agentDeckTheme.smallRound}; background: rgb(255 255 255 / .16); padding: .1em .3em; font-family: ${agentDeckTheme.codeFont}; }
-  pre { max-width: 100%; margin: .6rem 0; overflow: auto; border-radius: 9px; background: rgb(0 0 0 / .18); padding: .7rem; }
+  a, a:visited { color: ${agentDeckTheme.primaryStrongColor}; text-underline-offset: 2px; }
+  code { border-radius: ${agentDeckTheme.smallRound}; background: ${agentDeckTheme.lightBackgroundColor}; padding: .1em .3em; font-family: ${agentDeckTheme.codeFont}; }
+  pre { max-width: 100%; margin: .6rem 0; overflow: auto; border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; border-radius: 9px; background: ${agentDeckTheme.lightBackgroundColor}; padding: .7rem; }
   pre code { background: none; padding: 0; }
   table { border-collapse: collapse; }
-  th, td { border: 1px solid rgb(255 255 255 / .25); padding: .4rem; }
+  th, td { border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; padding: .4rem; }
   img { max-width: 100%; border-radius: 9px; }
   gem-bind-diff2html { display: block; max-width: 100%; overflow: auto; border-radius: 9px; }
 `);

@@ -17,7 +17,7 @@ const style = css`
     margin: 0;
     word-break: break-word;
     font-family: ${agentDeckTheme.displayFont};
-    font-size: 1.125rem;
+    font-size: ${agentDeckTheme.fontSizeLg};
     line-height: 1.375;
     font-weight: 600;
     letter-spacing: -0.025em;
@@ -26,7 +26,7 @@ const style = css`
   .description {
     margin: 6px 0 0;
     font-family: ${agentDeckTheme.font};
-    font-size: 0.875rem;
+    font-size: ${agentDeckTheme.fontSizeSm};
     line-height: 1.5;
     font-weight: 400;
     color: ${agentDeckTheme.describeColor};
@@ -57,7 +57,7 @@ const style = css`
     background: ${agentDeckTheme.backgroundColor};
     padding: 1rem;
     font-family: ${agentDeckTheme.codeFont};
-    font-size: 0.875rem;
+    font-size: ${agentDeckTheme.fontSizeSm};
     line-height: 1.625;
     color: ${agentDeckTheme.textColor};
   }

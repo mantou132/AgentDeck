@@ -129,7 +129,7 @@ export class DeckFileViewerElement extends GemElement {
         </tap-navbar>
         <deck-file-path
           slot="header"
-          class="border-b border-border bg-bg-light px-4 py-2 font-mono text-xs text-describe"
+          class="border-b border-border-strong bg-bg-light px-4 py-2 font-mono text-xs text-describe"
           path=${path}
         ></deck-file-path>
         <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">

@@ -6,6 +6,7 @@ import {
   requestPermissions,
   scan,
 } from '@tauri-apps/plugin-barcode-scanner';
+import { agentDeckTheme } from '../styles/theme';
 
 export type DeckQrScannerError = 'permission-denied' | 'scan-failed';
 
@@ -60,7 +61,7 @@ const style = css`
     z-index: 1;
     margin: 0;
     text-align: center;
-    font-size: 17px;
+    font-size: ${agentDeckTheme.fontSizeBase};
     font-weight: 600;
   }
 
@@ -134,7 +135,7 @@ const style = css`
     z-index: 1;
     margin: 0;
     text-align: center;
-    font-size: 14px;
+    font-size: ${agentDeckTheme.fontSizeSm};
     color: rgb(255 255 255 / 0.8);
   }
 
@@ -149,7 +150,7 @@ const style = css`
     border-radius: 16px;
     background: rgb(255 255 255 / 0.18);
     color: white;
-    font-size: 16px;
+    font-size: ${agentDeckTheme.fontSizeBase};
     font-weight: 600;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);

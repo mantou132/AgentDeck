@@ -59,17 +59,16 @@ export class DeckChangesDiffPageElement extends GemElement {
     return html`
       <tap-page class="bg-bg text-text">
         <tap-navbar slot="header" title=${fileName} back default-back>
-          <button
+          <tap-use
             slot="right"
-            type="button"
-            class="min-h-11 cursor-pointer border-0 bg-transparent px-3 text-describe transition-colors hover:text-text active:scale-[0.95]"
+            role="button"
             title=${i18n.get('global.reload')}
+            aria-label=${i18n.get('global.reload')}
+            .element=${icons.refresh}
             @click=${() => this.#state({ revision: this.#state.revision + 1 })}
-          >
-            <tap-use class="size-4" .element=${icons.refresh}></tap-use>
-          </button>
+          ></tap-use>
         </tap-navbar>
-        <div slot="header" class="flex items-center gap-2 border-b border-border bg-bg-light px-4 py-2 font-mono text-xs">
+        <div slot="header" class="flex items-center gap-2 border-b border-border-strong bg-bg-light px-4 py-2 font-mono text-xs">
           <deck-file-path class="min-w-0 flex-1 text-describe" path=${this.path}></deck-file-path>
           <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5">
             ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}

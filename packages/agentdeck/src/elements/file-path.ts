@@ -28,7 +28,12 @@ export class DeckFilePathElement extends GemElement {
       >
         <span v-if=${expanded}>${this.path}</span>
         <span v-if=${!expanded && !!head} class="min-w-0 truncate">${head}</span>
-        <span v-if=${!expanded} class="max-w-[70%] shrink-0 truncate">${tail}</span>
+        <span
+          v-if=${!expanded}
+          class=${classMap({ 'shrink-0 truncate': true, 'max-w-[70%]': !!head })}
+        >
+          ${tail}
+        </span>
       </div>
     `;
   };

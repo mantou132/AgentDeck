@@ -34,7 +34,7 @@ export class DeckSessionGroupElement extends GemElement {
 
     return html`
       <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
-        <header class="flex min-w-0 items-center gap-2.5 border-b border-border bg-bg-light/80 px-4 py-3">
+        <header class="flex min-w-0 items-center gap-2.5 border-b border-border bg-bg-light/80 px-4 py-3" @click=${this.#toggleExpand}>
           <span class="grid size-7 shrink-0 place-items-center rounded-[9px] bg-primary-soft text-primary-strong">
             <tap-use class="size-4" .element=${icons.folder}></tap-use>
           </span>

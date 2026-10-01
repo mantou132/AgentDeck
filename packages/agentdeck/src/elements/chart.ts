@@ -14,7 +14,7 @@ const style = css`
     display: block;
     margin-block: 0.75em;
     padding: 0.75rem;
-    border: 1px solid ${agentDeckTheme.borderColor};
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.lightBackgroundColor};
   }
@@ -25,7 +25,7 @@ const style = css`
     margin: 0;
     overflow: auto;
     font-family: ${agentDeckTheme.codeFont};
-    font-size: 0.8125rem;
+    font-size: ${agentDeckTheme.fontSizeXs};
   }
 `;
 

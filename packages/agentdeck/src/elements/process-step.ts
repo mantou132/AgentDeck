@@ -38,7 +38,7 @@ const style = css`
   deck-stream-markdown,
   gem-bind-marked {
     color: ${agentDeckTheme.textColor};
-    font-size: 1rem;
+    font-size: ${agentDeckTheme.fontSizeBase};
     line-height: 1.625;
   }
   .step-sections {
@@ -55,7 +55,7 @@ const style = css`
   .section-label {
     margin: 0;
     color: ${agentDeckTheme.describeColor};
-    font-size: 0.75rem;
+    font-size: ${agentDeckTheme.fontSizeXs};
     line-height: 1rem;
   }
   .diffs {
@@ -76,7 +76,7 @@ const style = css`
     margin: 0;
     color: ${agentDeckTheme.textColor};
     font-family: ${agentDeckTheme.codeFont};
-    font-size: 0.875rem;
+    font-size: ${agentDeckTheme.fontSizeSm};
     line-height: 1.625;
     overflow-wrap: break-word;
     white-space: pre-wrap;
@@ -91,7 +91,7 @@ const style = css`
     padding: 0.75rem 1rem;
     color: ${agentDeckTheme.textColor};
     font-family: ${agentDeckTheme.codeFont};
-    font-size: 0.875rem;
+    font-size: ${agentDeckTheme.fontSizeSm};
     line-height: 1.625;
     overflow-wrap: break-word;
     white-space: pre-wrap;

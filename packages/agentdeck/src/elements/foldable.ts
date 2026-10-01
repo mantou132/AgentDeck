@@ -37,19 +37,13 @@ const style = css`
     border: 0;
     border-radius: 999px;
     padding: 0.2rem 0.75rem;
-    background: color-mix(in srgb, currentColor 15%, transparent);
+    background: ${agentDeckTheme.lightBackgroundColor};
     color: inherit;
-    font-size: 0.75rem;
+    font-size: ${agentDeckTheme.fontSizeXs};
     font-weight: 500;
     cursor: pointer;
     backdrop-filter: blur(6px);
     box-shadow: ${agentDeckTheme.controlShadow};
-  }
-  .view-all:hover {
-    background: color-mix(in srgb, currentColor 22%, transparent);
-  }
-  .view-all:active {
-    scale: 0.96;
   }
   .icon {
     width: 0.75rem;
@@ -115,10 +109,10 @@ export class DeckFoldableElement extends GemElement {
     const folded = !this.disabled && this.#state.overflowing;
     return html`
       <div ${this.#contentRef} class=${classMap({ content: true, masked: folded })}><slot></slot></div>
-      <button v-if=${folded} type="button" class="view-all" @click=${this.#openDetail}>
+      <div v-if=${folded} role="button" class="view-all" @click=${this.#openDetail}>
         <span>${i18n.get('timeline.viewAll')}</span>
         <tap-use class="icon" .element=${icons.expand}></tap-use>
-      </button>
+      </div>
     `;
   };
 }

@@ -14,7 +14,7 @@ export class DeckPermissionRequestElement extends GemElement {
     if (!this.request) return html``;
     const { toolCall = {}, options = [] } = this.request;
     return html`
-      <section class="max-h-[45dvh] overflow-y-auto rounded-2xl border border-notice/35 bg-bg-light overscroll-y-contain">
+      <section class="max-h-[45dvh] overflow-y-auto rounded-2xl border border-notice/70 bg-bg-light overscroll-y-contain">
         <header class="px-4 pt-3.5 pb-3">
           <h2 class="m-0 text-base font-semibold text-highlight">${i18n.get('permission.title')}</h2>
           <p class="select-text mt-2 mb-0 break-words font-mono text-sm leading-relaxed text-text">${toolCall.title || i18n.get('permission.toolCall')}</p>

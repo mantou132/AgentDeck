@@ -87,7 +87,7 @@ export class DeckSessionTimelineElement extends GemElement {
       return html`
         <div class="mt-8 mb-4 flex justify-end first:mt-0">
           <div class="max-w-[min(86%,560px)]">
-            <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary px-4 py-3 text-base leading-[1.6] text-white shadow-primary">
+            <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary-soft px-4 py-3 text-base leading-[1.6] text-highlight">
               <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
                 ${attachments.map(
                   (attachment) => html`

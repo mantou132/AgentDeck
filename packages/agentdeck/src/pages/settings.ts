@@ -10,7 +10,7 @@ import { icons } from '../styles/icons';
 
 const style = css`
   .settings-header {
-    padding-top: calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   }
 
   .settings-scroll {
@@ -116,7 +116,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
       <tap-page class="bg-bg text-text" @hide=${() => this.#state({ showRelayId: false })}>
         <header
           slot="header"
-          class="settings-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border/80 bg-bg-light/90 px-3 pb-2.5 backdrop-blur-xl"
+          class="settings-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong px-3 pb-1.5"
         >
           <button
             class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft disabled:invisible"
@@ -157,7 +157,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
             <div class="relative block">
               <input
                 type=${this.#state.showRelayId ? 'text' : 'password'}
-                class="box-border h-12 w-full rounded-xl border border-border bg-bg pr-11 pl-3.5 outline-none placeholder:text-disabled ${
+                class="box-border h-12 w-full rounded-xl border border-border-strong bg-bg pr-11 pl-3.5 outline-none placeholder:text-disabled ${
                   this.#state.showRelayId
                     ? 'font-mono text-base text-highlight tracking-normal'
                     : 'font-sans text-sm text-describe tracking-[0.2em]'
@@ -197,7 +197,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
             <label class="block">
               <span class="relative block">
                 <select
-                  class="box-border h-12 w-full appearance-none rounded-xl border border-border bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
+                  class="box-border h-12 w-full appearance-none rounded-xl border border-border-strong bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
                   .value=${this.#state.agent}
                   @change=${(event: Event) => this.#state({ agent: (event.target as HTMLSelectElement).value })}
                 >

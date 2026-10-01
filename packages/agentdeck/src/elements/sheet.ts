@@ -6,7 +6,7 @@ import { agentDeckTheme } from '../styles/theme';
 const layerStyle = css`
   tap-sheet::part(sheet) {
     max-width: 620px;
-    border: 1px solid ${agentDeckTheme.borderColor};
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-bottom: 0;
     background: ${agentDeckTheme.lightBackgroundColor};
     padding: 0 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));

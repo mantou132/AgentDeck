@@ -28,7 +28,7 @@ export type ComposerInput = { text: string; attachments: Attachment[] };
 type InputSelection = { input: string; start: number; end: number };
 const style = css`
   .composer-shell {
-    padding-bottom: calc(9px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    padding-bottom: calc(6px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .composer-surface {
     border-radius: 26px;
@@ -369,7 +369,7 @@ export class DeckComposerElement extends GemElement {
   #render = () => {
     const canSend = this.#canSend;
     return html`
-          <div class="composer-shell bg-bg/90 px-2.5 pt-2 backdrop-blur-xl backdrop-saturate-125">
+          <div class="composer-shell bg-bg/90 px-2.5 pt-1.5 backdrop-blur-xl backdrop-saturate-125">
             <div class="composer-surface mx-auto max-w-[760px] overflow-hidden border border-primary/15 bg-bg-light shadow-card">
               <div v-if=${this.#state.attachments.length} class="flex max-h-40 flex-wrap gap-3 overflow-y-auto px-3.5 pt-3.5 pb-1.5">
                 ${this.#state.attachments.map(

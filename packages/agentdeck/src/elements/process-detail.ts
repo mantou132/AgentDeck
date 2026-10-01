@@ -28,7 +28,7 @@ const style = css`
   .empty {
     padding: 2.5rem 0;
     color: ${agentDeckTheme.describeColor};
-    font-size: 0.875rem;
+    font-size: ${agentDeckTheme.fontSizeSm};
     text-align: center;
   }
   .process-list {
@@ -90,7 +90,7 @@ const style = css`
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    font-size: 0.875rem;
+    font-size: ${agentDeckTheme.fontSizeSm};
     font-weight: 500;
     line-height: 1.25rem;
     text-overflow: ellipsis;

@@ -9,13 +9,13 @@ const style = css`
     display: block;
     margin-block: 0.75em;
   }
-  button {
+  .card {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid ${agentDeckTheme.borderColor};
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.lightBackgroundColor};
     color: inherit;
@@ -23,7 +23,7 @@ const style = css`
     text-align: start;
     cursor: pointer;
   }
-  button:disabled {
+  .card:disabled {
     cursor: default;
   }
   tap-use {
@@ -45,13 +45,13 @@ const style = css`
   .dir {
     color: ${agentDeckTheme.describeColor};
     font-family: ${agentDeckTheme.codeFont};
-    font-size: 0.75rem;
+    font-size: ${agentDeckTheme.fontSizeXs};
     overflow-wrap: anywhere;
   }
   .open {
     flex-shrink: 0;
     color: ${agentDeckTheme.primaryStrongColor};
-    font-size: 0.8125rem;
+    font-size: ${agentDeckTheme.fontSizeXs};
     font-weight: 600;
   }
 `;
@@ -69,7 +69,7 @@ export class DeckPreviewElement extends GemElement {
     const slash = path.search(/[\\/][^\\/]*$/);
     const openable = previewSupported && isAbsoluteHostPath(path);
     return html`
-      <button type="button" ?disabled=${!openable} @click=${() => openPreview(path)}>
+      <button class="card" type="button" ?disabled=${!openable} @click=${() => openPreview(path)}>
         <tap-use .element=${icons.code}></tap-use>
         <div class="text">
           <div class="name">${path.slice(slash + 1)}</div>
