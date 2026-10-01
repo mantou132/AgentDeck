@@ -28,7 +28,9 @@ export const DATABASES = {
 export const RELAY_URL = 'wss://agent-deck.xianqiao.wang/ws';
 
 /** Markdown blocks this client renders; the host teaches agents to write them (e.g. `agentdeck-chart`). */
-export const RENDER_CAPABILITIES: ClientCapabilities = { render: previewSupported ? ['chart', 'preview'] : ['chart'] };
+export const RENDER_CAPABILITIES: ClientCapabilities = {
+  render: previewSupported ? ['chart', 'preview', 'screen'] : ['chart', 'screen'],
+};
 
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
 export const popularAgents: { id: string; name: string }[] = [

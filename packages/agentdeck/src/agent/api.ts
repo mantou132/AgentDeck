@@ -162,6 +162,13 @@ export const REMOTE_APP_PANEL_CONTEXT: PanelContext = { surface: 'remote_app' };
 /** Output the client can render; the host loads matching skills into agent sessions (e.g. `render: ['chart']`). */
 export type ClientCapabilities = { render?: string[] };
 
+/** Device shape drawn around a screen capture; geometry is in the capture's native pixels. */
+export type ScreenFrame =
+  | { kind: 'phone'; cornerRadius: number; cutouts?: { path: string; transform: string }[] }
+  | { kind: 'browser'; title: string; url: string; mobile: boolean };
+
+export type ScreenCapture = { width: number; height: number; frame: ScreenFrame };
+
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 
 // Allow ACP startup/history work more time than the lightweight host handshake.
@@ -195,6 +202,15 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.connectHostTimeout'),
     });
   };
+
+  /** One JPEG frame of an app on the host (`ios:` / `android:` / `browser:` target), at most `maxWidth` wide. */
+  captureScreen = (target: string, maxWidth: number) =>
+    this.#peer.call<ScreenCapture & { data: Uint8Array<ArrayBuffer> }>(
+      'screen_capture',
+      { target, maxWidth },
+      undefined,
+      { timeoutMs: 10_000, timeoutMessage: i18n.get('screen.timeout'), ephemeral: true },
+    );
 
   /** Any host file as raw bytes, for serving it verbatim. */
   readRawFile = (path: string) =>

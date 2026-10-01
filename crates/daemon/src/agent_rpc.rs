@@ -12,6 +12,7 @@ use crate::{
     logger,
     peer::{CallCtx, Peer},
     render_skills::ClientCapabilities,
+    screen_capture,
 };
 
 /// Stream agent events as `{ id, event }` frames while a request runs.
@@ -160,6 +161,12 @@ impl AgentService {
             tokio::task::spawn_blocking(move || read_remote_file(&path, cwd.as_deref(), raw))
                 .await
                 .map_err(|err| format!("File read task failed: {err}"))?
+        });
+
+        peer.handle_with_bytes("screen_capture", move |params, _ctx| async move {
+            let target = required_str(&params, "target", "screen_capture")?;
+            let max_width = params.get("maxWidth").and_then(Value::as_u64);
+            screen_capture::capture(target, max_width).await
         });
 
         peer.handle("git_status", move |params, _ctx| async move {

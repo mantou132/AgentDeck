@@ -217,5 +217,13 @@
   "browser.share": "Share",
   "global.copy": "Copy",
   "global.copied": "Copied",
-  "preview.open": "Open preview"
+  "preview.open": "Open preview",
+  "screen.open": "Live view",
+  "screen.ios": "iOS Simulator",
+  "screen.android": "Android",
+  "screen.browser": "Browser tab",
+  "screen.loading": "Capturing screen…",
+  "screen.unavailable": "Screen unavailable",
+  "screen.failed": "Live view stopped",
+  "screen.timeout": "Screen capture timed out."
 }

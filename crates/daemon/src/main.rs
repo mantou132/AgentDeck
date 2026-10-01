@@ -18,6 +18,7 @@ mod relay_client;
 mod relay_codec;
 mod relay_encryption;
 mod render_skills;
+mod screen_capture;
 mod ui;
 
 use agent_rpc::AgentService;

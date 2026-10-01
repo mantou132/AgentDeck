@@ -10,6 +10,7 @@ import '@gem-bind/marked';
 import '@gem-bind/mermaid';
 import '../elements/chart';
 import '../elements/preview';
+import '../elements/screen';
 
 const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -104,6 +105,7 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
           return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
         if (closed && language === 'agentdeck-chart') return `<deck-chart source="${source}"></deck-chart>`;
         if (closed && language === 'agentdeck-preview') return `<deck-preview path="${source}"></deck-preview>`;
+        if (closed && language === 'agentdeck-screen') return `<deck-screen target="${source}"></deck-screen>`;
         if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }

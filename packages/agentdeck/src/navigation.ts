@@ -70,6 +70,13 @@ export const openPreview = (path: string, stack?: TapStackElement) => {
   return result;
 };
 
+export const openScreen = (target: string) => {
+  Stack.push({
+    content: html`<deck-screen-page .target=${target}></deck-screen-page>`,
+    gesture: true,
+  });
+};
+
 export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement) => {
   (stack || Stack).push({
     content: html`<deck-file-browser-page .path=${path} .cwd=${cwd}></deck-file-browser-page>`,

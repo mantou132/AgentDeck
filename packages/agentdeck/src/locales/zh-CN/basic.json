@@ -217,5 +217,13 @@
   "browser.share": "分享",
   "global.copy": "复制",
   "global.copied": "已复制",
-  "preview.open": "打开预览"
+  "preview.open": "打开预览",
+  "screen.open": "实时画面",
+  "screen.ios": "iOS 模拟器",
+  "screen.android": "Android",
+  "screen.browser": "浏览器标签页",
+  "screen.loading": "正在获取画面…",
+  "screen.unavailable": "暂时无法获取画面",
+  "screen.failed": "实时画面已中断",
+  "screen.timeout": "获取画面超时。"
 }
