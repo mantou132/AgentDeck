@@ -15,6 +15,7 @@ mod peer;
 mod power;
 mod push;
 mod relay_client;
+mod relay_codec;
 mod relay_encryption;
 mod render_skills;
 mod ui;

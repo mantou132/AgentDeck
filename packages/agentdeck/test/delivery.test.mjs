@@ -216,3 +216,53 @@ test('late rejection after stored or pairing change cannot fail another call', a
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
   assert.equal(fixture.app.agentdeckStore.connectionError, '');
 });
+
+test('file reads skip the outbox and fail at once while the host is offline', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  const read = fixture.app.agentApi.readFile('/tmp/a.txt', '/tmp');
+  const browse = fixture.app.agentApi.browseFiles('/tmp');
+  await tick();
+  const fileRead = fixture.requests.find((request) => request.payload.method === 'file_read');
+  const directory = fixture.requests.find((request) => request.payload.method === 'file_browse');
+  assert.equal(fileRead.ephemeral, true);
+  assert.equal(fileRead.message_id, fileRead.payload.id);
+  assert.equal(directory.ephemeral, undefined);
+  assert.equal(
+    outbox(fixture).some((message) => message.messageId === fileRead.message_id),
+    false,
+  );
+  fixture.sockets.at(-1).frame({ type: 'undeliverable', message_id: fileRead.message_id, reason: 'offline' });
+  await assert.rejects(read, /host is not connected/i);
+  fixture.reply(directory, { path: '/tmp', entries: [] });
+  assert.equal((await browse).path, '/tmp');
+
+  const retry = fixture.app.agentApi.readFile('/tmp/a.txt', '/tmp');
+  await tick();
+  fixture.reply(fixture.requests.at(-1), { path: '/tmp/a.txt', type: 'text', text: 'ok' });
+  assert.equal((await retry).text, 'ok');
+});
+
+test('plain image reads arrive as unencrypted binary frames with the bytes and MIME type', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  const read = fixture.app.agentApi.readFile('/tmp/a.png', '/tmp');
+  await tick();
+  const request = fixture.requests.at(-1);
+  const header = Buffer.from(
+    JSON.stringify({
+      id: request.payload.id,
+      peerId: 1,
+      result: { path: '/tmp/a.png', type: 'image', mimeType: 'image/png' },
+    }),
+  );
+  const body = Buffer.concat([Buffer.alloc(4), header, Buffer.from([137, 80, 78, 71])]);
+  body.writeUInt32BE(header.length);
+  const relayHeader = Buffer.from(JSON.stringify({ message_id: 'img-1' }));
+  const frame = Buffer.concat([Buffer.alloc(2), relayHeader, body]);
+  frame.writeUInt16BE(relayHeader.length);
+  fixture.sockets.at(-1).binary(new Uint8Array(frame));
+  const file = await read;
+  assert.equal(file.mimeType, 'image/png');
+  assert.deepEqual([...file.data], [137, 80, 78, 71]);
+});

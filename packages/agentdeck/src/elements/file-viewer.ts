@@ -33,6 +33,7 @@ export class DeckFileViewerElement extends GemElement {
 
   #state = createState({
     file: undefined as RemoteFile | undefined,
+    imageUrl: '',
     loading: true,
     error: '',
     revision: 0,
@@ -51,10 +52,13 @@ export class DeckFileViewerElement extends GemElement {
   @effect((i) => [i.path, i.cwd, i.#state.revision])
   #read = () => {
     let active = true;
-    this.#state({ file: undefined, loading: true, error: '', source: Boolean(this.line) });
+    let imageUrl = '';
+    this.#state({ file: undefined, imageUrl, loading: true, error: '', source: Boolean(this.line) });
     agentApi.readFile(this.path, this.cwd).then(
       (file) => {
-        if (active) this.#state({ file, loading: false });
+        if (!active) return;
+        if (file.type === 'image') imageUrl = URL.createObjectURL(new Blob([file.data], { type: file.mimeType }));
+        this.#state({ file, imageUrl, loading: false });
       },
       (error) => {
         if (!active) return;
@@ -64,6 +68,7 @@ export class DeckFileViewerElement extends GemElement {
     );
     return () => {
       active = false;
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
     };
   };
 
@@ -153,7 +158,7 @@ export class DeckFileViewerElement extends GemElement {
             </div>
           </div>
           <div v-else-if=${file?.type === 'image'} class="grid min-h-60 place-items-center p-4">
-            <img class="max-w-full rounded-xl object-contain" src=${file?.type === 'image' ? `data:${file.mimeType};base64,${file.data}` : ''} alt=${name} />
+            <img class="max-w-full rounded-xl object-contain" src=${this.#state.imageUrl} alt=${name} />
           </div>
           <gem-bind-marked
             v-else-if=${markdown && !source}

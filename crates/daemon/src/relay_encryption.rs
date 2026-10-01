@@ -69,6 +69,28 @@ impl RelayEncryption {
             .expect("serialize AAD")
     }
 
+    /// AAD of host-to-app binary frames; the extra label keeps them distinct
+    /// from JSON envelopes under the same key.
+    fn binary_aad(&self) -> Vec<u8> {
+        serde_json::to_vec(&(PROTOCOL, &self.route_id, "host-to-app", "host", "binary"))
+            .expect("serialize AAD")
+    }
+
+    /// Encrypts a binary frame body as `[24-byte nonce][ciphertext]`.
+    pub fn seal_bytes(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
+        let ciphertext = XChaCha20Poly1305::new((&self.send_key).into())
+            .encrypt(
+                &nonce,
+                Payload {
+                    msg: plaintext,
+                    aad: &self.binary_aad(),
+                },
+            )
+            .map_err(|_| anyhow::anyhow!("Message encryption failed"))?;
+        Ok([nonce.as_slice(), &ciphertext].concat())
+    }
+
     pub fn seal(&self, message: Value) -> Result<Value> {
         let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
         let mut frame = Envelope {
@@ -182,6 +204,36 @@ mod tests {
         for id in ["adk2_bad", "adk1_bad", "adk1_", "secret"] {
             assert!(RelayEncryption::new(id).is_err());
         }
+    }
+
+    fn open_binary(codec: &RelayEncryption, frame: &[u8]) -> Vec<u8> {
+        let (nonce, ciphertext) = frame.split_at(24);
+        XChaCha20Poly1305::new((&codec.send_key).into())
+            .decrypt(
+                XNonce::from_slice(nonce),
+                Payload {
+                    msg: ciphertext,
+                    aad: &codec.binary_aad(),
+                },
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn binary_frames_match_typescript_vector() {
+        let v = vector();
+        let codec = RelayEncryption::new(v["id"].as_str().unwrap()).unwrap();
+        let frame = URL_SAFE_NO_PAD
+            .decode(v["hostBinaryFrame"].as_str().unwrap())
+            .unwrap();
+        let plaintext = URL_SAFE_NO_PAD
+            .decode(v["hostBinaryPlaintext"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(open_binary(&codec, &frame), plaintext);
+
+        let sealed = codec.seal_bytes(&plaintext).unwrap();
+        assert_ne!(sealed, frame);
+        assert_eq!(open_binary(&codec, &sealed), plaintext);
     }
 
     #[test]

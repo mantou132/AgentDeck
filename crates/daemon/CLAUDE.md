@@ -10,15 +10,17 @@
 - `src/daemon/`：服务生命周期。`reset.rs` 编排重置；`singleton.rs` 是 `daemon.lock` 单例锁；自启在 macOS / Linux 用 `service_mgr.rs`（LaunchAgent / systemd --user），Windows 用 `windows.rs`（计划任务）。
 - `src/acp_agent/`：`acp_agent.rs` 是 ACP 客户端，每种 Agent 共用一个子进程，每个会话一个 actor；`catalog.rs` 负责 Agent 注册表、各平台启动命令、npx 回退和 `agentdeck_env`（Codex 通过 `CODEX_CONFIG` 关闭 `visualize` 插件）；`provision.rs` 负责下载和解压预编译 Agent；会话生命周期与并发测试在 `lifecycle_tests.rs`。
 - `src/agent_rpc.rs`：远端 RPC 入口（会话、文件、Git）。
-- `src/relay_client.rs`：`RemotePeerManager` 在一条 Relay 连接上复用多台设备，维护 deviceId → peerId 映射（`remote_peers_v1.json`）。
-- `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密。
+- `src/relay_client.rs`：`RemotePeerManager` 在一条 Relay 连接上复用多台设备，维护 deviceId → peerId 映射（`remote_peers_v1.json`）。请求带 `ephemeral: true` 时，记录 `(peerId, id)`，该请求的 event 与最终回复也以 ephemeral 发出。
+- `src/peer.rs`：JSON RPC 对端。`handle_with_bytes` 注册的处理函数可在结果旁返回原始字节（如 `file_read` 的图片与 raw 读取），由传输层携带，对端在 `result.data` 收到；结果本身不放 `data`，也不做 base64。
+- `src/relay_codec.rs`：RPC 消息与 Relay 帧互转（加密、帧大小限制与超限错误回复）。带字节的回复总是拼成二进制帧（`[u32 头长度][回复 JSON][原始字节]`，加密为 `[nonce][密文]`，AAD 带 `binary` 标签），Relay 按 ephemeral 投递。不涉及 peer 与设备。
+- `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密原语。
 - `src/push.rs`：prompt 成功完成时，向发起该 prompt 的设备推送 FCM 通知。
 - `src/render_skills.rs`：渲染能力对应的 skill（`src/render_skills/<能力>/SKILL.md`），首次使用时写入 `AppPaths::skills_dir()`。
 
 ## 约束与现状
 
 - **端到端加密**：`adk1_` 配对必须加密，Relay 只做帧路由，禁止自动退回明文。
-- **信任模型**：Pairing ID 是唯一凭证，所有设备共用同一把密钥，deviceId 由设备自报，不能按设备吊销（只能 `reset` 整体轮换）。所有设备共享全部会话。文件和 Git 接口直接使用客户端传入的路径，**没有目录限制**；`file_read` 带 `raw: true` 时，任意文件都以 base64 返回（`type: "binary"`），供 App 预览协议使用。
+- **信任模型**：Pairing ID 是唯一凭证，所有设备共用同一把密钥，deviceId 由设备自报，不能按设备吊销（只能 `reset` 整体轮换）。所有设备共享全部会话。文件和 Git 接口直接使用客户端传入的路径，**没有目录限制**；`file_read` 带 `raw: true` 时，任意文件都返回原始字节（`type: "binary"`），供 App 预览协议使用。
 - **会话并发**：同一会话同时只能被一处 load；同一会话的 prompt 互斥。权限请求只发给发起 prompt 的设备。
 - **配置**：`daemon.json` 自启时读取；Relay 配置变更需要重启，awake 配置会自动重载。显示 Pairing ID 时必须带安全警示边框。配对二维码为 `agentdeck://connect?pairingId=…`，使用非默认 Relay 时追加 `relayUrl`。
 - **防自动睡眠**：默认和 reset 后均为 `never`。`active` 以最后一次 RPC 收发时间计时，一小时无 RPC 后释放；状态写入 `awake_status.json`，daemon 退出时清理。

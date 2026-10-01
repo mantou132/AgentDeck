@@ -30,7 +30,7 @@
     "@vnidrop/tauri-plugin-share": "1.0.0-rc.2",
     "diff": "^8.0.4",
     "duoyun-ui": "^2.2.14",
-    "relay-client-ts": "^0.1.7",
+    "relay-client-ts": "^0.1.9",
     "tauri-plugin-edge-to-edge-api": "^0.1.1",
     "tauri-plugin-fcm": "^0.2.0",
     "tauri-plugin-selection-menu-api": "^0.1.2",

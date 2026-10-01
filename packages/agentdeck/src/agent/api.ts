@@ -24,7 +24,7 @@ type ResumePromptHandlers = {
 
 export type RemoteFile = { path: string } & (
   | { type: 'text'; text: string }
-  | { type: 'image'; data: string; mimeType: string }
+  | { type: 'image'; data: Uint8Array<ArrayBuffer>; mimeType: string }
 );
 
 export type BrowseEntry = {
@@ -196,17 +196,24 @@ export class AgentApi {
     });
   };
 
-  /** Any host file as base64 bytes, for serving it verbatim. */
+  /** Any host file as raw bytes, for serving it verbatim. */
   readRawFile = (path: string) =>
-    this.#peer.call<{ path: string; data: string }>('file_read', { path, raw: true }, undefined, {
-      timeoutMs: 30_000,
-      timeoutMessage: i18n.get('error.readFileTimeout'),
-    });
+    this.#peer.call<{ path: string; type: 'binary'; data: Uint8Array<ArrayBuffer> }>(
+      'file_read',
+      { path, raw: true },
+      undefined,
+      {
+        timeoutMs: 30_000,
+        timeoutMessage: i18n.get('error.readFileTimeout'),
+        ephemeral: true,
+      },
+    );
 
   readFile = (path: string, cwd: string) =>
     this.#peer.call<RemoteFile>('file_read', { path, cwd }, undefined, {
       timeoutMs: 15_000,
       timeoutMessage: i18n.get('error.readFileTimeout'),
+      ephemeral: true,
     });
 
   browseFiles = async (path = '', options?: FileBrowseOptions | string): Promise<FileBrowseResult> => {

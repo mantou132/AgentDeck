@@ -78,6 +78,9 @@ export function documentFixture(previous, options = {}) {
     frame(frame) {
       this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(frame) }));
     }
+    binary(bytes) {
+      this.dispatchEvent(new MessageEvent('message', { data: bytes.slice().buffer }));
+    }
     open() {
       this.readyState = 1;
       this.dispatchEvent(new Event('open'));

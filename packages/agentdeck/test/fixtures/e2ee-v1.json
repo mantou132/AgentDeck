@@ -57,5 +57,7 @@
     "sender": "test-phone",
     "nonce": "DQ4PEBESExQVFhcYGRobHB0eHyAhIiMk",
     "ciphertext": "X2zt41IWrrSHtVquXhGd3ICJ-Z0djnoWyfx2NE6sqTdQ36sYAtYtAOvILNVoQLc0mb5_aN8HBm9aflvx0D5HJ8jeKf0TtdNTSJ-cliJ8eeySBIjSChn9Qp5sGasBdT_FGiw"
-  }
+  },
+  "hostBinaryPlaintext": "AAAASHsiaWQiOiJyYXctMSIsInBlZXJJZCI6MSwicmVzdWx0Ijp7InBhdGgiOiIvdG1wL2EuYmluIiwidHlwZSI6ImJpbmFyeSJ9fQABAv8",
+  "hostBinaryFrame": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZX_lISeMjm8-MMTNynOoSjI3IBtH-i53vKF5D_Nqi2-3hx1XHh4ePlx3b8MGh6C9Nub66zM0llzmubI0u__F2FgylX7SWz-bEiKW0VSESgteqm3wLfCiQBj691QsmwWuve"
 }

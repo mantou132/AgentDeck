@@ -9,7 +9,8 @@ import {
 import { DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
 import { AgentApi, type ClientCapabilities, type PermissionRequest, type SessionEvent } from './api';
-import { createRelayEncryption, isPairingId, type RelayEncryption } from './encryption';
+import { isPairingId } from './encryption';
+import { RelayCodec } from './relay-codec';
 import type { RpcId, RpcMessage } from './rpc';
 
 type HostSyncOptions = {
@@ -54,19 +55,19 @@ export type TransportOptions = {
 };
 
 // ---------------------------------------------------------------------------
-// 1. Encrypted Storage Layer
+// 1. Outbox Storage Layer
 // ---------------------------------------------------------------------------
 
-/** Wraps a RelayStore with transparent ChaCha20-Poly1305 encryption & RPC tracking. */
-class EncryptedRelayStore implements RelayStore {
+/** Wraps a RelayStore so the outbox holds encoded payloads, and tracks which RPC each entry carries. */
+class RpcOutboxStore implements RelayStore {
   #active = true;
   #baseStore: RelayStore;
-  #encryption: RelayEncryption | undefined;
+  #codec: RelayCodec;
   #deliveries = new Map<string, Pick<RpcMessage, 'id' | 'method'>>();
 
-  constructor(baseStore: RelayStore, encryption: RelayEncryption | undefined) {
+  constructor(baseStore: RelayStore, codec: RelayCodec) {
     this.#baseStore = baseStore;
-    this.#encryption = encryption;
+    this.#codec = codec;
   }
 
   dispose(): void {
@@ -78,9 +79,7 @@ class EncryptedRelayStore implements RelayStore {
     const messages = await this.#baseStore.outbox();
     for (const message of messages) {
       if (this.#deliveries.has(message.messageId)) continue;
-      const payload = (
-        this.#encryption ? this.#encryption.readOutgoing(message.payload) : message.payload
-      ) as RpcMessage;
+      const payload = this.#codec.readOutgoing(message.payload);
       this.#deliveries.set(message.messageId, { id: payload?.id, method: payload?.method });
     }
     return messages;
@@ -89,18 +88,7 @@ class EncryptedRelayStore implements RelayStore {
   async enqueue(message: OutboundMessage): Promise<void> {
     if (!this.#active) return;
     const { id, method } = message.payload as RpcMessage;
-    let payload: unknown;
-    try {
-      payload = this.#encryption ? this.#encryption.seal(message.payload) : message.payload;
-    } catch {
-      throw new Error(i18n.get('error.encryptionFailed'));
-    }
-
-    // Match Relay's full WebSocket message limit, including the envelope.
-    const frame = JSON.stringify({ type: 'message', message_id: message.messageId, payload });
-    if (new TextEncoder().encode(frame).byteLength > 10 * 1024 * 1024) {
-      throw new Error(i18n.get('error.messageTooLarge'));
-    }
+    const payload = this.#codec.encode(message.payload as RpcMessage, false, message.messageId);
 
     try {
       await this.#baseStore.enqueue({ ...message, payload });
@@ -138,9 +126,7 @@ class EncryptedRelayStore implements RelayStore {
     if (!this.#active) return;
     for (const message of await this.#baseStore.outbox()) {
       if (!this.#active) return;
-      const payload = (
-        this.#encryption ? this.#encryption.readOutgoing(message.payload) : message.payload
-      ) as RpcMessage;
+      const payload = this.#codec.readOutgoing(message.payload);
       if (payload?.id === id && payload?.method) {
         await this.removeFromOutbox(message.messageId);
       }
@@ -269,7 +255,8 @@ class AgentTransport {
   #relayConnected = false;
 
   #relayClient: RelayClient | undefined;
-  #encryptedStore: EncryptedRelayStore | undefined;
+  #codec: RelayCodec | undefined;
+  #outboxStore: RpcOutboxStore | undefined;
 
   #connectTimer: ReturnType<typeof setTimeout> | undefined;
   #retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -278,7 +265,9 @@ class AgentTransport {
   constructor() {
     this.agentApi = new AgentApi(
       async (message) => {
-        if (!this.#relayClient) throw new Error(i18n.get('error.relayNotConfigured'));
+        const client = this.#relayClient;
+        const codec = this.#codec;
+        if (!client || !codec) throw new Error(i18n.get('error.relayNotConfigured'));
         if (message.method && message.method !== 'peer_attach' && this.#connectionState !== 'connected') {
           throw new Error(i18n.get('error.remoteNotConnectedRetry'));
         }
@@ -288,7 +277,17 @@ class AgentTransport {
         if (this.hostSession.peerId !== undefined) {
           (message as Record<string, unknown>).peerId = this.hostSession.peerId;
         }
-        const client = this.#relayClient;
+        if (message.ephemeral && message.id !== undefined) {
+          // The RPC id doubles as the Relay message id, so `onUndeliverable` names the call directly.
+          const messageId = String(message.id);
+          const payload = codec.encode(message, true, messageId);
+          try {
+            client.sendEphemeral(payload, undefined, messageId);
+          } catch {
+            throw new Error(i18n.get('error.remoteNotConnectedRetry'));
+          }
+          return;
+        }
         try {
           await client.send(message);
         } catch (error) {
@@ -297,7 +296,7 @@ class AgentTransport {
         }
       },
       async (id) => {
-        await this.#encryptedStore?.withdrawRpc(id);
+        await this.#outboxStore?.withdrawRpc(id);
       },
     );
   }
@@ -379,12 +378,13 @@ class AgentTransport {
     this.#currentDeviceId = options?.deviceId;
 
     const deviceId = this.getDeviceId();
-    const encryption = createRelayEncryption(relayId, deviceId);
-    const routeId = encryption?.routeId ?? relayId;
+    const codec = new RelayCodec(relayId, deviceId);
+    const { routeId } = codec;
+    this.#codec = codec;
 
     const baseStore = options?.createStore ? options.createStore(routeId) : localStorageStore(routeId);
-    const store = new EncryptedRelayStore(baseStore, encryption);
-    this.#encryptedStore = store;
+    const store = new RpcOutboxStore(baseStore, codec);
+    this.#outboxStore = store;
 
     const client = new RelayClient({
       relayId: routeId,
@@ -406,23 +406,17 @@ class AgentTransport {
           this.#reportReplyFailure();
         }
       },
+      onUndeliverable: (messageId) => {
+        if (this.#relayClient !== client) return;
+        this.agentApi.dispatch({ id: messageId, error: i18n.get('error.remoteNotConnectedRetry') });
+      },
       onPayload: async (payload) => {
         if (this.#relayClient !== client) return;
-        if (encryption) {
-          try {
-            payload = encryption.open(payload).message;
-          } catch {
-            throw new Error(i18n.get('error.decryptionFailed'));
-          }
-        }
-        if (this.#beforePayloadHook) {
-          try {
-            await this.#beforePayloadHook();
-          } catch {}
-        }
-        const data = payload as Record<string, unknown>;
-        if (!this.hostSession.isPayloadAllowed(data)) return;
-        await this.agentApi.dispatch(payload as RpcMessage);
+        await this.#receive(codec.decode(payload));
+      },
+      onBinary: async (data) => {
+        if (this.#relayClient !== client) return;
+        await this.#receive(codec.decodeBinary(data));
       },
       onStateChange: (connection, error = '') => {
         if (this.#relayClient !== client) return;
@@ -468,6 +462,16 @@ class AgentTransport {
     client.connect({ ackHead: options?.ackHead });
   }
 
+  async #receive(message: RpcMessage) {
+    if (this.#beforePayloadHook) {
+      try {
+        await this.#beforePayloadHook();
+      } catch {}
+    }
+    if (!this.hostSession.isPayloadAllowed(message as Record<string, unknown>)) return;
+    await this.agentApi.dispatch(message);
+  }
+
   #scheduleRetry(client: RelayClient, relayId: string) {
     clearTimeout(this.#retryTimer);
     if (!this.#relayClient || this.#currentRelayId !== relayId) return;
@@ -488,8 +492,9 @@ class AgentTransport {
   close() {
     const previous = this.#relayClient;
     this.#relayClient = undefined;
-    this.#encryptedStore?.dispose();
-    this.#encryptedStore = undefined;
+    this.#outboxStore?.dispose();
+    this.#outboxStore = undefined;
+    this.#codec = undefined;
     this.#relayConnected = false;
     this.#currentDeviceId = undefined;
     this.hostSession.reset();

@@ -6,7 +6,12 @@ type ResumeCallHandlers = {
 
 export type RpcId = string | number;
 
-export type CallOptions = { timeoutMs: number; timeoutMessage: string };
+export type CallOptions = {
+  timeoutMs: number;
+  timeoutMessage: string;
+  /** Skip Relay storage: fail at once while the host is offline, and never replay a late reply. */
+  ephemeral?: boolean;
+};
 
 export type RpcMessage = {
   id?: RpcId;
@@ -15,6 +20,8 @@ export type RpcMessage = {
   result?: unknown;
   error?: string;
   event?: unknown;
+  /** Skip Relay storage; the host answers this request the same way. */
+  ephemeral?: boolean;
 };
 
 type PendingCall = {
@@ -63,7 +70,7 @@ export class RpcPeer {
         this.#takePending(id)?.reject(error instanceof Error ? error : new Error(String(error)));
       };
       try {
-        Promise.resolve(this.#send({ id, method, params })).catch(failed);
+        Promise.resolve(this.#send({ id, method, params, ephemeral: !!options?.ephemeral })).catch(failed);
       } catch (error) {
         failed(error);
       }

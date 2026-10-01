@@ -99,6 +99,13 @@ export class RelayEncryption {
   readOutgoing = (value: unknown): unknown => this.#decrypt(value, this.#sendKey, this.#direction).message;
 
   open = (value: unknown) => this.#decrypt(value, this.#receiveKey, this.#receiveDirection);
+
+  /** Decrypts a host binary frame body, `[24-byte nonce][ciphertext]`; the `binary` AAD label keeps it apart from JSON envelopes. */
+  openBytes = (frame: Uint8Array): Uint8Array => {
+    if (frame.length < 24) throw new Error('Invalid encrypted message');
+    const aad = encoder.encode(JSON.stringify([PROTOCOL, this.routeId, this.#receiveDirection, 'host', 'binary']));
+    return xchacha20poly1305(this.#receiveKey, frame.subarray(0, 24), aad).decrypt(frame.subarray(24));
+  };
 }
 
 export const createRelayEncryption = (id: string, sender: string): RelayEncryption | undefined => {

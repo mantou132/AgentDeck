@@ -4,7 +4,6 @@ use std::{
     time::Duration,
 };
 
-use base64::{Engine as _, engine::general_purpose};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
@@ -154,7 +153,7 @@ impl AgentService {
             .map_err(|err| format!("File browse task failed: {err}"))?
         });
 
-        peer.handle("file_read", move |params, _ctx| async move {
+        peer.handle_with_bytes("file_read", move |params, _ctx| async move {
             let path = required_str(&params, "path", "file_read")?.to_string();
             let cwd = message_cwd(&params);
             let raw = params.get("raw").and_then(Value::as_bool).unwrap_or(false);
@@ -601,9 +600,13 @@ fn browse_files(
 const FILE_READ_MAX_BYTES: u64 = 8 * 1024 * 1024;
 const GIT_LOG_LIMIT: usize = 200;
 
-/// `raw` returns any file as base64 bytes, for clients serving files verbatim
-/// (the App's preview protocol) rather than displaying them.
-fn read_remote_file(path: &str, cwd: Option<&Path>, raw: bool) -> Result<Value, String> {
+/// Images, and with `raw` any file (for clients serving files verbatim, like
+/// the App's preview protocol), return their bytes next to the result.
+fn read_remote_file(
+    path: &str,
+    cwd: Option<&Path>,
+    raw: bool,
+) -> Result<(Value, Option<Vec<u8>>), String> {
     let base_dir = resolve_base_dir(path, cwd)?;
     let resolved = resolve_directory_path(path.trim(), &base_dir);
     let metadata = std::fs::metadata(&resolved)
@@ -622,30 +625,27 @@ fn read_remote_file(path: &str, cwd: Option<&Path>, raw: bool) -> Result<Value, 
         .map_err(|err| format!("Failed to read {}: {err}", resolved.display()))?;
     let path = resolved.to_string_lossy().into_owned();
     if raw {
-        return Ok(json!({
-            "path": path,
-            "type": "binary",
-            "data": general_purpose::STANDARD.encode(&bytes),
-        }));
+        return Ok((json!({ "path": path, "type": "binary" }), Some(bytes)));
     }
     let mime_type = mime_from_extension(&resolved);
     match mime_type {
-        Some(mime_type) => Ok(json!({
-            "path": path,
-            "type": "image",
-            "data": general_purpose::STANDARD.encode(&bytes),
-            "mimeType": mime_type,
-        })),
+        Some(mime_type) => Ok((
+            json!({ "path": path, "type": "image", "mimeType": mime_type }),
+            Some(bytes),
+        )),
         // Text files are rejected if they contain a NUL byte within the first
         // 8 KB, a cheap heuristic against serving binary blobs as text.
         None if bytes.contains(&0) => {
             Err(format!("Unsupported binary file: {}", resolved.display()))
         }
-        None => Ok(json!({
-            "path": path,
-            "type": "text",
-            "text": String::from_utf8_lossy(&bytes),
-        })),
+        None => Ok((
+            json!({
+                "path": path,
+                "type": "text",
+                "text": String::from_utf8_lossy(&bytes),
+            }),
+            None,
+        )),
     }
 }
 
@@ -1259,13 +1259,13 @@ mod tests {
         let binary_path = root.join("blob.bin");
         std::fs::write(&binary_path, [0x00, 0x01, 0x02]).expect("write binary file");
 
-        let text =
+        let (text, text_bytes) =
             read_remote_file(&text_path.to_string_lossy(), None, false).expect("read text file");
-        let image =
+        let (image, image_bytes) =
             read_remote_file(&png_path.to_string_lossy(), None, false).expect("read image file");
         let err = read_remote_file(&binary_path.to_string_lossy(), None, false)
             .expect_err("reject binary file");
-        let raw = read_remote_file(&binary_path.to_string_lossy(), None, true)
+        let (raw, raw_bytes) = read_remote_file(&binary_path.to_string_lossy(), None, true)
             .expect("read raw binary file");
         let missing = read_remote_file(&root.join("missing.txt").to_string_lossy(), None, false)
             .expect_err("reject missing file");
@@ -1273,11 +1273,14 @@ mod tests {
 
         assert_eq!(text["type"], "text");
         assert_eq!(text["text"], "hello");
+        assert!(text_bytes.is_none());
         assert_eq!(image["type"], "image");
         assert_eq!(image["mimeType"], "image/png");
+        assert_eq!(image_bytes.unwrap()[..4], [0x89, b'P', b'N', b'G']);
         assert!(err.contains("Unsupported binary file"));
         assert_eq!(raw["type"], "binary");
-        assert_eq!(raw["data"], "AAEC");
+        assert!(raw.get("data").is_none());
+        assert_eq!(raw_bytes.unwrap(), [0x00, 0x01, 0x02]);
         assert!(missing.contains("Failed to read"));
     }
 
@@ -1291,7 +1294,8 @@ mod tests {
         std::fs::create_dir_all(&root).expect("create test directory");
         std::fs::write(root.join("note.md"), b"# hi").expect("write file");
 
-        let file = read_remote_file("note.md", Some(&root), false).expect("read relative file");
+        let (file, _) =
+            read_remote_file("note.md", Some(&root), false).expect("read relative file");
         std::fs::remove_dir_all(&root).expect("remove test directory");
 
         assert_eq!(file["type"], "text");

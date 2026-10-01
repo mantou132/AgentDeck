@@ -1,3 +1,4 @@
+import { arrayBufferToBase64 } from '@mantou/tap-ui/lib/encode';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { previewSupported, resolvePreviewPath } from '../lib/preview';
@@ -13,7 +14,8 @@ export const startPreviewServer = async () => {
     let data: string | undefined;
     try {
       path = resolvePreviewPath(url);
-      if (path) data = (await agentApi.readRawFile(path)).data;
+      // Android IPC would serialize raw bytes as a JSON number array, so they cross as base64.
+      if (path) data = arrayBufferToBase64((await agentApi.readRawFile(path)).data.buffer);
     } catch (error) {
       console.warn('Preview request failed:', url, error);
     }

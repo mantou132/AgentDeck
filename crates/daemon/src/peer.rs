@@ -26,9 +26,13 @@ impl CallCtx {
     }
 }
 
+/// A handler's result, with optional raw bytes for the transport to attach.
+type Reply = (Value, Option<Vec<u8>>);
 type Handler =
-    Arc<dyn Fn(Value, CallCtx) -> BoxFuture<'static, Result<Value, String>> + Send + Sync>;
-type Writer = Arc<dyn Fn(Value) + Send + Sync>;
+    Arc<dyn Fn(Value, CallCtx) -> BoxFuture<'static, Result<Reply, String>> + Send + Sync>;
+/// Writes one outgoing message; the bytes only accompany a reply from
+/// [`Peer::handle_with_bytes`].
+type Writer = Arc<dyn Fn(Value, Option<Vec<u8>>) + Send + Sync>;
 
 struct Pending {
     reply: oneshot::Sender<Result<Value, String>>,
@@ -54,7 +58,7 @@ pub struct Peer {
 
 impl Default for Peer {
     fn default() -> Self {
-        Self::new(|_message| ())
+        Self::new(|_message, _bytes| ())
     }
 }
 
@@ -64,7 +68,7 @@ impl Peer {
     /// isolated even when several clients control the same native host.
     pub fn new<F>(writer: F) -> Self
     where
-        F: Fn(Value) + Send + Sync + 'static,
+        F: Fn(Value, Option<Vec<u8>>) + Send + Sync + 'static,
     {
         Self {
             pending: Arc::default(),
@@ -76,8 +80,12 @@ impl Peer {
     }
 
     fn write(&self, message: Value) {
+        self.write_with_bytes(message, None);
+    }
+
+    fn write_with_bytes(&self, message: Value, bytes: Option<Vec<u8>>) {
         crate::awake::record_activity();
-        (self.writer)(message);
+        (self.writer)(message, bytes);
     }
 
     /// Call the peer and await its final result.
@@ -125,6 +133,28 @@ impl Peer {
     where
         F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Value, String>> + Send + 'static,
+    {
+        self.insert_handler(method, move |params, ctx| {
+            let reply = f(params, ctx);
+            async move { reply.await.map(|result| (result, None)) }
+        });
+    }
+
+    /// Like [`Peer::handle`], but the handler may return raw bytes next to its
+    /// result. The transport carries them without base64 and the receiver sees
+    /// them as `result.data`, so the result itself must not contain `data`.
+    pub fn handle_with_bytes<F, Fut>(&self, method: &str, f: F)
+    where
+        F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Reply, String>> + Send + 'static,
+    {
+        self.insert_handler(method, f);
+    }
+
+    fn insert_handler<F, Fut>(&self, method: &str, f: F)
+    where
+        F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Reply, String>> + Send + 'static,
     {
         let handler: Handler = Arc::new(move |params, ctx| Box::pin(f(params, ctx)));
         self.handlers
@@ -199,11 +229,12 @@ impl Peer {
         };
         let reply_peer = self.clone();
         tokio::spawn(async move {
-            let reply = match handler(params, ctx).await {
-                Ok(result) => json!({ "id": id, "result": result }),
-                Err(err) => json!({ "id": id, "error": err }),
-            };
-            reply_peer.write(reply);
+            match handler(params, ctx).await {
+                Ok((result, bytes)) => {
+                    reply_peer.write_with_bytes(json!({ "id": id, "result": result }), bytes)
+                }
+                Err(err) => reply_peer.write(json!({ "id": id, "error": err })),
+            }
         });
     }
 

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { documentFixture, relayKey, tick } from './helpers/app-fixture.mjs';
 
 const vector = JSON.parse(readFileSync(new URL('./fixtures/e2ee-v1.json', import.meta.url)));
@@ -157,6 +160,53 @@ test('encrypted attachments, file reads and permission decisions use the same pr
   }
   fixture.reply(prompt, { answer: 'done' });
   await tick();
+});
+
+test('binary frames match the Rust vector and never open as JSON envelopes', () => {
+  const app = new RelayEncryption(vector.id, 'app', 'test-phone');
+  const frame = new Uint8Array(Buffer.from(vector.hostBinaryFrame, 'base64url'));
+  assert.deepEqual(Buffer.from(app.openBytes(frame)), Buffer.from(vector.hostBinaryPlaintext, 'base64url'));
+  const tampered = frame.slice();
+  tampered[tampered.length - 1] ^= 1;
+  assert.throws(() => app.openBytes(tampered));
+  const envelope = Buffer.concat([
+    Buffer.from(vector.hostFrame.nonce, 'base64url'),
+    Buffer.from(vector.hostFrame.ciphertext, 'base64url'),
+  ]);
+  assert.throws(() => app.openBytes(new Uint8Array(envelope)));
+  const wrong = new RelayEncryption(`adk1_${Buffer.alloc(32, 42).toString('base64url')}`, 'app', 'test-phone');
+  assert.throws(() => wrong.openBytes(frame));
+});
+
+test('encrypted raw file reads arrive as binary frames and resolve with the bytes', async () => {
+  const fixture = documentFixture(undefined, { pairingId: vector.id });
+  await fixture.connect();
+  const read = fixture.app.agentApi.readRawFile('/tmp/a.bin');
+  await tick();
+  const request = fixture.requests.at(-1);
+  assert.equal(request.ephemeral, true);
+
+  // Seal as the daemon does: `[u32 header length][reply JSON][bytes]`, then `[nonce][ciphertext]`.
+  const encoder = new TextEncoder();
+  const header = encoder.encode(
+    JSON.stringify({ id: request.payload.id, peerId: 1, result: { path: '/tmp/a.bin', type: 'binary' } }),
+  );
+  const plaintext = Buffer.concat([Buffer.alloc(4), header, Buffer.from([0, 1, 2, 255])]);
+  plaintext.writeUInt32BE(header.length);
+  const secret = Buffer.from(vector.id.slice(5), 'base64url');
+  const key = hkdf(sha256, secret, encoder.encode('agentdeck-e2ee-v1'), encoder.encode('host-to-app'), 32);
+  const aad = encoder.encode(JSON.stringify(['agentdeck-e2ee-v1', vector.routeId, 'host-to-app', 'host', 'binary']));
+  const nonce = crypto.getRandomValues(new Uint8Array(24));
+  const sealed = Buffer.concat([nonce, xchacha20poly1305(key, nonce, aad).encrypt(plaintext)]);
+  const relayHeader = Buffer.from(JSON.stringify({ message_id: 'bin-1' }));
+  const relayFrame = Buffer.concat([Buffer.alloc(2), relayHeader, sealed]);
+  relayFrame.writeUInt16BE(relayHeader.length);
+  fixture.sockets.at(-1).binary(new Uint8Array(relayFrame));
+
+  const file = await read;
+  assert.equal(file.type, 'binary');
+  assert.deepEqual([...file.data], [0, 1, 2, 255]);
+  assert.ok(!sealed.includes(Buffer.from('/tmp/a.bin')));
 });
 
 test('plaintext injection cannot establish a connection with an encrypted ID', async () => {

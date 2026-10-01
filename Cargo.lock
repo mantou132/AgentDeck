@@ -4361,10 +4361,11 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 [[package]]
 name = "relay-client"
 version = "0.1.0"
-source = "git+https://github.com/mantou132/relay.git#68bb15f8dfdc7466168a629c5155e8b5053a644c"
+source = "git+https://github.com/mantou132/relay.git#17dd70061cb01b67490084deec6a484feef28316"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes",
  "futures-util",
  "serde",
  "serde_json",

@@ -86,8 +86,8 @@ importers:
         specifier: ^2.2.14
         version: 2.2.14(@mantou/gem@2.2.12)
       relay-client-ts:
-        specifier: ^0.1.7
-        version: 0.1.7
+        specifier: ^0.1.9
+        version: 0.1.9
       tauri-plugin-edge-to-edge-api:
         specifier: ^0.1.1
         version: 0.1.1
@@ -150,8 +150,8 @@ importers:
         specifier: ^2.2.14
         version: 2.2.14(@mantou/gem@2.2.12)
       relay-client-ts:
-        specifier: ^0.1.7
-        version: 0.1.7
+        specifier: ^0.1.9
+        version: 0.1.9
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.0
@@ -4047,8 +4047,8 @@ packages:
     resolution: {integrity: sha512-ZbgR5aZEdf4UKZVBPYIgaglBmSF2Hi94s2PcIHhRGFjKYu+chjJdYfHn4rt3hB6eCKLJ8giVIIfgMa1ehDfZKA==}
     engines: {node: '>=0.10.0'}
 
-  relay-client-ts@0.1.7:
-    resolution: {integrity: sha512-Y/sLEVy3PEJG/BbYzR9WjznaiqqVWg30wJRC8yb3bi/X3zb1g9Q/11RMsrncckXIw5Ic5QcaM3+GF8qIPvPYFQ==}
+  relay-client-ts@0.1.9:
+    resolution: {integrity: sha512-RG/mACSQePwVXWQOzFNjb8GZxIP52OiTEFLqApGmqChjn9b8hXqh/8Jouom7/r06bDbbyNn5ikZiM5ayQBrkpg==}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -8945,7 +8945,7 @@ snapshots:
     dependencies:
       rc: 1.2.8
 
-  relay-client-ts@0.1.7: {}
+  relay-client-ts@0.1.9: {}
 
   require-directory@2.1.1: {}
 

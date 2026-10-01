@@ -26,6 +26,7 @@
 - **端到端加密（E2EE）**：普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - **会话状态机制**：新会话先建本地待创建会话（App 中称 pending session），首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
 - **连接与重试**：host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限。
+- **投递方式**：调用通过 `CallOptions.ephemeral` 显式声明走 Relay ephemeral（不落库、不 ack，host 离线时立即失败），host 对其 event / 回复同样走 ephemeral；目前只有 `file_read`，其余请求、回复与通知都走可靠投递。`file_read` 的 raw 与图片回复在 Relay 上以二进制帧传输（配对为 `adk1_` 时加密）。旧版 relay-client 无法解析 ephemeral 帧，App 与 daemon 需一起升级。
 - **重置与清理**：异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
 
 # 前端开发（Gem 规范与语法指南）
