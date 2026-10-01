@@ -4,13 +4,14 @@ import { isSmallTextFile } from './file-preview';
 import { parseMessageLink } from './links';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
 
-import '@gem-bind/diff2html';
-import '@gem-bind/latex';
-import '@gem-bind/marked';
-import '@gem-bind/mermaid';
 import '../elements/chart';
 import '../elements/preview';
 import '../elements/screen';
+
+// Heavy elements stay out of the initial bundle; markup rendered earlier upgrades once they define themselves.
+import('@gem-bind/diff2html');
+import('@gem-bind/latex');
+import('@gem-bind/mermaid');
 
 const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
