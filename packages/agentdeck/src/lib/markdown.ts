@@ -1,5 +1,6 @@
 import { type MarkedExtension, Renderer } from '@gem-bind/marked';
 import { agentDeckTheme } from '../styles/theme';
+import { diffColorScheme } from './diff';
 import { isSmallTextFile } from './file-preview';
 import { parseMessageLink } from './links';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
@@ -65,7 +66,6 @@ const inlineLatex = {
 
 const defaultRenderer = new Renderer();
 const diffLanguages = ['diff', 'patch', 'udiff', 'unified-diff'];
-export const diffColorScheme = globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
 
 export const isCodeBlockClosed = (raw = '') => {
   const match = /^[ \t]*(`{3,}|~{3,})/.exec(raw);

@@ -2,8 +2,12 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { GitDiffResult } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
+import { diffColorScheme } from '../lib/diff';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
+
+// Heavy element stays out of the initial bundle; markup upgrades once it defines itself.
+import('@gem-bind/diff2html');
 
 const pageStyle = css`
   :scope {
@@ -11,6 +15,12 @@ const pageStyle = css`
   }
   footer {
     height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  }
+  gem-bind-diff2html {
+    display: block;
+    min-height: 100%;
+    --d2h-border-color: transparent;
+    --d2h-dark-border-color: transparent;
   }
 `;
 
@@ -102,12 +112,14 @@ export class DeckChangesDiffPageElement extends GemElement {
             <p class="m-0">${i18n.get('changes.noDiff')}</p>
           </div>
 
-          <!-- Diff output: fill the page so short diffs still scroll horizontally anywhere -->
-          <tap-code-block
+          <!-- Diff output -->
+          <gem-bind-diff2html
             v-else
-            class="select-text m-0 grid min-h-full w-full grid-rows-1 bg-transparent text-sm rounded-none"
-            codelang="diff"
-          >${diff || ''}</tap-code-block>
+            class="select-text"
+            .colorScheme=${diffColorScheme}
+            no-header
+            compact-line-numbers
+          >${diff || ''}</gem-bind-diff2html>
         </main>
         <footer slot="footer"></footer>
       </tap-page>

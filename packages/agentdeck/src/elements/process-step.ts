@@ -2,9 +2,9 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
-import { toolCallDiffs } from '../lib/diff';
+import { diffColorScheme, toolCallDiffs } from '../lib/diff';
 import { followBottom } from '../lib/follow-bottom';
-import { diffColorScheme, markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
+import { markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { hasActiveStream } from '../lib/stream-text';
 import { openMessageLink } from '../navigation';
 import {

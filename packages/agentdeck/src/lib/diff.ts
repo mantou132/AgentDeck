@@ -1,5 +1,7 @@
 import { createTwoFilesPatch, FILE_HEADERS_ONLY } from 'diff';
 
+export const diffColorScheme = globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
+
 export type ToolCallDiff = {
   type: 'diff';
   path?: string;
