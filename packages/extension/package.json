@@ -11,12 +11,12 @@
     "@gem-bind/diff2html": "^0.0.5",
     "@gem-bind/latex": "^0.0.3",
     "@gem-bind/marked": "^0.0.7",
-    "@gem-bind/mermaid": "^0.0.5",
-    "@mantou/gem": "^2.2.12",
+    "@gem-bind/mermaid": "^0.0.6",
+    "@mantou/gem": "^2.2.13",
     "@swc/helpers": "^0.5.23",
     "agentdeck": "workspace:*",
     "diff": "^8.0.4",
-    "duoyun-ui": "^2.2.14",
+    "duoyun-ui": "^2.2.16",
     "relay-client-ts": "^0.1.9"
   },
   "devDependencies": {
