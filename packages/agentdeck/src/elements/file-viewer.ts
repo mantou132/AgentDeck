@@ -127,7 +127,7 @@ export class DeckFileViewerElement extends GemElement {
             v-if=${markdown}
             slot="right"
             type="button"
-            class="min-h-11 cursor-pointer border-0 bg-transparent px-3 text-sm font-semibold text-primary-strong"
+            class="min-h-11 cursor-pointer border-0 bg-transparent px-3 text-sm font-semibold text-highlight"
             @click=${() => this.#state({ source: !source })}
           >${i18n.get(source ? 'file.preview' : 'file.source')}</button>
         </tap-navbar>

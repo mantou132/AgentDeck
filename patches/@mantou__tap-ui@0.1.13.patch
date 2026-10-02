@@ -96,6 +96,19 @@ index 988e6960f786b27f4d93d9b305c8886a5579f652..c7716aa4b31a4a6f2a8b8882ce4d6e25
      `;
          }));
          constructor() {
+diff --git a/elements/navbar.js b/elements/navbar.js
+index 025c83a37ec167a1ec7e306908be392860a85e78..e09d55aebd4d131cd64f350e8032f06d3ae7b04e 100644
+--- a/elements/navbar.js
++++ b/elements/navbar.js
+@@ -84,7 +84,7 @@ const style = css `
+     border: none;
+     border-radius: ${theme.normalRound};
+     background: transparent;
+-    color: ${theme.primaryColor};
++    color: ${theme.highlightColor};
+     font: inherit;
+     cursor: pointer;
+   }
 diff --git a/lib/directives.d.ts b/lib/directives.d.ts
 index be6b7f7ae9e692cfa3757674b2cbfb68bf9e509a..842bd575b5f2c3159f00a2473ffd103e5e625cf4 100644
 --- a/lib/directives.d.ts
