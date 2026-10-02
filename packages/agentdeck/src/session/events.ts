@@ -1,6 +1,6 @@
 import type { SessionConfigOption, SessionEvent } from '../agent/api';
 import { i18n } from '../i18n';
-import { withCurrentMode } from './modes';
+import { withCurrentMode } from './config-options';
 import type {
   Attachment,
   ChatMessage,

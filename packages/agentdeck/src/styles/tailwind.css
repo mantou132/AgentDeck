@@ -53,11 +53,6 @@ tap-browser::part(navbar) {
   border-block-end-color: var(--color-border-strong);
 }
 
-/* webkit bug: ::part in scope invalid */
-tap-sheet::part(sheet) {
-  background: var(--color-bg-light);
-}
-
 @layer base {
   button,
   textarea,

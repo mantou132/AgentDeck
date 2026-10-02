@@ -205,6 +205,7 @@ function composerFixture() {
     customElement: () => noop,
     adoptedStyle: () => noop,
     property: noop,
+    attribute: noop,
     boolattribute: noop,
     emitter: () => () => noop,
     effect: fieldHook(effects),

@@ -20,7 +20,6 @@ import {
   stopVoiceListening,
   voiceSupported,
 } from '../lib/voice';
-import type { ModeSelection } from '../session/modes';
 import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
 
@@ -47,9 +46,8 @@ const style = css`
 export class DeckComposerElement extends GemElement {
   @property sessionKey = '';
   @property draftKey = '';
-  @property mode?: ModeSelection;
-  @boolattribute modeBusy: boolean;
-  @emitter modeChange: Emitter<string>;
+  @attribute configLabel: string;
+  @emitter configOpen: Emitter;
   @property placeholder = '';
   @property submit?: (input: ComposerInput) => boolean | Promise<boolean>;
   @boolattribute disabled: boolean;
@@ -108,7 +106,6 @@ export class DeckComposerElement extends GemElement {
       this.ready &&
       !this.#state.loadingDraft &&
       !this.pending &&
-      !this.modeBusy &&
       Boolean(this.#state.draft.trim() || this.#state.quote.trim() || this.#state.attachments.length) &&
       this.#state.attachments.length <= MAX_ATTACHMENTS &&
       !this.#state.readingAttachments &&
@@ -425,24 +422,17 @@ export class DeckComposerElement extends GemElement {
                   <span v-if=${this.#state.readingAttachments || this.#state.submitting} class="truncate">
                     ${this.#state.readingAttachments ? i18n.get('composer.readingState') : i18n.get('composer.preparingSession')}
                   </span>
-                  <div v-if=${this.mode} class="relative flex min-w-0 items-center gap-1">
-                    <select
-                      class="min-h-9 max-w-32 min-w-0 cursor-pointer truncate rounded-lg border-0 bg-transparent pr-4 pl-1 text-sm font-medium text-describe outline-none focus:outline-none disabled:cursor-default disabled:opacity-50"
-                      aria-label=${i18n.get('composer.modeAria')}
-                      title=${this.mode?.choices.find((choice) => choice.value === this.mode?.currentValue)?.description || i18n.get('composer.modeAria')}
-                      ?disabled=${!this.ready || this.modeBusy || this.#state.submitting}
-                      @change=${(event: Event) => {
-                        const select = event.target as HTMLSelectElement;
-                        const value = select.value;
-                        select.value = this.mode?.currentValue ?? '';
-                        this.modeChange(value);
-                      }}
-                    >
-                      <option v-if=${this.sessionKey === 'pending-session'} value="" .selected=${!this.mode?.currentValue}>${i18n.get('composer.defaultMode')}</option>
-                      ${this.mode?.choices.map((choice) => html`<option value=${choice.value} .selected=${choice.value === this.mode?.currentValue}>${choice.name}</option>`)}
-                    </select>
-                    <tap-use v-if=${this.modeBusy} class="size-3.5 shrink-0" .element=${icons.loading}></tap-use>
-                  </div>
+                  <button
+                    v-if=${!!this.configLabel}
+                    type="button"
+                    class="flex min-h-9 min-w-0 cursor-pointer items-center gap-1 rounded-lg border-0 bg-transparent px-1 text-sm font-medium text-describe disabled:cursor-default disabled:opacity-50"
+                    aria-label=${i18n.get('composer.configAria')}
+                    ?disabled=${!this.ready || this.#state.submitting}
+                    @click=${() => this.configOpen()}
+                  >
+                    <span class="truncate">${this.configLabel}</span>
+                    <tap-use class="size-3.5 shrink-0" .element=${icons.expand}></tap-use>
+                  </button>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <button

@@ -45,7 +45,7 @@ const style = css`
     max-height: 65dvh;
     overflow: auto;
     border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.backgroundColor};
+    background: ${agentDeckTheme.lightBackgroundColor};
   }
   .plain-text {
     margin: 0;
@@ -54,7 +54,7 @@ const style = css`
     white-space: pre-wrap;
     word-break: break-word;
     border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.backgroundColor};
+    background: ${agentDeckTheme.lightBackgroundColor};
     padding: 1rem;
     font-family: ${agentDeckTheme.codeFont};
     font-size: ${agentDeckTheme.fontSizeSm};

@@ -231,8 +231,8 @@ export function documentFixture(previous, options = {}) {
     ...[
       'state/store',
       'state/sessions',
-      'state/modes',
-      'session/modes',
+      'state/config-options',
+      'session/config-options',
       'state/app',
       'session/events',
       'session/timeline',

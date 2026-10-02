@@ -17,6 +17,7 @@ export const RELAY_GUIDE_SEEN_KEY = 'agentdeck.relay_guide_seen.v1';
 export const ACTIVE_MARKER_KEY = 'agentdeck.active_in_flight.v1';
 export const FALLBACK_KEY = 'agentdeck.in_flight_fallback.v1';
 export const SESSION_META_KEY = 'agentdeck.meta.v1';
+export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
 
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.

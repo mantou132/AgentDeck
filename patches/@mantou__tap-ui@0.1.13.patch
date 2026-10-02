@@ -1,0 +1,98 @@
+diff --git a/elements/cell.d.ts b/elements/cell.d.ts
+index ae4a949442c17a5d426b5efe705c52ee06ffdbdc..428296b997c564fe7e8f9d9d7ece3a491d320502 100644
+--- a/elements/cell.d.ts
++++ b/elements/cell.d.ts
+@@ -16,7 +16,7 @@ export declare class TapCellElement extends GemElement {
+     action: boolean;
+ }
+ export type CellItem = {
+-    label: string;
++    label: string | TemplateResult;
+     description?: string | TemplateResult;
+     /**Show trailing chevron; defaults to true when not a switch row */
+     action?: boolean;
+diff --git a/elements/cell.js b/elements/cell.js
+index 988e6960f786b27f4d93d9b305c8886a5579f652..c7716aa4b31a4a6f2a8b8882ce4d6e2543e08e5a 100644
+--- a/elements/cell.js
++++ b/elements/cell.js
+@@ -32,7 +32,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
+     }
+     return useValue ? value : void 0;
+ };
+-import { adoptedStyle, aria, attribute, boolattribute, customElement, effect, part, property, shadow, slot, template, } from '@mantou/gem/lib/decorators';
++import { adoptedStyle, aria, attribute, boolattribute, customElement, effect, light, part, property, shadow, slot, template, } from '@mantou/gem/lib/decorators';
+ import { css, GemElement, html } from '@mantou/gem/lib/element';
+ import { icons } from '../lib/icons';
+ import { theme } from '../lib/theme';
+@@ -201,28 +201,29 @@ let TapCellElement = (() => {
+     return TapCellElement = _classThis;
+ })();
+ export { TapCellElement };
+-const groupStyle = css `
+-  :scope:where(:not([hidden])) {
++// 内容可被外部样式化，类名使用生成的唯一名称，避免被外部同名规则意外命中
++const groupStyle = css({
++    $: `
+     display: block;
+     width: 100%;
+     color: ${theme.textColor};
+-  }
+-  :scope:not(:first-of-type) {
+-    margin-block-start: 0.5em;
+-  }
+-  .heading {
++    &:where(:not(:first-of-type)) {
++      margin-block-start: 0.5em;
++    }
++  `,
++    heading: `
+     padding: 0.75em calc(1.0625em / 0.8125) 0.5em;
+     font-size: 0.8125em;
+     line-height: 1.3;
+     color: ${theme.describeColor};
+-  }
+-  .body {
++  `,
++    body: `
+     display: block;
+     background: ${theme.backgroundColor};
+-  }
+-`;
++  `,
++});
+ let TapCellGroupElement = (() => {
+-    let _classDecorators = [customElement('tap-cell-group'), adoptedStyle(groupStyle), aria({ role: 'group' })];
++    let _classDecorators = [customElement('tap-cell-group'), adoptedStyle(groupStyle), aria({ role: 'group' }), light({ penetrable: true })];
+     let _classDescriptor;
+     let _classExtraInitializers = [];
+     let _classThis;
+@@ -283,14 +284,16 @@ let TapCellGroupElement = (() => {
+         };
+         #renderItem = (item) => {
+             const action = this.#showAction(item);
++            const label = typeof item.label === 'string' ? item.label : '';
+             const description = typeof item.description === 'string' ? item.description : '';
+             return html `
+       <tap-cell
+-        label=${item.label}
++        label=${label}
+         description=${description}
+         ?action=${action}
+-        @click=${(evt) => action && item.onClick?.(evt)}
++        @click=${(evt) => item.onClick?.(evt)}
+       >
++        <div v-if=${typeof item.label !== 'string'} slot="label">${item.label}</div>
+         <div v-if=${typeof item.description !== 'string' && !!item.description} slot="description">${item.description}</div>
+         ${this.#renderExtra(item)}
+       </tap-cell>
+@@ -301,8 +304,8 @@ let TapCellGroupElement = (() => {
+         });
+         #content = (__runInitializers(this, _private_updateAria_extraInitializers), __runInitializers(this, _private_content_initializers, () => {
+             return html `
+-      <div class="heading" v-if=${!!this.heading}>${this.heading}</div>
+-      <div class="body">${(this.items || []).map((item) => this.#renderItem(item))}</div>
++      <div class=${groupStyle.heading} v-if=${!!this.heading}>${this.heading}</div>
++      <div class=${groupStyle.body}>${(this.items || []).map((item) => this.#renderItem(item))}</div>
+     `;
+         }));
+         constructor() {

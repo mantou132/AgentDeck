@@ -201,6 +201,7 @@ const baseMarkdownStyle = `
     overflow-x: auto;
     border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
+    background: ${agentDeckTheme.lightBackgroundColor};
   }
   table { width: 100%; border-collapse: collapse; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }

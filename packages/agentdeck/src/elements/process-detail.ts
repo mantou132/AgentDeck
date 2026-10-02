@@ -17,7 +17,7 @@ const style = css`
     line-height: 1.5;
   }
   tap-page, tap-navbar {
-    background: ${agentDeckTheme.lightBackgroundColor};
+    background: ${agentDeckTheme.backgroundColor};
   }
   tap-navbar {
     border: 0;

@@ -8,7 +8,6 @@ const layerStyle = css`
     max-width: 620px;
     border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-bottom: 0;
-    background: ${agentDeckTheme.lightBackgroundColor};
     padding: 0 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 `;

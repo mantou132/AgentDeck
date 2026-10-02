@@ -26,7 +26,7 @@ const style = css`
     line-height: 1.5;
   }
   tap-page, tap-navbar {
-    background: ${agentDeckTheme.lightBackgroundColor};
+    background: ${agentDeckTheme.backgroundColor};
   }
   tap-navbar {
     border: 0;
@@ -84,7 +84,7 @@ const style = css`
   .code-block {
     overflow-x: auto;
     border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.backgroundColor};
+    background: ${agentDeckTheme.lightBackgroundColor};
   }
   .command-text {
     margin: 0;
@@ -96,7 +96,7 @@ const style = css`
     overflow-wrap: break-word;
     white-space: pre-wrap;
     border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.backgroundColor};
+    background: ${agentDeckTheme.lightBackgroundColor};
   }
 `;
 

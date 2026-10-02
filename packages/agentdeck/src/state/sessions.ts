@@ -4,9 +4,9 @@ import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { draftKey, removeDraft } from '../composer/drafts';
 import { i18n } from '../i18n';
+import { getConfigSelects } from '../session/config-options';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
-import { getModeSelection, withCurrentMode } from '../session/modes';
 import {
   cancelTurnPrompt,
   declineAllPermissions,
@@ -16,6 +16,7 @@ import {
   setPendingSessionCanceled,
 } from '../session/turn';
 import type { Attachment, DeckSession, SessionOptions, TextMessage } from '../session/types';
+import { applyConfigSelection, getConfigDefaults, saveConfigDefaults } from './config-options';
 import {
   clearAllInFlight,
   type InFlightSession,
@@ -23,7 +24,6 @@ import {
   saveInFlight,
   updateInFlightMessages,
 } from './in-flight';
-import { applyRemoteMode } from './modes';
 import { getSessionMeta, isSessionDeleted, markSessionDeleted, saveSessionMeta } from './session-meta';
 import {
   agentdeckStore,
@@ -110,7 +110,6 @@ export const resetRemoteState = () => {
     loadingSessionIds: [],
     pendingSessionIds: [],
     unreadSessionIds: [],
-    changingModeSessionIds: [],
     errorsBySession: {},
     optionsBySession: {},
     permissionsBySession: {},
@@ -284,7 +283,6 @@ export const deleteSession = async (sessionId: string) => {
       loadingSessionIds: agentdeckStore.loadingSessionIds.filter((id) => id !== sessionId),
       pendingSessionIds: agentdeckStore.pendingSessionIds.filter((id) => id !== sessionId),
       unreadSessionIds: agentdeckStore.unreadSessionIds.filter((id) => id !== sessionId),
-      changingModeSessionIds: agentdeckStore.changingModeSessionIds.filter((id) => id !== sessionId),
     });
   } catch (error) {
     if (isCurrentHost()) {
@@ -305,7 +303,6 @@ export const closeSession = async (sessionId: string) => {
   setSessionFlag('loadingSessionIds', sessionId, false);
   setSessionFlag('pendingSessionIds', sessionId, false);
   setSessionFlag('unreadSessionIds', sessionId, false);
-  setSessionFlag('changingModeSessionIds', sessionId, false);
   resolvePermission(sessionId, null);
   removeInFlight(sessionId);
   setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
@@ -346,13 +343,9 @@ export const createPendingSession = ({ agent, cwd }: CreateSessionInput): DeckSe
   setSessionFlag('loadingSessionIds', 'pending-session', false);
   setSessionFlag('pendingSessionIds', 'pending-session', false);
   setSessionFlag('loadedSessionIds', 'pending-session', true);
-  const knownSession = agentdeckStore.sessions.find(
-    (session) => session.agent === agent && getModeSelection(agentdeckStore.optionsBySession[session.sessionId]),
-  );
-  const knownOptions = knownSession ? agentdeckStore.optionsBySession[knownSession.sessionId] : {};
   agentdeckStore({
     pendingSession,
-    optionsBySession: { ...agentdeckStore.optionsBySession, 'pending-session': withCurrentMode(knownOptions, '') },
+    optionsBySession: { ...agentdeckStore.optionsBySession, 'pending-session': getConfigDefaults(agent) },
   });
   return pendingSession;
 };
@@ -415,7 +408,10 @@ export const ensureSessionLoaded = async (sessionId: string) => {
     setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
     setSessionFlag('loadingSessionIds', sessionId, false);
     setSessionFlag('loadedSessionIds', sessionId, true);
-    updateSessionOptions(sessionId, { modes: loaded.modes, configOptions: loaded.configOptions ?? [] });
+    const loadedOptions = { modes: loaded.modes, configOptions: loaded.configOptions ?? [] };
+    updateSessionOptions(sessionId, loadedOptions);
+    // 还没记住过该 agent 的配置时，以首个加载的会话作为新会话默认值
+    if (!getConfigSelects(getConfigDefaults(session.agent)).length) saveConfigDefaults(session.agent, loadedOptions);
 
     const meta = getSessionMeta(sessionId);
     const title = isPlaceholderTitle(loaded.title) && meta?.title ? meta.title : loaded.title || meta?.title;
@@ -575,7 +571,7 @@ export const promotePendingSession = async (
     onFailed?.();
     return null;
   }
-  const selectedMode = getModeSelection(agentdeckStore.optionsBySession['pending-session'])?.currentValue;
+  const selectedOptions = agentdeckStore.optionsBySession['pending-session'] ?? {};
   setPendingSessionCanceled(false);
   const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
   setMessages('pending-session', [userMessage]);
@@ -623,19 +619,18 @@ export const promotePendingSession = async (
   });
 
   let options: SessionOptions = { modes: created.modes, configOptions: created.configOptions };
-  let modeError = '';
-  if (selectedMode) {
-    try {
-      options = await applyRemoteMode(liveSession, options, selectedMode);
-    } catch (error) {
-      modeError = error instanceof Error ? error.message : i18n.get('error.switchModeFailed');
-    }
-    if (isPendingSessionCanceled()) {
-      agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
-      setMessages('pending-session', []);
-      setSessionFlag('pendingSessionIds', 'pending-session', false);
-      return null;
-    }
+  let configError = '';
+  try {
+    options = await applyConfigSelection(liveSession, options, selectedOptions);
+    saveConfigDefaults(liveSession.agent, options);
+  } catch (error) {
+    configError = error instanceof Error ? error.message : i18n.get('error.switchConfigFailed');
+  }
+  if (isPendingSessionCanceled()) {
+    agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
+    setMessages('pending-session', []);
+    setSessionFlag('pendingSessionIds', 'pending-session', false);
+    return null;
   }
   updateSessionOptions(sessionId, options);
 
@@ -660,9 +655,9 @@ export const promotePendingSession = async (
   setSessionFlag('pendingSessionIds', 'pending-session', false);
   setSessionFlag('loadedSessionIds', liveSession.sessionId, true);
 
-  if (modeError) {
+  if (configError) {
     setMessages(sessionId, [{ ...userMessage, failed: true }]);
-    setSessionError(sessionId, modeError);
+    setSessionError(sessionId, configError);
     onFailed?.();
   } else {
     runPromptTurn(liveSession, userMessage, stagedMessages.length, onFailed);
@@ -684,8 +679,7 @@ export const sendPrompt = (
     session.pendingCreation ||
     agentdeckStore.connection !== 'connected' ||
     !agentdeckStore.loadedSessionIds.includes(sessionId) ||
-    agentdeckStore.pendingSessionIds.includes(sessionId) ||
-    agentdeckStore.changingModeSessionIds.includes(sessionId)
+    agentdeckStore.pendingSessionIds.includes(sessionId)
   ) {
     onFailed?.();
     return false;

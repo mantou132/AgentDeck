@@ -5,14 +5,14 @@ import { Stack } from '@mantou/tap-ui/elements/stack';
 import { reconnectTransport } from '../agent/transport';
 import { draftKey, removeDraft, restoreDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
+import { openSessionConfig } from '../elements/session-config';
 import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { hapticImpact } from '../lib/haptics';
 import { displayPath } from '../lib/path';
 import { openChanges, openSettings, replaceSession } from '../navigation';
-import { getModeSelection } from '../session/modes';
+import { getConfigLabel, getConfigSelects } from '../session/config-options';
 import type { Attachment, DeckSession } from '../session/types';
-import { changeSessionMode } from '../state/modes';
 import {
   cancelTurn,
   closeSession,
@@ -241,7 +241,6 @@ export class AgentDeckSessionPageElement extends GemElement {
     const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId);
     const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
     const pending = agentdeckStore.pendingSessionIds.includes(session.sessionId);
-    const changingMode = agentdeckStore.changingModeSessionIds.includes(session.sessionId);
     const error =
       agentdeckStore.errorsBySession[session.sessionId] ||
       agentdeckStore.connectionError ||
@@ -344,11 +343,8 @@ export class AgentDeckSessionPageElement extends GemElement {
             ${this.#composerRef}
             .sessionKey=${this.sessionId}
             .draftKey=${draftKey(session)}
-            .mode=${getModeSelection(agentdeckStore.optionsBySession[session.sessionId])}
-            ?mode-busy=${changingMode}
-            @mode-change=${(event: CustomEvent<string>) => {
-              changeSessionMode(session, event.detail);
-            }}
+            config-label=${getConfigLabel(getConfigSelects(agentdeckStore.optionsBySession[session.sessionId]))}
+            @config-open=${() => openSessionConfig(session.sessionId)}
             .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get('session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
             .submit=${this.#send}
             ?disabled=${!loaded}
