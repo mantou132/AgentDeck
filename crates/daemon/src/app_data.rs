@@ -69,7 +69,8 @@ impl AppPaths {
         AgentPaths::new(self.agents_dir().join(id))
     }
 
-    /// Caller must hold the instance lock. Configuration and installed agents are preserved.
+    /// Caller must hold the instance lock. Configuration and installed agents
+    /// are preserved.
     pub fn clear_runtime_state(&self) -> Result<()> {
         remove_if_present(&self.awake_status_file(), |path| fs::remove_file(path))?;
         remove_if_present(&self.peers_file(), |path| fs::remove_file(path))?;
@@ -91,7 +92,8 @@ impl AppPaths {
     }
 }
 
-/// Installed binaries and disposable download staging for one managed agent.
+/// Installed binaries, disposable download staging and owned state for one
+/// managed agent.
 pub(crate) struct AgentPaths {
     root: PathBuf,
 }
@@ -115,6 +117,12 @@ impl AgentPaths {
 
     pub fn manifest_file(&self) -> PathBuf {
         self.root.join("managed-binary.json")
+    }
+
+    /// Agent state AgentDeck owns, such as the free agent's sessions; kept by
+    /// reset.
+    pub fn data_dir(&self) -> PathBuf {
+        self.root.join("data")
     }
 }
 

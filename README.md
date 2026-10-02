@@ -6,7 +6,7 @@ AgentDeck turns your coding agents (Claude Code, Codex, Cursor, pi) into remote 
 
 ## Features
 
-- **Any ACP agent**: Claude Code, Codex, Cursor, Google Antigravity, GitHub Copilot, OpenCode, Qwen Code, Kimi CLI and more. Switch agents and session modes from the client.
+- **Any ACP agent**: a built-in Free agent (OpenCode free models, no login), Claude Code, Codex, Cursor, Google Antigravity, GitHub Copilot, OpenCode, Qwen Code, Kimi CLI and more. Switch agents and session modes from the client.
 - **Phone and browser**: Android app, plus a Chrome / Edge / Firefox extension (side panel and DevTools panel).
 - **End-to-end encrypted**: the relay only forwards ciphertext; your code and agents stay on your own computer.
 - **Self-hosted relay**: run your own [relay][relay] and pair by scanning the QR code from `agentdeckd status`.

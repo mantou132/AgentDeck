@@ -13,7 +13,7 @@ use std::{
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::catalog::{AgentCandidate, AgentLaunch, RegistryBinaryTarget};
+use super::catalog::{AgentCandidate, AgentLaunch, RegistryBinaryTarget, managed_binary_agent};
 use crate::{app_data, logger};
 
 static AGENT_INSTALL_LOCK: StdMutex<()> = StdMutex::new(());
@@ -133,14 +133,11 @@ struct ManagedBinaryManifest {
     command: String,
     #[serde(default)]
     args: Vec<String>,
-    #[serde(default)]
-    env: HashMap<String, String>,
 }
 
 struct PreparedProgram {
     executable: PathBuf,
     args: Vec<String>,
-    env: HashMap<String, String>,
 }
 
 fn safe_join(root: &Path, relative: &str) -> Result<PathBuf> {
@@ -177,7 +174,6 @@ fn cached_managed_binary(runtime: &app_data::AgentPaths, version: &str) -> Optio
     Some(PreparedProgram {
         executable,
         args: manifest.args,
-        env: manifest.env,
     })
 }
 
@@ -372,7 +368,6 @@ fn install_registry_binary(
             version: version.to_string(),
             command: relative_command,
             args: binary.args.clone(),
-            env: binary.env.clone(),
         };
         let manifest_path = runtime.manifest_file();
         fs::write(
@@ -391,7 +386,6 @@ fn install_registry_binary(
         Ok(PreparedProgram {
             executable,
             args: manifest.args,
-            env: manifest.env,
         })
     })();
     let _ = fs::remove_dir_all(&install_root);
@@ -426,16 +420,16 @@ fn prepare_native_command(
         PreparedProgram {
             executable,
             args: binary.args.clone(),
-            env: binary.env.clone(),
         }
     } else {
-        let runtime = app_data::AppPaths::discover()?.agent(&candidate.id);
+        let owner = managed_binary_agent(&candidate.id);
+        let runtime = app_data::AppPaths::discover()?.agent(owner);
         logger::info(&format!(
             "Using managed {} CLI from {}",
             candidate.name,
             runtime.root().display()
         ));
-        install_registry_binary(&runtime, &candidate.id, version, binary)?
+        install_registry_binary(&runtime, owner, version, binary)?
     };
 
     let path_entries = user_path_entries();
@@ -443,7 +437,7 @@ fn prepare_native_command(
         "PATH={}",
         joined_path(&path_entries)?.to_string_lossy()
     )];
-    for (k, v) in &program.env {
+    for (k, v) in &binary.env {
         command.push(format!("{k}={v}"));
     }
     append_program(&mut command, &program.executable, &program.args);
@@ -519,8 +513,10 @@ pub(super) fn prepare_agent_command(candidate: AgentCandidate) -> Result<Vec<Str
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{
+        io::Write,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use super::{cached_managed_binary, extract_agent_archive, remove_other_versions, safe_join};
 
@@ -640,8 +636,7 @@ mod tests {
         let manifest = serde_json::json!({
             "version": "1.0.0",
             "command": executable.strip_prefix(&runtime_dir).unwrap().to_string_lossy(),
-            "args": ["acp"],
-            "env": { "TEST_ENV": "1" }
+            "args": ["acp"]
         });
         std::fs::write(
             runtime.manifest_file(),
@@ -655,6 +650,5 @@ mod tests {
 
         assert_eq!(cached.executable, executable);
         assert_eq!(cached.args, vec!["acp".to_string()]);
-        assert_eq!(cached.env.get("TEST_ENV"), Some(&"1".to_string()));
     }
 }

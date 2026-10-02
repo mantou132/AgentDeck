@@ -34,11 +34,13 @@ export const RENDER_CAPABILITIES: ClientCapabilities = {
 };
 
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
+// `free` is the daemon's built-in agent (OpenCode free models), first so it is the default.
 export const popularAgents: { id: string; name: string }[] = [
+  { id: 'free', name: 'Free' },
   { id: 'claude-acp', name: 'Claude Code' },
   { id: 'codex-acp', name: 'Codex' },
   { id: 'cursor', name: 'Cursor' },
-  { id: 'pi-acp', name: 'pi' },
+  { id: 'pi-acp', name: 'Pi' },
   { id: 'antigravity-acp', name: 'Google Antigravity' },
   { id: 'github-copilot-cli', name: 'GitHub Copilot' },
   { id: 'opencode', name: 'OpenCode' },

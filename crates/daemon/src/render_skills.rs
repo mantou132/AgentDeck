@@ -97,6 +97,18 @@ pub fn skill_directories(capabilities: &ClientCapabilities) -> Vec<PathBuf> {
     skills.map(|skill| root.join(skill.capability)).collect()
 }
 
+/// Skill folders for every capability, for agents configured once per
+/// process instead of per session.
+pub fn all_skill_paths() -> Vec<PathBuf> {
+    let Some(root) = skills_root() else {
+        return Vec::new();
+    };
+    SKILLS
+        .iter()
+        .map(|skill| root.join(skill.capability).join(SKILL_ROOTS[0]))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

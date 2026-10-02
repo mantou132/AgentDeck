@@ -1,5 +1,3 @@
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
@@ -10,10 +8,22 @@ use std::{
     time::Duration,
 };
 
-use crate::{app_data::AppPaths, logger};
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    app_data::{self, AppPaths},
+    logger, render_skills,
+};
 
 pub(super) const REGISTRY_JSON: &str = include_str!("registry.json");
 const REGISTRY_URL: &str = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
+
+/// AgentDeck's built-in agent: the registry's OpenCode limited to its free
+/// models, keeping its own sessions apart from the user's OpenCode.
+const FREE_AGENT_ID: &str = "free";
+const FREE_AGENT_NAME: &str = "Free";
+const FREE_AGENT_BASE: &str = "opencode";
 
 #[derive(Clone, Debug)]
 pub(super) enum AgentLaunch {
@@ -167,36 +177,15 @@ fn registry_platform() -> String {
     format!("{os}-{}", std::env::consts::ARCH)
 }
 
-/// AgentDeck launch env layered over the registry's for an agent.
-fn agentdeck_env(id: &str) -> &'static [(&'static str, &'static str)] {
-    match id {
-        // Codex's bundled visualize plugin answers chart requests with `visualize{...}`
-        // references only the Codex app renders.
-        "codex-acp" => &[(
-            "CODEX_CONFIG",
-            r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}}}"#,
-        )],
-        _ => &[],
-    }
-}
-
-fn with_agentdeck_env(id: &str, mut env: HashMap<String, String>) -> HashMap<String, String> {
-    for (name, value) in agentdeck_env(id) {
-        env.insert(name.to_string(), value.to_string());
-    }
-    env
-}
-
 /// Select a distribution for the host before deriving its CLI or launch args.
 fn candidates_for_platform(registry: Registry, platform: &str) -> Vec<AgentCandidate> {
     let mut candidates = Vec::new();
     for agent in registry.agents {
-        if let Some(mut binary) = agent
+        if let Some(binary) = agent
             .distribution
             .binary
             .and_then(|mut targets| targets.remove(platform))
         {
-            binary.env = with_agentdeck_env(&agent.id, binary.env);
             // Registry Windows paths can mix '/' and '\\', including when
             // inspecting another platform's catalog in a test.
             let cmd_name = binary.cmd.rsplit(['/', '\\']).next().unwrap_or_default();
@@ -215,6 +204,21 @@ fn candidates_for_platform(registry: Registry, platform: &str) -> Vec<AgentCandi
                 cmd_name
             };
             let cli = (!cmd_name.is_empty()).then(|| cmd_name.to_string());
+            if agent.id == FREE_AGENT_BASE {
+                // Always the managed binary, never the user's own CLI.
+                candidates.insert(
+                    0,
+                    AgentCandidate {
+                        id: FREE_AGENT_ID.to_string(),
+                        name: FREE_AGENT_NAME.to_string(),
+                        cli: None,
+                        launch: AgentLaunch::Binary {
+                            version: agent.version.clone(),
+                            target: binary.clone(),
+                        },
+                    },
+                );
+            }
             candidates.push(AgentCandidate {
                 id: agent.id.clone(),
                 name: agent.name,
@@ -225,27 +229,25 @@ fn candidates_for_platform(registry: Registry, platform: &str) -> Vec<AgentCandi
                 },
             });
         } else if let Some(npx) = agent.distribution.npx {
-            let id = agent.id;
             candidates.push(AgentCandidate {
-                id: id.clone(),
+                id: agent.id,
                 name: agent.name,
                 cli: None,
                 launch: AgentLaunch::Npx {
                     package: npx.package,
                     args: npx.args,
-                    env: with_agentdeck_env(&id, npx.env),
+                    env: npx.env,
                 },
             });
         } else if let Some(uvx) = agent.distribution.uvx {
-            let id = agent.id;
             candidates.push(AgentCandidate {
-                id: id.clone(),
+                id: agent.id,
                 name: agent.name,
                 cli: None,
                 launch: AgentLaunch::Uvx {
                     package: uvx.package,
                     args: uvx.args,
-                    env: with_agentdeck_env(&id, uvx.env),
+                    env: uvx.env,
                 },
             });
         }
@@ -253,10 +255,61 @@ fn candidates_for_platform(registry: Registry, platform: &str) -> Vec<AgentCandi
     candidates
 }
 
-pub(super) fn agent_candidate(id: &str) -> Option<AgentCandidate> {
-    candidates_for_platform((*current_registry()).clone(), &registry_platform())
-        .into_iter()
-        .find(|candidate| candidate.id == id)
+/// AgentDeck launch env layered over the registry's, resolved when the agent
+/// starts.
+fn agentdeck_env(id: &str) -> Result<Vec<(String, String)>> {
+    Ok(match id {
+        // Codex's bundled visualize plugin answers chart requests with `visualize{...}`
+        // references only the Codex app renders.
+        "codex-acp" => vec![(
+            "CODEX_CONFIG".to_string(),
+            r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}}}"#.to_string(),
+        )],
+        // The free agent: its own session database, no user login, only the free
+        // OpenCode provider, and every render skill (OpenCode does not take
+        // per-session `additionalDirectories`).
+        FREE_AGENT_ID => {
+            let data_dir = AppPaths::discover()?.agent(FREE_AGENT_ID).data_dir();
+            app_data::ensure_dir(&data_dir)?;
+            let config = serde_json::json!({
+                "enabled_providers": ["opencode"],
+                "skills": { "paths": render_skills::all_skill_paths() },
+            });
+            vec![
+                (
+                    "OPENCODE_DB".to_string(),
+                    data_dir.join("opencode.db").to_string_lossy().into_owned(),
+                ),
+                ("OPENCODE_AUTH_CONTENT".to_string(), "{}".to_string()),
+                ("OPENCODE_CONFIG_CONTENT".to_string(), config.to_string()),
+            ]
+        }
+        _ => Vec::new(),
+    })
+}
+
+/// Agent whose directory holds the managed binary: the free agent shares
+/// OpenCode's install and keeps only its data apart.
+pub(super) fn managed_binary_agent(id: &str) -> &str {
+    if id == FREE_AGENT_ID {
+        FREE_AGENT_BASE
+    } else {
+        id
+    }
+}
+
+pub(super) fn agent_candidate(id: &str) -> Result<AgentCandidate> {
+    let mut candidate =
+        candidates_for_platform((*current_registry()).clone(), &registry_platform())
+            .into_iter()
+            .find(|candidate| candidate.id == id)
+            .with_context(|| format!("Unknown ACP agent: {id}"))?;
+    let env = match &mut candidate.launch {
+        AgentLaunch::Binary { target, .. } => &mut target.env,
+        AgentLaunch::Npx { env, .. } | AgentLaunch::Uvx { env, .. } => env,
+    };
+    env.extend(agentdeck_env(id)?);
+    Ok(candidate)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -279,7 +332,9 @@ pub fn available_agents() -> Vec<AvailableAgent> {
 
 #[cfg(test)]
 mod tests {
-    use super::{AgentLaunch, bundled_registry, candidates_for_platform};
+    use super::{
+        AgentLaunch, agentdeck_env, bundled_registry, candidates_for_platform, managed_binary_agent,
+    };
 
     #[test]
     fn parses_bundled_registry() {
@@ -321,15 +376,34 @@ mod tests {
     }
 
     #[test]
-    fn codex_launch_disables_the_visualize_plugin() {
-        let codex = candidates_for_platform(bundled_registry(), "darwin-aarch64")
-            .into_iter()
-            .find(|candidate| candidate.id == "codex-acp")
+    fn free_agent_is_first_and_always_uses_the_managed_opencode() {
+        let candidates = candidates_for_platform(bundled_registry(), "darwin-aarch64");
+        let free = &candidates[0];
+        assert_eq!(free.id, "free");
+        assert!(free.cli.is_none());
+        let opencode = candidates
+            .iter()
+            .find(|candidate| candidate.id == "opencode")
             .unwrap();
-        let AgentLaunch::Npx { env, .. } = codex.launch else {
-            panic!("codex-acp launches through npx");
+        assert_eq!(opencode.cli.as_deref(), Some("opencode"));
+        let (
+            AgentLaunch::Binary { target: free, .. },
+            AgentLaunch::Binary {
+                target: opencode, ..
+            },
+        ) = (&free.launch, &opencode.launch)
+        else {
+            panic!("free and opencode launch the registry binary");
         };
-        let config: serde_json::Value = serde_json::from_str(&env["CODEX_CONFIG"]).unwrap();
+        assert_eq!(free.archive, opencode.archive);
+        assert_eq!(managed_binary_agent("free"), "opencode");
+    }
+
+    #[test]
+    fn codex_launch_disables_the_visualize_plugin() {
+        let env = agentdeck_env("codex-acp").unwrap();
+        let (_, config) = env.iter().find(|(name, _)| name == "CODEX_CONFIG").unwrap();
+        let config: serde_json::Value = serde_json::from_str(config).unwrap();
         assert_eq!(
             config["plugins"]["visualize@openai-bundled"]["enabled"],
             false

@@ -2,16 +2,20 @@ import { popularAgents } from 'agentdeck/config';
 
 // Aligned with AgentDeck and ACP Registry:
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
+// The built-in `free` agent runs OpenCode and has no registry icon.
+const registryIcon = (id) =>
+  `https://cdn.agentclientprotocol.com/registry/v1/latest/${id === 'free' ? 'opencode' : id}.svg`;
+
 export const POPULAR_AGENTS = popularAgents.map(({ id, name }) => ({
   id,
   name,
-  icon: `https://cdn.agentclientprotocol.com/registry/v1/latest/${id}.svg`,
+  icon: registryIcon(id),
 }));
 
 export function getAgentIconUrl(agentId) {
   const popular = POPULAR_AGENTS.find((agent) => agent.id === agentId);
   if (popular?.icon) return popular.icon;
-  return `https://cdn.agentclientprotocol.com/registry/v1/latest/${agentId}.svg`;
+  return registryIcon(agentId);
 }
 
 export function getAgentName(agentId) {

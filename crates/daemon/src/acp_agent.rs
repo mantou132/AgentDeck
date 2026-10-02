@@ -185,11 +185,12 @@ impl AcpRuntime {
 
     async fn serve_connection(&self, generation: u64) -> Result<()> {
         catalog::refresh_registry();
-        let candidate = catalog::agent_candidate(&self.agent)
-            .with_context(|| format!("Unknown ACP agent: {}", self.agent))?;
-        let command = tokio::task::spawn_blocking(move || prepare_agent_command(candidate))
-            .await
-            .context("ACP runtime preparation task failed")??;
+        let agent = self.agent.clone();
+        let command = tokio::task::spawn_blocking(move || {
+            prepare_agent_command(catalog::agent_candidate(&agent)?)
+        })
+        .await
+        .context("ACP runtime preparation task failed")??;
         logger::info(&format!(
             "Starting {} ACP agent: {}",
             self.agent,
@@ -1271,7 +1272,8 @@ async fn send_set_config_option(
 /// Run one prompt turn. While the turn runs, keeps draining `incoming` (when
 /// given) so Cancel stays actionable instead of queueing behind the turn;
 /// explicit close interrupts the entire actor independently of this queue.
-/// Config/mode changes go out live (see `send_set_mode`), other commands are deferred.
+/// Config/mode changes go out live (see `send_set_mode`), other commands are
+/// deferred.
 async fn run_prompt_turn(
     session: &mut ActiveSession<'_, Agent>,
     prompt: String,
