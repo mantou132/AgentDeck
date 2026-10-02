@@ -138,15 +138,15 @@ export class DeckFileViewerElement extends GemElement {
           path=${path}
         ></deck-file-path>
         <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">
-          <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-describe">
+          <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe">
             <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
             ${i18n.get('file.loading')}
           </div>
-          <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-12 text-center">
+          <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-16 text-center">
             <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
             <p class="m-0 font-semibold text-highlight">${i18n.get('file.failed')}</p>
             <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
-            <div class="flex justify-center gap-3">
+            <div class="mt-4 flex justify-center gap-3">
               <button
                 class="min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 text-sm font-semibold text-primary-strong"
                 @click=${() => this.#state({ revision: this.#state.revision + 1 })}

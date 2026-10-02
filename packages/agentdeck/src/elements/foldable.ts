@@ -42,7 +42,6 @@ const style = css`
     font-size: ${agentDeckTheme.fontSizeXs};
     font-weight: 500;
     cursor: pointer;
-    backdrop-filter: blur(6px);
     box-shadow: ${agentDeckTheme.controlShadow};
   }
   .icon {

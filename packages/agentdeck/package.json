@@ -15,7 +15,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@gem-bind/diff2html": "^0.0.5",
+    "@gem-bind/diff2html": "^0.0.6",
     "@gem-bind/echarts": "^0.0.2",
     "@gem-bind/latex": "^0.0.3",
     "@gem-bind/marked": "^0.0.7",

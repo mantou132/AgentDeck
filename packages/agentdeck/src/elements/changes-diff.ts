@@ -16,12 +16,6 @@ const pageStyle = css`
   footer {
     height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
-  gem-bind-diff2html {
-    display: block;
-    min-height: 100%;
-    --d2h-border-color: transparent;
-    --d2h-dark-border-color: transparent;
-  }
 `;
 
 @customElement('deck-changes-diff-page')
@@ -86,7 +80,7 @@ export class DeckChangesDiffPageElement extends GemElement {
           </div>
         </div>
 
-        <main class="h-full overflow-auto overscroll-contain">
+        <main class="flex h-full flex-col overflow-auto overscroll-contain">
 
           <!-- Loading state -->
           <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe">
@@ -115,7 +109,7 @@ export class DeckChangesDiffPageElement extends GemElement {
           <!-- Diff output -->
           <gem-bind-diff2html
             v-else
-            class="select-text"
+            class="shrink-0 grow border-none select-text"
             .colorScheme=${diffColorScheme}
             no-header
             compact-line-numbers

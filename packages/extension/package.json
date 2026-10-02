@@ -8,7 +8,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@gem-bind/diff2html": "^0.0.5",
+    "@gem-bind/diff2html": "^0.0.6",
     "@gem-bind/latex": "^0.0.3",
     "@gem-bind/marked": "^0.0.7",
     "@gem-bind/mermaid": "^0.0.6",

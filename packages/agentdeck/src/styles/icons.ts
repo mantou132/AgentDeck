@@ -3,12 +3,17 @@ import { extendIcons } from '@mantou/tap-ui/lib/icons';
 
 // Rune Icons（https://www.runeicons.com，Apache-2.0）normal 风格描边图形，覆盖 Tap UI 内置图标并补充专用图标。
 // key 沿用 Tap UI 命名或扩展语义，对应 Rune 图标以注释标出；`loading` 用 activity 字形并内置呼吸动画。
-const rune = (d: string, ext = '') => raw`
-  <svg part="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+// `scale` 通过扩大 viewBox 缩小字形，用于视觉上偏大的图标；线宽按比例补偿以保持粗细一致。
+const rune = (d: string, ext = '', scale = 1) => {
+  const size = 24 / scale;
+  const offset = (24 - size) / 2;
+  return raw`
+  <svg part="icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="${offset} ${offset} ${size} ${size}" width="24px" fill="none" stroke="currentColor" stroke-width="${2 / scale}" stroke-linecap="round" stroke-linejoin="round">
     <path d="${d}"></path>
     ${ext}
   </svg>
 `;
+};
 
 const pulseStyle =
   '<style>path{animation:rune-pulse 1.5s ease-in-out infinite}@keyframes rune-pulse{0%,100%{opacity:.25}50%{opacity:1}}</style>';
@@ -80,6 +85,8 @@ export const icons = extendIcons({
   ), // senses/eye-off
   refresh: rune(
     'M3 12C3 9.61305 3.94821 7.32387 5.63604 5.63604C7.32387 3.94821 9.61305 3 12 3C14.516 3.00947 16.931 3.99122 18.74 5.74L21 8M16 8H21V3M21 12C21 14.3869 20.0518 16.6761 18.364 18.364C16.6761 20.0518 14.3869 21 12 21C9.48395 20.9905 7.06897 20.0088 5.26 18.26L3 16M3 21V16H8',
+    '',
+    0.8,
   ), // schedule/refresh-cw
   scan: rune(
     'M3 7V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H7M17 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V7M21 17V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H17M7 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C2.21071 20.0391 3 19.5304 3 19V17M7 12H17',

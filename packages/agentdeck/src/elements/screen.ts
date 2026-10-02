@@ -44,8 +44,9 @@ const cardStyle = css`
     margin-block: 0.75em;
   }
   .card {
-    position: relative;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     width: 100%;
     height: 12rem;
     padding: 0;
@@ -60,7 +61,8 @@ const cardStyle = css`
   }
   .shot {
     width: 100%;
-    height: 100%;
+    height: 0;
+    flex: 1;
     object-fit: cover;
     object-position: top;
   }
@@ -69,7 +71,7 @@ const cardStyle = css`
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    height: 100%;
+    flex: 1;
     color: ${agentDeckTheme.describeColor};
     font-size: ${agentDeckTheme.fontSizeXs};
   }
@@ -77,8 +79,6 @@ const cardStyle = css`
     width: 1.25rem;
   }
   .bar {
-    position: absolute;
-    inset: auto 0 0;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -357,15 +357,15 @@ export class DeckScreenPageElement extends GemElement {
           <div
             v-else-if=${!error}
             role="status"
-            class="flex h-full items-center justify-center gap-2 text-sm text-describe"
+            class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe"
           >
             <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
             ${i18n.get('screen.loading')}
           </div>
-          <div v-if=${!!error} role="alert" class="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+          <div v-if=${!!error} role="alert" class="absolute inset-x-0 top-0 mx-auto max-w-lg px-5 py-16 text-center">
             <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
             <p class="m-0 font-semibold text-highlight">${i18n.get('screen.failed')}</p>
-            <p class="select-text mt-2 max-w-lg text-sm break-words text-negative">${error}</p>
+            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
             <button
               class="mt-4 min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
               @click=${this.#retry}
