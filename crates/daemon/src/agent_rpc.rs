@@ -420,6 +420,22 @@ impl AgentService {
                     })
                 });
 
+                // Claude predicts the next prompt after the turn settles; only the
+                // device that sent this prompt shows it.
+                let suggestion_peer = peer.clone();
+                let suggestion_agent = agent.to_string();
+                let suggestion_session_id = session_id.to_string();
+                let suggestion_sink: acp_agent::SuggestionSink = Arc::new(move |suggestion| {
+                    suggestion_peer.notify(
+                        "agent_prompt_suggestion",
+                        json!({
+                            "agent": suggestion_agent,
+                            "sessionId": suggestion_session_id,
+                            "suggestion": suggestion,
+                        }),
+                    );
+                });
+
                 // Stream agent events as `{ id, event }` frames while the prompt
                 // runs; the forwarder is drained before the final result so no
                 // event overtakes the response.
@@ -435,6 +451,7 @@ impl AgentService {
                         timeout_secs,
                         event_tx,
                         Some(permission_resolver),
+                        Some(suggestion_sink),
                     )
                     .await;
 

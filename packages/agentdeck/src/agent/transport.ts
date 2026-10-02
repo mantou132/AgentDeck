@@ -41,7 +41,8 @@ export type TransportMessage =
   | { type: 'connection'; connection: ConnectionState; error?: string }
   | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
-  | { type: 'session_ended'; sessionId: string };
+  | { type: 'session_ended'; sessionId: string }
+  | { type: 'prompt_suggestion'; sessionId: string; suggestion: string };
 
 type MessageHandler = (message: TransportMessage) => void;
 
@@ -531,6 +532,9 @@ export const initTransport = (options: InitTransportOptions) => {
   transportInitialized = true;
   agentApi.setPermissionHandler(options.onRequestPermission);
   agentApi.setSessionEndedHandler(({ sessionId }) => transport.dispatchMessage({ type: 'session_ended', sessionId }));
+  agentApi.setPromptSuggestionHandler(({ sessionId, suggestion }) =>
+    transport.dispatchMessage({ type: 'prompt_suggestion', sessionId, suggestion }),
+  );
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
   if (isPairingId(options.initialRelayId))
     startTransport(options.initialRelayId, {

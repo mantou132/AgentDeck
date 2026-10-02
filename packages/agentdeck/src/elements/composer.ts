@@ -49,6 +49,8 @@ export class DeckComposerElement extends GemElement {
   @attribute configLabel: string;
   @emitter configOpen: Emitter;
   @property placeholder = '';
+  /** Predicted next prompt: replaces the placeholder while the input is empty and can be sent as is. */
+  @property suggestion = '';
   @property submit?: (input: ComposerInput) => boolean | Promise<boolean>;
   @boolattribute disabled: boolean;
   @boolattribute ready: boolean;
@@ -101,12 +103,22 @@ export class DeckComposerElement extends GemElement {
     }
   };
 
+  get #activeSuggestion() {
+    const { draft, quote, attachments } = this.#state;
+    return draft || quote || attachments.length ? '' : this.suggestion;
+  }
+
   get #canSend() {
     return (
       this.ready &&
       !this.#state.loadingDraft &&
       !this.pending &&
-      Boolean(this.#state.draft.trim() || this.#state.quote.trim() || this.#state.attachments.length) &&
+      Boolean(
+        this.#state.draft.trim() ||
+          this.#state.quote.trim() ||
+          this.#state.attachments.length ||
+          this.#activeSuggestion,
+      ) &&
       this.#state.attachments.length <= MAX_ATTACHMENTS &&
       !this.#state.readingAttachments &&
       !this.#state.submitting
@@ -119,7 +131,7 @@ export class DeckComposerElement extends GemElement {
       return;
     }
     if (!this.#canSend || !this.submit) return;
-    const draftText = this.#state.draft.trim();
+    const draftText = this.#state.draft.trim() || this.#activeSuggestion;
     const quoteText = this.#state.quote.trim();
     const promptText = quoteText ? (draftText ? `"${quoteText}"\n\n${draftText}` : `"${quoteText}"`) : draftText;
     const input: ComposerInput = { text: promptText, attachments: this.#state.attachments };
@@ -398,7 +410,7 @@ export class DeckComposerElement extends GemElement {
                 class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
                 rows="1"
                 aria-label=${i18n.get('composer.sendMessageAria')}
-                placeholder=${this.placeholder}
+                placeholder=${this.#activeSuggestion || this.placeholder}
                 .value=${this.#state.draft}
                 @input=${(event: InputEvent) => this.#setDraft((event.target as HTMLTextAreaElement).value)}
                 @beforeinput=${this.#onBeforeInput}

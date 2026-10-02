@@ -169,6 +169,8 @@ export type ScreenFrame =
 
 export type ScreenCapture = { width: number; height: number; frame: ScreenFrame };
 
+export type PromptSuggestion = { agent: string; sessionId: string; suggestion: string };
+
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 
 // Allow ACP startup/history work more time than the lightweight host handshake.
@@ -192,6 +194,10 @@ export class AgentApi {
 
   setSessionEndedHandler = (handler?: ((params: { agent: string; sessionId: string }) => void) | null) =>
     this.#peer.onNotify('agent_session_ended', (params) => handler?.(params as { agent: string; sessionId: string }));
+
+  /** Claude's predicted next prompt, sent after a turn to the device that started it. */
+  setPromptSuggestionHandler = (handler?: ((params: PromptSuggestion) => void) | null) =>
+    this.#peer.onNotify('agent_prompt_suggestion', (params) => handler?.(params as PromptSuggestion));
 
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());

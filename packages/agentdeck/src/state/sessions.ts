@@ -30,6 +30,7 @@ import {
   clearSessionError,
   patchSession,
   setMessages,
+  setPromptSuggestion,
   setSessionError,
   setSessionFlag,
   updateSessionOptions,
@@ -450,6 +451,7 @@ const runPromptTurn = (
   setSessionFlag('unreadSessionIds', session.sessionId, false);
   setSessionFlag('pendingSessionIds', session.sessionId, true);
   setSessionError(session.sessionId, '');
+  setPromptSuggestion(session.sessionId, '');
   patchSession(session.sessionId, { updatedAt: now });
   const rpcId = callId ?? crypto.randomUUID();
   turnRpcIds.set(session.sessionId, rpcId);

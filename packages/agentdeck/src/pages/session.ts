@@ -346,6 +346,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             config-label=${getConfigLabel(getConfigSelects(agentdeckStore.optionsBySession[session.sessionId]))}
             @config-open=${() => openSessionConfig(session.sessionId)}
             .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get('session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
+            .suggestion=${connected && loaded ? (agentdeckStore.suggestionsBySession[session.sessionId] ?? '') : ''}
             .submit=${this.#send}
             ?disabled=${!loaded}
             ?ready=${connected && loaded}

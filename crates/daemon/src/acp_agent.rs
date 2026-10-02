@@ -8,7 +8,7 @@ use std::{
 };
 
 use agent_client_protocol::{
-    AcpAgent, ActiveSession, Agent, Client, ConnectionTo, SessionMessage,
+    AcpAgent, ActiveSession, Agent, Client, ConnectionTo, JsonRpcNotification, SessionMessage,
     schema::{
         ProtocolVersion,
         v1::{
@@ -24,7 +24,7 @@ use agent_client_protocol::{
     util::MatchDispatch,
 };
 use anyhow::{Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
@@ -55,6 +55,19 @@ fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
 /// `None` cancels the pending tool call.
 pub type PermissionResolver =
     Arc<dyn Fn(serde_json::Value) -> BoxFuture<'static, Option<String>> + Send + Sync>;
+
+/// Receives the agent's predicted next user prompt for a session.
+pub type SuggestionSink = Arc<dyn Fn(String) + Send + Sync>;
+
+/// Raw Claude Agent SDK message forwarded by claude-agent-acp when the session
+/// opts in through `_meta.claudeCode.emitRawSDKMessages`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonRpcNotification)]
+#[notification(method = "_claude/sdkMessage")]
+struct ClaudeSdkMessage {
+    #[serde(rename = "sessionId")]
+    session_id: String,
+    message: serde_json::Value,
+}
 
 /// Client-specific setup sent with `session/new` / `session/load`.
 #[derive(Clone, Default)]
@@ -107,6 +120,8 @@ struct AcpRuntime {
     agent: String,
     state: Arc<Mutex<RuntimeState>>,
     session_resolvers: Arc<Mutex<HashMap<String, PermissionResolver>>>,
+    /// Kept after the turn: suggestions arrive once the prompt has settled.
+    suggestion_sinks: Arc<Mutex<HashMap<String, SuggestionSink>>>,
     permission_cancels: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
     disconnects: watch::Sender<u64>,
 }
@@ -123,6 +138,7 @@ impl AcpRuntime {
                 waiters: Vec::new(),
             })),
             session_resolvers: Arc::new(Mutex::new(HashMap::new())),
+            suggestion_sinks: Arc::new(Mutex::new(HashMap::new())),
             permission_cancels: Arc::new(Mutex::new(HashMap::new())),
             disconnects,
         }
@@ -193,6 +209,7 @@ impl AcpRuntime {
     ) -> Result<()> {
         let session_resolvers = self.session_resolvers.clone();
         let permission_cancels = self.permission_cancels.clone();
+        let suggestion_sinks = self.suggestion_sinks.clone();
         let runtime = self.clone();
         let agent_id = self.agent.clone();
 
@@ -242,6 +259,24 @@ impl AcpRuntime {
                     })
                 },
                 agent_client_protocol::on_receive_request!(),
+            )
+            // Registered before session routing, so it also sees the suggestion
+            // that arrives after the turn while no prompt reads session updates.
+            .on_receive_notification(
+                async move |notification: ClaudeSdkMessage, _connection| {
+                    if let Some(suggestion) = prompt_suggestion(&notification.message) {
+                        let sink = suggestion_sinks
+                            .lock()
+                            .await
+                            .get(&notification.session_id)
+                            .cloned();
+                        if let Some(sink) = sink {
+                            sink(suggestion);
+                        }
+                    }
+                    Ok(())
+                },
+                agent_client_protocol::on_receive_notification!(),
             )
             .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
                 let request = InitializeRequest::new(ProtocolVersion::V1).client_info(
@@ -314,7 +349,13 @@ impl AcpRuntime {
             capabilities,
         } = self.connection().await?;
         let generation = self.state.lock().await.generation;
-        let meta = context.system_prompt.as_deref().map(system_prompt_meta);
+        // Agents ignore `_meta` keys they don't know, so no per-agent check.
+        let mut meta = context
+            .system_prompt
+            .as_deref()
+            .map(system_prompt_meta)
+            .unwrap_or_default();
+        meta.insert("claudeCode".to_string(), claude_code_meta());
         let directories = if capabilities
             .session_capabilities
             .additional_directories
@@ -395,9 +436,17 @@ impl AcpRuntime {
         self.session_resolvers.lock().await.remove(session_id);
     }
 
+    async fn set_suggestion_sink(&self, session_id: &str, sink: SuggestionSink) {
+        self.suggestion_sinks
+            .lock()
+            .await
+            .insert(session_id.to_string(), sink);
+    }
+
     async fn unregister_session(&self, session_id: &str) {
         self.permission_cancels.lock().await.remove(session_id);
         self.session_resolvers.lock().await.remove(session_id);
+        self.suggestion_sinks.lock().await.remove(session_id);
     }
 }
 
@@ -418,6 +467,27 @@ fn system_prompt_meta(prompt: &str) -> serde_json::Map<String, serde_json::Value
         "systemPrompt".to_string(),
         serde_json::json!({ "append": prompt }),
     )])
+}
+
+/// Enable Claude's next-prompt suggestions and forward only those raw SDK
+/// messages; claude-agent-acp drops them otherwise.
+fn claude_code_meta() -> serde_json::Value {
+    serde_json::json!({
+        "options": { "promptSuggestions": true },
+        "emitRawSDKMessages": [{ "type": "prompt_suggestion" }],
+    })
+}
+
+fn prompt_suggestion(message: &serde_json::Value) -> Option<String> {
+    if message.get("type")?.as_str()? != "prompt_suggestion" {
+        return None;
+    }
+    message
+        .get("suggestion")?
+        .as_str()
+        .map(str::trim)
+        .filter(|suggestion| !suggestion.is_empty())
+        .map(str::to_string)
 }
 
 /// Extra content sent along with a prompt.
@@ -519,6 +589,7 @@ enum SessionCommand {
         attachments: Vec<Attachment>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         permission_resolver: Option<PermissionResolver>,
+        suggestion_sink: Option<SuggestionSink>,
         reply: oneshot::Sender<Result<String, String>>,
     },
     Cancel,
@@ -689,6 +760,7 @@ impl AgentSessionManager {
         timeout_secs: u64,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         permission_resolver: Option<PermissionResolver>,
+        suggestion_sink: Option<SuggestionSink>,
     ) -> Result<String> {
         let session = self.session(agent, session_id).await?;
         if session.busy.swap(true, Ordering::AcqRel) {
@@ -726,6 +798,7 @@ impl AgentSessionManager {
                 attachments,
                 event_tx: turn_event_tx,
                 permission_resolver,
+                suggestion_sink,
                 reply: reply_tx,
             })
             .await
@@ -984,10 +1057,14 @@ async fn run_session_actor_inner(
                     attachments,
                     event_tx,
                     permission_resolver,
+                    suggestion_sink,
                     reply,
                 } => {
                     if let Some(resolver) = permission_resolver {
                         runtime.set_session_resolver(&session_id, resolver).await;
+                    }
+                    if let Some(sink) = suggestion_sink {
+                        runtime.set_suggestion_sink(&session_id, sink).await;
                     }
                     let turn_result = run_prompt_turn(
                         &mut session,

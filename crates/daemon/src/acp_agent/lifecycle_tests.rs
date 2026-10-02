@@ -138,7 +138,7 @@ impl MockAcp {
         let id = id.to_string();
         tokio::spawn(async move {
             manager
-                .prompt("codex-acp", &id, "test".into(), vec![], 30, None, None)
+                .prompt("codex-acp", &id, "test".into(), vec![], 30, None, None, None)
                 .await
         })
     }
@@ -424,6 +424,7 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
                 30,
                 None,
                 Some(resolver),
+                None,
             )
             .await
     });
@@ -509,4 +510,51 @@ async fn unadvertised_session_methods_are_not_sent_to_acp() {
             .await
             .is_err()
     );
+}
+
+#[tokio::test]
+async fn prompt_suggestion_after_turn_reaches_the_prompting_sink() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let (suggestion_tx, mut suggestion_rx) = mpsc::unbounded_channel();
+    let sink: SuggestionSink = Arc::new(move |suggestion| {
+        let _ = suggestion_tx.send(suggestion);
+    });
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                30,
+                None,
+                None,
+                Some(sink),
+            )
+            .await
+    });
+    let request = mock.next("session/prompt").await;
+    mock.respond(&request, json!({"stopReason": "end_turn"}));
+    assert!(prompt.await.unwrap().is_ok());
+
+    // The SDK emits the suggestion after the result, while the session is idle.
+    for message in [
+        json!({"type": "rate_limit_event"}),
+        json!({"type": "prompt_suggestion", "suggestion": "  Run the tests  "}),
+    ] {
+        mock.peer
+            .tx
+            .unbounded_send(frame(json!({
+                "jsonrpc": "2.0",
+                "method": "_claude/sdkMessage",
+                "params": {"sessionId": "session", "message": message},
+            })))
+            .unwrap();
+    }
+    let suggestion = tokio::time::timeout(Duration::from_secs(1), suggestion_rx.recv())
+        .await
+        .unwrap();
+    assert_eq!(suggestion.as_deref(), Some("Run the tests"));
 }

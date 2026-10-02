@@ -16,7 +16,7 @@ import {
   resumeInFlightTurn,
   settleLostTurns,
 } from './sessions';
-import { agentdeckStore } from './store';
+import { agentdeckStore, setPromptSuggestion } from './store';
 
 /**
  * 唯一的底层消息消费中枢：
@@ -47,6 +47,12 @@ const handleTransportMessage = (message: TransportMessage) => {
     }
     case 'session_ended': {
       endSession(message.sessionId);
+      break;
+    }
+    case 'prompt_suggestion': {
+      // 建议晚于回合结束到达，期间已开始的新回合不需要它
+      if (!agentdeckStore.pendingSessionIds.includes(message.sessionId))
+        setPromptSuggestion(message.sessionId, message.suggestion);
       break;
     }
   }

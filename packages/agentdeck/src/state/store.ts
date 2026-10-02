@@ -26,7 +26,16 @@ export const agentdeckStore = createStore({
   errorsBySession: {} as Record<string, string>,
   optionsBySession: {} as Record<string, SessionOptions>,
   permissionsBySession: {} as Record<string, PermissionRequest>,
+  /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
+  suggestionsBySession: {} as Record<string, string>,
 });
+
+export const setPromptSuggestion = (sessionId: string, suggestion: string) => {
+  const next = { ...agentdeckStore.suggestionsBySession };
+  if (suggestion) next[sessionId] = suggestion;
+  else delete next[sessionId];
+  agentdeckStore({ suggestionsBySession: next });
+};
 
 export const clearSessionError = (sessionId: string) => {
   const next = { ...agentdeckStore.errorsBySession };
