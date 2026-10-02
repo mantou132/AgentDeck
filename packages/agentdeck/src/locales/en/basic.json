@@ -171,6 +171,7 @@
   "error.invalidRelayId": "Invalid Pairing ID",
   "error.selectRemoteAgent": "Please select a remote agent",
   "error.fetchSessionsFailed": "Failed to read sessions",
+  "error.daemonOutdated": "agentdeckd is outdated. Please upgrade it.",
   "error.remoteNotConnected": "Host is not connected",
   "error.loadSessionFailed": "Failed to load session",
   "error.remoteNotConnectedCreate": "Cannot create session until host is connected",

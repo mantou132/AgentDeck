@@ -11,6 +11,7 @@
 - `src/acp_agent/`：`acp_agent.rs` 是 ACP 客户端，每种 Agent 共用一个子进程，每个会话一个 actor；`catalog.rs` 负责 Agent 注册表（每次启动 Agent 进程时后台拉取官方 CDN 最新版并存为数据目录的 `registry.json`，供之后的启动使用；不等网络，当前用已拉取的或内置版本；Agent 运行时按需创建）、各平台启动命令、npx 回退和 `agentdeck_env`（启动 Agent 时叠加在注册表 env 之上：Codex 通过 `CODEX_CONFIG` 关闭 `visualize` 插件；`free` 以 `OPENCODE_DB`（`agents/free/data/`，reset 保留）、`OPENCODE_AUTH_CONTENT={}` 与 `OPENCODE_CONFIG_CONTENT`（只启用免费的 `opencode` provider，`skills.paths` 挂载全部渲染 skill）与用户的 OpenCode 隔离，不用 XDG 变量，因为它们会传给 Agent 执行的命令）；内置 Agent `free` 复用注册表 `opencode` 的二进制，总用托管版本（不用用户的 CLI），与 `opencode` 共用 `agents/opencode/` 安装目录；`provision.rs` 负责下载和解压预编译 Agent（装好新版本后删除旧版本目录）；会话生命周期与并发测试在 `lifecycle_tests.rs`。
 - `src/agent_rpc.rs`：远端 RPC 入口（会话、文件、Git）。
 - `src/relay_client.rs`：`RemotePeerManager` 在一条 Relay 连接上复用多台设备，维护 deviceId → peerId 映射（`remote_peers_v1.json`）。请求带 `ephemeral: true` 时，记录 `(peerId, id)`，该请求的 event 与最终回复也以 ephemeral 发出。
+  `peer_attach` 回复带 `version`（`CARGO_PKG_VERSION`，发布时由 `release.yml` 按 tag 写入 `Cargo.toml`），App 据此提示升级。
 - `src/peer.rs`：JSON RPC 对端。`handle_with_bytes` 注册的处理函数可在结果旁返回原始字节（如 `file_read` 的图片与 raw 读取），由传输层携带，对端在 `result.data` 收到；结果本身不放 `data`，也不做 base64。
 - `src/relay_codec.rs`：RPC 消息与 Relay 帧互转（加密、帧大小限制与超限错误回复）。带字节的回复总是拼成二进制帧（`[u32 头长度][回复 JSON][原始字节]`，加密为 `[nonce][密文]`，AAD 带 `binary` 标签），Relay 按 ephemeral 投递。不涉及 peer 与设备。
 - `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密原语。

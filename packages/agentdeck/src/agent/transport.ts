@@ -38,7 +38,8 @@ export const connectionLabels = new Proxy({} as Record<ConnectionState, string>,
 });
 
 export type TransportMessage =
-  | { type: 'connection'; connection: ConnectionState; error?: string }
+  /** `hostVersion` comes with `connected`; old hosts omit it. */
+  | { type: 'connection'; connection: ConnectionState; error?: string; hostVersion?: string }
   | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
   | { type: 'session_ended'; sessionId: string }
@@ -141,6 +142,7 @@ class RpcOutboxStore implements RelayStore {
 
 class HostSessionManager {
   #peerId: number | undefined;
+  #hostVersion: string | undefined;
   #attachId: RpcId | undefined;
   #attaching: Promise<void> | undefined;
   #fcmToken: string | null | undefined;
@@ -153,6 +155,10 @@ class HostSessionManager {
 
   set peerId(id: number | undefined) {
     this.#peerId = id;
+  }
+
+  get hostVersion() {
+    return this.#hostVersion;
   }
 
   get attachId() {
@@ -207,6 +213,7 @@ class HostSessionManager {
         }
         const peerChanged = this.#peerId !== result.peerId;
         this.#peerId = result.peerId;
+        this.#hostVersion = result.version;
         this.#syncedFcmToken = sentToken;
         if (!silent || peerChanged) options.onStateChange('connected');
       })
@@ -332,7 +339,8 @@ class AgentTransport {
 
   #emitConnection(connection: ConnectionState, error = '') {
     this.#connectionState = connection;
-    this.dispatchMessage({ type: 'connection', connection, error });
+    const hostVersion = connection === 'connected' ? this.hostSession.hostVersion : undefined;
+    this.dispatchMessage({ type: 'connection', connection, error, hostVersion });
   }
 
   #reportReplyFailure() {

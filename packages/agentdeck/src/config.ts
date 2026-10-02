@@ -28,6 +28,9 @@ export const DATABASES = {
 
 export const RELAY_URL = 'wss://agent-deck.xianqiao.wang/ws';
 
+/** Raise when the app needs a newer agentdeckd; older hosts get an upgrade toast once per launch. */
+export const MIN_DAEMON_VERSION = '0.4.0';
+
 /** Markdown blocks this client renders; the host teaches agents to write them (e.g. `agentdeck-chart`). */
 export const RENDER_CAPABILITIES: ClientCapabilities = {
   render: previewSupported ? ['chart', 'preview', 'screen'] : ['chart', 'screen'],

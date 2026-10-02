@@ -171,6 +171,7 @@
   "error.invalidRelayId": "无效的配对码",
   "error.selectRemoteAgent": "请选择远端 Agent",
   "error.fetchSessionsFailed": "读取会话失败",
+  "error.daemonOutdated": "agentdeckd 版本过旧，请升级",
   "error.remoteNotConnected": "远端尚未连接",
   "error.loadSessionFailed": "加载会话失败",
   "error.remoteNotConnectedCreate": "远端连接后才能新建会话",

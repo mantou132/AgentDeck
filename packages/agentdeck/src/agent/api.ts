@@ -203,10 +203,15 @@ export class AgentApi {
     this.#peer.onNotify('host_reconnected', () => handler?.());
 
   attachPeer = async (deviceId: string, fcmToken?: string | null, capabilities?: ClientCapabilities) => {
-    return this.#peer.call<{ peerId: number }>('peer_attach', { deviceId, fcmToken, capabilities }, undefined, {
-      timeoutMs: 10_000,
-      timeoutMessage: i18n.get('error.connectHostTimeout'),
-    });
+    return this.#peer.call<{ peerId: number; version?: string }>(
+      'peer_attach',
+      { deviceId, fcmToken, capabilities },
+      undefined,
+      {
+        timeoutMs: 10_000,
+        timeoutMessage: i18n.get('error.connectHostTimeout'),
+      },
+    );
   };
 
   /** One JPEG frame of an app on the host (`ios:` / `android:` / `browser:` target), at most `maxWidth` wide. */

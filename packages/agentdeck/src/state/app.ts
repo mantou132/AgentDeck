@@ -1,8 +1,9 @@
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
-import { type AppSettings, RENDER_CAPABILITIES, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
+import { type AppSettings, MIN_DAEMON_VERSION, RENDER_CAPABILITIES, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
 import { requestPermission as requestTurnPermission } from '../session/turn';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
@@ -18,6 +19,20 @@ import {
 } from './sessions';
 import { agentdeckStore, setPromptSuggestion } from './store';
 
+/** 旧版 daemon 不返回版本，同样视为过旧；预发布后缀不参与比较 */
+const isDaemonOutdated = (version?: string) => {
+  if (!version) return true;
+  const parse = (value: string) => value.split('-')[0].split('.').map(Number);
+  const current = parse(version);
+  const min = parse(MIN_DAEMON_VERSION);
+  for (let i = 0; i < min.length; i++) {
+    if (current[i] !== min[i]) return current[i] < min[i];
+  }
+  return false;
+};
+
+let daemonVersionChecked = false;
+
 /**
  * 唯一的底层消息消费中枢：
  * Web socket 连接与 App 状态彻底解耦，App 仅在此单一点响应状态与消息。
@@ -29,7 +44,7 @@ const handleTransportMessage = (message: TransportMessage) => {
       break;
     }
     case 'connection': {
-      const { connection, error } = message;
+      const { connection, error, hostVersion } = message;
       agentdeckStore({
         connection,
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
@@ -38,6 +53,10 @@ const handleTransportMessage = (message: TransportMessage) => {
         refreshSessions();
         // 旧版 daemon 没有对账接口，失败时保持等待
         settleLostTurns().catch(console.error);
+        if (!daemonVersionChecked) {
+          daemonVersionChecked = true;
+          if (isDaemonOutdated(hostVersion)) Toast.open('warning', i18n.get('error.daemonOutdated'));
+        }
       }
       break;
     }

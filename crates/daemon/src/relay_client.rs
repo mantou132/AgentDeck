@@ -287,16 +287,18 @@ impl RemotePeerManager {
             .and_then(|value| serde_json::from_value(value).ok())
             .unwrap_or_default();
 
+        // Clients compare it against their minimum supported host version.
+        let version = env!("CARGO_PKG_VERSION");
         let response = match id {
             Some(req_id) => json!({
                 "peerId": peer_id,
                 "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id }
+                "result": { "peerId": peer_id, "deviceId": device_id, "version": version }
             }),
             None => json!({
                 "peerId": peer_id,
                 "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id }
+                "params": { "peerId": peer_id, "deviceId": device_id, "version": version }
             }),
         };
         let target = if device_id.is_empty() {
