@@ -14,7 +14,7 @@ import('@gem-bind/diff2html');
 import('@gem-bind/latex');
 import('@gem-bind/mermaid');
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 const languageFromInfo = (info = '') => {

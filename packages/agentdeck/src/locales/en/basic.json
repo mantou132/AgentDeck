@@ -219,6 +219,7 @@
   "browser.share": "Share",
   "global.copy": "Copy",
   "global.copied": "Copied",
+  "preview.loadFailed": "Unable to load page",
   "preview.open": "Open preview",
   "screen.open": "Live view",
   "screen.ios": "iOS Simulator",

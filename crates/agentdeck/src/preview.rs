@@ -70,20 +70,21 @@ pub fn handle<R: Runtime>(
     }
 }
 
-/// Answers a pending request; `data` is the file as base64, or absent when it
-/// could not be read. `path` picks the content type.
+/// Answers a pending request; `data` is the body as base64: the file, or the
+/// webview's error page when it could not be read. `path` picks the content type.
 #[tauri::command]
 pub fn preview_respond(
     requests: State<'_, PreviewRequests>,
     id: u64,
     path: String,
-    data: Option<String>,
+    data: String,
+    status: u16,
 ) {
     let Some(responder) = requests.take(id) else {
         return;
     };
-    let Some(Ok(body)) = data.map(|data| STANDARD.decode(data)) else {
-        return responder.respond(status(StatusCode::NOT_FOUND));
+    let Ok(body) = STANDARD.decode(data) else {
+        return responder.respond(self::status(StatusCode::INTERNAL_SERVER_ERROR));
     };
     let mime = mime_guess::from_path(&path).first_or_octet_stream();
     // Generated pages often omit `<meta charset>`; text defaults to UTF-8.
@@ -94,6 +95,7 @@ pub fn preview_respond(
     };
     responder.respond(
         Response::builder()
+            .status(status)
             .header(CONTENT_TYPE, content_type)
             .body(body)
             .unwrap(),
