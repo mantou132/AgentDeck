@@ -40,6 +40,8 @@ const sessionLoads = new Map<string, number>();
 const failedSessionLoads = new Set<string>();
 const localSessions = new Map<string, DeckSession>();
 const inFlightSessions = new Map<string, DeckSession>();
+// 每个 pending 会话当前回合的 rpcId，对账结束回合时用来丢弃其等待中的调用
+const turnRpcIds = new Map<string, string>();
 
 export const recordInFlightSession = (session: DeckSession) => {
   inFlightSessions.set(session.sessionId, session);
@@ -454,6 +456,7 @@ const runPromptTurn = (
   setSessionError(session.sessionId, '');
   patchSession(session.sessionId, { updatedAt: now });
   const rpcId = callId ?? crypto.randomUUID();
+  turnRpcIds.set(session.sessionId, rpcId);
   const currentMessages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
   const activeSession: DeckSession = { ...session, updatedAt: now };
   recordInFlightSession(activeSession);
@@ -509,6 +512,7 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
   const { sessionId, rpcId, session } = inFlight;
   localSessions.set(sessionId, session);
   openedSessionIds.add(sessionId);
+  turnRpcIds.set(sessionId, rpcId);
   agentApi.resumePrompt(rpcId, {
     onEvent: (event) => applySessionEvent(sessionId, event),
     resolve: (result) => {
@@ -534,6 +538,30 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
       setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
     },
   });
+};
+
+/**
+ * Relay 会丢弃长时间未 ack 的消息，回合的最终回复可能永远收不到。
+ * 连上 host 后对账：本地仍在进行、但 daemon 已不在运行的回合，就地结束并重新 load 历史。
+ */
+export const settleLostTurns = async () => {
+  if (!agentdeckStore.pendingSessionIds.some((sessionId) => turnRpcIds.has(sessionId))) return;
+  const { sessions } = await agentApi.listRunningPrompts();
+  const running = new Set(sessions.map((session) => session.sessionId));
+  // 排在查询回复之前的回复已先处理完，此时仍 pending 且 daemon 不在运行的，就是丢了回复的回合
+  for (const sessionId of agentdeckStore.pendingSessionIds) {
+    const rpcId = turnRpcIds.get(sessionId);
+    if (!rpcId || running.has(sessionId)) continue;
+    // 最终回复可能仍在途中，忘掉该调用，避免它落到重新 load 的 timeline 上
+    agentApi.forgetPrompt(rpcId);
+    turnRpcIds.delete(sessionId);
+    removeInFlight(sessionId);
+    resolvePermission(sessionId, null);
+    setSessionFlag('pendingSessionIds', sessionId, false);
+    setSessionFlag('unreadSessionIds', sessionId, true);
+    openedSessionIds.delete(sessionId);
+    ensureSessionLoaded(sessionId);
+  }
 };
 
 export const promotePendingSession = async (

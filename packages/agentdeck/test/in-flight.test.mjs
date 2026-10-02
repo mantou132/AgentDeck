@@ -151,3 +151,56 @@ test('app restart reconciles in-flight session with remote list, keeping the act
     'contains the in-flight session',
   );
 });
+
+const restartWithLostReply = async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  await fixture.openSession();
+  assert.equal(fixture.app.sendPrompt('s1', 'Long task'), true);
+  await tick();
+  const promptRequest = fixture.requests.find((r) => r.payload.method === 'agent_prompt');
+  // The final reply expired on the Relay while the App was away.
+  const fresh = documentFixture(fixture);
+  await fresh.connect();
+  const query = fresh.requests.find((r) => r.payload.method === 'agent_prompts_running');
+  assert.ok(query, 'queries running prompts after connecting');
+  return { fresh, promptRequest, query };
+};
+
+test('a restored turn the host no longer runs is settled and reloaded from history', async () => {
+  const { fresh, promptRequest, query } = await restartWithLostReply();
+  const requestsBefore = fresh.requests.length;
+  fresh.reply(query, { sessions: [] });
+  await fresh.settleHost();
+
+  const store = fresh.app.agentdeckStore;
+  assert.equal(store.pendingSessionIds.includes('s1'), false);
+  assert.ok(store.unreadSessionIds.includes('s1'));
+  assert.ok(store.loadedSessionIds.includes('s1'));
+  const methods = fresh.requests.slice(requestsBefore).map((r) => r.payload.method);
+  assert.deepEqual(
+    methods.filter((m) => m === 'agent_session_close' || m === 'agent_session_load'),
+    ['agent_session_close', 'agent_session_load'],
+  );
+
+  // A reply that was still on its way must not land on the reloaded timeline.
+  fresh.reply(promptRequest, { answer: 'Late answer' });
+  await tick();
+  assert.equal(store.messagesBySession.s1.length, 0);
+
+  const restartAgain = documentFixture(fresh);
+  await restartAgain.connect();
+  assert.equal(restartAgain.app.agentdeckStore.pendingSessionIds.length, 0);
+});
+
+test('a restored turn the host still runs keeps waiting for its reply', async () => {
+  const { fresh, promptRequest, query } = await restartWithLostReply();
+  fresh.reply(query, { sessions: [{ agent: 'codex', sessionId: 's1' }] });
+  await fresh.settleHost();
+  assert.ok(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'));
+
+  fresh.reply(promptRequest, { answer: 'Done' });
+  await tick();
+  assert.equal(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'), false);
+  assert.ok(fresh.app.agentdeckStore.unreadSessionIds.includes('s1'));
+});

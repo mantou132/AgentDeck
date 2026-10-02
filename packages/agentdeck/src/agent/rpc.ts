@@ -85,6 +85,11 @@ export class RpcPeer {
     });
   };
 
+  /** Drop a pending call without settling it; a late reply is then ignored. */
+  forget = (id: RpcId) => {
+    this.#takePending(id);
+  };
+
   handle = (method: string, handler: Handler) => this.#handlers.set(method, handler);
 
   onNotify = (method: string, handler: Handler) => this.#notifyHandlers.set(method, handler);

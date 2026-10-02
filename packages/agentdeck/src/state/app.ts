@@ -14,6 +14,7 @@ import {
   refreshSessions,
   resetRemoteState,
   resumeInFlightTurn,
+  settleLostTurns,
 } from './sessions';
 import { agentdeckStore } from './store';
 
@@ -35,6 +36,8 @@ const handleTransportMessage = (message: TransportMessage) => {
       });
       if (connection === 'connected') {
         refreshSessions();
+        // 旧版 daemon 没有对账接口，失败时保持等待
+        settleLostTurns().catch(console.error);
       }
       break;
     }

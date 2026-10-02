@@ -171,6 +171,25 @@ async fn close_waits_for_acp_release_before_load_and_prompt() {
 }
 
 #[tokio::test]
+async fn running_prompts_lists_only_sessions_with_an_unfinished_prompt() {
+    let mut mock = MockAcp::new().await;
+    mock.create("busy").await;
+    mock.create("idle").await;
+    assert!(mock.manager.running_prompts().await.is_empty());
+
+    let prompt = mock.prompt("busy");
+    let request = mock.next("session/prompt").await;
+    assert_eq!(
+        mock.manager.running_prompts().await,
+        vec![("codex-acp".to_string(), "busy".to_string())]
+    );
+
+    mock.respond(&request, json!({"stopReason": "end_turn"}));
+    assert!(prompt.await.unwrap().is_ok());
+    assert!(mock.manager.running_prompts().await.is_empty());
+}
+
+#[tokio::test]
 async fn close_timeout_releases_pending_turn_and_permissions_but_preserves_other_sessions() {
     let mut mock = MockAcp::new().await;
     mock.create("session").await;

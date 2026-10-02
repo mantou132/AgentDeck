@@ -357,6 +357,20 @@ impl AgentService {
             }
         });
 
+        let running_sessions = sessions.clone();
+        peer.handle("agent_prompts_running", move |_params, _ctx| {
+            let sessions = running_sessions.clone();
+            async move {
+                let running: Vec<Value> = sessions
+                    .running_prompts()
+                    .await
+                    .into_iter()
+                    .map(|(agent, session_id)| json!({ "agent": agent, "sessionId": session_id }))
+                    .collect();
+                Ok(json!({ "sessions": running }))
+            }
+        });
+
         let prompt_sessions = sessions.clone();
         let prompt_peer = peer.clone();
         peer.handle("agent_prompt", move |params, ctx| {

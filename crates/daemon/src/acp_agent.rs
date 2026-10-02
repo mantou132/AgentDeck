@@ -780,6 +780,18 @@ impl AgentSessionManager {
         }
     }
 
+    /// Sessions with a prompt still running, as `(agent, session_id)`. Remote
+    /// clients use it to settle turns whose final reply never reached them.
+    pub async fn running_prompts(&self) -> Vec<(String, String)> {
+        self.sessions
+            .lock()
+            .await
+            .iter()
+            .filter(|(_, session)| session.busy.load(Ordering::Acquire))
+            .map(|(key, _)| (key.agent.clone(), key.session_id.clone()))
+            .collect()
+    }
+
     /// Cancel the in-flight prompt of a session. The prompt settles with the
     /// partial answer and a `stop` event carrying the cancel reason.
     pub async fn cancel(&self, agent: &str, session_id: &str) -> bool {

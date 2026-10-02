@@ -382,6 +382,14 @@ export class AgentApi {
       reject: handlers.reject,
     });
 
+  forgetPrompt = (rpcId: RpcId) => this.#peer.forget(rpcId);
+
+  listRunningPrompts = () =>
+    this.#peer.call<{ sessions: { agent: string; sessionId: string }[] }>('agent_prompts_running', {}, undefined, {
+      timeoutMs: 10_000,
+      timeoutMessage: 'List running prompts timeout',
+    });
+
   cancelPrompt = (sessionId: string, agent: string) =>
     this.#peer.call<{ cancelled?: boolean }>('agent_prompt_cancel', { agent, sessionId }, undefined, {
       timeoutMs: 10_000,
