@@ -138,23 +138,15 @@ export class DeckChangesPageElement extends GemElement {
 
         <main class="h-full overflow-auto overscroll-contain">
           <!-- Loading state -->
-          <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe">
-            <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
-            ${i18n.get('changes.loading')}
-          </div>
+          <deck-loading v-if=${loading} label=${i18n.get('changes.loading')}></deck-loading>
 
           <!-- Error state -->
-          <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-16 text-center">
-            <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
-            <p class="m-0 font-semibold text-highlight">${i18n.get('changes.failed')}</p>
-            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
-            <button
-              class="mt-4 min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
-              @click=${() => this.#state({ revision: this.#state.revision + 1 })}
-            >
-              ${i18n.get('global.retry')}
-            </button>
-          </div>
+          <deck-error
+            v-else-if=${error}
+            heading=${i18n.get('changes.failed')}
+            error=${error}
+            @retry=${() => this.#state({ revision: this.#state.revision + 1 })}
+          ></deck-error>
 
           <!-- Clean state (no changes) -->
           <div v-else-if=${files.length === 0} class="px-5 py-16 text-center text-sm text-describe">

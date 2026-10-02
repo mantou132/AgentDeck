@@ -6,7 +6,6 @@ import { i18n } from '../i18n';
 import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
 import { fileMarkdownExtensions, fileViewerMarkdownStyle } from '../lib/markdown';
 import { openMessageLink, openSettings } from '../navigation';
-import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
@@ -138,25 +137,21 @@ export class DeckFileViewerElement extends GemElement {
           path=${path}
         ></deck-file-path>
         <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">
-          <div v-if=${loading} role="status" class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe">
-            <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
-            ${i18n.get('file.loading')}
-          </div>
-          <div v-else-if=${error} role="alert" class="mx-auto max-w-lg px-5 py-16 text-center">
-            <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
-            <p class="m-0 font-semibold text-highlight">${i18n.get('file.failed')}</p>
-            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
-            <div class="mt-4 flex justify-center gap-3">
+          <deck-loading v-if=${loading} label=${i18n.get('file.loading')}></deck-loading>
+          <deck-error
+            v-else-if=${error}
+            heading=${i18n.get('file.failed')}
+            error=${error}
+            .actions=${html`
               <button
-                class="min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-4 text-sm font-semibold text-primary-strong"
-                @click=${() => this.#state({ revision: this.#state.revision + 1 })}
-              >${i18n.get('global.retry')}</button>
-              <button
-                class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-4 text-sm font-semibold text-text"
+                class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-5 text-sm font-semibold text-text active:scale-[0.98]"
                 @click=${openSettings}
-              >${i18n.get('global.openSettings')}</button>
-            </div>
-          </div>
+              >
+                ${i18n.get('global.openSettings')}
+              </button>
+            `}
+            @retry=${() => this.#state({ revision: this.#state.revision + 1 })}
+          ></deck-error>
           <div v-else-if=${file?.type === 'image'} class="grid min-h-60 place-items-center p-4">
             <img class="max-w-full rounded-xl object-contain" src=${this.#state.imageUrl} alt=${name} />
           </div>

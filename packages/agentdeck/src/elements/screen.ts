@@ -354,25 +354,14 @@ export class DeckScreenPageElement extends GemElement {
         <tap-navbar slot="header" title=${targetName(this.target, shot)} back default-back></tap-navbar>
         <main class="relative h-full overflow-hidden">
           <deck-screen-device v-if=${!!shot} class=${error ? 'opacity-40' : ''} .shot=${shot}></deck-screen-device>
-          <div
-            v-else-if=${!error}
-            role="status"
-            class="flex items-center justify-center gap-2 px-4 py-16 text-sm text-describe"
-          >
-            <tap-use class="size-5 text-primary" .element=${icons.loading}></tap-use>
-            ${i18n.get('screen.loading')}
-          </div>
-          <div v-if=${!!error} role="alert" class="absolute inset-x-0 top-0 mx-auto max-w-lg px-5 py-16 text-center">
-            <tap-use class="mb-3 size-8 text-negative" .element=${icons.error}></tap-use>
-            <p class="m-0 font-semibold text-highlight">${i18n.get('screen.failed')}</p>
-            <p class="select-text mt-2 text-sm break-words text-negative">${error}</p>
-            <button
-              class="mt-4 min-h-11 cursor-pointer rounded-xl border border-primary/20 bg-primary-soft px-5 text-sm font-semibold text-primary-strong active:scale-[0.98]"
-              @click=${this.#retry}
-            >
-              ${i18n.get('global.retry')}
-            </button>
-          </div>
+          <deck-loading v-else-if=${!error} label=${i18n.get('screen.loading')}></deck-loading>
+          <deck-error
+            v-if=${!!error}
+            class="absolute inset-x-0 top-0"
+            heading=${i18n.get('screen.failed')}
+            error=${error}
+            @retry=${this.#retry}
+          ></deck-error>
         </main>
         <footer slot="footer"></footer>
       </tap-page>
