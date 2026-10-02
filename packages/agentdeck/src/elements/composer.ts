@@ -1,5 +1,6 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { longPress } from '@mantou/tap-ui/lib/directives';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { readDraft, saveDraft } from '../composer/drafts';
 import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
@@ -49,7 +50,7 @@ export class DeckComposerElement extends GemElement {
   @attribute configLabel: string;
   @emitter configOpen: Emitter;
   @property placeholder = '';
-  /** Predicted next prompt: replaces the placeholder while the input is empty and can be sent as is. */
+  /** Predicted next prompt: replaces the placeholder while the input is empty, can be sent as is, long press fills it in. */
   @property suggestion = '';
   @property submit?: (input: ComposerInput) => boolean | Promise<boolean>;
   @boolattribute disabled: boolean;
@@ -347,6 +348,22 @@ export class DeckComposerElement extends GemElement {
     if (range.start !== start || range.end !== end) textarea.setSelectionRange(range.start, range.end);
   };
 
+  #fillSuggestion = () => {
+    const suggestion = this.#activeSuggestion;
+    if (!suggestion) return;
+    hapticSelection();
+    this.#replaceInputRange(0, 0, suggestion);
+  };
+
+  // iOS 只在用户手势中弹出键盘，计时器里的聚焦不算，松开时重新聚焦
+  #focusAtEnd = () => {
+    const textarea = this.#textareaRef.value;
+    if (!textarea) return;
+    textarea.blur();
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  };
+
   #onPaste = (event: ClipboardEvent) => {
     const textarea = event.target as HTMLTextAreaElement;
     const selection = { input: textarea.value, start: textarea.selectionStart, end: textarea.selectionEnd };
@@ -407,7 +424,8 @@ export class DeckComposerElement extends GemElement {
               </div>
               <textarea
                 ${this.#textareaRef}
-                class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none"
+                ${longPress(this.#fillSuggestion, { disabled: !this.#activeSuggestion, release: this.#focusAtEnd })}
+                class="block min-h-[50px] max-h-[140px] w-full resize-none border-0 bg-transparent px-3.5 pt-[13px] pb-1.5 text-base leading-[1.5] text-highlight outline-none [field-sizing:content] placeholder:text-disabled focus:outline-none ${this.#activeSuggestion ? '[-webkit-touch-callout:none]' : ''}"
                 rows="1"
                 aria-label=${i18n.get('composer.sendMessageAria')}
                 placeholder=${this.#activeSuggestion || this.placeholder}
