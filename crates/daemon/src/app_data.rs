@@ -56,6 +56,11 @@ impl AppPaths {
         self.root.join("skills")
     }
 
+    /// Last ACP registry fetched from the CDN.
+    pub fn registry_file(&self) -> PathBuf {
+        self.root.join("registry.json")
+    }
+
     fn agents_dir(&self) -> PathBuf {
         self.root.join("agents")
     }

@@ -386,6 +386,7 @@ fn install_registry_binary(
                 manifest_path.display()
             )
         })?;
+        remove_other_versions(&version_dir);
 
         Ok(PreparedProgram {
             executable,
@@ -395,6 +396,19 @@ fn install_registry_binary(
     })();
     let _ = fs::remove_dir_all(&install_root);
     result
+}
+
+/// Drop superseded versions once the manifest points at the new one. A file
+/// still in use (Windows) is left for the next upgrade.
+fn remove_other_versions(version_dir: &Path) {
+    let Some(Ok(entries)) = version_dir.parent().map(fs::read_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.path() != version_dir {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
 }
 
 fn prepare_native_command(
@@ -508,7 +522,7 @@ mod tests {
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{cached_managed_binary, extract_agent_archive, safe_join};
+    use super::{cached_managed_binary, extract_agent_archive, remove_other_versions, safe_join};
 
     #[test]
     fn extracts_tar_gz_zip_and_standalone_agents() {
@@ -582,6 +596,23 @@ mod tests {
             safe_join(&runtime, "./dist-package/cursor-agent").expect("safe path"),
             runtime.join("dist-package").join("cursor-agent")
         );
+    }
+
+    #[test]
+    fn keeps_only_the_installed_version() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let runtime_dir = std::env::temp_dir().join(format!("agentdeck-versions-{unique}"));
+        let runtime = crate::app_data::AgentPaths::new(runtime_dir.clone());
+        for version in ["1.0.0", "2.0.0"] {
+            std::fs::create_dir_all(runtime.version_dir(version)).unwrap();
+        }
+        remove_other_versions(&runtime.version_dir("2.0.0"));
+        assert!(!runtime.version_dir("1.0.0").exists());
+        assert!(runtime.version_dir("2.0.0").is_dir());
+        std::fs::remove_dir_all(&runtime_dir).unwrap();
     }
 
     #[test]

@@ -44,7 +44,7 @@ impl MockAcp {
         manager: &AgentSessionManager,
         capabilities: Value,
     ) -> (Channel, JoinHandle<()>) {
-        let runtime = manager.runtime("codex-acp").unwrap();
+        let runtime = manager.runtime("codex-acp");
         let generation = {
             let mut state = runtime.state.lock().await;
             state.generation += 1;
@@ -194,7 +194,7 @@ async fn close_timeout_releases_pending_turn_and_permissions_but_preserves_other
     let mut mock = MockAcp::new().await;
     mock.create("session").await;
     mock.create("other").await;
-    let runtime = mock.manager.runtime("codex-acp").unwrap();
+    let runtime = mock.manager.runtime("codex-acp");
     // Closing must latch cancellation even before a permission handler subscribes.
     let cancel = runtime.permission_cancels.lock().await["session"].clone();
     runtime
@@ -336,7 +336,7 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     let request = mock.next("session/load").await;
     mock.respond(&request, json!({}));
     // Wait for attach, then supply a replay event to establish that the actor is draining history.
-    let runtime = mock.manager.runtime("codex-acp").unwrap();
+    let runtime = mock.manager.runtime("codex-acp");
     tokio::time::timeout(Duration::from_secs(1), async {
         while !runtime
             .permission_cancels

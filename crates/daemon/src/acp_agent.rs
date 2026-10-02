@@ -41,7 +41,6 @@ mod provision;
 mod lifecycle_tests;
 
 pub use catalog::available_agents;
-use catalog::{AgentCandidate, agent_candidates};
 use provision::prepare_agent_command;
 
 fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
@@ -106,7 +105,6 @@ struct StartedSession {
 #[derive(Clone)]
 struct AcpRuntime {
     agent: String,
-    candidate: AgentCandidate,
     state: Arc<Mutex<RuntimeState>>,
     session_resolvers: Arc<Mutex<HashMap<String, PermissionResolver>>>,
     permission_cancels: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
@@ -114,11 +112,10 @@ struct AcpRuntime {
 }
 
 impl AcpRuntime {
-    fn new(candidate: AgentCandidate) -> Self {
+    fn new(agent: String) -> Self {
         let (disconnects, _) = watch::channel(0);
         Self {
-            agent: candidate.id.to_string(),
-            candidate,
+            agent,
             state: Arc::new(Mutex::new(RuntimeState {
                 connection: None,
                 connecting: false,
@@ -171,7 +168,9 @@ impl AcpRuntime {
     }
 
     async fn serve_connection(&self, generation: u64) -> Result<()> {
-        let candidate = self.candidate.clone();
+        catalog::refresh_registry();
+        let candidate = catalog::agent_candidate(&self.agent)
+            .with_context(|| format!("Unknown ACP agent: {}", self.agent))?;
         let command = tokio::task::spawn_blocking(move || prepare_agent_command(candidate))
             .await
             .context("ACP runtime preparation task failed")??;
@@ -471,7 +470,8 @@ pub type SessionEndCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
 #[derive(Clone)]
 pub struct AgentSessionManager {
     sessions: Arc<Mutex<HashMap<AgentSessionKey, AgentSession>>>,
-    runtimes: Arc<HashMap<String, AcpRuntime>>,
+    /// Created on first use so agents added by the fetched registry can launch.
+    runtimes: Arc<std::sync::Mutex<HashMap<String, AcpRuntime>>>,
     on_end: Option<SessionEndCallback>,
 }
 
@@ -535,26 +535,20 @@ enum SessionCommand {
 
 impl AgentSessionManager {
     pub fn new(on_end: Option<SessionEndCallback>) -> Self {
-        let runtimes = agent_candidates()
-            .into_iter()
-            .map(|candidate| {
-                let agent = candidate.id.to_string();
-                (agent.clone(), AcpRuntime::new(candidate))
-            })
-            .collect();
-
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            runtimes: Arc::new(runtimes),
+            runtimes: Arc::default(),
             on_end,
         }
     }
 
-    fn runtime(&self, agent: &str) -> Result<AcpRuntime> {
+    fn runtime(&self, agent: &str) -> AcpRuntime {
         self.runtimes
-            .get(agent)
-            .cloned()
-            .with_context(|| format!("Unknown ACP agent: {agent}"))
+            .lock()
+            .expect("runtimes lock poisoned")
+            .entry(agent.to_string())
+            .or_insert_with(|| AcpRuntime::new(agent.to_string()))
+            .clone()
     }
 
     pub async fn create_session(
@@ -613,7 +607,7 @@ impl AgentSessionManager {
         // A timed-out create/load must not leave a detached actor behind.
         let close_on_drop = closing.clone().drop_guard();
         let actor_closing = closing.clone();
-        let runtime = self.runtime(agent)?;
+        let runtime = self.runtime(agent);
         let agent = agent.to_string();
         tokio::spawn(async move {
             // ended_tx drops when the actor exits, triggering cleanup.
@@ -897,7 +891,7 @@ impl AgentSessionManager {
         let AgentConnection {
             connection,
             capabilities,
-        } = self.runtime(agent)?.connection().await?;
+        } = self.runtime(agent).connection().await?;
         if capabilities.session_capabilities.list.is_none() {
             anyhow::bail!("{agent} does not support listing sessions");
         }
@@ -919,7 +913,7 @@ impl AgentSessionManager {
         let AgentConnection {
             connection,
             capabilities,
-        } = self.runtime(agent)?.connection().await?;
+        } = self.runtime(agent).connection().await?;
         if capabilities.session_capabilities.delete.is_none() {
             anyhow::bail!("{agent} does not support deleting sessions");
         }
