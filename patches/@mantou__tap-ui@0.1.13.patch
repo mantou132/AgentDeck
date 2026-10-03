@@ -237,6 +237,43 @@ index 025c83a37ec167a1ec7e306908be392860a85e78..e09d55aebd4d131cd64f350e8032f06d
      font: inherit;
      cursor: pointer;
    }
+diff --git a/elements/toast.d.ts b/elements/toast.d.ts
+index f60312bc5f6a8762af78cb9c06e64b5c0ccca2aa..7147e68d66d9f03fc2c5e9e78fcbc6b229143383 100644
+--- a/elements/toast.d.ts
++++ b/elements/toast.d.ts
+@@ -23,8 +23,9 @@ export declare class TapToastElement extends GemElement {
+     static action: string;
+     items?: ToastItem[];
+     static instance?: TapToastElement;
+-    static open(options: ToastOptions): void;
+-    static open(type: Type, content: string | TemplateResult): void;
++    /** Returns a function that closes the toast; `duration: Infinity` keeps it until closed. */
++    static open(options: ToastOptions): () => void;
++    static open(type: Type, content: string | TemplateResult): () => void;
+     render: () => TemplateResult;
+ }
+ export declare const Toast: typeof TapToastElement;
+diff --git a/elements/toast.js b/elements/toast.js
+index 61074ba4a094b205b4c1df6e5b7785c4291e0dbe..e8a89747fc5204ea1e5407a75e982eb23a76db61 100644
+--- a/elements/toast.js
++++ b/elements/toast.js
+@@ -179,8 +179,14 @@ let TapToastElement = (() => {
+             // 取消正在执行移除动画的删除定时器
+             removedSet.delete(item);
+             clearTimeout(itemTimerMap.get(item));
+-            const removeTimer = setTimeout(() => toast.#removeItem(item), debug ? 1000000 : duration);
+-            itemTimerMap.set(item, removeTimer);
++            const timeout = debug ? 1000000 : duration;
++            if (Number.isFinite(timeout)) {
++                itemTimerMap.set(item, setTimeout(() => toast.#removeItem(item), timeout));
++            }
++            return () => {
++                clearTimeout(itemTimerMap.get(item));
++                toast.#removeItem(item);
++            };
+         }
+         #over = (__runInitializers(this, _items_extraInitializers), Promise.resolve());
+         #getIcon = (type) => {
 diff --git a/lib/directives.d.ts b/lib/directives.d.ts
 index be6b7f7ae9e692cfa3757674b2cbfb68bf9e509a..842bd575b5f2c3159f00a2473ffd103e5e625cf4 100644
 --- a/lib/directives.d.ts

@@ -275,6 +275,13 @@ export class AgentApi {
     };
   };
 
+  /** Whether `path` can be listed as a directory; any failure counts as not a directory. */
+  isDirectory = (path: string, cwd: string) =>
+    this.browseFiles(path, { cwd, limit: 1 }).then(
+      () => true,
+      () => false,
+    );
+
   gitStatus = (cwd: string) =>
     this.#peer.call<GitStatusResult>('git_status', { cwd }, undefined, {
       timeoutMs: 15_000,

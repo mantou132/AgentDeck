@@ -1,6 +1,7 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
 import { Stack, type TapStackElement } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { sleep } from '@mantou/tap-ui/lib/timer';
 import { share } from '@vnidrop/tauri-plugin-share';
 import { onWebProxyState, toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
@@ -122,10 +123,13 @@ export const openPath = async (path: string, cwd: string, line?: number, stack?:
     openFileViewer(path, cwd, line, stack);
     return;
   }
-  try {
-    await agentApi.browseFiles(path, { cwd, limit: 1 });
+  // 至少显示 500ms，避免快速返回时闪烁
+  const closeToast = Toast.open({ type: 'loading', content: i18n.get('file.opening'), duration: Infinity });
+  const [isDir] = await Promise.all([agentApi.isDirectory(path, cwd), sleep(500)]);
+  closeToast();
+  if (isDir) {
     openFileBrowser(path, cwd, stack);
-  } catch {
+  } else {
     openFileViewer(path, cwd, undefined, stack);
   }
 };
