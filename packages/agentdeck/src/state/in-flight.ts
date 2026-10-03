@@ -100,7 +100,7 @@ export const updateInFlightMessages = async (sessionId: string, messages: ChatMe
     return;
   }
 
-  // 浏览器原生环境：使用 throttle 节流写入，避免密集 chunk 造成频繁 GC 和事务开销
+  // Native browser environment: throttle writes to prevent dense chunks from causing frequent GC and transaction overhead
   let updater = throttledUpdaters.get(sessionId);
   if (!updater) {
     updater = throttle(

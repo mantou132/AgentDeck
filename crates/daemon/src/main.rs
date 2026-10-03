@@ -194,7 +194,7 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
 }
 
 async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
-    // 确保运行时单例
+    // Ensure runtime singleton
     let _instance_lock =
         daemon::InstanceLock::acquire_at(&paths.lock_file()).context("cannot start daemon")?;
 

@@ -330,7 +330,7 @@ export class DeckScreenPageElement extends GemElement {
 
   #retry = () => this.#state({ error: '', revision: this.#state.revision + 1 });
 
-  // 没有缓存帧时，首帧可能在进场动画中途到达，等动画结束再显示设备框；已有缓存帧直接显示
+  // When there is no cached frame, the initial frame may arrive midway through enter animation; wait until animation completes before displaying device frame. Existing cached frames are displayed immediately
   @effect((i) => [i.target])
   #checkCache = () => this.#state({ deferFrame: !screenStore.shots[this.target] });
 

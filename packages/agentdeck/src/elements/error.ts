@@ -4,7 +4,7 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { icons } from '../styles/icons';
 
-/** 整页错误状态：标题、错误信息和重试按钮；`actions` 追加在重试按钮后 */
+/** Full-page error state: heading, error message, and retry button; `actions` are appended after the retry button */
 @customElement('deck-error')
 @adoptedStyle(blockContainer)
 @aria({ role: 'alert' })

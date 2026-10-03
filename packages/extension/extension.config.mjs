@@ -52,13 +52,13 @@ export default {
         },
       ],
     });
-    // dy-code-block 的 Prism 改为本地 vendor，见 loaders/prism-local.mjs
+    // Use local vendor for dy-code-block Prism, see loaders/prism-local.mjs
     config.module.rules.unshift({
       test: /\.js$/,
       include: (filename) => /[\\/]@mantou[\\/]tap-ui[\\/]elements[\\/]code-block\.js$/.test(filename),
       use: [{ loader: new URL('./loaders/prism-local.mjs', import.meta.url).pathname }],
     });
-    // @gem-bind/diff2html 的样式改为本地 vendor，见 loaders/diff2html-local.mjs
+    // Use local vendor for @gem-bind/diff2html styles, see loaders/diff2html-local.mjs
     config.module.rules.unshift({
       test: /\.js$/,
       include: (filename) => /[\\/]@gem-bind[\\/]diff2html[\\/]dist[\\/]index\.js$/.test(filename),

@@ -81,7 +81,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
     ensureSessionLoaded(this.sessionId);
-    // 远端加载可能在进场动画中途返回，此时时间线等动画结束再渲染；内存中已有的会话直接渲染
+    // Remote load may return midway through the enter animation; delay timeline rendering until animation finishes. Existing in-memory sessions render immediately
     this.#state({ deferTimeline: agentdeckStore.loadingSessionIds.includes(this.sessionId) });
   };
 
@@ -90,7 +90,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     return agentdeckStore.loadingSessionIds.includes(this.sessionId) || (deferTimeline && !entered);
   }
 
-  // 历史回放结束后整段消息一次性渲染，直接定位到底部，不做平滑追赶
+  // After history replay finishes, messages render all at once; jump directly to the bottom without smooth catching-up
   @effect((i) => [i.#loading])
   #jumpAfterHistory = () => {
     if (!this.#loading) this.#following?.resume();
@@ -114,7 +114,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   #restoreFailedInput = async (session: DeckSession, input: ComposerInput) => {
     const key = draftKey(session);
     try {
-      // 保留用户为下一轮输入的新内容。
+      // Preserve new content typed by the user for the next turn.
       const restored = await restoreDraft(key, input);
       this.#composerRef.value?.restoreIfEmpty(key, restored);
     } catch {
@@ -139,7 +139,7 @@ export class AgentDeckSessionPageElement extends GemElement {
 
     const onFailed = () => {
       failed = true;
-      // 提交期间先记录失败，等会话切换和旧草稿清理结束后再恢复。
+      // Record failure during submission first, then restore after session switching and old draft cleanup complete.
       if (submissionComplete) this.#restoreFailedInput(targetSession, input);
     };
 
@@ -155,7 +155,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         accepted = sendPrompt(session.sessionId, text, attachments, onFailed);
       }
 
-      // 提交被接收后，由 in-flight 持久化接管输入，才能删除原草稿。
+      // Once submission is accepted and in-flight persistence takes over input, the original draft can be deleted.
       if (accepted) await removeDraft(originalDraftKey);
     } catch {
       failed = true;

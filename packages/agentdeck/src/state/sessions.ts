@@ -41,7 +41,7 @@ const sessionLoads = new Map<string, number>();
 const failedSessionLoads = new Set<string>();
 const localSessions = new Map<string, DeckSession>();
 const inFlightSessions = new Map<string, DeckSession>();
-// 每个 pending 会话当前回合的 rpcId，对账结束回合时用来丢弃其等待中的调用
+// The current turn rpcId for each pending session; used to discard waiting calls during reconciliation when ending turns
 const turnRpcIds = new Map<string, string>();
 
 export const recordInFlightSession = (session: DeckSession) => {
@@ -49,7 +49,7 @@ export const recordInFlightSession = (session: DeckSession) => {
   localSessions.set(session.sessionId, session);
 };
 
-// App 运行生命周期内已成功打开过的 session（只要打开过一次就不再重复 close+load）
+// Sessions successfully opened during the app lifecycle (once opened, avoid repeated close+load)
 const openedSessionIds = new Set<string>();
 
 export const isSessionOpened = (sessionId: string) => openedSessionIds.has(sessionId);
@@ -362,14 +362,14 @@ export const resetPendingSession = () => {
 };
 
 /**
- * 核心运行规则：
- * session 只要打开过一次，就不用关闭了，也不用重复走 close+load session。
- * 除非重启 app（openedSessionIds 为空），首次进入 session 才走一遍 close + load。
+ * Core runtime rules:
+ * Once a session is opened, it does not need to be closed or repeat close+load session.
+ * Only on first entry after app restart (when openedSessionIds is empty) does it run through close + load.
  */
 export const ensureSessionLoaded = async (sessionId: string) => {
   if (sessionId === 'pending-session') return;
   if (openedSessionIds.has(sessionId)) {
-    // 已经打开过，保持在内存中直接秒开，绝不重复走 close + load
+    // Already opened; keep in memory for instant access, never repeat close + load
     return;
   }
   if (agentdeckStore.pendingSessionIds.includes(sessionId)) {
@@ -394,7 +394,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
   setMessages(sessionId, []);
 
   try {
-    // 重启后首次进 session，走一遍 close + load session
+    // First time entering session after restart: run close + load session
     await agentApi.closeSession(session.agent, sessionId);
     const loaded = await agentApi.loadSession({
       agent: session.agent,
@@ -411,7 +411,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
     setSessionFlag('loadedSessionIds', sessionId, true);
     const loadedOptions = { modes: loaded.modes, configOptions: loaded.configOptions ?? [] };
     updateSessionOptions(sessionId, loadedOptions);
-    // 还没记住过该 agent 的配置时，以首个加载的会话作为新会话默认值
+    // When configuration for this agent has not been saved yet, use the first loaded session as defaults for new sessions
     if (!getConfigSelects(getConfigDefaults(session.agent)).length) saveConfigDefaults(session.agent, loadedOptions);
 
     const meta = getSessionMeta(sessionId);
@@ -539,18 +539,18 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
 };
 
 /**
- * Relay 会丢弃长时间未 ack 的消息，回合的最终回复可能永远收不到。
- * 连上 host 后对账：本地仍在进行、但 daemon 已不在运行的回合，就地结束并重新 load 历史。
+ * Relay drops messages unacknowledged for a long time, so a turn's final response may never arrive.
+ * Reconcile after connecting to host: turns still pending locally whose daemon task is no longer running are ended immediately and history is reloaded.
  */
 export const settleLostTurns = async () => {
   if (!agentdeckStore.pendingSessionIds.some((sessionId) => turnRpcIds.has(sessionId))) return;
   const { sessions } = await agentApi.listRunningPrompts();
   const running = new Set(sessions.map((session) => session.sessionId));
-  // 排在查询回复之前的回复已先处理完，此时仍 pending 且 daemon 不在运行的，就是丢了回复的回合
+  // Responses prior to the query reply are already processed; any turns still pending whose daemon is no longer running are lost-reply turns
   for (const sessionId of agentdeckStore.pendingSessionIds) {
     const rpcId = turnRpcIds.get(sessionId);
     if (!rpcId || running.has(sessionId)) continue;
-    // 最终回复可能仍在途中，忘掉该调用，避免它落到重新 load 的 timeline 上
+    // The final reply might still be in flight; forget this call to prevent it from landing on the reloaded timeline
     agentApi.forgetPrompt(rpcId);
     turnRpcIds.delete(sessionId);
     removeInFlight(sessionId);

@@ -1,7 +1,7 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { icons } from '../styles/icons';
 
-/** 整页加载状态，位置与 `deck-error` 对齐 */
+/** Full-page loading state, aligned with `deck-error` */
 @customElement('deck-loading')
 @adoptedStyle(blockContainer)
 @aria({ role: 'status' })

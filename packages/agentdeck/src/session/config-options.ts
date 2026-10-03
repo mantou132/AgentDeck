@@ -2,7 +2,7 @@ import type { ConfigChoice, SessionConfigOption } from '../agent/api';
 import { i18n } from '../i18n';
 import type { SessionOptions } from './types';
 
-/** 会话可选配置（mode / model / effort…）；`legacyMode` 来自 ACP 旧版 `modes`，经 `set_mode` 切换。 */
+/** Optional session configuration (mode / model / effort...); `legacyMode` comes from ACP legacy `modes`, switched via `set_mode`. */
 export type ConfigSelect = {
   id: string;
   name: string;
@@ -33,7 +33,7 @@ export const getConfigSelects = (options?: SessionOptions): ConfigSelect[] => {
       ]
     : [];
   for (const option of options?.configOptions ?? []) {
-    // 同时上报 modes 时，mode 类 config option 与之重复
+    // When modes are reported concurrently, mode-like config options are duplicate
     if (option.type !== 'select' || (modes && isModeOption(option))) continue;
     const choices = option.options.flatMap((item) => ('options' in item ? item.options : [item]));
     if (!choices.length) continue;
@@ -45,7 +45,7 @@ export const getConfigSelects = (options?: SessionOptions): ConfigSelect[] => {
 
 export const isModelSelect = (select: ConfigSelect) => select.category === 'model' || select.id === 'model';
 
-/** composer 上只展示当前模型；没有模型选项时展示第一项。 */
+/** Composer displays only the current model; shows first item when no model option exists. */
 export const getConfigLabel = (selects: ConfigSelect[]) => {
   const select = selects.find(isModelSelect) ?? selects[0];
   return select?.choices.find((choice) => choice.value === select.currentValue)?.name ?? '';

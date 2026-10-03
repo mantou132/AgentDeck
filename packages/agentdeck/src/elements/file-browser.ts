@@ -51,7 +51,7 @@ export class DeckFileBrowserElement extends GemElement {
   @property cwd = '';
   @property emptyText = '';
   @boolattribute directoriesOnly: boolean;
-  /** 条目列表推迟渲染，请求照常发出（如等待 Stack 进场动画结束） */
+  /** Defer entry list rendering while requests proceed normally (e.g. waiting for Stack enter transition to finish) */
   @boolattribute deferred: boolean;
 
   @emitter change: Emitter<string>;

@@ -54,7 +54,7 @@ const badgeInfo = (status: string) => {
 @connectStore(agentdeckStore)
 export class DeckChangesPageElement extends GemElement {
   @property cwd = '';
-  /** 提供时展示该提交的更改，否则展示工作区更改 */
+  /** Shows changes for the given commit if provided, otherwise shows workspace changes */
   @property commit?: string;
 
   #state = createState({

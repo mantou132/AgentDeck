@@ -2,7 +2,7 @@
 @import "tailwindcss/preflight";
 @import "tailwindcss/utilities";
 
-/* 默认细线，需要明显边界的地方配合 border-strong 颜色 */
+/* Default hairline border; use with border-strong color where distinct boundaries are needed */
 @theme static {
   --default-border-width: 0.5px;
 }
@@ -26,7 +26,7 @@
   --color-notice: light-dark(#d98b36, #d9af70);
   --color-negative: light-dark(#d4545e, #e18489);
   --color-focus: light-dark(#5a5fe8, #aab3ff);
-  /* 字号按 iOS 默认 Dynamic Type 上调一档，间距仍以 16px rem 为基准 */
+  /* Font size adjusted up one step per iOS default Dynamic Type, spacing still based on 16px rem */
   --text-xs: 13px;
   --text-sm: 15px;
   --text-base: 17px;
@@ -44,7 +44,7 @@ html {
   color-scheme: light dark;
 }
 
-/* 和页面 header 一致：高度、细线 + 明显边界色 */
+/* Consistent with page header: height, hairline + distinct boundary color */
 tap-navbar,
 tap-browser::part(navbar) {
   grid-template-rows: 44px;

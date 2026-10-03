@@ -1,6 +1,6 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 
-/** 单行路径：默认保留文件名、在目录部分省略；点击切换为可横向滚动的完整路径 */
+/** Single-line path: keeps filename by default, truncates directory portion; click toggles horizontally scrollable full path */
 @customElement('deck-file-path')
 @adoptedStyle(blockContainer)
 export class DeckFilePathElement extends GemElement {

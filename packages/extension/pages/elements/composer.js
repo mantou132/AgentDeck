@@ -52,7 +52,7 @@ class AgentComposerElement extends GemElement {
   #s = createState({
     input: '',
     attachments: [], // staged prompt attachments: { id, kind: 'image'|'text', name, … }
-    editingId: null, // 正在编辑的队列条目：发送时会原地更新它而不是新发一条
+    editingId: null, // Queued item currently being edited: sending will update it in place instead of posting a new one
   });
 
   #fileInputRef = createRef();
@@ -102,7 +102,7 @@ class AgentComposerElement extends GemElement {
   };
 
   #onKeydown = (e) => {
-    // 组字（输入法候选中）时的 Enter 是确认上屏，不能当作发送
+    // Enter during IME composition confirms character selection and must not trigger send
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -362,7 +362,7 @@ class AgentComposerElement extends GemElement {
       )
       .join('; ');
     const canSend = this.#canSend;
-    // 忙碌时主按钮二态：有草稿是「加入队列」，空草稿是「停止」
+    // Dual state for primary button when busy: "Enqueue" with draft, "Stop" with empty draft
     const mainIcon = pending ? (canSend ? icons.queueAdd : icons.stop) : icons.arrowUp;
     const mainTitle = pending
       ? canSend

@@ -92,7 +92,7 @@ export const openFileViewer = (path: string, cwd: string, line?: number, stack?:
   });
 };
 
-/** 不传 commit 时展示工作区更改 */
+/** Shows workspace changes when commit is omitted */
 export const openChanges = (cwd: string, commit?: string) => {
   Stack.push({
     content: html`<deck-changes-page .cwd=${cwd} .commit=${commit}></deck-changes-page>`,
@@ -123,7 +123,7 @@ export const openPath = async (path: string, cwd: string, line?: number, stack?:
     openFileViewer(path, cwd, line, stack);
     return;
   }
-  // 至少显示 500ms，避免快速返回时闪烁
+  // Show for at least 500ms to avoid flickering on fast returns
   const closeToast = Toast.open({ type: 'loading', content: i18n.get('file.opening'), duration: Infinity });
   const [isDir] = await Promise.all([agentApi.isDirectory(path, cwd), sleep(500)]);
   closeToast();

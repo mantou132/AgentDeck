@@ -70,7 +70,7 @@ export type GitCommit = {
   shortId: string;
   summary: string;
   author: string;
-  /** 毫秒时间戳 */
+  /** Millisecond timestamp */
   time: number;
 };
 

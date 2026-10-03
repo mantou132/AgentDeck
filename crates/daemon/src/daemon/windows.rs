@@ -49,17 +49,17 @@ pub fn uninstall_daemon() -> Result<()> {
     Ok(())
 }
 
-/// 注册自启服务，并且如果未运行则立即运行
+/// Register autostart service and start it immediately if not already running.
 pub fn start_daemon() -> Result<()> {
-    // 1. 注册自启任务
+    // 1. Register autostart task
     install_daemon()?;
 
-    // 2. 检查是否已经在运行
+    // 2. Check if already running
     if let Ok(Some(_)) = InstanceLock::check_running() {
         return Ok(());
     }
 
-    // 3. 运行任务
+    // 3. Run task
     let output = Command::new("schtasks")
         .args(["/run", "/tn", TASK_NAME])
         .output()
@@ -73,17 +73,17 @@ pub fn start_daemon() -> Result<()> {
     Ok(())
 }
 
-/// 取消自启注册，并且尝试关闭运行中的守护进程
+/// Unregister autostart service and try to terminate the running daemon process.
 pub fn stop_daemon() -> Result<()> {
-    // 1. 停止计划任务
+    // 1. Stop scheduled task
     let _ = Command::new("schtasks")
         .args(["/end", "/tn", TASK_NAME])
         .output();
 
-    // 2. 取消注册
+    // 2. Unregister
     let _ = uninstall_daemon();
 
-    // 3. 尝试关闭运行中的进程
+    // 3. Try to terminate running process
     if let Ok(Some(pid)) = InstanceLock::check_running() {
         if pid > 0 {
             super::singleton::kill_process(pid);

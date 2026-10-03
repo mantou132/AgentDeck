@@ -218,7 +218,7 @@ const baseMarkdownStyle = `
   .table-scroll {
     overflow-x: auto;
   }
-  /* WebKit 的 collapse 模式不绘制小于 1px 的单元格边框 */
+  /* WebKit collapse mode does not render table cell borders smaller than 1px */
   table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }
   th { background: ${agentDeckTheme.hoverBackgroundColor}; color: ${agentDeckTheme.highlightColor}; text-align: left; }

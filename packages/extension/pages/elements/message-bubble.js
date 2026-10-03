@@ -124,8 +124,8 @@ GemBindMarkedElement[Symbol.metadata].adoptedStyleSheets.push(css`
     margin: 0.5rem 0;
     border: 1px solid ${theme.borderColor};
     background: ${theme.backgroundColor};
-    /* token 配色只有一套亮色默认值，深色底上不可读：亮色沿用默认值，
-       暗色对齐 vendor 的 github-dark（和 diff2html 的 hljs 主题一致）*/
+    /* Token colors only have a light default set and are unreadable on dark backgrounds:
+       light mode uses default values, dark mode aligns with vendor github-dark (consistent with diff2html hljs theme) */
     --code-comment-color: light-dark(#6e6e6e, #8b949e);
     --code-title-color: light-dark(#4646c6, #c9d1d9);
     --code-section-color: light-dark(#c9252d, #7ee787);
@@ -152,8 +152,8 @@ const defaultMarkdownRenderer = new Renderer();
 const markdownExtensions = createMarkdownExtensions(defaultMarkdownRenderer);
 const diffColorScheme = globalThis.chrome?.devtools?.panels?.themeName === 'dark' ? 'dark' : 'light';
 
-// 工具标题已含文件路径，隐藏 d2h 文件头；
-// 元素把自己的样式表排在外来之后，特异性必须高于上游的 .d2h-file-header 才能覆盖
+// Tool title already includes file path, hide d2h file header;
+// The element places its own stylesheet after external ones, so specificity must exceed upstream .d2h-file-header to override
 GemBindDiff2htmlElement[Symbol.metadata].adoptedStyleSheets.push(css`
   div.d2h-wrapper {
     .d2h-file-header {

@@ -74,7 +74,7 @@ const style = css`
     transform: translate(-50%, -50%);
     border-radius: 12px;
 
-    /* 框外遮罩，框内保持透明，可以看到原生 Camera */
+    /* Mask outside the frame, keep inside transparent to show the native camera */
     box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.5);
   }
 

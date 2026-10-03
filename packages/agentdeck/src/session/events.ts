@@ -70,7 +70,7 @@ export const appendImage = (
   return next;
 };
 
-// codex-acp 回放从其他 Agent 导入的历史时，工具调用和结果以文本标记输出，还原为工具消息以收拢到过程分组
+// When codex-acp replays history imported from other agents, tool calls and results are output as text markers; restore them as tool messages to collapse into process groups
 const externalToolPattern =
   /\[external_agent_tool_call: ([^\]\n]+)\]\n?([\s\S]*?)\n?\[\/external_agent_tool_call\]|\[external_agent_tool_result(: error)?\]\n?([\s\S]*?)\n?\[\/external_agent_tool_result\]/g;
 const externalToolPrefix = 'external-';

@@ -1,9 +1,9 @@
 const escapeHtml = (value) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
-// Agent 代码引用围栏信息，codelang 应取文件扩展名：
+// Agent code reference fence info; codelang should extract the file extension:
 // - Cursor: startLine:endLine:filepath
-// - path:line:col（编译器/终端常见，含 file:/// 绝对路径）
+// - path:line:col (common in compilers/terminals, including file:/// absolute paths)
 const CODE_REFERENCE_RE = /^(\d+):(\d+):(.+)$/;
 const PATH_LOCATION_RE = /^(?!\d+:\d+:)(.+):(\d+):(\d+)$/;
 
@@ -79,7 +79,7 @@ export const createMarkdownExtensions = (defaultMarkdownRenderer) => [
     extensions: [blockLatex, inlineLatex],
     renderer: {
       link({ href, title, tokens }) {
-        // TODO：默认编辑器中打开本地文件
+        // TODO: Open local file in default editor
         const label = this.parser.parseInline(tokens);
         const titleAttribute = title ? `title="${escapeHtml(title)}"` : '';
         return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" ${titleAttribute}>${label}</a>`;

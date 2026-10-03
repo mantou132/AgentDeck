@@ -84,7 +84,7 @@ export const parseToolOutputs = (data: ToolCallData): ToolParsedOutputs => {
   return { texts, raw };
 };
 
-// 历史消息里的内联 base64 图片不再渲染为链接，还原成消息附件展示
+// Inline base64 images in historical messages are no longer rendered as links, but restored as message attachments
 const dataImageLinkPattern = /!?\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
 
 const dataImageCache = new Cache<{ attachments: Attachment[]; markdown: string }>({ max: 100 });
@@ -153,7 +153,7 @@ export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: b
     }
   }
 
-  // 任务仍在执行时末尾分组即使工具都已结束也还在等待后续事件
+  // While a task is still running, the trailing group remains waiting for follow-up events even if all tools have completed
   const last = result.at(-1);
   if (sessionPending && last?.type === 'group') last.group.pending = true;
 

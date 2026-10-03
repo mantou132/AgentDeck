@@ -1,6 +1,6 @@
-// @gem-bind/diff2html 运行时从 jsdelivr/cdnjs fetch 样式，断网会让页面挂掉。
-// 构建期把 CDN 地址改写为 public/vendor 下的本地拷贝；
-// 上游改写加载方式导致地址消失时直接报错，避免静默失效。
+// @gem-bind/diff2html fetches styles from jsdelivr/cdnjs at runtime; network disconnection would break the page.
+// Rewrite CDN URLs to local copies under public/vendor at build time;
+// Throw an error directly if upstream changes loading mechanism and URLs disappear, avoiding silent failures.
 const DIFF_CSS_CDN = `'https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css'`;
 const DIFF_CSS_LOCAL = `'/vendor/diff2html/diff2html.min.css'`;
 const HLJS_CSS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/';

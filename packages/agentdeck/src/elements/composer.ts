@@ -81,7 +81,7 @@ export class DeckComposerElement extends GemElement {
     this.#clearInput();
     this.#state({ loadingDraft: Boolean(this.draftKey), readingAttachments: false });
     if (!this.draftKey) return;
-    // 不处理本地草稿读取期间快速切换会话的竞态。
+    // Does not handle race conditions from rapid session switching while reading local drafts.
     try {
       const draft = await readDraft(this.draftKey);
       if (draft) this.#restoreInput(draft, false);
@@ -99,7 +99,7 @@ export class DeckComposerElement extends GemElement {
         quote: this.#state.quote,
       });
     } catch {
-      // 附件可能耗尽存储配额，需要提示用户草稿未保存。
+      // Attachments may exhaust storage quota; notify user that the draft was not saved.
       Toast.open('error', i18n.get('composer.draftSaveFailed'));
     }
   };
@@ -269,7 +269,7 @@ export class DeckComposerElement extends GemElement {
       return;
     }
     this.#state({ readingAttachments: true });
-    // 附件读取期间切换会话不做额外隔离。
+    // No extra isolation when switching sessions while reading attachments.
     const results = await Promise.allSettled(files.map(readAttachment));
     const attachments: Attachment[] = [];
     const errors: string[] = [];
@@ -355,7 +355,7 @@ export class DeckComposerElement extends GemElement {
     this.#replaceInputRange(0, 0, suggestion);
   };
 
-  // iOS 只在用户手势中弹出键盘，计时器里的聚焦不算，松开时重新聚焦
+  // iOS only opens the keyboard during user gestures; focus inside timers does not count, so refocus on release
   #focusAtEnd = () => {
     const textarea = this.#textareaRef.value;
     if (!textarea) return;

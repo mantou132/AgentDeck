@@ -50,19 +50,19 @@ const style = css`
   }
 `;
 
-/** 超出高度时折叠内容，通过 Sheet 查看全部；未提供 markdown 时视为 `codelang` 代码块 */
+/** Collapses content when exceeding height, allowing full view via Sheet; treated as a `codelang` code block when markdown is omitted */
 @customElement('deck-foldable')
 @adoptedStyle(blockContainer)
 @adoptedStyle(style)
 @shadow()
 export class DeckFoldableElement extends GemElement {
-  /** `small` 折叠高度更低，用于用户消息 */
+  /** `small` uses a lower collapsed height, suitable for user messages */
   @attribute size: string;
   @attribute label: string;
   @attribute codelang: string;
-  /** Sheet 内链接相对该目录打开 */
+  /** Links inside the Sheet are opened relative to this directory */
   @attribute cwd: string;
-  /** 不折叠，如流式输出期间 */
+  /** Disable collapse, e.g. during streaming output */
   @boolattribute disabled: boolean;
   @property markdown?: string;
 
@@ -97,7 +97,7 @@ export class DeckFoldableElement extends GemElement {
         >
       `,
     });
-    // Sheet 盖在页面栈之上，内容触发页面栈变化（打开文件、网页、预览等）时关闭
+    // Sheet overlays the page stack; close when content triggers page stack changes (opening file, webpage, preview, etc.)
     const { store } = Stack.instance!;
     const top = store.pages.at(-1);
     result.finally(connect(store, () => store.pages.at(-1) !== top && result.sheet.close(null)));

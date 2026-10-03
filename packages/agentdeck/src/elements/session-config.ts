@@ -59,7 +59,7 @@ const style = css`
   }
 `;
 
-/** 会话配置 Sheet 的页面：不指定 `configId` 时为根页（模型单选 + 其他配置入口），否则为该配置的单选页。 */
+/** Page for session config Sheet: root page (model radio + entries for other configs) when `configId` is omitted; otherwise a radio choice page for that config. */
 @customElement('deck-session-config')
 @adoptedStyle(blockContainer)
 @adoptedStyle(style)
@@ -85,7 +85,7 @@ export class DeckSessionConfigElement extends GemElement {
     });
   };
 
-  /** 部分 agent 的说明以「名称 · 」开头，与上一行重复 */
+  /** Some agents prefix descriptions with "<name> · ", which is redundant with the preceding line */
   #description = ({ name, description }: ConfigChoice) =>
     description?.startsWith(`${name} · `) ? description.slice(name.length + 3) : description;
 

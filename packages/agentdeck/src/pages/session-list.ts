@@ -133,7 +133,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
         <main class="menu-scroll px-4 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]">
           <div
             v-if=${hasGroups && hasError}
-            class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-negative/20 bg-negative/[0.06] px-4 py-3 text-xs leading-relaxed text-negative"
+            class="flex items-center justify-between gap-3 rounded-2xl border border-negative/20 bg-negative/[0.06] px-4 py-3 text-xs leading-relaxed text-negative"
           >
             <div class="flex min-w-0 items-center gap-2">
               <tap-use class="size-4 shrink-0" .element=${icons.error}></tap-use>

@@ -19,7 +19,7 @@ import {
 } from './sessions';
 import { agentdeckStore, setPromptSuggestion } from './store';
 
-/** 旧版 daemon 不返回版本，同样视为过旧；预发布后缀不参与比较 */
+/** Older daemon versions that do not report a version are also considered outdated; prerelease suffixes are ignored in comparison */
 const isDaemonOutdated = (version?: string) => {
   if (!version) return true;
   const parse = (value: string) => value.split('-')[0].split('.').map(Number);
@@ -34,8 +34,8 @@ const isDaemonOutdated = (version?: string) => {
 let daemonVersionChecked = false;
 
 /**
- * 唯一的底层消息消费中枢：
- * Web socket 连接与 App 状态彻底解耦，App 仅在此单一点响应状态与消息。
+ * Single underlying message consumption hub:
+ * WebSocket connection and App state are fully decoupled; App responds to state and messages only at this single point.
  */
 const handleTransportMessage = (message: TransportMessage) => {
   switch (message.type) {
@@ -51,7 +51,7 @@ const handleTransportMessage = (message: TransportMessage) => {
       });
       if (connection === 'connected') {
         refreshSessions();
-        // 旧版 daemon 没有对账接口，失败时保持等待
+        // Older daemon has no reconciliation endpoint; stay waiting if it fails
         settleLostTurns().catch(console.error);
         if (!daemonVersionChecked) {
           daemonVersionChecked = true;
@@ -69,7 +69,7 @@ const handleTransportMessage = (message: TransportMessage) => {
       break;
     }
     case 'prompt_suggestion': {
-      // 建议晚于回合结束到达，期间已开始的新回合不需要它
+      // Suggestions arriving after turn completion are not needed by any newly started turn
       if (!agentdeckStore.pendingSessionIds.includes(message.sessionId))
         setPromptSuggestion(message.sessionId, message.suggestion);
       break;
@@ -172,8 +172,8 @@ export const saveSettings = (settings: AppSettings) => {
 };
 
 /**
- * 重载整个 App，结束旧文档中的连接、回调、权限等待和 Stack 页面。
- * 配对设置保留，Relay 缓存和未决会话在重新启动时清除；不等待远端取消或关闭。
+ * Reloads the entire App, terminating connections, callbacks, pending permissions, and Stack pages in the old document.
+ * Pairing settings are preserved; Relay cache and unresolved sessions are cleared upon restart without waiting for remote cancellation or closure.
  */
 export const hardResetApp = () => {
   sessionStorage.setItem(RESET_PENDING_KEY, 'true');

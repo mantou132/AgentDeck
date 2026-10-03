@@ -60,7 +60,7 @@ pub fn uninstall_daemon() -> Result<()> {
     Ok(())
 }
 
-/// 注册自启服务，并且如果未运行则立即运行
+/// Register autostart service and start it immediately if not already running.
 pub fn start_daemon() -> Result<()> {
     install_daemon()?;
 
@@ -78,7 +78,7 @@ pub fn start_daemon() -> Result<()> {
     Ok(())
 }
 
-/// 取消自启注册，并且尝试关闭运行中的守护进程
+/// Unregister autostart service and try to terminate the running daemon process.
 pub fn stop_daemon() -> Result<()> {
     let _ = uninstall_daemon();
 

@@ -16,7 +16,7 @@ const readConfigDefaults = (): Record<string, SessionOptions> => {
 
 export const getConfigDefaults = (agent: string): SessionOptions => readConfigDefaults()[agent] ?? {};
 
-/** 按 agent 记住整组选项，新会话不必先加载同 agent 的会话就能展示并沿用。 */
+/** Remember full option set per agent so new sessions can display and reuse them without first loading a session of the same agent. */
 export const saveConfigDefaults = (agent: string, options: SessionOptions) => {
   if (!getConfigSelects(options).length) return;
   const { modes, configOptions } = options;
@@ -40,7 +40,7 @@ const applyRemoteConfig = async (
   return { ...options, configOptions };
 };
 
-/** 把待创建会话上的选择逐项应用到刚创建的远端会话；远端不再支持的项或值跳过。 */
+/** Apply selections from a pending-creation session item-by-item to the newly created remote session; skip items or values no longer supported by remote. */
 export const applyConfigSelection = async (session: DeckSession, created: SessionOptions, selected: SessionOptions) => {
   let options = created;
   for (const { id, currentValue } of getConfigSelects(selected)) {
@@ -52,7 +52,7 @@ export const applyConfigSelection = async (session: DeckSession, created: Sessio
   return options;
 };
 
-/** 选择立即生效；远端失败时提示并回退到选择前的值。 */
+/** Selection takes effect immediately; warns and rolls back to previous value if remote call fails. */
 export const changeSessionConfig = async (session: DeckSession, configId: string, value: string) => {
   const { sessionId } = session;
   const select = getConfigSelects(agentdeckStore.optionsBySession[sessionId]).find((item) => item.id === configId);
@@ -74,7 +74,7 @@ export const changeSessionConfig = async (session: DeckSession, configId: string
   } catch (error) {
     Toast.open('error', error instanceof Error ? error.message : i18n.get('error.switchConfigFailed'));
     const options = agentdeckStore.optionsBySession[sessionId];
-    // 之后又选了别的值时保留新选择
+    // Keep the new selection if another value was chosen in the meantime
     if (getConfigSelects(options).find((item) => item.id === configId)?.currentValue === value) {
       updateSessionOptions(sessionId, withConfigValue(options, select, select.currentValue));
     }
