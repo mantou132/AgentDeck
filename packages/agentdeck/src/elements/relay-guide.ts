@@ -43,7 +43,7 @@ export class DeckRelayGuideElement extends GemElement {
     ].map(({ title, image, description }) => ({
       label: title,
       content: html`
-        <div class="text-center">
+        <div class="text-center bg-bg">
           <!-- In light mode, multiply blends the white image background into the Sheet background; in dark mode multiply would darken the image, so preserve the white rounded card -->
           <img
             class="mx-auto block h-[clamp(128px,24dvh,220px)] w-auto max-w-full rounded-xl object-contain mix-blend-multiply dark:mix-blend-normal"

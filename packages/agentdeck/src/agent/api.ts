@@ -360,19 +360,19 @@ export class AgentApi {
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
     );
 
-  setSessionMode = (agent: string, sessionId: string, modeId: string) =>
+  setSessionMode = (agent: string, sessionId: string, modeId: string, timeoutMs = 15_000) =>
     this.#peer.call('agent_session_set_mode', { agent, sessionId, modeId }, undefined, {
-      timeoutMs: 15_000,
+      timeoutMs,
       timeoutMessage: i18n.get('error.switchModeTimeout'),
     });
 
-  setSessionConfigOption = (agent: string, sessionId: string, configId: string, value: string) =>
+  setSessionConfigOption = (agent: string, sessionId: string, configId: string, value: string, timeoutMs = 15_000) =>
     this.#peer.call<{ configOptions: SessionConfigOption[] }>(
       'agent_session_set_config_option',
       { agent, sessionId, configId, value },
       undefined,
       {
-        timeoutMs: 15_000,
+        timeoutMs,
         timeoutMessage: i18n.get('error.switchModeTimeout'),
       },
     );

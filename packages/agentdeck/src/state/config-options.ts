@@ -31,23 +31,33 @@ const applyRemoteConfig = async (
   options: SessionOptions,
   select: ConfigSelect,
   value: string,
+  timeoutMs?: number,
 ): Promise<SessionOptions> => {
   if (select.legacyMode) {
-    await agentApi.setSessionMode(session.agent, session.sessionId, value);
+    await agentApi.setSessionMode(session.agent, session.sessionId, value, timeoutMs);
     return withCurrentMode(options, value);
   }
-  const { configOptions } = await agentApi.setSessionConfigOption(session.agent, session.sessionId, select.id, value);
+  const { configOptions } = await agentApi.setSessionConfigOption(
+    session.agent,
+    session.sessionId,
+    select.id,
+    value,
+    timeoutMs,
+  );
   return { ...options, configOptions };
 };
 
-/** Apply selections from a pending-creation session item-by-item to the newly created remote session; skip items or values no longer supported by remote. */
+/**
+ * Apply selections from a pending-creation session item-by-item to the newly created remote session; skip items or values no longer supported by remote.
+ * Uses the session-creation timeout: the agent may still be starting up and handle these requests only after it is ready.
+ */
 export const applyConfigSelection = async (session: DeckSession, created: SessionOptions, selected: SessionOptions) => {
   let options = created;
   for (const { id, currentValue } of getConfigSelects(selected)) {
     const select = getConfigSelects(options).find((item) => item.id === id);
     if (!select || select.currentValue === currentValue) continue;
     if (!select.choices.some((choice) => choice.value === currentValue)) continue;
-    options = await applyRemoteConfig(session, options, select, currentValue);
+    options = await applyRemoteConfig(session, options, select, currentValue, 65_000);
   }
   return options;
 };
