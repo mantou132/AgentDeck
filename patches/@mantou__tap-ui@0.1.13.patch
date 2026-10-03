@@ -1,3 +1,131 @@
+diff --git a/elements/base/visible.d.ts b/elements/base/visible.d.ts
+index e98d957bf2674b9c8da8ee5a9e7462cc6e0d372d..daee8c5880fc7923ab71b229c2788e1f9508e891 100644
+--- a/elements/base/visible.d.ts
++++ b/elements/base/visible.d.ts
+@@ -4,6 +4,8 @@ export declare abstract class VisibleBaseElement extends GemElement {
+     visible: boolean;
+     show: Emitter;
+     hide: Emitter;
++    fullVisible?: boolean;
++    fullShow?: Emitter;
+     intersectionRoot?: Element | Document;
+     intersectionRootMargin?: string;
+     trackVisibility?: boolean;
+@@ -14,7 +16,13 @@ export declare class TapVisibleBaseElement extends GemElement implements Visible
+     #private;
+     show: Emitter;
+     hide: Emitter;
++    /**
++     * Fired when the element becomes visible and entirely within the viewport,
++     * e.g. a page whose enter animation has finished.
++     */
++    fullShow: Emitter;
+     visible: boolean;
++    fullVisible: boolean;
+     intersectionRoot?: Element | Document;
+     intersectionRootMargin?: string;
+     trackVisibility: boolean;
+diff --git a/elements/base/visible.js b/elements/base/visible.js
+index 224ef28488e4aeecf7b8f6f48f86b6a59c3d3730..a3a2b7180c0a1a0cc535763aff8981339e079ad0 100644
+--- a/elements/base/visible.js
++++ b/elements/base/visible.js
+@@ -39,6 +39,8 @@ export class VisibleBaseElement extends GemElement {
+     visible;
+     show;
+     hide;
++    fullVisible;
++    fullShow;
+     intersectionRoot;
+     intersectionRootMargin;
+     trackVisibility;
+@@ -46,6 +48,7 @@ export class VisibleBaseElement extends GemElement {
+ }
+ export function visibilityObserver(ele) {
+     let inViewport = false;
++    let fullInViewport = false;
+     let nativeTrackVisibility = false;
+     const update = () => {
+         let visible = !document.hidden && inViewport;
+@@ -66,11 +69,17 @@ export function visibilityObserver(ele) {
+                 ele.hide(null);
+             }
+         }
++        const fullVisible = visible && fullInViewport;
++        if (!!ele.fullVisible !== fullVisible) {
++            ele.fullVisible = fullVisible;
++            if (fullVisible)
++                ele.fullShow?.(null);
++        }
+     };
+     const options = {
+         root: ele.intersectionRoot,
+         rootMargin: ele.intersectionRootMargin,
+-        threshold: Number.EPSILON,
++        threshold: [Number.EPSILON, 1],
+     };
+     if (ele.trackVisibility) {
+         options.trackVisibility = true;
+@@ -79,6 +88,7 @@ export function visibilityObserver(ele) {
+     const io = new IntersectionObserver((entries) => {
+         const entry = entries.at(-1);
+         const isIntersecting = entry.intersectionRatio >= Number.EPSILON;
++        fullInViewport = entry.intersectionRatio >= 1;
+         if (ele.trackVisibility && 'isVisible' in entry) {
+             nativeTrackVisibility = true;
+             inViewport = isIntersecting && Boolean(entry.isVisible);
+@@ -103,9 +113,15 @@ let TapVisibleBaseElement = (() => {
+     let _hide_decorators;
+     let _hide_initializers = [];
+     let _hide_extraInitializers = [];
++    let _fullShow_decorators;
++    let _fullShow_initializers = [];
++    let _fullShow_extraInitializers = [];
+     let _visible_decorators;
+     let _visible_initializers = [];
+     let _visible_extraInitializers = [];
++    let _fullVisible_decorators;
++    let _fullVisible_initializers = [];
++    let _fullVisible_extraInitializers = [];
+     let _intersectionRoot_decorators;
+     let _intersectionRoot_initializers = [];
+     let _intersectionRoot_extraInitializers = [];
+@@ -126,7 +142,9 @@ let TapVisibleBaseElement = (() => {
+             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+             _show_decorators = [emitter];
+             _hide_decorators = [emitter];
++            _fullShow_decorators = [emitter];
+             _visible_decorators = [state];
++            _fullVisible_decorators = [state];
+             _intersectionRoot_decorators = [property];
+             _intersectionRootMargin_decorators = [property];
+             _trackVisibility_decorators = [boolattribute];
+@@ -134,7 +152,9 @@ let TapVisibleBaseElement = (() => {
+             _private_observer_decorators = [effect((i) => [i.intersectionRoot, i.intersectionRootMargin, i.trackVisibility, i.delay])];
+             __esDecorate(null, null, _show_decorators, { kind: "field", name: "show", static: false, private: false, access: { has: obj => "show" in obj, get: obj => obj.show, set: (obj, value) => { obj.show = value; } }, metadata: _metadata }, _show_initializers, _show_extraInitializers);
+             __esDecorate(null, null, _hide_decorators, { kind: "field", name: "hide", static: false, private: false, access: { has: obj => "hide" in obj, get: obj => obj.hide, set: (obj, value) => { obj.hide = value; } }, metadata: _metadata }, _hide_initializers, _hide_extraInitializers);
++            __esDecorate(null, null, _fullShow_decorators, { kind: "field", name: "fullShow", static: false, private: false, access: { has: obj => "fullShow" in obj, get: obj => obj.fullShow, set: (obj, value) => { obj.fullShow = value; } }, metadata: _metadata }, _fullShow_initializers, _fullShow_extraInitializers);
+             __esDecorate(null, null, _visible_decorators, { kind: "field", name: "visible", static: false, private: false, access: { has: obj => "visible" in obj, get: obj => obj.visible, set: (obj, value) => { obj.visible = value; } }, metadata: _metadata }, _visible_initializers, _visible_extraInitializers);
++            __esDecorate(null, null, _fullVisible_decorators, { kind: "field", name: "fullVisible", static: false, private: false, access: { has: obj => "fullVisible" in obj, get: obj => obj.fullVisible, set: (obj, value) => { obj.fullVisible = value; } }, metadata: _metadata }, _fullVisible_initializers, _fullVisible_extraInitializers);
+             __esDecorate(null, null, _intersectionRoot_decorators, { kind: "field", name: "intersectionRoot", static: false, private: false, access: { has: obj => "intersectionRoot" in obj, get: obj => obj.intersectionRoot, set: (obj, value) => { obj.intersectionRoot = value; } }, metadata: _metadata }, _intersectionRoot_initializers, _intersectionRoot_extraInitializers);
+             __esDecorate(null, null, _intersectionRootMargin_decorators, { kind: "field", name: "intersectionRootMargin", static: false, private: false, access: { has: obj => "intersectionRootMargin" in obj, get: obj => obj.intersectionRootMargin, set: (obj, value) => { obj.intersectionRootMargin = value; } }, metadata: _metadata }, _intersectionRootMargin_initializers, _intersectionRootMargin_extraInitializers);
+             __esDecorate(null, null, _trackVisibility_decorators, { kind: "field", name: "trackVisibility", static: false, private: false, access: { has: obj => "trackVisibility" in obj, get: obj => obj.trackVisibility, set: (obj, value) => { obj.trackVisibility = value; } }, metadata: _metadata }, _trackVisibility_initializers, _trackVisibility_extraInitializers);
+@@ -144,8 +164,14 @@ let TapVisibleBaseElement = (() => {
+         }
+         show = __runInitializers(this, _show_initializers, void 0);
+         hide = (__runInitializers(this, _show_extraInitializers), __runInitializers(this, _hide_initializers, void 0));
+-        visible = (__runInitializers(this, _hide_extraInitializers), __runInitializers(this, _visible_initializers, void 0));
+-        intersectionRoot = (__runInitializers(this, _visible_extraInitializers), __runInitializers(this, _intersectionRoot_initializers, void 0));
++        /**
++         * Fired when the element becomes visible and entirely within the viewport,
++         * e.g. a page whose enter animation has finished.
++         */
++        fullShow = (__runInitializers(this, _hide_extraInitializers), __runInitializers(this, _fullShow_initializers, void 0));
++        visible = (__runInitializers(this, _fullShow_extraInitializers), __runInitializers(this, _visible_initializers, void 0));
++        fullVisible = (__runInitializers(this, _visible_extraInitializers), __runInitializers(this, _fullVisible_initializers, void 0));
++        intersectionRoot = (__runInitializers(this, _fullVisible_extraInitializers), __runInitializers(this, _intersectionRoot_initializers, void 0));
+         intersectionRootMargin = (__runInitializers(this, _intersectionRoot_extraInitializers), __runInitializers(this, _intersectionRootMargin_initializers, void 0));
+         trackVisibility = (__runInitializers(this, _intersectionRootMargin_extraInitializers), __runInitializers(this, _trackVisibility_initializers, void 0));
+         delay = (__runInitializers(this, _trackVisibility_extraInitializers), __runInitializers(this, _delay_initializers, void 0));
 diff --git a/elements/cell.d.ts b/elements/cell.d.ts
 index ae4a949442c17a5d426b5efe705c52ee06ffdbdc..428296b997c564fe7e8f9d9d7ece3a491d320502 100644
 --- a/elements/cell.d.ts

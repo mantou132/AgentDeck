@@ -37,6 +37,7 @@ export class DeckFileViewerElement extends GemElement {
     error: '',
     revision: 0,
     source: false,
+    entered: false,
   });
   #mainRef = createRef<HTMLElement>();
   #lineRef = createRef<HTMLElement>();
@@ -78,7 +79,7 @@ export class DeckFileViewerElement extends GemElement {
     }
   };
 
-  @effect((i) => [i.#state.file, i.#state.source, i.line])
+  @effect((i) => [i.#state.file, i.#state.source, i.#state.entered, i.line])
   #scrollToLine = () => {
     if (!this.line) return;
     requestAnimationFrame(() => {
@@ -112,7 +113,7 @@ export class DeckFileViewerElement extends GemElement {
 
   @template()
   #render = () => {
-    const { file, loading, error, source } = this.#state;
+    const { file, loading, error, source, entered } = this.#state;
     const path = file?.path || this.path;
     const name = path.split(/[\\/]/).pop() || path;
     const markdown = file?.type === 'text' && /\.(md|markdown)$/i.test(path);
@@ -121,7 +122,7 @@ export class DeckFileViewerElement extends GemElement {
     const isSmall = isSmallTextFile(text);
 
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         <tap-navbar slot="header" title=${name} back default-back>
           <button
             v-if=${markdown}
@@ -137,7 +138,8 @@ export class DeckFileViewerElement extends GemElement {
           path=${path}
         ></deck-file-path>
         <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">
-          <deck-loading v-if=${loading} label=${i18n.get('file.loading')}></deck-loading>
+          <!-- Highlighting and markdown wait for the Stack enter animation -->
+          <deck-loading v-if=${loading || !entered} label=${i18n.get('file.loading')}></deck-loading>
           <deck-error
             v-else-if=${error}
             heading=${i18n.get('file.failed')}

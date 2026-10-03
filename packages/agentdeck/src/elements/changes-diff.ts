@@ -32,6 +32,7 @@ export class DeckChangesDiffPageElement extends GemElement {
     error: '',
     result: undefined as GitDiffResult | undefined,
     revision: 0,
+    entered: false,
   });
 
   @effect((i) => [i.path, i.cwd, i.commit, i.#state.revision])
@@ -55,13 +56,13 @@ export class DeckChangesDiffPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { loading, error, result } = this.#state;
+    const { loading, error, result, entered } = this.#state;
     const fileName = this.path.split(/[/\\]/).filter(Boolean).pop() || this.path || i18n.get('changes.diffTitle');
     const stats = result?.stats;
     const diff = result?.diff;
 
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         <tap-navbar slot="header" title=${fileName} back default-back>
           <tap-use
             slot="right"
@@ -82,8 +83,8 @@ export class DeckChangesDiffPageElement extends GemElement {
 
         <main class="flex h-full flex-col overflow-auto overscroll-contain">
 
-          <!-- Loading state -->
-          <deck-loading v-if=${loading} label=${i18n.get('changes.loadingDiff')}></deck-loading>
+          <!-- Loading state; diff2html waits for the Stack enter animation -->
+          <deck-loading v-if=${loading || !entered} label=${i18n.get('changes.loadingDiff')}></deck-loading>
 
           <!-- Error state -->
           <deck-error
