@@ -41,7 +41,7 @@ const style = css`
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState({ followMessages: true });
+  #state = createState({ followMessages: true, deferTimeline: false, entered: false });
   #messagesRef = createRef<HTMLElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
@@ -81,6 +81,8 @@ export class AgentDeckSessionPageElement extends GemElement {
   @effect((instance) => [instance.sessionId])
   #openSession = () => {
     ensureSessionLoaded(this.sessionId);
+    // 远端加载可能在进场动画中途返回，此时时间线等动画结束再渲染；内存中已有的会话直接渲染
+    this.#state({ deferTimeline: agentdeckStore.loadingSessionIds.includes(this.sessionId) });
   };
 
   @effect((i) => [i.sessionId, i.#messagesRef.value, i.#messagesContentRef.value])
@@ -238,7 +240,8 @@ export class AgentDeckSessionPageElement extends GemElement {
       `;
     }
     const messages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
-    const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId);
+    const { deferTimeline, entered } = this.#state;
+    const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId) || (deferTimeline && !entered);
     const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
     const pending = agentdeckStore.pendingSessionIds.includes(session.sessionId);
     const error =
@@ -247,7 +250,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         ${this.#renderHeader(session.title || (session.pendingCreation ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd)}
 
         <div class="relative h-full">

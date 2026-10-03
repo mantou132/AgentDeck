@@ -44,8 +44,9 @@ export class DeckRelayGuideElement extends GemElement {
       label: title,
       content: html`
         <div class="text-center">
+          <!-- 浅色下用 multiply 把图片白底融入 Sheet 背景；深色下 multiply 会把图片压暗，保留白色圆角卡片 -->
           <img
-            class="mx-auto block h-[clamp(128px,24dvh,220px)] w-auto max-w-full rounded-xl object-contain"
+            class="mx-auto block h-[clamp(128px,24dvh,220px)] w-auto max-w-full rounded-xl object-contain mix-blend-multiply dark:mix-blend-normal"
             src=${`/relay-guide/${image}.png`}
             alt=""
             width="1536"

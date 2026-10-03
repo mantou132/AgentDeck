@@ -326,9 +326,13 @@ const pageStyle = css`
 export class DeckScreenPageElement extends GemElement {
   @property target = '';
 
-  #state = createState({ error: '', revision: 0 });
+  #state = createState({ error: '', revision: 0, deferFrame: false, entered: false });
 
   #retry = () => this.#state({ error: '', revision: this.#state.revision + 1 });
+
+  // 没有缓存帧时，首帧可能在进场动画中途到达，等动画结束再显示设备框；已有缓存帧直接显示
+  @effect((i) => [i.target])
+  #checkCache = () => this.#state({ deferFrame: !screenStore.shots[this.target] });
 
   @effect((i) => [i.target, i.#state.revision])
   #live = () => {
@@ -346,13 +350,14 @@ export class DeckScreenPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { error } = this.#state;
+    const { error, deferFrame, entered } = this.#state;
     const shot = screenStore.shots[this.target];
+    const showShot = !!shot && (!deferFrame || entered);
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         <tap-navbar slot="header" title=${targetName(this.target, shot)} back default-back></tap-navbar>
         <main class="relative h-full overflow-hidden">
-          <deck-screen-device v-if=${!!shot} class=${error ? 'opacity-40' : ''} .shot=${shot}></deck-screen-device>
+          <deck-screen-device v-if=${showShot} class=${error ? 'opacity-40' : ''} .shot=${shot}></deck-screen-device>
           <deck-loading v-else-if=${!error} label=${i18n.get('screen.loading')}></deck-loading>
           <deck-error
             v-if=${!!error}

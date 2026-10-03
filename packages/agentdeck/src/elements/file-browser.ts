@@ -51,6 +51,8 @@ export class DeckFileBrowserElement extends GemElement {
   @property cwd = '';
   @property emptyText = '';
   @boolattribute directoriesOnly: boolean;
+  /** 条目列表推迟渲染，请求照常发出（如等待 Stack 进场动画结束） */
+  @boolattribute deferred: boolean;
 
   @emitter change: Emitter<string>;
   @emitter navstart: Emitter<string>;
@@ -181,7 +183,7 @@ export class DeckFileBrowserElement extends GemElement {
       </div>
 
       <div class="entries-container">
-        <div v-if=${loading} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
+        <div v-if=${loading || this.deferred} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
           <tap-use class="size-4" .element=${icons.loading}></tap-use>
           ${i18n.get('cwdPicker.reading')}
         </div>
@@ -307,9 +309,7 @@ export class DeckFileBrowserPageElement extends GemElement {
   @property path = '';
   @property cwd = '';
 
-  #state = createState({
-    currentPath: '',
-  });
+  #state = createState({ currentPath: '', entered: false });
 
   #title = () => {
     const p = this.#state.currentPath || this.path;
@@ -326,10 +326,11 @@ export class DeckFileBrowserPageElement extends GemElement {
 
   @template()
   #render = () => html`
-    <tap-page class="bg-bg text-text">
+    <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
       <tap-navbar slot="header" title=${this.#title()} back default-back></tap-navbar>
       <main class="h-full overflow-hidden p-4">
         <deck-file-browser
+          ?deferred=${!this.#state.entered}
           .path=${this.path}
           .cwd=${this.cwd}
           @change=${(e: CustomEvent<string>) => this.#state({ currentPath: e.detail })}

@@ -29,6 +29,7 @@ export class DeckGitLogPageElement extends GemElement {
     error: '',
     result: undefined as GitLogResult | undefined,
     revision: 0,
+    entered: false,
   });
 
   @effect((i) => [i.cwd, i.#state.revision])
@@ -52,13 +53,13 @@ export class DeckGitLogPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { loading, error, result } = this.#state;
+    const { loading, error, result, entered } = this.#state;
     const commits = result?.commits ?? [];
     const branch = result?.branch;
     const repoName = result?.repo ? displayPath(result.repo) : displayPath(this.cwd);
 
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         <tap-navbar slot="header" title=${i18n.get('changes.history')} back default-back>
           <tap-use
             slot="right"
@@ -81,8 +82,8 @@ export class DeckGitLogPageElement extends GemElement {
         </div>
 
         <main class="h-full overflow-auto overscroll-contain">
-          <!-- Loading state -->
-          <deck-loading v-if=${loading} label=${i18n.get('changes.loadingHistory')}></deck-loading>
+          <!-- Loading state; the commit list waits for the Stack enter animation -->
+          <deck-loading v-if=${loading || !entered} label=${i18n.get('changes.loadingHistory')}></deck-loading>
 
           <!-- Error state -->
           <deck-error

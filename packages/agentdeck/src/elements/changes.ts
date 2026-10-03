@@ -62,6 +62,7 @@ export class DeckChangesPageElement extends GemElement {
     error: '',
     result: undefined as (GitStatusResult | GitShowResult) | undefined,
     revision: 0,
+    entered: false,
   });
 
   @effect((i) => [i.cwd, i.commit, i.#state.revision])
@@ -89,7 +90,7 @@ export class DeckChangesPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { loading, error, result } = this.#state;
+    const { loading, error, result, entered } = this.#state;
     const files = result?.files ?? [];
     const stats = result?.stats;
     const commit = result && 'commit' in result ? result.commit : undefined;
@@ -97,7 +98,7 @@ export class DeckChangesPageElement extends GemElement {
     const repoName = result?.repo ? displayPath(result.repo) : displayPath(this.cwd);
 
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         <tap-navbar slot="header" title=${commit?.summary || i18n.get('changes.title')} back default-back>
           <tap-use
             slot="right"
@@ -137,8 +138,8 @@ export class DeckChangesPageElement extends GemElement {
         </div>
 
         <main class="h-full overflow-auto overscroll-contain">
-          <!-- Loading state -->
-          <deck-loading v-if=${loading} label=${i18n.get('changes.loading')}></deck-loading>
+          <!-- Loading state; the file list waits for the Stack enter animation -->
+          <deck-loading v-if=${loading || !entered} label=${i18n.get('changes.loading')}></deck-loading>
 
           <!-- Error state -->
           <deck-error
