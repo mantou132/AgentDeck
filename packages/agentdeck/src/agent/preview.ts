@@ -6,7 +6,7 @@ import { escapeHtml } from '../lib/markdown';
 import { previewSupported, resolvePreviewPath } from '../lib/preview';
 import { agentApi } from './transport';
 
-type PreviewRequest = { id: number; url: string };
+type PreviewRequest = { id: number; url: string; range?: [number, number] };
 
 // Android IPC would serialize raw bytes as a JSON number array, so they cross as base64.
 const toBase64 = (bytes: Uint8Array) => arrayBufferToBase64(bytes.buffer);
@@ -22,12 +22,12 @@ const errorPage = (detail: string) => `<!doctype html>
 /** Answers the native `agentdeck-preview` protocol with host files read over Relay. */
 export const startPreviewServer = async () => {
   if (!previewSupported) return;
-  await listen<PreviewRequest>('preview-request', async ({ payload: { id, url } }) => {
+  await listen<PreviewRequest>('preview-request', async ({ payload: { id, url, range } }) => {
     const path = resolvePreviewPath(url);
     try {
       if (!path) throw new Error(url);
-      const { data } = await agentApi.readRawFile(path);
-      await invoke('preview_respond', { id, path, data: toBase64(data), status: 200 });
+      const { data, size } = await agentApi.readRawFile(path, range);
+      await invoke('preview_respond', { id, path, data: toBase64(data), status: 200, size });
     } catch (error) {
       console.warn('Preview request failed:', url, error);
       const page = new TextEncoder().encode(errorPage(error instanceof Error ? error.message : String(error)));

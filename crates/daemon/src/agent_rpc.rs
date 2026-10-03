@@ -1,4 +1,5 @@
 use std::{
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
@@ -158,9 +159,19 @@ impl AgentService {
             let path = required_str(&params, "path", "file_read")?.to_string();
             let cwd = message_cwd(&params);
             let raw = params.get("raw").and_then(Value::as_bool).unwrap_or(false);
-            tokio::task::spawn_blocking(move || read_remote_file(&path, cwd.as_deref(), raw))
-                .await
-                .map_err(|err| format!("File read task failed: {err}"))?
+            let range = params
+                .get("offset")
+                .and_then(Value::as_u64)
+                .zip(params.get("length").and_then(Value::as_u64));
+            tokio::task::spawn_blocking(move || {
+                if raw {
+                    read_raw_file(&path, cwd.as_deref(), range)
+                } else {
+                    read_remote_file(&path, cwd.as_deref())
+                }
+            })
+            .await
+            .map_err(|err| format!("File read task failed: {err}"))?
         });
 
         peer.handle_with_bytes("screen_capture", move |params, _ctx| async move {
@@ -638,13 +649,8 @@ fn browse_files(
 const FILE_READ_MAX_BYTES: u64 = 8 * 1024 * 1024;
 const GIT_LOG_LIMIT: usize = 200;
 
-/// Images, and with `raw` any file (for clients serving files verbatim, like
-/// the App's preview protocol), return their bytes next to the result.
-fn read_remote_file(
-    path: &str,
-    cwd: Option<&Path>,
-    raw: bool,
-) -> Result<(Value, Option<Vec<u8>>), String> {
+/// A regular file under the size limit, or an error naming why it can't be read.
+fn resolve_file(path: &str, cwd: Option<&Path>, len_limit: bool) -> Result<(PathBuf, u64), String> {
     let base_dir = resolve_base_dir(path, cwd)?;
     let resolved = resolve_directory_path(path.trim(), &base_dir);
     let metadata = std::fs::metadata(&resolved)
@@ -652,19 +658,56 @@ fn read_remote_file(
     if metadata.is_dir() {
         return Err(format!("{} is a directory", resolved.display()));
     }
-    if metadata.len() > FILE_READ_MAX_BYTES {
+    if len_limit && metadata.len() > FILE_READ_MAX_BYTES {
         return Err(format!(
             "{} is too large ({} bytes, limit is {FILE_READ_MAX_BYTES})",
             resolved.display(),
             metadata.len()
         ));
     }
+    Ok((resolved, metadata.len()))
+}
+
+/// Any file's bytes for clients serving files verbatim, like the App's preview
+/// protocol. `range` (offset, length) reads one slice, so large media can be
+/// streamed by HTTP Range requests; the result carries the full `size`.
+fn read_raw_file(
+    path: &str,
+    cwd: Option<&Path>,
+    range: Option<(u64, u64)>,
+) -> Result<(Value, Option<Vec<u8>>), String> {
+    let (resolved, size) = resolve_file(path, cwd, range.is_none())?;
+    let read_err = |err: std::io::Error| format!("Failed to read {}: {err}", resolved.display());
+    let bytes = match range {
+        None => std::fs::read(&resolved).map_err(read_err)?,
+        Some((_, length)) if length > FILE_READ_MAX_BYTES => {
+            return Err(format!(
+                "Range of {length} bytes is too large (limit is {FILE_READ_MAX_BYTES})"
+            ));
+        }
+        Some((offset, length)) => {
+            let mut file = std::fs::File::open(&resolved).map_err(read_err)?;
+            file.seek(SeekFrom::Start(offset)).map_err(read_err)?;
+            let mut bytes = Vec::new();
+            file.take(length)
+                .read_to_end(&mut bytes)
+                .map_err(read_err)?;
+            bytes
+        }
+    };
+    let path = resolved.to_string_lossy();
+    Ok((
+        json!({ "path": path, "type": "binary", "size": size }),
+        Some(bytes),
+    ))
+}
+
+/// Images return their bytes next to the result; other files are text.
+fn read_remote_file(path: &str, cwd: Option<&Path>) -> Result<(Value, Option<Vec<u8>>), String> {
+    let (resolved, _) = resolve_file(path, cwd, true)?;
     let bytes = std::fs::read(&resolved)
         .map_err(|err| format!("Failed to read {}: {err}", resolved.display()))?;
     let path = resolved.to_string_lossy().into_owned();
-    if raw {
-        return Ok((json!({ "path": path, "type": "binary" }), Some(bytes)));
-    }
     let mime_type = mime_from_extension(&resolved);
     match mime_type {
         Some(mime_type) => Ok((
@@ -1194,8 +1237,8 @@ mod tests {
     };
 
     use super::{
-        browse_files, complete_directories, message_panel_system_prompt, read_remote_file,
-        resolve_directory_path,
+        browse_files, complete_directories, message_panel_system_prompt, read_raw_file,
+        read_remote_file, resolve_directory_path,
     };
 
     #[test]
@@ -1303,14 +1346,17 @@ mod tests {
         std::fs::write(&binary_path, [0x00, 0x01, 0x02]).expect("write binary file");
 
         let (text, text_bytes) =
-            read_remote_file(&text_path.to_string_lossy(), None, false).expect("read text file");
+            read_remote_file(&text_path.to_string_lossy(), None).expect("read text file");
         let (image, image_bytes) =
-            read_remote_file(&png_path.to_string_lossy(), None, false).expect("read image file");
-        let err = read_remote_file(&binary_path.to_string_lossy(), None, false)
-            .expect_err("reject binary file");
-        let (raw, raw_bytes) = read_remote_file(&binary_path.to_string_lossy(), None, true)
+            read_remote_file(&png_path.to_string_lossy(), None).expect("read image file");
+        let err =
+            read_remote_file(&binary_path.to_string_lossy(), None).expect_err("reject binary file");
+        let (raw, raw_bytes) = read_raw_file(&binary_path.to_string_lossy(), None, None)
             .expect("read raw binary file");
-        let missing = read_remote_file(&root.join("missing.txt").to_string_lossy(), None, false)
+        let (slice, slice_bytes) =
+            read_raw_file(&binary_path.to_string_lossy(), None, Some((1, 5)))
+                .expect("read raw binary range");
+        let missing = read_remote_file(&root.join("missing.txt").to_string_lossy(), None)
             .expect_err("reject missing file");
         std::fs::remove_dir_all(&root).expect("remove test directory");
 
@@ -1324,6 +1370,8 @@ mod tests {
         assert_eq!(raw["type"], "binary");
         assert!(raw.get("data").is_none());
         assert_eq!(raw_bytes.unwrap(), [0x00, 0x01, 0x02]);
+        assert_eq!(slice["size"], 3);
+        assert_eq!(slice_bytes.unwrap(), [0x01, 0x02]);
         assert!(missing.contains("Failed to read"));
     }
 
@@ -1337,8 +1385,7 @@ mod tests {
         std::fs::create_dir_all(&root).expect("create test directory");
         std::fs::write(root.join("note.md"), b"# hi").expect("write file");
 
-        let (file, _) =
-            read_remote_file("note.md", Some(&root), false).expect("read relative file");
+        let (file, _) = read_remote_file("note.md", Some(&root)).expect("read relative file");
         std::fs::remove_dir_all(&root).expect("remove test directory");
 
         assert_eq!(file["type"], "text");

@@ -223,11 +223,11 @@ export class AgentApi {
       { timeoutMs: 10_000, timeoutMessage: i18n.get('screen.timeout'), ephemeral: true },
     );
 
-  /** Any host file as raw bytes, for serving it verbatim. */
-  readRawFile = (path: string) =>
-    this.#peer.call<{ path: string; type: 'binary'; data: Uint8Array<ArrayBuffer> }>(
+  /** Any host file as raw bytes, for serving it verbatim; `range` is `[offset, length]` of one slice. */
+  readRawFile = (path: string, range?: [number, number]) =>
+    this.#peer.call<{ path: string; type: 'binary'; size: number; data: Uint8Array<ArrayBuffer> }>(
       'file_read',
-      { path, raw: true },
+      range ? { path, raw: true, offset: range[0], length: range[1] } : { path, raw: true },
       undefined,
       {
         timeoutMs: 30_000,
