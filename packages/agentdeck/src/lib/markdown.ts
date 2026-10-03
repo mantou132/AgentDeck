@@ -218,7 +218,8 @@ const baseMarkdownStyle = `
   .table-scroll {
     overflow-x: auto;
   }
-  table { width: 100%; border-collapse: collapse; font-size: .9em; }
+  /* WebKit 的 collapse 模式不绘制小于 1px 的单元格边框 */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }
   th { background: ${agentDeckTheme.hoverBackgroundColor}; color: ${agentDeckTheme.highlightColor}; text-align: left; }
   tr + tr td, tbody td { border-top: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; }

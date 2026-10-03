@@ -1,6 +1,8 @@
 type FollowBottomOptions = { onFollowingChange?: (following: boolean) => void; isActive?: () => boolean };
 
 const BOTTOM_THRESHOLD = 24;
+// Fraction of the remaining distance moved per frame while content grows.
+const SMOOTH_FACTOR = 0.2;
 
 export const followBottom = (
   viewport: HTMLElement | null | undefined,
@@ -11,6 +13,7 @@ export const followBottom = (
 
   let following = true;
   let frame = 0;
+  let jump = false;
   let lastScrollTop = viewport.scrollTop;
 
   const setFollowing = (value: boolean) => {
@@ -19,15 +22,26 @@ export const followBottom = (
     onFollowingChange?.(value);
   };
 
-  const scrollToBottom = () => {
-    if (!following || !isActive()) return;
-    if (frame) return;
-    frame = requestAnimationFrame(() => {
-      frame = 0;
-      if (!isActive() || !following) return;
+  // Chases the bottom frame by frame, so continuous growth keeps one animation instead of restarting it.
+  const step = () => {
+    frame = 0;
+    if (!isActive() || !following) return;
+    const distance = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
+    if (jump || distance <= 1) {
+      jump = false;
       viewport.scrollTop = viewport.scrollHeight;
-      lastScrollTop = viewport.scrollTop;
-    });
+    } else {
+      viewport.scrollTop += Math.ceil(distance * SMOOTH_FACTOR);
+      frame = requestAnimationFrame(step);
+    }
+    lastScrollTop = viewport.scrollTop;
+  };
+
+  const scrollToBottom = (instant = false) => {
+    if (!following || !isActive()) return;
+    if (instant) jump = true;
+    if (frame) return;
+    frame = requestAnimationFrame(step);
   };
 
   const onScroll = () => {
@@ -37,6 +51,7 @@ export const followBottom = (
     if (following) {
       if (currentScrollTop < lastScrollTop - 2 && distanceToBottom > BOTTOM_THRESHOLD) {
         setFollowing(false);
+        jump = false;
         if (frame) {
           cancelAnimationFrame(frame);
           frame = 0;
@@ -53,17 +68,17 @@ export const followBottom = (
   };
 
   // Also catches delayed Markdown, image and diff layout changes.
-  const observer = new ResizeObserver(scrollToBottom);
+  const observer = new ResizeObserver(() => scrollToBottom());
   observer.observe(viewport);
   observer.observe(content);
   viewport.addEventListener('scroll', onScroll, { passive: true });
   onFollowingChange?.(true);
-  scrollToBottom();
+  scrollToBottom(true);
 
   return {
     resume: () => {
       setFollowing(true);
-      scrollToBottom();
+      scrollToBottom(true);
     },
     disconnect: () => {
       if (frame) {

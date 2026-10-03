@@ -1,6 +1,6 @@
 ---
 name: chart
-description: Show charts in the AgentDeck client. Use whenever the user asks to plot, chart, graph or visualize numbers (trends, comparisons, proportions, distributions, relationships); answer with an `agentdeck-chart` fenced block holding an Apache ECharts option instead of image files, HTML files, ASCII art or other visualization tools.
+description: Show charts, diagrams and math in the AgentDeck client. Use whenever the user asks to plot, chart, graph or visualize numbers (trends, comparisons, proportions, distributions, relationships), or when a flowchart, sequence, state, class, ER or architecture diagram, or a formula would explain better than prose; answer with an `agentdeck-chart` fenced block holding an Apache ECharts option for data, a `mermaid` fenced block for diagrams and LaTeX for math, instead of image files, HTML files, ASCII art or other visualization tools.
 ---
 
 # AgentDeck charts
@@ -36,3 +36,10 @@ The AgentDeck client renders a fenced code block with the `agentdeck-chart` lang
 - Write the block directly in your reply; do not create files or call tools to draw the chart.
 - Keep data to what the chart needs (at most a few hundred points); aggregate larger data first.
 - Do not repeat the plotted numbers as a table or list; add at most one or two sentences with the takeaway.
+
+## Diagrams and math
+
+The client also renders standard Markdown extensions in place:
+
+- A fenced block with the `mermaid` language is drawn as a Mermaid diagram. Use it for structure and flow (flowcharts, sequences, states, classes, ER, architecture); keep `agentdeck-chart` for numeric data. Prefer top-down layouts and short node labels for narrow screens.
+- LaTeX between `$...$` or `\(...\)` renders inline, and between `$$...$$` or `\[...\]` as a block.

@@ -72,6 +72,10 @@ function fixture({ active = true } = {}) {
       frames.clear();
       for (const callback of callbacks) callback();
     },
+    settle() {
+      for (let i = 0; i < 100 && frames.size; i++) this.flush();
+      assert.equal(frames.size, 0);
+    },
     resize(target = content) {
       for (const observer of observers) {
         if (observer.targets.has(target)) observer.callback();
@@ -88,11 +92,11 @@ test('initial display, delayed content growth and viewport resizing keep the bot
   f.resize();
   f.resize();
   assert.equal(f.frames.size, 1);
-  f.flush();
+  f.settle();
   assert.equal(f.viewport.scrollTop, 1200);
   f.viewport.clientHeight = 120;
   f.resize(f.viewport);
-  f.flush();
+  f.settle();
   assert.equal(f.viewport.scrollTop, 1280);
 });
 
@@ -118,7 +122,7 @@ test('scrolling within four pixels of the bottom resumes following', () => {
   f.viewport.scroll(796);
   f.viewport.scrollHeight = 1300;
   f.resize();
-  f.flush();
+  f.settle();
   assert.equal(f.viewport.scrollTop, 1100);
   assert.deepEqual(f.changes, [true, false, true]);
 });
@@ -159,7 +163,7 @@ test('inactive content stays in place on opening and resizing, then follows acti
   f.setActive(true);
   f.viewport.scrollHeight = 1600;
   f.resize();
-  f.flush();
+  f.settle();
   assert.equal(f.viewport.scrollTop, 1480);
 });
 
@@ -202,7 +206,7 @@ test('rapid content streaming and intermediate scroll events do not break follow
   f.viewport.dispatchEvent(new Event('scroll'));
   assert.deepEqual(f.changes, [true]); // Following must not be erroneously cancelled!
 
-  f.flush();
+  f.settle();
   assert.equal(f.viewport.scrollTop, 1200);
 
   // Another rapid burst
@@ -212,6 +216,36 @@ test('rapid content streaming and intermediate scroll events do not break follow
   f.viewport.dispatchEvent(new Event('scroll'));
   assert.deepEqual(f.changes, [true]);
 
-  f.flush();
+  f.settle();
   assert.equal(f.viewport.scrollTop, 1800);
+});
+
+test('content growth scrolls smoothly and keeps chasing a moving bottom without restarting', () => {
+  const f = fixture();
+  f.flush();
+  f.viewport.scrollHeight = 1400;
+  f.resize();
+  f.flush();
+  assert.ok(f.viewport.scrollTop > 800 && f.viewport.scrollTop < 1200);
+  assert.equal(f.frames.size, 1);
+  // Programmatic steps only move down, so they never pause following.
+  f.viewport.dispatchEvent(new Event('scroll'));
+  f.viewport.scrollHeight = 2000;
+  f.resize();
+  assert.equal(f.frames.size, 1);
+  f.settle();
+  assert.equal(f.viewport.scrollTop, 1800);
+  assert.deepEqual(f.changes, [true]);
+});
+
+test('jump to latest skips an in-flight smooth scroll', () => {
+  const f = fixture();
+  f.flush();
+  f.viewport.scrollHeight = 3000;
+  f.resize();
+  f.flush();
+  f.controller.resume();
+  f.flush();
+  assert.equal(f.viewport.scrollTop, 2800);
+  assert.equal(f.frames.size, 0);
 });
