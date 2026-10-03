@@ -9,6 +9,7 @@
   "global.back": "Back",
   "file.loading": "Reading file…",
   "file.failed": "Unable to open file",
+  "file.browseProject": "Browse Project",
   "file.opening": "Opening…",
   "file.preview": "Preview",
   "file.source": "Source",

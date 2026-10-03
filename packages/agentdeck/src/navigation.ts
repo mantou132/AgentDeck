@@ -78,8 +78,13 @@ export const openScreen = (target: string) => {
   });
 };
 
-export const openFileBrowser = (path: string, cwd: string, stack?: TapStackElement) => {
-  (stack || Stack).push({
+export const openFileBrowser = (
+  path: string,
+  cwd: string,
+  stack?: TapStackElement,
+  options?: { replace?: boolean },
+) => {
+  (stack || Stack)[options?.replace ? 'replace' : 'push']({
     content: html`<deck-file-browser-page .path=${path} .cwd=${cwd}></deck-file-browser-page>`,
     gesture: true,
   });

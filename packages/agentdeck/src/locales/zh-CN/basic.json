@@ -9,6 +9,7 @@
   "global.back": "返回",
   "file.loading": "正在读取文件…",
   "file.failed": "无法打开文件",
+  "file.browseProject": "查看项目目录",
   "file.opening": "正在打开…",
   "file.preview": "预览",
   "file.source": "源码",

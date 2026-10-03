@@ -1,11 +1,12 @@
 import type { TapCodeBlockElement } from '@mantou/tap-ui/elements/code-block';
+import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
 import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
-import { openMessageLink, openSettings } from '../navigation';
+import { openFileBrowser, openMessageLink } from '../navigation';
 import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
@@ -146,9 +147,9 @@ export class DeckFileViewerElement extends GemElement {
             .actions=${html`
               <button
                 class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-5 text-sm font-semibold text-text active:scale-[0.98]"
-                @click=${openSettings}
+                @click=${() => openFileBrowser('.', this.cwd, Stack.getClosestStack(this), { replace: true })}
               >
-                ${i18n.get('global.openSettings')}
+                ${i18n.get('file.browseProject')}
               </button>
             `}
             @retry=${() => this.#state({ revision: this.#state.revision + 1 })}
