@@ -4,7 +4,7 @@ import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
-import { fileMarkdownExtensions, fileViewerMarkdownStyle } from '../lib/markdown';
+import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { openMessageLink, openSettings } from '../navigation';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -44,9 +44,8 @@ export class DeckFileViewerElement extends GemElement {
   #codeBlockRef = createRef<TapCodeBlockElement>();
 
   // Relative images resolve against the host file's directory.
-  @memo((i) => [i.#state.file?.path])
   get #markdownExtensions() {
-    return fileMarkdownExtensions(this.#state.file?.path.replace(/[^\\/]+$/, '') || '');
+    return unfoldedMarkdownExtensions(this.#state.file?.path.replace(/[^\\/]+$/, ''));
   }
 
   @effect((i) => [i.path, i.cwd, i.#state.revision])

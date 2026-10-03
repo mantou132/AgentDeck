@@ -41,7 +41,8 @@ const targetName = (target: string, shot?: ScreenShot) => {
 const cardStyle = css`
   :host {
     display: block;
-    margin-block: 0.75em;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .card {
     display: flex;
@@ -50,10 +51,8 @@ const cardStyle = css`
     width: 100%;
     height: 12rem;
     padding: 0;
-    overflow: hidden;
-    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
-    border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.lightBackgroundColor};
+    border: 0;
+    background: transparent;
     color: inherit;
     font: inherit;
     text-align: start;

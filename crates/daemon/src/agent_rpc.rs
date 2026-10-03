@@ -1119,7 +1119,12 @@ fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String>
         )),
         "remote_app" => Ok(Some(
             "You are running inside AgentDeck's mobile app. The user is interacting remotely \
-             from a mobile device; the host environment is running on their remote machine."
+             from a mobile device; the host environment is running on their remote machine. \
+             Reference files on this machine with Markdown, not HTML: the client reads them \
+             directly. A link like `[app.ts](src/app.ts:42)` opens the file (at a line via `:42` \
+             or `#L42`) or directory; an image like `![Screenshot](/abs/path/shot.png)` shows it \
+             inline, so never inline images as base64. Paths are absolute or relative to the \
+             session's working directory."
                 .to_string(),
         )),
         _ => Err(format!("unknown panelContext.surface: {surface}")),

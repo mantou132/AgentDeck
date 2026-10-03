@@ -8,6 +8,9 @@ overrides:
   swc-plugin-gem: 0.1.18-beta
 
 patchedDependencies:
+  '@gem-bind/mermaid@0.0.6':
+    hash: c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223
+    path: patches/@gem-bind__mermaid@0.0.6.patch
   '@mantou/tap-ui@0.1.13':
     hash: 7ebde0fdabcbf7b6203a35d77623673387fcce66163ab5e2b47e0e0ac9de995a
     path: patches/@mantou__tap-ui@0.1.13.patch
@@ -57,7 +60,7 @@ importers:
         version: 0.0.7(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))
       '@gem-bind/mermaid':
         specifier: ^0.0.6
-        version: 0.0.6(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))
+        version: 0.0.6(patch_hash=c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223)(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))
       '@mantou/gem':
         specifier: ^2.2.13
         version: 2.2.13
@@ -136,7 +139,7 @@ importers:
         version: 0.0.7(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))
       '@gem-bind/mermaid':
         specifier: ^0.0.6
-        version: 0.0.6(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))
+        version: 0.0.6(patch_hash=c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223)(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))
       '@mantou/gem':
         specifier: ^2.2.13
         version: 2.2.13
@@ -5224,7 +5227,7 @@ snapshots:
       duoyun-ui: 2.2.16(@mantou/gem@2.2.13)
       marked: 15.0.12
 
-  '@gem-bind/mermaid@0.0.6(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))':
+  '@gem-bind/mermaid@0.0.6(patch_hash=c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223)(@mantou/gem@2.2.13)(duoyun-ui@2.2.16(@mantou/gem@2.2.13))':
     dependencies:
       '@mantou/gem': 2.2.13
       '@swc/helpers': 0.5.23

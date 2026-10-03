@@ -33,6 +33,7 @@ export class DeckSessionTimelineElement extends GemElement {
       .streamKey=${streamKey}
       ?streaming=${streaming}
       ?user=${user}
+      cwd=${this.cwd}
       @click=${(event: MouseEvent) => openMessageLink(event, this.cwd)}
     ></deck-stream-markdown>
   `;

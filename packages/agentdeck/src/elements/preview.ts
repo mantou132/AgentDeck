@@ -7,7 +7,8 @@ import { agentDeckTheme } from '../styles/theme';
 const style = css`
   :host {
     display: block;
-    margin-block: 0.75em;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .card {
     display: flex;
@@ -15,9 +16,8 @@ const style = css`
     gap: 0.75rem;
     width: 100%;
     padding: 0.75rem;
-    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
-    border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.lightBackgroundColor};
+    border: 0;
+    background: transparent;
     color: inherit;
     font: inherit;
     text-align: start;

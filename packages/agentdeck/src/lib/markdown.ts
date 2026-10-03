@@ -76,7 +76,7 @@ export const isCodeBlockClosed = (raw = '') => {
   return new RegExp(`\\n[ \\t]{0,3}${fenceChar}{${fenceLen},}[ \\t]*\\n?$`).test(raw);
 };
 
-/** `baseDir` resolves relative images, e.g. a Markdown file's own directory. */
+/** `baseDir` resolves relative images, e.g. the session cwd or a Markdown file's own directory. */
 type MarkdownOptions = { codeBlock?: boolean; foldCode?: boolean; baseDir?: string };
 
 /** Host path of an image source, loaded through the preview protocol. */
@@ -84,7 +84,7 @@ const hostImagePath = (src: string, baseDir?: string) => {
   const link = parseMessageLink(src);
   if (link?.type !== 'file') return;
   if (isAbsoluteHostPath(link.path)) return link.path;
-  if (baseDir) return `${baseDir}${link.path.replace(/^\.[\\/]/, '')}`;
+  if (baseDir) return `${baseDir.replace(/[\\/]?$/, '/')}${link.path.replace(/^\.[\\/]/, '')}`;
 };
 
 const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtension[] => [
@@ -133,10 +133,22 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
   },
 ];
 
-export const markdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true, foldCode: true });
-export const unfoldedMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: true });
-export const userMarkdownExtensions: MarkedExtension[] = createMarkdownExtensions({ codeBlock: false });
-export const fileMarkdownExtensions = (baseDir: string) => createMarkdownExtensions({ codeBlock: true, baseDir });
+/** Extensions by `baseDir`, cached so the same directory keeps the same parser. */
+const extensionsFor = (options: Omit<MarkdownOptions, 'baseDir'>) => {
+  const cache = new Map<string, MarkedExtension[]>();
+  return (baseDir = '') => {
+    let extensions = cache.get(baseDir);
+    if (!extensions) {
+      extensions = createMarkdownExtensions({ ...options, baseDir });
+      cache.set(baseDir, extensions);
+    }
+    return extensions;
+  };
+};
+
+export const markdownExtensions = extensionsFor({ codeBlock: true, foldCode: true });
+export const unfoldedMarkdownExtensions = extensionsFor({ codeBlock: true });
+export const userMarkdownExtensions = extensionsFor({ codeBlock: false });
 
 const baseMarkdownStyle = `
   :host {
@@ -175,12 +187,21 @@ const baseMarkdownStyle = `
     font-family: ${agentDeckTheme.codeFont};
     font-size: .9em;
   }
-  pre, tap-code-block {
-    max-width: 100%;
-    margin: .7rem 0;
+  pre,
+  tap-code-block,
+  gem-bind-mermaid,
+  .table-scroll,
+  deck-chart,
+  deck-preview,
+  deck-screen {
     border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.lightBackgroundColor};
+    max-width: 100%;
+    margin: .7rem 0;
+    outline: none;
+  }
+  pre, tap-code-block {
     color: ${agentDeckTheme.textColor};
     line-height: 1.55;
   }
@@ -192,16 +213,10 @@ const baseMarkdownStyle = `
     overflow: hidden;
   }
   pre code { background: none; padding: 0; }
-  pre, tap-code-block, .table-scroll { outline: none; }
   deck-foldable { margin: .7rem 0; }
   deck-foldable > :is(pre, tap-code-block) { margin: 0; }
   .table-scroll {
-    max-width: 100%;
-    margin: .7rem 0;
     overflow-x: auto;
-    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
-    border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.lightBackgroundColor};
   }
   table { width: 100%; border-collapse: collapse; font-size: .9em; }
   th, td { min-width: 7rem; padding: .55rem .7rem; vertical-align: top; }
@@ -240,8 +255,22 @@ userMarkdownStyle.replaceSync(`
   blockquote { margin: .5rem 0; border-left: 2px solid currentColor; padding-left: .65rem; opacity: .85; }
   a, a:visited { color: ${agentDeckTheme.primaryStrongColor}; text-underline-offset: 2px; }
   code { border-radius: ${agentDeckTheme.smallRound}; background: ${agentDeckTheme.lightBackgroundColor}; padding: .1em .3em; font-family: ${agentDeckTheme.codeFont}; }
-  pre { max-width: 100%; margin: .6rem 0; overflow: auto; border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; border-radius: 9px; background: ${agentDeckTheme.lightBackgroundColor}; padding: .7rem; }
+  pre,
+  gem-bind-mermaid,
+  .table-scroll,
+  deck-chart,
+  deck-preview,
+  deck-screen {
+    max-width: 100%;
+    margin: .6rem 0;
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
+    border-radius: 9px;
+    background: ${agentDeckTheme.lightBackgroundColor};
+    outline: none;
+  }
+  pre { overflow: auto; padding: .7rem; }
   pre code { background: none; padding: 0; }
+  .table-scroll { overflow-x: auto; }
   table { border-collapse: collapse; }
   th, td { border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor}; padding: .4rem; }
   img { max-width: 100%; border-radius: 9px; }

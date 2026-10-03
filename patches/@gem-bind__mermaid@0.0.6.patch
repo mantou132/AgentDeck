@@ -1,0 +1,237 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 2c4aa6cd88686cea403fec99c98cb4012607141f..11a5f00bbdec2295bcd9372c3d2a425101f574a0 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -15,6 +15,8 @@ export declare class GemBindMermaidElement extends DuoyunVisibleBaseElement {
+     /** Disable zoom and reset controls. */
+     noControls: boolean;
+     loading: boolean;
++    /** Set when the source fails to render; the raw source is shown instead. */
++    error: boolean;
+     render: () => import("@mantou/gem").TemplateResult;
+ }
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff --git a/dist/index.d.ts.map b/dist/index.d.ts.map
+index ee4f54350903670f9ee99a4c8e4013f58e9b9d1a..fc70ecd12f7cf0d0d09e5e3b871b45b63638562e 100644
+--- a/dist/index.d.ts.map
++++ b/dist/index.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../src/index.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,wBAAwB,EAAE,MAAM,iCAAiC,CAAC;AAG3E,OAAgB,EAAE,KAAK,aAAa,EAAE,MAAM,SAAS,CAAC;AAEtD,OAAO,4BAA4B,CAAC;AACpC,OAAO,SAAS,CAAC;AAEjB,cAAc,SAAS,CAAC;AACxB,OAAO,EAAE,OAAO,IAAI,OAAO,EAAE,MAAM,SAAS,CAAC;AA6S7C,eAAO,MAAM,mBAAmB,GAAI,QAAQ,MAAM,WAKjD,CAAC;AAOF,4EAA4E;AAC5E,qBAGa,qBAAsB,SAAQ,wBAAwB;;IACjE,kCAAkC;IACxB,MAAM,CAAC,EAAE,aAAa,CAAC;IAEjC,kEAAkE;IACxD,OAAO,CAAC,EAAE,aAAa,CAAC;IAElC,uCAAuC;IACxB,UAAU,EAAE,OAAO,CAAC;IAE5B,OAAO,EAAE,OAAO,CAAC;IAuNxB,MAAM,6CAsBJ;CACH"}
+\ No newline at end of file
++{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../private/tmp/gb06/packages/mermaid/src/index.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,wBAAwB,EAAE,MAAM,iCAAiC,CAAC;AAG3E,OAAgB,EAAE,KAAK,aAAa,EAAE,MAAM,SAAS,CAAC;AAEtD,OAAO,4BAA4B,CAAC;AACpC,OAAO,SAAS,CAAC;AAEjB,cAAc,SAAS,CAAC;AACxB,OAAO,EAAE,OAAO,IAAI,OAAO,EAAE,MAAM,SAAS,CAAC;AAuT7C,eAAO,MAAM,mBAAmB,GAAI,QAAQ,MAAM,WAKjD,CAAC;AAOF,4EAA4E;AAC5E,qBAGa,qBAAsB,SAAQ,wBAAwB;;IACjE,kCAAkC;IACxB,MAAM,CAAC,EAAE,aAAa,CAAC;IAEjC,kEAAkE;IACxD,OAAO,CAAC,EAAE,aAAa,CAAC;IAElC,uCAAuC;IACxB,UAAU,EAAE,OAAO,CAAC;IAE5B,OAAO,EAAE,OAAO,CAAC;IAExB,4EAA4E;IACrE,KAAK,EAAE,OAAO,CAAC;IAqOtB,MAAM,6CAuBJ;CACH"}
+\ No newline at end of file
+diff --git a/dist/index.js b/dist/index.js
+index 71376515f5498f07fdde7a044403a48b4ae3e63d..f29580aaf06d109d2f32a3b73b447d320235eccd 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,7 +1,7 @@
+ import { _ as _apply_decs_2311 } from "@swc/helpers/_/_apply_decs_2311";
+ import { _ as _identity } from "@swc/helpers/_/_identity";
+-let _dec, _dec1, _dec2, _initClass, _DuoyunVisibleBaseElement, _dec3, _dec4, _dec5, _dec6, /** Mermaid initialize options. */ _init_config, _init_extra__init_config, /** Additional stylesheet adopted by the element's shadow root. */ _init_mdStyle, _init_extra__init_mdStyle, /** Disable zoom and reset controls. */ _init_noControls, _init_extra__init_noControls, _init_loading, _init_extra__init_loading, _init_observeSource, _init_extra_observeSource, _init_adoptCustomStyle, _init_extra_adoptCustomStyle, _init_generateSvg, _init_extra_generateSvg, _init_bindMermaid, _init_extra_bindMermaid;
+-import { css, customElement, adoptedStyle, shadow, property, boolattribute, state, createState, createRef, mounted, effect, html } from "@mantou/gem";
++let _dec, _dec1, _dec2, _initClass, _DuoyunVisibleBaseElement, _dec3, _dec4, _dec5, _dec6, /** Mermaid initialize options. */ _init_config, _init_extra__init_config, /** Additional stylesheet adopted by the element's shadow root. */ _init_mdStyle, _init_extra__init_mdStyle, /** Disable zoom and reset controls. */ _init_noControls, _init_extra__init_noControls, _init_loading, _init_extra__init_loading, /** Set when the source fails to render; the raw source is shown instead. */ _init_error, _init_extra__init_error, _init_observeSource, _init_extra_observeSource, _init_adoptCustomStyle, _init_extra_adoptCustomStyle, _init_generateSvg, _init_extra_generateSvg, _init_bindMermaid, _init_extra_bindMermaid;
++import { css, svg, customElement, adoptedStyle, shadow, property, boolattribute, state, createState, createRef, mounted, effect, html } from "@mantou/gem";
+ import "duoyun-ui/elements/gesture";
+ import { addMicrotask } from '@mantou/gem';
+ import { DuoyunVisibleBaseElement } from 'duoyun-ui/elements/base/visible';
+@@ -32,6 +32,14 @@ const style = css`
+     cursor: progress;
+   }
+ 
++  .source {
++    margin: 0;
++    font-family: ${theme.codeFont};
++    font-size: 0.875em;
++    white-space: pre-wrap;
++    color: ${theme.describeColor};
++  }
++
+   :host(:focus-visible) {
+     outline: 2px solid ${theme.focusColor};
+     outline-offset: -2px;
+@@ -103,15 +111,15 @@ const renderMermaid = (task)=>{
+     return result;
+ };
+ const parseSvg = (source)=>{
+-    const parser = new DOMParser();
+-    const doc = parser.parseFromString(source, 'image/svg+xml');
+-    if (!doc.querySelector('parsererror')) {
+-        const parsedSvg = doc.querySelector('svg');
+-        if (parsedSvg) {
+-            return document.importNode ? document.importNode(parsedSvg, true) : parsedSvg;
+-        }
+-    }
++    // Parse as HTML: htmlLabels emit HTML (e.g. `<br>`) inside foreignObject, which is not well-formed XML.
++    const doc = new DOMParser().parseFromString(source, 'text/html');
++    const parsedSvg = doc.querySelector('svg');
++    if (!parsedSvg) throw new Error('Mermaid returned invalid SVG');
++    return document.importNode(parsedSvg, true);
+ };
++// `light dark` follows the system preference.
++const darkQuery = matchMedia('(prefers-color-scheme: dark)');
++const isDark = (colorScheme)=>colorScheme === 'dark' || colorScheme.includes('dark') && darkQuery.matches;
+ const getViewBox = (svg)=>{
+     const viewBox = svg?.viewBox.baseVal;
+     if (!viewBox?.width || !viewBox.height) return;
+@@ -274,7 +282,7 @@ new class extends _identity {
+     }
+     static [class GemBindMermaidElement extends _DuoyunVisibleBaseElement {
+         static{
+-            ({ e: [_init_config, _init_extra__init_config, _init_mdStyle, _init_extra__init_mdStyle, _init_noControls, _init_extra__init_noControls, _init_loading, _init_extra__init_loading, _init_observeSource, _init_extra_observeSource, _init_adoptCustomStyle, _init_extra_adoptCustomStyle, _init_generateSvg, _init_extra_generateSvg, _init_bindMermaid, _init_extra_bindMermaid], c: [_GemBindMermaidElement, _initClass] } = _apply_decs_2311(this, [
++            ({ e: [_init_config, _init_extra__init_config, _init_mdStyle, _init_extra__init_mdStyle, _init_noControls, _init_extra__init_noControls, _init_loading, _init_extra__init_loading, _init_error, _init_extra__init_error, _init_observeSource, _init_extra_observeSource, _init_adoptCustomStyle, _init_extra_adoptCustomStyle, _init_generateSvg, _init_extra_generateSvg, _init_bindMermaid, _init_extra_bindMermaid], c: [_GemBindMermaidElement, _initClass] } = _apply_decs_2311(this, [
+                 _dec,
+                 _dec1,
+                 _dec2
+@@ -299,6 +307,11 @@ new class extends _identity {
+                     0,
+                     "loading"
+                 ],
++                [
++                    state,
++                    0,
++                    "error"
++                ],
+                 [
+                     _dec3,
+                     0,
+@@ -349,7 +362,8 @@ new class extends _identity {
+         mdStyle = (_init_extra__init_config(this), _init_mdStyle(this));
+         noControls = (_init_extra__init_mdStyle(this), _init_noControls(this));
+         loading = (_init_extra__init_noControls(this), _init_loading(this));
+-        #state = (_init_extra__init_loading(this), createState({
++        error = (_init_extra__init_loading(this), _init_error(this));
++        #state = (_init_extra__init_error(this), createState({
+             source: '',
+             isZoomed: false
+         }));
+@@ -359,7 +373,11 @@ new class extends _identity {
+         #rerender = false;
+         #renderedConfig;
+         #svg;
++        #renderedDark;
+         #initialViewBox;
++        get #source() {
++            return this.textContent?.trim() || '';
++        }
+         #setViewBox = (viewBox)=>{
+             if (!this.#svg || !this.#initialViewBox) return;
+             const initial = this.#initialViewBox;
+@@ -462,12 +480,14 @@ new class extends _identity {
+             this.addEventListener('keydown', this.#onKeydown);
+             this.addEventListener('dblclick', this.#onDblClick);
+             this.addEventListener('show', this.#generateSvg);
++            darkQuery.addEventListener('change', this.#generateSvg);
+             return ()=>{
+                 this.#observer.disconnect();
+                 this.removeEventListener('wheel', this.#onWheel);
+                 this.removeEventListener('keydown', this.#onKeydown);
+                 this.removeEventListener('dblclick', this.#onDblClick);
+                 this.removeEventListener('show', this.#generateSvg);
++                darkQuery.removeEventListener('change', this.#generateSvg);
+             };
+         });
+         #adoptCustomStyle = (_init_extra_observeSource(this), _init_adoptCustomStyle(this, ()=>{
+@@ -485,19 +505,31 @@ new class extends _identity {
+                 this.#rerender = true;
+                 return;
+             }
+-            const source = this.textContent?.trim() || '';
+-            if (source === this.#state.source && this.config === this.#renderedConfig) return;
+-            if (!source) {
+-                this.#svg = undefined;
+-                this.#initialViewBox = undefined;
+-                this.#renderedConfig = this.config;
+-                this.loading = false;
++            const source = this.#source;
++            const requestedConfig = this.config;
++            const dark = isDark(getComputedStyle(this).colorScheme);
++            const isCurrent = ()=>source === this.#source && requestedConfig === this.config;
++            if (source === this.#state.source && requestedConfig === this.#renderedConfig && dark === this.#renderedDark) {
++                return;
++            }
++            const commit = (state)=>{
++                this.#renderedConfig = requestedConfig;
++                this.#renderedDark = dark;
++                this.#svg = state.svg;
++                this.error = !!state.error;
+                 this.#state({
+-                    source: '',
++                    source,
+                     svg: undefined,
+                     bindFunctions: undefined,
+-                    isZoomed: false
++                    isZoomed: false,
++                    error: false,
++                    ...state
+                 });
++            };
++            if (!source) {
++                this.#initialViewBox = undefined;
++                this.loading = false;
++                commit({});
+                 return;
+             }
+             this.#rendering = true;
+@@ -505,8 +537,8 @@ new class extends _identity {
+             this.loading = true;
+             try {
+                 const config = {
+-                    theme: getComputedStyle(this).colorScheme === 'dark' ? 'dark' : 'default',
+-                    ...this.config
++                    theme: dark ? 'dark' : 'default',
++                    ...requestedConfig
+                 };
+                 let sankeyReplacements;
+                 const { svg, bindFunctions } = await renderMermaid(async ()=>{
+@@ -530,37 +562,37 @@ new class extends _identity {
+                         return mermaid.render(`gem-bind-mermaid-${++diagramId}`, repair.source);
+                     }
+                 });
+-                if (!this.isConnected || source !== this.textContent?.trim()) return;
++                if (!this.isConnected || !isCurrent()) return;
+                 const svgElement = parseSvg(svg);
+-                if (svgElement) restoreSankeyLabels(svgElement, sankeyReplacements);
+-                this.#svg = svgElement;
++                restoreSankeyLabels(svgElement, sankeyReplacements);
+                 this.#initialViewBox = getViewBox(svgElement);
+-                this.#renderedConfig = this.config;
+-                this.#state({
+-                    source,
++                commit({
+                     svg: svgElement,
+-                    bindFunctions,
+-                    isZoomed: false
++                    bindFunctions
+                 });
+             } catch (error) {
+                 console.error('Mermaid render failed:', error);
++                if (!this.isConnected || !isCurrent()) return;
++                this.#initialViewBox = undefined;
++                commit({
++                    error: true
++                });
+             } finally{
+                 this.#rendering = false;
+                 this.loading = false;
+-                if (this.isConnected && (this.#rerender || source !== this.textContent?.trim())) {
+-                    addMicrotask(this.#generateSvg);
+-                }
++                if (this.isConnected && (this.#rerender || !isCurrent())) addMicrotask(this.#generateSvg);
+             }
+         }));
+         #bindMermaid = (_init_extra_generateSvg(this), _init_bindMermaid(this, ()=>{
+             const { source, svg, bindFunctions } = this.#state;
+-            if (!svg || source !== this.textContent?.trim()) return;
++            if (!svg || source !== this.#source) return;
+             const gesture = this.#gestureRef.value;
+             if (!gesture) return;
+             bindFunctions?.(gesture);
+         }));
+         render = (_init_extra_bindMermaid(this), ()=>{
+-            const svg = this.#state.svg;
++            const { svg, error, source } = this.#state;
++            if (error) return html`<pre class="source">${source}</pre>`;
+             return html`
+       <dy-gesture
+         ${this.#gestureRef}

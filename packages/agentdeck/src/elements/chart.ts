@@ -12,11 +12,8 @@ const parseOption = (source: string): EChartsOption | undefined => {
 const style = css`
   :host {
     display: block;
-    margin-block: 0.75em;
+    box-sizing: border-box;
     padding: 0.75rem;
-    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
-    border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.lightBackgroundColor};
   }
   gem-bind-echarts {
     height: 300px;

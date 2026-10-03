@@ -49,7 +49,7 @@ test('isCodeBlockClosed: identifies unclosed code blocks correctly', () => {
 });
 
 test('closed agentdeck-chart blocks render as charts with the JSON in an escaped attribute', () => {
-  const { code } = exports.markdownExtensions[0].renderer;
+  const { code } = exports.markdownExtensions()[0].renderer;
   const text = '{"style":"bar","series":[{"values":[1]}]}';
   assert.equal(
     code.call({}, { text, lang: 'agentdeck-chart', raw: `\`\`\`agentdeck-chart\n${text}\n\`\`\`` }),

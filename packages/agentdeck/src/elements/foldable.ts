@@ -91,7 +91,7 @@ export class DeckFoldableElement extends GemElement {
       body: html`
         <gem-bind-marked
           .mdStyle=${markdownStyle}
-          .extensions=${unfoldedMarkdownExtensions}
+          .extensions=${unfoldedMarkdownExtensions(this.cwd)}
           @click=${(event: MouseEvent) => openMessageLink(event, this.cwd)}
           >${this.markdown ?? `${fence}${this.codelang}\n${text}\n${fence}`}</gem-bind-marked
         >

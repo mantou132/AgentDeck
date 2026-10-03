@@ -163,7 +163,7 @@ export class DeckProcessStepElement extends GemElement {
           .streamKey=${`${this.sessionId}:${this.groupId}:${item.id}`}
           ?streaming=${Boolean(this.#group?.pending && item.pending)}
           .mdStyle=${markdownStyle}
-          .extensions=${unfoldedMarkdownExtensions}
+          .extensions=${unfoldedMarkdownExtensions(getSession(this.sessionId)?.cwd)}
           @click=${this.#openLink}
         ></deck-stream-markdown>
       `;
@@ -208,7 +208,7 @@ export class DeckProcessStepElement extends GemElement {
             .streamKey=${`${this.sessionId}:${this.groupId}:${item.id}:output`}
             ?streaming=${this.#updating}
             .mdStyle=${markdownStyle}
-            .extensions=${unfoldedMarkdownExtensions}
+            .extensions=${unfoldedMarkdownExtensions(getSession(this.sessionId)?.cwd)}
             @click=${this.#openLink}
           ></deck-stream-markdown>
           <tap-code-block

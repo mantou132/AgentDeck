@@ -15,6 +15,8 @@ export class DeckStreamMarkdownElement extends GemElement {
   @property streamKey = '';
   @property mdStyle?: CSSStyleSheet;
   @property extensions?: MarkedExtension[];
+  /** Session cwd that relative image paths resolve against. */
+  @attribute cwd: string;
   @boolattribute streaming: boolean;
   @boolattribute user: boolean;
 
@@ -104,7 +106,7 @@ export class DeckStreamMarkdownElement extends GemElement {
       class="select-text"
       ?streaming=${this.#isStreaming}
       .mdStyle=${this.mdStyle ?? (this.user ? userMarkdownStyle : markdownStyle)}
-      .extensions=${this.extensions ?? (this.user ? userMarkdownExtensions : markdownExtensions)}
+      .extensions=${this.extensions ?? (this.user ? userMarkdownExtensions : markdownExtensions)(this.cwd)}
     >${this.#displayText}</gem-bind-marked>
   `;
 }
