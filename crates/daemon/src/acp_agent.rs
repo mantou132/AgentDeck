@@ -1210,7 +1210,7 @@ async fn drain_replay(
             Ok(Ok(SessionMessage::SessionMessage(dispatch))) => {
                 MatchDispatch::new(dispatch)
                     .if_notification(async |notif: SessionNotification| {
-                        let update = to_json(notif.update);
+                        let update = update_to_json(notif.update);
                         metadata.apply(&update);
                         send_agent_event(Some(event_tx), AgentEvent::SessionUpdate { update });
                         Ok(())
@@ -1383,10 +1383,50 @@ fn handle_session_update(
     send_agent_event(
         event_tx,
         AgentEvent::SessionUpdate {
-            update: to_json(update),
+            update: update_to_json(update),
         },
     );
     Ok(())
+}
+
+/// Serialize a session update for the client, dropping image bytes from tool
+/// output. Tool images (e.g. screenshots the agent read) arrive twice, in
+/// `content` and `rawOutput`, at up to ~1MB each; the client does not render
+/// them, and on load they clog the ordered Relay queue so later replies time out.
+fn update_to_json(update: SessionUpdate) -> serde_json::Value {
+    let mut update = to_json(update);
+    if matches!(
+        update
+            .get("sessionUpdate")
+            .and_then(serde_json::Value::as_str),
+        Some("tool_call" | "tool_call_update")
+    ) {
+        for key in ["content", "rawOutput"] {
+            if let Some(value) = update.get_mut(key) {
+                omit_image_data(value);
+            }
+        }
+    }
+    update
+}
+
+/// Remove base64 payloads from both the ACP (`{type, data, mimeType}`) and the
+/// Claude (`{type, source: {data, media_type}}`) image shapes.
+fn omit_image_data(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            if map.get("type").and_then(serde_json::Value::as_str) == Some("image") {
+                map.remove("data");
+                if let Some(serde_json::Value::Object(source)) = map.get_mut("source") {
+                    source.remove("data");
+                }
+                return;
+            }
+            map.values_mut().for_each(omit_image_data);
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(omit_image_data),
+        _ => {}
+    }
 }
 
 fn send_agent_event(event_tx: Option<&mpsc::UnboundedSender<AgentEvent>>, event: AgentEvent) {
@@ -1405,7 +1445,27 @@ fn to_json(value: impl Serialize) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{SessionReplayMetadata, session_metadata_from_meta};
+    use super::{SessionReplayMetadata, session_metadata_from_meta, update_to_json};
+
+    #[test]
+    fn tool_updates_omit_image_data() {
+        let update = serde_json::from_value(serde_json::json!({
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "t1",
+            "content": [{ "type": "content", "content": { "type": "image", "data": "AAAA", "mimeType": "image/png" } }],
+            "rawOutput": [{ "type": "image", "source": { "type": "base64", "data": "AAAA", "media_type": "image/png" } }],
+        }))
+        .unwrap();
+        let json = update_to_json(update);
+        assert_eq!(
+            json["content"][0]["content"],
+            serde_json::json!({ "type": "image", "mimeType": "image/png" })
+        );
+        assert_eq!(
+            json["rawOutput"][0],
+            serde_json::json!({ "type": "image", "source": { "type": "base64", "media_type": "image/png" } })
+        );
+    }
 
     #[test]
     fn reads_session_metadata_from_load_meta_and_replay() {
