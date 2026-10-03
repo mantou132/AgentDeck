@@ -85,6 +85,17 @@ export class AgentDeckSessionPageElement extends GemElement {
     this.#state({ deferTimeline: agentdeckStore.loadingSessionIds.includes(this.sessionId) });
   };
 
+  get #loading() {
+    const { deferTimeline, entered } = this.#state;
+    return agentdeckStore.loadingSessionIds.includes(this.sessionId) || (deferTimeline && !entered);
+  }
+
+  // 历史回放结束后整段消息一次性渲染，直接定位到底部，不做平滑追赶
+  @effect((i) => [i.#loading])
+  #jumpAfterHistory = () => {
+    if (!this.#loading) this.#following?.resume();
+  };
+
   @effect((i) => [i.sessionId, i.#messagesRef.value, i.#messagesContentRef.value])
   #followMessages = () => {
     this.#following = followBottom(this.#messagesRef.value, this.#messagesContentRef.value, {
@@ -240,8 +251,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       `;
     }
     const messages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
-    const { deferTimeline, entered } = this.#state;
-    const loading = agentdeckStore.loadingSessionIds.includes(session.sessionId) || (deferTimeline && !entered);
+    const loading = this.#loading;
     const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
     const pending = agentdeckStore.pendingSessionIds.includes(session.sessionId);
     const error =

@@ -1,4 +1,4 @@
-import { createTwoFilesPatch, FILE_HEADERS_ONLY } from 'diff';
+import { structuredPatch } from 'diff';
 
 export const diffColorScheme = globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
 
@@ -20,23 +20,13 @@ const isToolCallDiff = (value: unknown): value is ToolCallDiff => {
   );
 };
 
-const unifiedDiff = ({ path, oldText, newText }: ToolCallDiff) => {
-  const name = path || 'file';
-  return [
-    `diff --git ${name} ${name}`,
-    createTwoFilesPatch(
-      oldText == null ? '/dev/null' : name,
-      newText == null ? '/dev/null' : name,
-      oldText ?? '',
-      newText ?? '',
-      undefined,
-      undefined,
-      { context: 3, headerOptions: FILE_HEADERS_ONLY },
-    ),
-  ].join('\n');
-};
+// Tool diffs only carry snippets, so hunk headers and line numbers would be misleading; keep +/- lines only.
+const snippetDiff = ({ oldText, newText }: ToolCallDiff) =>
+  structuredPatch('', '', oldText ?? '', newText ?? '', undefined, undefined, { context: 3 })
+    .hunks.map(({ lines }) => lines.filter((line) => !line.startsWith('\\')).join('\n'))
+    .join('\n…\n');
 
 export const toolCallDiffs = (content: unknown) => {
   if (!Array.isArray(content)) return [];
-  return content.filter(isToolCallDiff).map((diff) => ({ path: diff.path || 'file', text: unifiedDiff(diff) }));
+  return content.filter(isToolCallDiff).map((diff) => ({ path: diff.path || 'file', text: snippetDiff(diff) }));
 };

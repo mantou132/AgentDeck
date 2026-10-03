@@ -2,7 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
-import { diffColorScheme, toolCallDiffs } from '../lib/diff';
+import { toolCallDiffs } from '../lib/diff';
 import { followBottom } from '../lib/follow-bottom';
 import { markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { hasActiveStream } from '../lib/stream-text';
@@ -64,14 +64,6 @@ const style = css`
     gap: 0.75rem;
     overflow-x: auto;
   }
-  gem-bind-diff2html {
-    position: relative;
-    box-sizing: border-box;
-    display: block;
-    width: 100%;
-    overflow-x: auto;
-    border-radius: ${agentDeckTheme.normalRound};
-  }
   pre {
     margin: 0;
     color: ${agentDeckTheme.textColor};
@@ -81,10 +73,13 @@ const style = css`
     overflow-wrap: break-word;
     white-space: pre-wrap;
   }
-  .code-block {
-    overflow-x: auto;
+  .code-block, .command-text {
+    border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.lightBackgroundColor};
+  }
+  .code-block {
+    overflow-x: auto;
   }
   .command-text {
     margin: 0;
@@ -95,8 +90,6 @@ const style = css`
     line-height: 1.625;
     overflow-wrap: break-word;
     white-space: pre-wrap;
-    border-radius: ${agentDeckTheme.normalRound};
-    background: ${agentDeckTheme.lightBackgroundColor};
   }
 `;
 
@@ -193,13 +186,7 @@ export class DeckProcessStepElement extends GemElement {
           <p class="section-label">${i18n.get('timeline.output')}</p>
           <div v-if=${diffs.length} class="diffs">
             ${diffs.map(
-              ({ text }) => html`
-                <gem-bind-diff2html
-                  .colorScheme=${diffColorScheme}
-                  no-header
-                  compact-line-numbers
-                >${text}</gem-bind-diff2html>
-              `,
+              ({ text }) => html`<tap-code-block codelang="diff" class="code-block">${text}</tap-code-block>`,
             )}
           </div>
           <deck-stream-markdown

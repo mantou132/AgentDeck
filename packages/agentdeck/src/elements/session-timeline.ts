@@ -87,18 +87,21 @@ export class DeckSessionTimelineElement extends GemElement {
     if (message.role === 'user') {
       return html`
         <div class="mt-8 mb-4 flex justify-end first:mt-0">
-          <div class="max-w-[min(86%,560px)]">
-            <div class="overflow-hidden rounded-[19px_19px_5px_19px] bg-primary-soft px-4 py-3 text-base leading-[1.6] text-highlight">
-              <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
-                ${attachments.map(
-                  (attachment) => html`
-                    <deck-attachment
-                      .attachment=${attachment}
-                      @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}
-                    ></deck-attachment>
-                  `,
-                )}
-              </div>
+          <div class="flex max-w-[min(86%,560px)] flex-col items-end">
+            <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
+              ${attachments.map(
+                (attachment) => html`
+                  <deck-attachment
+                    .attachment=${attachment}
+                    @preview=${(event: CustomEvent<Attachment>) => this.preview(event.detail)}
+                  ></deck-attachment>
+                `,
+              )}
+            </div>
+            <div
+              v-if=${!!markdown.trim()}
+              class="max-w-full overflow-hidden rounded-[19px_19px_5px_19px] bg-primary-soft px-4 py-3 text-base leading-[1.6] text-highlight"
+            >
               <deck-foldable
                 size="small"
                 cwd=${this.cwd}
