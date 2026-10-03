@@ -10,7 +10,6 @@ use tokio::sync::mpsc;
 
 use crate::{
     acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
-    logger,
     peer::{CallCtx, Peer},
     render_skills::ClientCapabilities,
     screen_capture,
@@ -420,11 +419,11 @@ impl AgentService {
                                 .and_then(|v| v.as_str())
                                 .map(str::to_string),
                             Ok(Err(err)) => {
-                                logger::log(&format!("Permission request declined: {err}"));
+                                tracing::debug!("Permission request declined: {err}");
                                 None
                             }
                             Err(_) => {
-                                logger::log("Permission request timed out");
+                                tracing::debug!("Permission request timed out");
                                 None
                             }
                         }

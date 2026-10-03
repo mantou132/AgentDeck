@@ -1,38 +1,30 @@
-use std::{fs::OpenOptions, io::Write, path::PathBuf};
-
-use chrono::Local;
+use anyhow::Result;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::{EnvFilter, fmt::time::ChronoLocal};
 
 use crate::app_data::{self, AppPaths};
 
-fn log_path() -> anyhow::Result<PathBuf> {
-    let paths = AppPaths::discover()?;
-    app_data::ensure_dir(&paths.logs_dir())?;
-    Ok(paths.log_file())
-}
+/// Daily log files kept in `logs/`; older ones are deleted on rotation.
+const MAX_LOG_FILES: usize = 7;
 
-fn write(level: &str, msg: &str) {
-    let Ok(path) = log_path() else {
-        return;
-    };
-    let Ok(mut file) = OpenOptions::new().append(true).create(true).open(path) else {
-        return;
-    };
-    let ts = Local::now().format("%Y-%m-%d %H:%M:%S");
-    let _ = writeln!(file, "{ts} [{level}] {msg}");
-}
-
-/// Info level — always written (important events).
-pub fn info(msg: &str) {
-    write("INFO", msg);
-}
-
-/// Debug level — only written in debug builds, stripped in release.
-#[cfg(debug_assertions)]
-pub fn log(msg: &str) {
-    write("DEBUG", msg);
-}
-
-#[cfg(not(debug_assertions))]
-pub fn log(msg: &str) {
-    let _ = msg;
+/// Writes daemon and dependency `tracing` events to daily rolling files.
+/// The level defaults to `info` and can be overridden with `RUST_LOG`.
+pub fn init(paths: &AppPaths) -> Result<()> {
+    let dir = paths.logs_dir();
+    app_data::ensure_dir(&dir)?;
+    let appender = RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .filename_prefix("agentdeckd")
+        .filename_suffix("log")
+        .max_log_files(MAX_LOG_FILES)
+        .build(dir)?;
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S".into()))
+        .with_ansi(false)
+        .with_writer(appender)
+        .init();
+    Ok(())
 }

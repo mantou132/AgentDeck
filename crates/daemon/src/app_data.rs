@@ -47,10 +47,6 @@ impl AppPaths {
         self.root.join("logs")
     }
 
-    pub fn log_file(&self) -> PathBuf {
-        self.logs_dir().join("agentdeckd.log")
-    }
-
     /// Generated render skills mounted as ACP additional directories.
     pub fn skills_dir(&self) -> PathBuf {
         self.root.join("skills")
@@ -154,7 +150,7 @@ mod tests {
         ];
         let removed = [
             "remote_peers_v1.json",
-            "logs/agentdeckd.log",
+            "logs/agentdeckd.2026-01-01.log",
             "agents/codex/install/partial/archive.zip",
         ];
         for file in preserved.iter().chain(removed.iter()) {

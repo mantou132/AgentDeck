@@ -18,7 +18,6 @@ use serde_json::{Value, json};
 use crate::{
     agent_rpc::{AgentService, PeerCapabilities},
     app_data::{self, AppPaths},
-    logger,
     peer::Peer,
     push,
     relay_codec::{Frame, RelayCodec},
@@ -163,9 +162,7 @@ impl RemotePeerManager {
                 ephemeral,
             };
             if outbound_tx.send(outbound).is_err() {
-                logger::info(&format!(
-                    "Relay client stopped; peer {peer_id} message dropped"
-                ));
+                tracing::info!("Relay client stopped; peer {peer_id} message dropped");
             }
         });
         let capabilities = PeerCapabilities::default();
@@ -325,7 +322,7 @@ impl ClientHandler for Handler {
         let (sender, message) = match self.codec.decode(payload) {
             Ok(decoded) => decoded,
             Err(error) => {
-                logger::info(&format!("Rejected encrypted relay message: {error:#}"));
+                tracing::warn!("Rejected encrypted relay message: {error:#}");
                 return;
             }
         };
@@ -340,7 +337,7 @@ impl ClientHandler for Handler {
                 })
             };
             if !attached {
-                logger::info("Rejected encrypted RPC with mismatched device identity");
+                tracing::warn!("Rejected encrypted RPC with mismatched device identity");
                 return;
             }
         }
@@ -351,7 +348,7 @@ impl ClientHandler for Handler {
     }
 
     fn on_connected(&self) {
-        logger::info("Connected to relay WebSocket");
+        tracing::info!("Connected to relay WebSocket");
         let _ = self.manager.outbound_tx.send(Outbound {
             message: json!({
                 "method": "host_reconnected",
@@ -369,7 +366,7 @@ impl ClientHandler for Handler {
     }
 
     fn on_preempted(&self) {
-        logger::info("Relay connection preempted: another host connection opened");
+        tracing::info!("Relay connection preempted: another host connection opened");
     }
 }
 
@@ -422,7 +419,7 @@ pub fn start(
                 Err(error) => Err(error),
             };
             if let Err(error) = sent {
-                logger::info(&format!("Failed to send relay message: {error:#}"));
+                tracing::warn!("Failed to send relay message: {error:#}");
             }
         }
     });

@@ -37,6 +37,9 @@ keepawake = "0.6.1"
 qr2term = "0.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 rmcp = { version = "3", default-features = false, features = ["client", "transport-streamable-http-client-reqwest"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "chrono", "std"] }
 
 [target.'cfg(windows)'.dependencies]
 planif = "1.0.0"

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_data::{self, AppPaths},
-    logger, render_skills,
+    render_skills,
 };
 
 pub(super) const REGISTRY_JSON: &str = include_str!("registry.json");
@@ -159,11 +159,11 @@ pub(super) fn refresh_registry() {
                     fs::write(paths.registry_file(), body)
                         .context("failed to save the ACP registry")
                 }) {
-                    logger::info(&format!("{err:#}"));
+                    tracing::warn!("{err:#}");
                 }
                 *REGISTRY.lock().expect("registry lock poisoned") = Some(Arc::new(registry));
             }
-            Err(err) => logger::info(&format!("Failed to fetch the ACP registry: {err:#}")),
+            Err(err) => tracing::warn!("Failed to fetch the ACP registry: {err:#}"),
         }
         REGISTRY_REFRESHING.store(false, Ordering::Release);
     });

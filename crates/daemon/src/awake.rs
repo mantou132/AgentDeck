@@ -108,7 +108,7 @@ impl Monitor {
                     }
                     if error != previous_error {
                         if let Some(error) = &error {
-                            crate::logger::log(&format!("Keep awake: {error}"));
+                            tracing::warn!("Keep awake: {error}");
                         }
                         previous_error = error.clone();
                     }
@@ -124,7 +124,7 @@ impl Monitor {
                         paths.awake_status_file(),
                         serde_json::to_vec(&status).unwrap(),
                     ) {
-                        crate::logger::log(&format!("Cannot write keep-awake status: {error}"));
+                        tracing::debug!("Cannot write keep-awake status: {error}");
                     }
                     if !matches!(
                         rx.recv_timeout(Duration::from_secs(1)),

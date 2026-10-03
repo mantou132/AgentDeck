@@ -12,7 +12,7 @@ use std::{
 use anyhow::Result;
 use serde::Deserialize;
 
-use crate::{app_data::AppPaths, logger};
+use crate::app_data::AppPaths;
 
 /// Rendering capabilities a client declares in `peer_attach`.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -69,7 +69,7 @@ fn skills_root() -> Option<&'static PathBuf> {
         match root.and_then(|root| write_skills(&root).map(|()| root)) {
             Ok(root) => Some(root),
             Err(err) => {
-                logger::info(&format!("Failed to write render skills: {err:#}"));
+                tracing::warn!("Failed to write render skills: {err:#}");
                 None
             }
         }

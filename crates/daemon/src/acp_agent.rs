@@ -29,7 +29,6 @@ use tokio::sync::{Mutex, mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    logger,
     peer::BoxFuture,
     render_skills::{self, ClientCapabilities},
 };
@@ -178,7 +177,7 @@ impl AcpRuntime {
                 .err()
                 .map(|err| err.to_string())
                 .unwrap_or_else(|| "ACP agent connection stopped".to_string());
-            logger::info(&error);
+            tracing::warn!("{error}");
             runtime.connection_stopped(generation, error).await;
         });
     }
@@ -191,11 +190,7 @@ impl AcpRuntime {
         })
         .await
         .context("ACP runtime preparation task failed")??;
-        logger::info(&format!(
-            "Starting {} ACP agent: {}",
-            self.agent,
-            command.join(" ")
-        ));
+        tracing::info!("Starting {} ACP agent: {}", self.agent, command.join(" "));
         // `from_args` treats leading `NAME=value` args as env overrides for the
         // spawned subprocess.
         let acp_agent =
@@ -290,10 +285,7 @@ impl AcpRuntime {
                         response.protocol_version
                     )));
                 }
-                logger::info(&format!(
-                    "ACP agent capabilities: {:?}",
-                    response.agent_capabilities
-                ));
+                tracing::info!("ACP agent capabilities: {:?}", response.agent_capabilities);
                 let agent_connection = AgentConnection {
                     connection: connection.clone(),
                     capabilities: Arc::new(response.agent_capabilities),
@@ -696,7 +688,7 @@ impl AgentSessionManager {
             )
             .await
             {
-                logger::info(&format!("ACP session actor stopped: {err}"));
+                tracing::info!("ACP session actor stopped: {err}");
             }
         });
 
@@ -1139,7 +1131,7 @@ fn cancel_prompt(session: &ActiveSession<'_, Agent>, cancel_flag: &watch::Sender
     cancel_flag.send_replace(true);
     let notification = CancelNotification::new(session.session_id().clone());
     if let Err(err) = session.connection().send_notification(notification) {
-        logger::info(&format!("Failed to cancel ACP session: {err}"));
+        tracing::warn!("Failed to cancel ACP session: {err}");
     }
 }
 
@@ -1158,8 +1150,8 @@ async fn close_session_gracefully(session: &ActiveSession<'_, Agent>) {
     .await
     {
         Ok(Ok(_)) => {}
-        Ok(Err(err)) => logger::info(&format!("Failed to close ACP session gracefully: {err}")),
-        Err(_) => logger::info("Timed out closing ACP session; releasing local session state"),
+        Ok(Err(err)) => tracing::warn!("Failed to close ACP session gracefully: {err}"),
+        Err(_) => tracing::warn!("Timed out closing ACP session; releasing local session state"),
     }
 }
 

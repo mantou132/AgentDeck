@@ -9,8 +9,6 @@ use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
-use crate::logger;
-
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Event emitter passed to request handlers for streaming intermediate frames
@@ -201,10 +199,10 @@ impl Peer {
                 if let Some(handler) = handler {
                     handler(params);
                 } else {
-                    logger::log(&format!("Unhandled notification: {method}"));
+                    tracing::debug!("Unhandled notification: {method}");
                 }
             }
-            (None, None) => logger::log(&format!("Message without id or method: {:?}", msg)),
+            (None, None) => tracing::debug!("Message without id or method: {:?}", msg),
         }
     }
 
@@ -248,13 +246,13 @@ impl Peer {
                     on_event(event.clone());
                 }
             } else {
-                logger::log(&format!("Event for unknown request: {:?}", msg));
+                tracing::debug!("Event for unknown request: {:?}", msg);
             }
             return;
         }
 
         let Some(entry) = pending.remove(&id) else {
-            logger::log(&format!("No pending request for response: {:?}", msg));
+            tracing::debug!("No pending request for response: {:?}", msg);
             return;
         };
         let result = if let Some(error) = msg.get("error").and_then(|v| v.as_str()) {

@@ -14,7 +14,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::catalog::{AgentCandidate, AgentLaunch, RegistryBinaryTarget, managed_binary_agent};
-use crate::{app_data, logger};
+use crate::app_data;
 
 static AGENT_INSTALL_LOCK: StdMutex<()> = StdMutex::new(());
 
@@ -269,7 +269,7 @@ fn install_registry_binary(
         .expect("agent install lock poisoned");
 
     if let Some(program) = cached_managed_binary(runtime, version) {
-        logger::info(&format!("Reusing cached managed {registry_id} binary"));
+        tracing::info!("Reusing cached managed {registry_id} binary");
         return Ok(program);
     }
 
@@ -322,10 +322,10 @@ fn install_registry_binary(
             .sync_all()
             .context("failed to flush the agent archive to disk")?;
 
-        logger::info(&format!(
+        tracing::info!(
             "Extracting managed {registry_id} binary to {}",
             unpack_dir.display()
-        ));
+        );
         extract_agent_archive(&downloaded_archive, &binary.archive, &unpack_dir)?;
 
         let source_executable = safe_join(&unpack_dir, &binary.cmd)?;
@@ -412,11 +412,11 @@ fn prepare_native_command(
     binary: &RegistryBinaryTarget,
 ) -> Result<Vec<String>> {
     let program = if let Some(executable) = user_cli {
-        logger::info(&format!(
+        tracing::info!(
             "Using user-installed {} CLI: {}",
             candidate.name,
             executable.display()
-        ));
+        );
         PreparedProgram {
             executable,
             args: binary.args.clone(),
@@ -424,11 +424,11 @@ fn prepare_native_command(
     } else {
         let owner = managed_binary_agent(&candidate.id);
         let runtime = app_data::AppPaths::discover()?.agent(owner);
-        logger::info(&format!(
+        tracing::info!(
             "Using managed {} CLI from {}",
             candidate.name,
             runtime.root().display()
-        ));
+        );
         install_registry_binary(&runtime, owner, version, binary)?
     };
 

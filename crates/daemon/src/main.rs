@@ -186,7 +186,7 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
     println!();
     let uri = pairing_uri(config.relay_id(), config.relay_url());
     if let Err(error) = qr2term::print_qr(&uri) {
-        crate::logger::log(&format!("Cannot print QR code: {error}"));
+        tracing::debug!("Cannot print QR code: {error}");
         ui::kv("URI", uri);
     }
     println!();
@@ -197,11 +197,9 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
     // Ensure runtime singleton
     let _instance_lock =
         daemon::InstanceLock::acquire_at(&paths.lock_file()).context("cannot start daemon")?;
+    logger::init(paths).context("cannot initialize logging")?;
 
-    logger::info(&format!(
-        "Starting AgentDeck daemon v{}",
-        env!("CARGO_PKG_VERSION")
-    ));
+    tracing::info!("Starting AgentDeck daemon v{}", env!("CARGO_PKG_VERSION"));
 
     let config = DaemonConfig::load_or_init(paths, options)?;
     let _awake_monitor = awake::Monitor::start(paths)?;
@@ -209,7 +207,7 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
 
     let service = Arc::new(AgentService::new());
 
-    logger::info("Connecting to Relay");
+    tracing::info!("Connecting to Relay");
 
     let _remote_manager = relay_client::start(config.relay_url(), relay_id, &service)
         .context("failed to start Relay remote peer manager")?;
@@ -218,7 +216,7 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
 
     tokio::signal::ctrl_c().await?;
     println!("\n{}", ui::dim("Shutting down AgentDeck daemon..."));
-    logger::info("AgentDeck daemon stopped");
+    tracing::info!("AgentDeck daemon stopped");
 
     Ok(())
 }

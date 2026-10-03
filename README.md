@@ -71,7 +71,7 @@ Both settings are saved for future starts. Use `restart` to change settings whil
 - **Cannot connect:** check `agentdeckd status`, confirm the client uses the same Pairing ID and relay, then try `agentdeckd restart`. Ensure your network permits WebSocket connections to the relay.
 - **Still stuck:** run `agentdeckd reset` and use **Reset App** in the client's Settings to clear local connection state.
 - **Connection preempted:** close duplicate clients sharing the same device identity.
-- **Connected, but an agent fails:** check that its CLI works locally and inspect `agentdeckd.log` under the data directory below. Save any useful logs before running `reset`.
+- **Connected, but an agent fails:** check that its CLI works locally and inspect the daemon logs under the data directory below. Save any useful logs before running `reset`.
 
 | OS | Daemon data directory |
 | --- | --- |
@@ -79,7 +79,7 @@ Both settings are saved for future starts. Use `restart` to change settings whil
 | Linux | `${XDG_DATA_HOME:-~/.local/share}/agentdeck/` |
 | Windows | `%LOCALAPPDATA%\agentdeck\` |
 
-Logs are in `logs/agentdeckd.log`.
+Logs are in `logs/agentdeckd.YYYY-MM-DD.log`, one file per day; only the last 7 days are kept. Set `RUST_LOG=debug` for more detail.
 
 ## Enterprise
 
