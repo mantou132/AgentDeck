@@ -18,6 +18,7 @@ use std::{
     env,
     path::PathBuf,
     process::{Command, Output},
+    time::Duration,
 };
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -276,31 +277,59 @@ fn cutout_paths(spec: &str, width: f64, height: f64, density: f64, rotation: u32
         .collect()
 }
 
-/// A tab's PNG and its title / URL through browser4agent's local MCP service,
-/// one short session per frame.
-async fn capture_browser(tab_id: &str) -> Result<(Vec<u8>, Value), String> {
-    let tab_id: i64 = tab_id
-        .parse()
-        .map_err(|_| format!("Invalid browser tab id: {tab_id}"))?;
-    let client = ClientConfig::default()
+async fn connect_browser4agent() -> Result<RunningService<RoleClient, ClientConfig>, String> {
+    ClientConfig::default()
         .serve(StreamableHttpClientTransport::from_uri(
             BROWSER4AGENT_MCP_URL,
         ))
         .await
         .map_err(|err| {
             format!("browser4agent is not running (install its browser extension): {err}")
-        })?;
+        })
+}
+
+async fn find_tab(
+    client: &RunningService<RoleClient, ClientConfig>,
+    tab_id: i64,
+) -> Result<Option<Value>, String> {
+    let tabs = call_tool(client, "list_tabs", json!({})).await?;
+    Ok(tool_text(&tabs)
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        .and_then(|tabs| {
+            tabs.get("tabs")?
+                .as_array()?
+                .iter()
+                .find(|tab| tab.get("id").and_then(Value::as_i64) == Some(tab_id))
+                .cloned()
+        }))
+}
+
+/// Whether browser4agent on this machine drives the browser holding this tab.
+/// Tab ids are per browser, so the URL must match too.
+pub async fn browser_has_tab(tab_id: i64, url: &str) -> bool {
+    let check = async {
+        let client = connect_browser4agent().await.ok()?;
+        let tab = find_tab(&client, tab_id).await.ok().flatten();
+        let _ = client.cancel().await;
+        tab
+    };
+    tokio::time::timeout(Duration::from_secs(1), check)
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|tab| tab.get("url").and_then(Value::as_str) == Some(url))
+}
+
+/// A tab's PNG and its title / URL through browser4agent's local MCP service,
+/// one short session per frame.
+async fn capture_browser(tab_id: &str) -> Result<(Vec<u8>, Value), String> {
+    let tab_id: i64 = tab_id
+        .parse()
+        .map_err(|_| format!("Invalid browser tab id: {tab_id}"))?;
+    let client = connect_browser4agent().await?;
     let result = async {
-        let tabs = call_tool(&client, "list_tabs", json!({})).await?;
-        let tab = tool_text(&tabs)
-            .and_then(|text| serde_json::from_str::<Value>(text).ok())
-            .and_then(|tabs| {
-                tabs.get("tabs")?
-                    .as_array()?
-                    .iter()
-                    .find(|tab| tab.get("id").and_then(Value::as_i64) == Some(tab_id))
-                    .cloned()
-            })
+        let tab = find_tab(&client, tab_id)
+            .await?
             .ok_or_else(|| format!("Browser tab {tab_id} is closed"))?;
         let shot = call_tool(&client, "screenshot_tab", json!({ "tab_id": tab_id })).await?;
         let data = shot

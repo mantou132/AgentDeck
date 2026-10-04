@@ -229,7 +229,7 @@ impl AgentService {
             async move {
                 let agent = required_agent(&params, "agent_session_create")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities)?;
+                let context = session_context(&params, &capabilities).await?;
                 let timeout_secs = message_timeout_secs(&params);
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
@@ -258,7 +258,7 @@ impl AgentService {
             async move {
                 let (agent, session_id) = required_agent_session(&params, "agent_session_load")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities)?;
+                let context = session_context(&params, &capabilities).await?;
                 let timeout_secs = message_timeout_secs(&params);
 
                 // The actor drains the load-time history replay into this channel
@@ -1123,17 +1123,32 @@ fn message_cwd(params: &Value) -> Option<PathBuf> {
     non_empty_str(params, "cwd").map(PathBuf::from)
 }
 
-fn session_context(
+async fn session_context(
     params: &Value,
     capabilities: &PeerCapabilities,
 ) -> Result<SessionContext, String> {
     Ok(SessionContext {
-        system_prompt: message_panel_system_prompt(params)?,
+        system_prompt: message_panel_system_prompt(params).await?,
         client_capabilities: capabilities.lock().expect("lock poisoned").clone(),
     })
 }
 
-fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String> {
+const REMOTE_APP_SYSTEM_PROMPT: &str = "You are running inside AgentDeck's mobile app. The user is interacting remotely \
+     from a mobile device; the host environment is running on their remote machine. \
+     Reference files on this machine with Markdown, not HTML: the client reads them \
+     directly. A link like `[app.ts](src/app.ts:42)` opens the file (at a line via `:42` \
+     or `#L42`) or directory; an image like `![Screenshot](/abs/path/shot.png)` shows it \
+     inline, so never inline images as base64. Paths are absolute or relative to the \
+     session's working directory.\n\nWhen a user message ends with \
+     `<agentdeck-voice-chat/>`, the user is talking by voice through earphones and \
+     cannot look at the screen. Do the task as usual, then end your final reply with an \
+     HTML comment holding a short spoken summary in the user's language: \
+     `<!-- agentdeck-speech` on its own line, one to three plain sentences on what you \
+     did, the result and anything the user must decide, then `-->`. It is read aloud and \
+     hidden from the transcript, so write it for listening: no Markdown, code, paths, URLs \
+     or lists, and never `-->` inside it.";
+
+async fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String> {
     let Some(context) = params.get("panelContext") else {
         return Ok(None);
     };
@@ -1142,47 +1157,48 @@ fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String>
         .and_then(Value::as_str)
         .ok_or_else(|| "panelContext.surface must be a string".to_string())?;
     match surface {
-        "devtools" => {
-            let tab_id = context
-                .get("tabId")
-                .and_then(Value::as_u64)
-                .ok_or_else(|| "DevTools panelContext requires a numeric tabId".to_string())?;
-            Ok(Some(format!(
-                "You are running inside AgentDeck's Agent panel in browser DevTools. This \
-                 DevTools instance is attached to browser tab ID {tab_id}. Treat that inspected \
-                 tab as the primary target for browser-related requests. For browser tools that \
-                 accept a tabId, use {tab_id}; do not substitute the globally active tab unless \
-                 the user explicitly asks you to. Read the inspected tab before acting when page \
-                 context is needed, and prefer a suitable page-provided tool returned by read_tab."
-            )))
-        }
-        "side_panel" => Ok(Some(
-            "You are running inside AgentDeck's browser sidebar Agent panel. Treat the \
-             currently active browser tab as the primary target for browser-related requests. The \
-             active tab may change during this session, so resolve it with read_active_tab at the \
-             start of each browser task and use the returned tabId for related actions. Prefer a \
-             suitable page-provided tool returned by read_active_tab."
-                .to_string(),
-        )),
-        "remote_app" => Ok(Some(
-            "You are running inside AgentDeck's mobile app. The user is interacting remotely \
-             from a mobile device; the host environment is running on their remote machine. \
-             Reference files on this machine with Markdown, not HTML: the client reads them \
-             directly. A link like `[app.ts](src/app.ts:42)` opens the file (at a line via `:42` \
-             or `#L42`) or directory; an image like `![Screenshot](/abs/path/shot.png)` shows it \
-             inline, so never inline images as base64. Paths are absolute or relative to the \
-             session's working directory.\n\nWhen a user message ends with \
-             `<agentdeck-voice-chat/>`, the user is talking by voice through earphones and \
-             cannot look at the screen. Do the task as usual, then end your final reply with an \
-             HTML comment holding a short spoken summary in the user's language: \
-             `<!-- agentdeck-speech` on its own line, one to three plain sentences on what you \
-             did, the result and anything the user must decide, then `-->`. It is read aloud and \
-             hidden from the transcript, so write it for listening: no Markdown, code, paths, URLs \
-             or lists, and never `-->` inside it."
-                .to_string(),
-        )),
-        _ => Err(format!("unknown panelContext.surface: {surface}")),
+        "remote_app" => return Ok(Some(REMOTE_APP_SYSTEM_PROMPT.to_string())),
+        "devtools" | "side_panel" => {}
+        _ => return Err(format!("unknown panelContext.surface: {surface}")),
     }
+    // Browser panels may run on another machine; their tab instructions only
+    // hold when this machine's browser4agent drives the panel's browser.
+    let tab_id = context.get("tabId").and_then(Value::as_i64);
+    let url = context.get("url").and_then(Value::as_str);
+    let prompt = match (tab_id, url) {
+        (Some(tab_id), Some(url)) if screen_capture::browser_has_tab(tab_id, url).await => {
+            let browser = browser_panel_system_prompt(surface, tab_id);
+            format!("{browser}\n\n{EXTENSION_SYSTEM_PROMPT}")
+        }
+        _ => EXTENSION_SYSTEM_PROMPT.to_string(),
+    };
+    Ok(Some(prompt))
+}
+
+const EXTENSION_SYSTEM_PROMPT: &str = "You are running inside AgentDeck's browser extension \
+     panel. The user may be on a different computer from this machine, so they cannot open \
+     files, local paths or `localhost` URLs from your reply; links open as web pages in their \
+     browser, and local images are not shown. When the user needs to see code, output or file \
+     contents, quote the relevant part in the reply instead of only pointing to a path. Replies \
+     render as Markdown, including code blocks, tables, Mermaid diagrams and LaTeX math.";
+
+fn browser_panel_system_prompt(surface: &str, tab_id: i64) -> String {
+    if surface == "devtools" {
+        return format!(
+            "You are running inside AgentDeck's Agent panel in browser DevTools. This \
+             DevTools instance is attached to browser tab ID {tab_id}. Treat that inspected \
+             tab as the primary target for browser-related requests. For browser tools that \
+             accept a tabId, use {tab_id}; do not substitute the globally active tab unless \
+             the user explicitly asks you to. Read the inspected tab before acting when page \
+             context is needed, and prefer a suitable page-provided tool returned by read_tab."
+        );
+    }
+    "You are running inside AgentDeck's browser sidebar Agent panel. Treat the currently \
+     active browser tab as the primary target for browser-related requests. The active tab may \
+     change during this session, so resolve it with read_active_tab at the start of each \
+     browser task and use the returned tabId for related actions. Prefer a suitable \
+     page-provided tool returned by read_active_tab."
+        .to_string()
 }
 
 fn message_timeout_secs(params: &Value) -> u64 {
@@ -1260,12 +1276,13 @@ mod tests {
     };
 
     use super::{
-        VOICE_CHAT_MARKER, browse_files, complete_directories, message_panel_system_prompt,
-        message_voice_chat, read_raw_file, read_remote_file, resolve_directory_path,
+        VOICE_CHAT_MARKER, browse_files, browser_panel_system_prompt, complete_directories,
+        message_panel_system_prompt, message_voice_chat, read_raw_file, read_remote_file,
+        resolve_directory_path,
     };
 
-    #[test]
-    fn voice_chat_prompts_carry_the_marker_the_app_system_prompt_explains() {
+    #[tokio::test]
+    async fn voice_chat_prompts_carry_the_marker_the_app_system_prompt_explains() {
         assert!(message_voice_chat(
             &serde_json::json!({ "voiceChat": true })
         ));
@@ -1273,30 +1290,27 @@ mod tests {
         let prompt = message_panel_system_prompt(
             &serde_json::json!({ "panelContext": { "surface": "remote_app" } }),
         )
+        .await
         .unwrap()
         .unwrap();
+        assert!(prompt.contains("mobile app"));
         assert!(prompt.contains(VOICE_CHAT_MARKER));
         assert!(prompt.contains("<!-- agentdeck-speech"));
     }
 
     #[test]
-    fn builds_panel_system_prompts() {
-        for (context, expected) in [
-            (
-                serde_json::json!({ "surface": "devtools", "tabId": 42 }),
-                "tab ID 42",
-            ),
-            (
-                serde_json::json!({ "surface": "side_panel" }),
-                "browser sidebar",
-            ),
-            (serde_json::json!({ "surface": "remote_app" }), "mobile app"),
-        ] {
-            let prompt =
-                message_panel_system_prompt(&serde_json::json!({ "panelContext": context }))
-                    .expect("valid panel context")
-                    .expect("system prompt");
-            assert!(prompt.contains(expected), "{expected}");
+    fn builds_browser_panel_system_prompts() {
+        assert!(browser_panel_system_prompt("devtools", 42).contains("tab ID 42"));
+        assert!(browser_panel_system_prompt("side_panel", 42).contains("browser sidebar"));
+    }
+
+    #[tokio::test]
+    async fn browser_panels_without_a_verified_tab_get_only_the_extension_prompt() {
+        for surface in ["devtools", "side_panel"] {
+            let params = serde_json::json!({ "panelContext": { "surface": surface } });
+            let prompt = message_panel_system_prompt(&params).await.unwrap().unwrap();
+            assert!(prompt.contains("browser extension panel"));
+            assert!(!prompt.contains("browser4agent") && !prompt.contains("tabId"));
         }
     }
 

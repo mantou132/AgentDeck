@@ -2,9 +2,15 @@ import { agentSessionKey, sessionTitleFromPrompt, upsertStoredSession } from '..
 import { t } from '../../shared/i18n.js';
 import { completeThought, DRAFT_SESSION_KEY, withAgentConfigOptions, withConfigValue } from './session-runtime.js';
 
-function getPanelContext() {
-  const tabId = globalThis.chrome?.devtools?.inspectedWindow?.tabId;
-  return Number.isInteger(tabId) ? { surface: 'devtools', tabId } : { surface: 'side_panel' };
+// The host only adds browser instructions when its browser4agent sees this tab, i.e. same browser.
+async function getPanelContext() {
+  const inspectedWindow = globalThis.chrome?.devtools?.inspectedWindow;
+  if (inspectedWindow) {
+    const url = await new Promise((resolve) => inspectedWindow.eval('location.href', resolve));
+    return { surface: 'devtools', tabId: inspectedWindow.tabId, url };
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return { surface: 'side_panel', tabId: tab?.id, url: tab?.url };
 }
 
 export function createSessionController({ state, runtime, turns, api }) {
@@ -41,7 +47,7 @@ export function createSessionController({ state, runtime, turns, api }) {
       const created = await api.createSession({
         agent: draft.agent,
         cwd: draft.cwd,
-        panelContext: getPanelContext(),
+        panelContext: await getPanelContext(),
       });
       createdTarget = { agent: draft.agent, sessionId: created.sessionId };
       const composerConfigOptions = runtime.getPane(sessionKey)?.configOptions ?? draftState.configOptions;
@@ -151,7 +157,7 @@ export function createSessionController({ state, runtime, turns, api }) {
         sessionId: selected.sessionId,
         cwd: selected.cwd,
         onEvent: (event) => runtime.applyEvent(sessionKey, event),
-        panelContext: getPanelContext(),
+        panelContext: await getPanelContext(),
       });
       if (!record.alive) return;
       runtime.finishThought(sessionKey);

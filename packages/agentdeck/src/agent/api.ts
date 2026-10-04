@@ -153,8 +153,7 @@ export type CreatedSession = {
 };
 
 export type PanelContext =
-  | { surface: 'devtools'; tabId: number }
-  | { surface: 'side_panel' }
+  | { surface: 'devtools' | 'side_panel'; tabId?: number; url?: string }
   | { surface: 'remote_app' };
 
 export const REMOTE_APP_PANEL_CONTEXT: PanelContext = { surface: 'remote_app' };
