@@ -3,6 +3,20 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { PermissionRequest } from '../agent/api';
 import { i18n } from '../i18n';
 
+const button =
+  'min-h-11 flex-auto cursor-pointer whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98]';
+const style = {
+  reject: `${button} border-border bg-bg-light text-describe`,
+  allowAlways: `${button} border-primary bg-bg-light text-primary`,
+  allow: `${button} border-primary bg-primary text-white`,
+};
+
+type Option = NonNullable<PermissionRequest['options']>[number];
+
+// Reject on the left, one-time allow (primary) on the right.
+const rank = ({ kind }: Option) => (kind?.startsWith('reject') ? 0 : kind === 'allow_always' ? 1 : 2);
+const styles = [style.reject, style.allowAlways, style.allow];
+
 @customElement('deck-permission-request')
 @adoptedStyle(blockContainer)
 export class DeckPermissionRequestElement extends GemElement {
@@ -13,40 +27,29 @@ export class DeckPermissionRequestElement extends GemElement {
   #render = () => {
     if (!this.request) return html``;
     const { toolCall = {}, options = [] } = this.request;
+    const sorted = [...options].sort((a, b) => rank(a) - rank(b));
     return html`
-      <section class="max-h-[45dvh] overflow-y-auto rounded-2xl border border-notice/70 bg-bg-light overscroll-y-contain">
-        <header class="px-4 pt-3.5 pb-3">
-          <h2 class="m-0 text-base font-semibold text-highlight">${i18n.get('permission.title')}</h2>
-          <p class="select-text mt-2 mb-0 break-words font-mono text-sm leading-relaxed text-text">${toolCall.title || i18n.get('permission.toolCall')}</p>
-        </header>
-        <details v-if=${toolCall.rawInput !== undefined} class="border-t border-border text-sm">
-          <summary class="cursor-pointer px-4 py-3 text-describe">${i18n.get('permission.viewParams')}</summary>
+      <section class="flex max-h-[45dvh] flex-col overflow-hidden rounded-2xl border border-notice/70 bg-bg-light">
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-3 pb-3">
+          <h2 class="m-0 text-sm font-semibold text-highlight">${i18n.get('permission.title')}</h2>
           <pre
-            class="select-text m-0 max-h-44 overflow-auto whitespace-pre-wrap break-words border-t border-border bg-bg px-4 py-3 font-mono text-sm leading-relaxed text-text"
-          >${JSON.stringify(toolCall.rawInput, null, 2)}</pre>
-        </details>
-        <footer class="flex flex-wrap justify-end gap-2 border-t border-border px-3 py-3">
-          <button
-            class="min-h-11 cursor-pointer rounded-xl border border-border bg-bg-light px-4 py-2 text-sm font-medium text-describe active:bg-bg-hover"
-            @click=${() => this.resolve(null)}
-          >
+            class="select-text mt-2 mb-0 whitespace-pre-wrap break-words rounded-lg bg-bg px-3 py-2 font-mono text-[13px] leading-relaxed text-text"
+          >${toolCall.title || i18n.get('permission.toolCall')}</pre>
+          <details v-if=${toolCall.rawInput !== undefined} class="mt-2 text-sm">
+            <summary class="cursor-pointer py-1 text-describe">${i18n.get('permission.viewParams')}</summary>
+            <pre
+              class="select-text mt-1 mb-0 whitespace-pre-wrap break-words rounded-lg bg-bg px-3 py-2 font-mono text-[13px] leading-relaxed text-text"
+            >${JSON.stringify(toolCall.rawInput, null, 2)}</pre>
+          </details>
+        </div>
+        <footer class="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2.5">
+          <button v-if=${!sorted.some((option) => rank(option) === 0)} class=${style.reject} @click=${() => this.resolve(null)}>
             ${i18n.get('permission.cancel')}
           </button>
-          ${options.map((option) => {
-            const reject = option.kind?.startsWith('reject');
-            return html`
-              <button
-                class=${classMap({
-                  'min-h-11 cursor-pointer rounded-xl border px-4 py-2 text-sm font-medium active:scale-[0.98]': true,
-                  'border-border bg-bg-light text-describe': reject,
-                  'border-primary bg-primary text-white': !reject,
-                })}
-                @click=${() => this.resolve(option.optionId)}
-              >
-                ${option.name}
-              </button>
-            `;
-          })}
+          ${sorted.map(
+            (option) =>
+              html`<button class=${styles[rank(option)]} @click=${() => this.resolve(option.optionId)}>${option.name}</button>`,
+          )}
         </footer>
       </section>
     `;
