@@ -15,6 +15,7 @@ import {
   type ProcessGroup,
 } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
+import { stripVoiceChatMarker } from '../session/voice-chat';
 import { icons } from '../styles/icons';
 
 @customElement('deck-session-timeline')
@@ -81,7 +82,9 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderTextMessage = (message: TextMessage) => {
-    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(message.text);
+    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(
+      message.role === 'user' ? stripVoiceChatMarker(message.text) : message.text,
+    );
     const attachments = [...(message.attachments ?? []), ...linkedAttachments];
 
     if (message.role === 'user') {

@@ -11,6 +11,7 @@
     "barcode-scanner:default",
     "selection-menu:default",
     "stt:default",
+    "tts:default",
     "vnidrop-share:default"
   ]
 }

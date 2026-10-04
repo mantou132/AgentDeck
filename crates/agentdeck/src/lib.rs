@@ -14,6 +14,8 @@ pub fn run() {
             _app.handle().plugin(tauri_plugin_selection_menu::init())?;
             #[cfg(mobile)]
             _app.handle().plugin(tauri_plugin_stt::init())?;
+            #[cfg(mobile)]
+            _app.handle().plugin(tauri_plugin_tts::init())?;
             Ok(())
         })
         .manage(preview::PreviewRequests::default())

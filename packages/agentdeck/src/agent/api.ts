@@ -384,10 +384,11 @@ export class AgentApi {
     onEvent: (event: SessionEvent) => void | Promise<void>,
     attachments: PromptAttachment[] = [],
     callId?: RpcId,
+    voiceChat?: boolean,
   ) =>
     this.#peer.call<{ answer?: string }>(
       'agent_prompt',
-      { agent, sessionId, prompt, attachments, stream: true },
+      { agent, sessionId, prompt, attachments, voiceChat, stream: true },
       (event) => onEvent(event as SessionEvent),
       undefined,
       callId,

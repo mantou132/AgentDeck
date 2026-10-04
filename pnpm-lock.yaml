@@ -106,6 +106,9 @@ importers:
       tauri-plugin-stt-api:
         specifier: ^0.2.2
         version: 0.2.2
+      tauri-plugin-tts-api:
+        specifier: ^0.2.1
+        version: 0.2.1
       tauri-plugin-webproxy-api:
         specifier: ^0.1.2
         version: 0.1.2
@@ -4406,6 +4409,9 @@ packages:
 
   tauri-plugin-stt-api@0.2.2:
     resolution: {integrity: sha512-wSrNLxQqrpUFAad0LggQqzf81vsf7xbDkXfmowghAlfwwtC8oH9zcyamDju88Bl9yvFwxEwvkeYOv9eRBFkwaQ==}
+
+  tauri-plugin-tts-api@0.2.1:
+    resolution: {integrity: sha512-iVTT+3fZbo7WotupbLGrpeHXzyh/z/KgCSN7pM9Wvc1cyxIOM/r+w7elAIUSg7fP1IjfJqOuwxuJOI84/Z8OVw==}
 
   tauri-plugin-webproxy-api@0.1.2:
     resolution: {integrity: sha512-9F80wPJtfofRJxg5B0Yvn+u5alph+4PAOfh5DkDkBHOA7iQN3fnercaB3DQsNMTb/siInbC8B16WzoBJzDm9YQ==}
@@ -9311,6 +9317,10 @@ snapshots:
       '@tauri-apps/api': 2.11.1
 
   tauri-plugin-stt-api@0.2.2:
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  tauri-plugin-tts-api@0.2.1:
     dependencies:
       '@tauri-apps/api': 2.11.1
 

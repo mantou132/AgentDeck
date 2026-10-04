@@ -469,7 +469,7 @@ const runPromptTurn = (
   });
   performTurn(
     session,
-    prompt.text,
+    prompt,
     {
       onEvent: (event) => applySessionEvent(session.sessionId, event),
       onAnswer: (answer) => {
@@ -501,7 +501,6 @@ const runPromptTurn = (
         setSessionFlag('pendingSessionIds', session.sessionId, false);
       },
     },
-    prompt.attachments,
     rpcId,
   );
 };
@@ -567,6 +566,7 @@ export const promotePendingSession = async (
   text: string,
   attachments: Attachment[] = [],
   onFailed?: () => void,
+  voiceChat?: boolean,
 ): Promise<DeckSession | null> => {
   if (agentdeckStore.connection !== 'connected') {
     setSessionError('pending-session', i18n.get('error.remoteNotConnectedCreate'));
@@ -575,7 +575,7 @@ export const promotePendingSession = async (
   }
   const selectedOptions = agentdeckStore.optionsBySession['pending-session'] ?? {};
   setPendingSessionCanceled(false);
-  const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
+  const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments, voiceChat };
   setMessages('pending-session', [userMessage]);
   setSessionFlag('pendingSessionIds', 'pending-session', true);
   setSessionError('pending-session', '');
@@ -672,6 +672,7 @@ export const sendPrompt = (
   prompt: string,
   attachments: Attachment[] = [],
   onFailed?: () => void,
+  voiceChat?: boolean,
 ) => {
   const text = prompt.trim();
   const session = getSession(sessionId);
@@ -687,7 +688,7 @@ export const sendPrompt = (
     return false;
   }
   const messages = completeThought(agentdeckStore.messagesBySession[sessionId] ?? []);
-  const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments };
+  const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments, voiceChat };
   setMessages(sessionId, [...messages, userMessage]);
   const turnStart = messages.length + 1;
   runPromptTurn(session, userMessage, turnStart, onFailed);

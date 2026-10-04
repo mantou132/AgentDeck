@@ -32,6 +32,8 @@ export type TextMessage = {
   role: 'user' | 'agent';
   text: string;
   attachments?: Attachment[];
+  /** Sent from voice chat: the agent is asked for a spoken summary. */
+  voiceChat?: boolean;
   streaming?: boolean;
   failed?: boolean;
 };

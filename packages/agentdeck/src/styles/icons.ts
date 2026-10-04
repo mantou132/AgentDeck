@@ -139,4 +139,5 @@ export const icons = extendIcons({
     'M12 2C10.8954 2 10 2.89543 10 4V12C10 13.1046 10.8954 14 12 14C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z',
     '<path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10"></path><line x1="12" y1="19" x2="12" y2="22"></line>',
   ), // audio/mic
+  audioLines: rune('M2 10V13M6 6V17M10 3V21M14 8V15M18 5V18M22 10V13'), // custom: audio lines
 });

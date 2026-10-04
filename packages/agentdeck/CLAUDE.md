@@ -9,7 +9,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/relay-codec.ts`（RPC 消息与 Relay 载荷互转：加密、帧大小限制、二进制回复）、`agent/encryption.ts`（`adk1_` 端到端加密原语）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
 - ACP 事件：`session/events.ts` 为 reducer，`session/turn.ts` 控制流式任务与权限决断。
 - 持久化：`lib/database.ts` 为 drafts 与 in-flight 共用的 IndexedDB Store API；新增库或 store 在 `DATABASES` 声明，已有名称不得改动。
-- 原生插件：推送 `agent/push.ts`（`tauri-plugin-fcm`）；语音 `lib/voice.ts`（`tauri-plugin-stt`，桌面端未注册，以 `voiceSupported` 判断）。
+- 原生插件：推送 `agent/push.ts`（`tauri-plugin-fcm`）；语音识别 `lib/speech-recognition.ts`（`tauri-plugin-stt`）与朗读 `lib/speech-synthesis.ts`（`tauri-plugin-tts`），均只在移动端注册，以 `speechSupported` 判断。
 
 ## 行为约束
 
@@ -17,6 +17,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - **会话配置**（`state/config-options.ts`）：所有 select 类型的 `configOptions`（mode / model / effort…）均可选，旧版 `modes` 作为 mode 一项。composer 只展示当前模型，点击打开带 Stack 的 Sheet（`elements/session-config.ts`）：根页为模型单选，其余配置点击后 push 单选页（均用 `tap-cell-group`，依赖 `patches/@mantou__tap-ui@*.patch`：group 可穿透样式、`label` 支持模板、无箭头行也触发 `onClick`；上游发版升级后删除 patch）。选择立即生效，远端失败时 toast 并回退。用户修改后按 agent 存整组选项到 `CONFIG_DEFAULTS_KEY`（未存过时以首个加载的会话为准），新会话直接沿用；create 后逐项应用，远端不支持的项或值跳过。settings 重置保留。
 - **进行中回合**：回合存入 in-flight，重启后恢复等待回复。Relay 会丢弃过期未 ack 的消息，所以每次连上 host 都调 `agent_prompts_running` 对账（`settleLostTurns`）：daemon 已不在运行的回合就地结束、标未读，并 close → load 历史；旧 daemon 无此接口时保持等待。
 - **下一句建议**：host 的 `agent_prompt_suggestion` 存入 `suggestionsBySession`（回合进行中到达的丢弃），新回合开始时清除。composer 输入为空时用它替换 placeholder，可直接发送，长按填入输入框继续编辑（tap-ui 的 `longPress` 指令，暂由 `patches/@mantou__tap-ui@*.patch` 提供，上游发版后删除该部分 patch；iOS 只在手势中弹键盘，所以松开时再聚焦）；只在内存中，不持久化。
+- **语音对话**（`elements/voice-chat.ts`）：composer 无内容可发（含下一句建议）时发送按钮变为入口，会话页打开 Sheet；按住录音、松开发送、移出按钮松开取消，回合进行中按下只播报提示。消息带 `voiceChat: true`，daemon 追加 `<agentdeck-voice-chat/>` 标记，`remote_app` 系统提示要求 agent 见到它时在回复末尾写 `<!-- agentdeck-speech … -->` 注释（其他客户端也不渲染）；时间线隐藏这两者（`session/voice-chat.ts`、`lib/markdown.ts`），回合结束后朗读该注释（不读系统提示的非 Claude agent、旧 daemon 或没有注释时，朗读去掉 Markdown 的回复开头）。没说话松开不发送也不提示。权限请求在 Sheet 内显示并朗读。Sheet 显示时经 duoyun-ui 的 `DuoyunWakeLockBaseElement` 保持亮屏，锁屏后不可用。
 - **daemon 版本**：host 在 `peer_attach` 返回 `version`（旧版没有，视为过旧），每次启动首次连上时与 `config.ts` 的 `MIN_DAEMON_VERSION` 比较，过旧则 Toast 提示升级。只在需要 App 与 daemon 一起升级时调高该常量。
 - **设置**：自定义 Relay URL 只能通过扫描配对二维码设置，UI 不展示；手动修改 Pairing ID 即恢复默认 Relay。
 - **草稿**（`composer/drafts.ts`）：仅 App 启用（composer 传入 draftKey），扩展不启用。新会话按 agent + 工作目录恢复，正式会话按 sessionId 恢复，跨 Relay 配置保留。提交交给 in-flight 持久化后清除；失败时回填且不覆盖新输入；删除会话和 settings 重置时清理。

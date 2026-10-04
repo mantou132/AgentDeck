@@ -58,3 +58,9 @@ test('closed agentdeck-chart blocks render as charts with the JSON in an escaped
   const streaming = code.call({}, { text, lang: 'agentdeck-chart', raw: `\`\`\`agentdeck-chart\n${text}` });
   assert.doesNotMatch(streaming, /<deck-chart/);
 });
+
+test('agentdeck-speech comments are hidden, even while unclosed', () => {
+  const { html } = exports.markdownExtensions()[0].renderer;
+  assert.equal(html.call({}, { text: '<!-- agentdeck-speech\nTests pass now.\n-->' }), '');
+  assert.equal(html.call({}, { text: '<!-- agentdeck-speech\nTests pass' }), '');
+});

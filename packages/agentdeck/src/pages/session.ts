@@ -41,7 +41,7 @@ const style = css`
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
 
-  #state = createState({ followMessages: true, deferTimeline: false, entered: false });
+  #state = createState({ followMessages: true, deferTimeline: false, entered: false, voiceChat: false });
   #messagesRef = createRef<HTMLElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
@@ -130,7 +130,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       return false;
     }
 
-    const { text, attachments } = input;
+    const { text, attachments, voiceChat } = input;
     const originalDraftKey = draftKey(session);
     let targetSession = session;
     let accepted = false;
@@ -145,14 +145,14 @@ export class AgentDeckSessionPageElement extends GemElement {
 
     try {
       if (session.pendingCreation) {
-        const liveSession = await promotePendingSession(session, text, attachments, onFailed);
+        const liveSession = await promotePendingSession(session, text, attachments, onFailed, voiceChat);
         if (liveSession) {
           targetSession = liveSession;
           this.sessionId = liveSession.sessionId;
           accepted = true;
         }
       } else {
-        accepted = sendPrompt(session.sessionId, text, attachments, onFailed);
+        accepted = sendPrompt(session.sessionId, text, attachments, onFailed, voiceChat);
       }
 
       // Once submission is accepted and in-flight persistence takes over input, the original draft can be deleted.
@@ -367,9 +367,24 @@ export class AgentDeckSessionPageElement extends GemElement {
             @cancel=${() => cancelTurn(this.sessionId)}
             @preview=${this.#previewAttachment}
             @draft-change=${() => clearSessionError(this.sessionId)}
+            @voice-chat=${() => this.#state({ voiceChat: true })}
           ></deck-composer>
         </footer>
       </tap-page>
+      <deck-sheet
+        ?open=${this.#state.voiceChat}
+        .snap=${[0.7]}
+        .heading=${i18n.get('voiceChat.heading')}
+        @close=${() => this.#state({ voiceChat: false })}
+        .content=${html`
+          <deck-voice-chat
+            .sessionId=${this.sessionId}
+            .submit=${this.#send}
+            ?ready=${connected && loaded}
+            ?active=${this.#state.voiceChat}
+          ></deck-voice-chat>
+        `}
+      ></deck-sheet>
     `;
   };
 }

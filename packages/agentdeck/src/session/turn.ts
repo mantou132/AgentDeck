@@ -2,7 +2,7 @@ import type { PermissionRequest, SessionEvent } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { hapticWarning } from '../lib/haptics';
-import type { Attachment, DeckSession } from './types';
+import type { DeckSession, TextMessage } from './types';
 
 type TurnHandlers = {
   onEvent: (event: SessionEvent) => void | Promise<void>;
@@ -46,9 +46,8 @@ export const isPendingSessionCanceled = () => pendingSessionCanceled;
 
 export const performTurn = async (
   session: DeckSession,
-  text: string,
+  { text, attachments = [], voiceChat }: Pick<TextMessage, 'text' | 'attachments' | 'voiceChat'>,
   handlers: TurnHandlers,
-  attachments: Attachment[] = [],
   callId?: string,
 ) => {
   let completed = false;
@@ -70,6 +69,7 @@ export const performTurn = async (
         return { type: 'text', text: `<attachment name="${name}">\n${attachment.text}\n</attachment>` };
       }),
       callId,
+      voiceChat,
     );
     if (result.answer) {
       handlers.onAnswer(result.answer);

@@ -33,3 +33,4 @@ tauri-plugin-fcm = { git = "https://github.com/mantou132/tauri-plugin-fcm" }
 tauri-plugin-barcode-scanner = "2"
 tauri-plugin-selection-menu = { git = "https://github.com/mantou132/tauri-plugin-selection-menu" }
 tauri-plugin-stt = "0.2"
+tauri-plugin-tts = "0.2"

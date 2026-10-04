@@ -396,13 +396,18 @@ impl AgentService {
                     .unwrap_or_default()
                     .to_string();
                 let timeout_secs = message_timeout_secs(&params);
-                let attachments = message_attachments(&params)?;
+                let mut attachments = message_attachments(&params)?;
                 if prompt.is_empty() && attachments.is_empty() {
                     return Err(
                         "agent_prompt requires a non-empty prompt or attachments".to_string()
                     );
                 }
                 let session_id = required_session_id(&params, "agent_prompt")?;
+                if message_voice_chat(&params) {
+                    attachments.push(acp_agent::Attachment::Text {
+                        text: VOICE_CHAT_MARKER.to_string(),
+                    });
+                }
 
                 let permission_peer = peer.clone();
                 let permission_resolver: acp_agent::PermissionResolver = Arc::new(move |request| {
@@ -1166,7 +1171,14 @@ fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String>
              directly. A link like `[app.ts](src/app.ts:42)` opens the file (at a line via `:42` \
              or `#L42`) or directory; an image like `![Screenshot](/abs/path/shot.png)` shows it \
              inline, so never inline images as base64. Paths are absolute or relative to the \
-             session's working directory."
+             session's working directory.\n\nWhen a user message ends with \
+             `<agentdeck-voice-chat/>`, the user is talking by voice through earphones and \
+             cannot look at the screen. Do the task as usual, then end your final reply with an \
+             HTML comment holding a short spoken summary in the user's language: \
+             `<!-- agentdeck-speech` on its own line, one to three plain sentences on what you \
+             did, the result and anything the user must decide, then `-->`. It is read aloud and \
+             hidden from the transcript, so write it for listening: no Markdown, code, paths, URLs \
+             or lists, and never `-->` inside it."
                 .to_string(),
         )),
         _ => Err(format!("unknown panelContext.surface: {surface}")),
@@ -1179,6 +1191,18 @@ fn message_timeout_secs(params: &Value) -> u64 {
         .and_then(|v| v.as_u64())
         .unwrap_or(600)
         .clamp(1, 3600)
+}
+
+/// Marks prompts sent from the client's voice chat; the `remote_app` system
+/// prompt asks for a spoken summary after it. The client strips it from
+/// replayed user messages.
+const VOICE_CHAT_MARKER: &str = "<agentdeck-voice-chat/>";
+
+fn message_voice_chat(params: &Value) -> bool {
+    params
+        .get("voiceChat")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
 }
 
 fn message_stream(params: &Value) -> bool {
@@ -1236,9 +1260,24 @@ mod tests {
     };
 
     use super::{
-        browse_files, complete_directories, message_panel_system_prompt, read_raw_file,
-        read_remote_file, resolve_directory_path,
+        VOICE_CHAT_MARKER, browse_files, complete_directories, message_panel_system_prompt,
+        message_voice_chat, read_raw_file, read_remote_file, resolve_directory_path,
     };
+
+    #[test]
+    fn voice_chat_prompts_carry_the_marker_the_app_system_prompt_explains() {
+        assert!(message_voice_chat(
+            &serde_json::json!({ "voiceChat": true })
+        ));
+        assert!(!message_voice_chat(&serde_json::json!({})));
+        let prompt = message_panel_system_prompt(
+            &serde_json::json!({ "panelContext": { "surface": "remote_app" } }),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(prompt.contains(VOICE_CHAT_MARKER));
+        assert!(prompt.contains("<!-- agentdeck-speech"));
+    }
 
     #[test]
     fn builds_panel_system_prompts() {

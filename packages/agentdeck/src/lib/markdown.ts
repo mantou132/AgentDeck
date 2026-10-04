@@ -121,6 +121,10 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
           return `<deck-foldable codelang="${escapeHtml(language)}">${block}</deck-foldable>`;
         return block;
       },
+      // Voice chat summary (`session/voice-chat.ts`): hidden even while unclosed, which would otherwise swallow the template.
+      html(token) {
+        return /^\s*<!--\s*agentdeck-speech\b/.test(token.text) ? '' : defaultRenderer.html.call(this, token);
+      },
       // Host images (e.g. screenshots taken by the agent) load through the preview protocol.
       image(token) {
         const path = previewSupported ? hostImagePath(token.href, options.baseDir) : undefined;

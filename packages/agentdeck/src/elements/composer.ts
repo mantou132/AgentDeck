@@ -12,19 +12,11 @@ import {
 } from '../composer/references';
 import { i18n } from '../i18n';
 import { hapticSelection } from '../lib/haptics';
-import {
-  ensureVoicePermission,
-  listenVoiceError,
-  listenVoiceResult,
-  type RecognitionResult,
-  startVoiceListening,
-  stopVoiceListening,
-  voiceSupported,
-} from '../lib/voice';
+import { ensureRecognitionPermission, speechSupported, startRecognitionSession } from '../lib/speech-recognition';
 import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
 
-export type ComposerInput = { text: string; attachments: Attachment[] };
+export type ComposerInput = { text: string; attachments: Attachment[]; voiceChat?: boolean };
 type InputSelection = { input: string; start: number; end: number };
 const style = css`
   .composer-shell {
@@ -59,6 +51,8 @@ export class DeckComposerElement extends GemElement {
   @emitter cancel: Emitter;
   @emitter preview: Emitter<Attachment>;
   @emitter draftChange: Emitter;
+  /** Send button with nothing to send opens voice chat instead. */
+  @emitter voiceChat: Emitter;
 
   #state = createState({
     draft: '',
@@ -67,14 +61,13 @@ export class DeckComposerElement extends GemElement {
     readingAttachments: false,
     submitting: false,
     loadingDraft: false,
-    listening: false,
+    dictating: false,
   });
   #textareaRef = createRef<HTMLTextAreaElement>();
   #fileInputRef = createRef<HTMLInputElement>();
   #nextPasteReference = 1;
   #pastedAttachments = new Map<string, Attachment>();
-  #voiceUnlisten = () => {};
-  #voiceBaseText = '';
+  #stopDictationSession?: () => void;
 
   @effect((i) => [i.sessionKey, i.draftKey])
   #resetInput = async () => {
@@ -107,6 +100,18 @@ export class DeckComposerElement extends GemElement {
   get #activeSuggestion() {
     const { draft, quote, attachments } = this.#state;
     return draft || quote || attachments.length ? '' : this.suggestion;
+  }
+
+  get #voiceChatEntry() {
+    const { draft, quote, attachments } = this.#state;
+    return (
+      speechSupported &&
+      !this.pending &&
+      !draft.trim() &&
+      !quote.trim() &&
+      !attachments.length &&
+      !this.#activeSuggestion
+    );
   }
 
   get #canSend() {
@@ -160,52 +165,39 @@ export class DeckComposerElement extends GemElement {
     this.#pastedAttachments.clear();
     this.#state({ draft: '', quote: '', attachments: [] });
     if (this.#textareaRef.value) this.#textareaRef.value.value = '';
-    this.#stopVoice();
+    this.#stopDictation();
   };
 
-  #applyVoiceTranscript = (result: RecognitionResult) => {
-    const base = this.#voiceBaseText ? `${this.#voiceBaseText} ` : '';
-    this.#setDraft(base + result.transcript);
-    if (result.isFinal) this.#voiceBaseText = base + result.transcript;
+  #stopDictation = () => {
+    if (!this.#state.dictating) return;
+    this.#stopDictationSession?.();
+    this.#state({ dictating: false });
   };
 
-  #stopVoice = () => {
-    if (!this.#state.listening) return;
-    this.#voiceUnlisten();
-    this.#state({ listening: false });
-    stopVoiceListening().catch(() => {
-      // Recognition session may already have ended (e.g. after an error event).
-    });
-  };
-
-  #toggleVoice = async () => {
-    if (this.#state.listening) return this.#stopVoice();
+  #toggleDictation = async () => {
+    if (this.#state.dictating) return this.#stopDictation();
     try {
-      if (!(await ensureVoicePermission())) {
-        Toast.open('warning', i18n.get('composer.voicePermissionDenied'));
+      if (!(await ensureRecognitionPermission())) {
+        Toast.open('warning', i18n.get('speechRecognition.permissionDenied'));
         return;
       }
-      this.#voiceBaseText = this.#state.draft.trim();
-      const unlistenResult = await listenVoiceResult(this.#applyVoiceTranscript);
-      const unlistenError = await listenVoiceError(() => {
-        Toast.open('error', i18n.get('composer.voiceFailed'));
-        this.#stopVoice();
-      });
-      this.#voiceUnlisten = () => {
-        unlistenResult();
-        unlistenError();
-      };
       hapticSelection();
-      await startVoiceListening();
-      this.#state({ listening: true });
+      this.#stopDictationSession = await startRecognitionSession({
+        base: this.#state.draft.trim(),
+        onTranscript: this.#setDraft,
+        onError: () => {
+          Toast.open('error', i18n.get('speechRecognition.failed'));
+          this.#state({ dictating: false });
+        },
+      });
+      this.#state({ dictating: true });
     } catch {
-      this.#voiceUnlisten();
-      Toast.open('error', i18n.get('composer.voiceUnavailable'));
+      Toast.open('error', i18n.get('speechRecognition.unavailable'));
     }
   };
 
   @unmounted()
-  #stopVoiceOnUnmount = () => this.#stopVoice();
+  #stopDictationOnUnmount = () => this.#stopDictation();
 
   restoreIfEmpty = (key: string, message: ComposerInput) => {
     if (this.draftKey === key && !this.#state.draft && !this.#state.quote && !this.#state.attachments.length)
@@ -466,15 +458,15 @@ export class DeckComposerElement extends GemElement {
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
-                    v-if=${voiceSupported}
+                    v-if=${speechSupported}
                     type="button"
-                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent active:bg-bg-hover disabled:cursor-default disabled:opacity-45 ${this.#state.listening ? 'text-primary' : 'text-describe'}"
-                    aria-label=${this.#state.listening ? i18n.get('composer.stopVoiceAria') : i18n.get('composer.startVoiceAria')}
-                    title=${this.#state.listening ? i18n.get('composer.stopVoiceAria') : i18n.get('composer.startVoiceAria')}
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent active:bg-bg-hover disabled:cursor-default disabled:opacity-45 ${this.#state.dictating ? 'text-primary' : 'text-describe'}"
+                    aria-label=${this.#state.dictating ? i18n.get('composer.stopDictationAria') : i18n.get('composer.startDictationAria')}
+                    title=${this.#state.dictating ? i18n.get('composer.stopDictationAria') : i18n.get('composer.startDictationAria')}
                     ?disabled=${this.#state.loadingDraft || this.#state.readingAttachments || this.#state.submitting}
-                    @click=${this.#toggleVoice}
+                    @click=${this.#toggleDictation}
                   >
-                    <tap-use class="size-5" .element=${this.#state.listening ? icons.stop : icons.mic}></tap-use>
+                    <tap-use class="size-5" .element=${this.#state.dictating ? icons.stop : icons.mic}></tap-use>
                   </button>
                   <button
                     v-if=${this.pending}
@@ -483,6 +475,18 @@ export class DeckComposerElement extends GemElement {
                     @click=${() => this.cancel()}
                   >
                     <span class="size-2.5 rounded-[3px] bg-current"></span>
+                  </button>
+                  <button
+                    v-else-if=${this.#voiceChatEntry}
+                    class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-[transform,background-color] duration-150 active:scale-[0.92] disabled:cursor-default disabled:bg-border disabled:text-disabled disabled:active:scale-100"
+                    ?disabled=${!this.ready || this.#state.loadingDraft || this.#state.submitting}
+                    aria-label=${i18n.get('composer.voiceChatAria')}
+                    @click=${() => {
+                      this.#stopDictation();
+                      this.voiceChat();
+                    }}
+                  >
+                    <tap-use class="size-[18px]" .element=${icons.audioLines}></tap-use>
                   </button>
                   <button
                     v-else
