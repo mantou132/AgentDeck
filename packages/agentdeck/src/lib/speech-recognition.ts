@@ -28,9 +28,17 @@ type RecognitionSessionOptions = {
   onError: () => void;
 };
 
+// Chinese and Japanese, including their full-width punctuation, are written without spaces between words.
+const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3000-\u303f\uff00-\uffef]/u;
+
+const joinTranscript = (head: string, tail: string) => {
+  if (!head) return tail;
+  return UNSPACED.test(head.at(-1) ?? '') || UNSPACED.test(tail[0] ?? '') ? head + tail : `${head} ${tail}`;
+};
+
 /**
- * Starts recognizing and resolves to a function that stops it. The recognizer finalizes one segment at a time,
- * so finished segments are joined in front of the current one.
+ * Starts recognizing and resolves to a function that stops it, settling once the engine has stopped.
+ * The recognizer finalizes one segment at a time, so finished segments are joined in front of the current one.
  */
 export const startRecognitionSession = async ({
   base = '',
@@ -38,9 +46,9 @@ export const startRecognitionSession = async ({
   onError: onFailed,
 }: RecognitionSessionOptions) => {
   let finished = base;
-  let stopped = false;
+  let stopping: Promise<void> | undefined;
   const unlistenResult = await onResult((result) => {
-    const text = finished ? `${finished} ${result.transcript}` : result.transcript;
+    const text = joinTranscript(finished, result.transcript);
     if (result.isFinal) finished = text;
     onTranscript(text);
   });
@@ -53,12 +61,13 @@ export const startRecognitionSession = async ({
     unlistenError();
   };
   const stop = () => {
-    if (stopped) return;
-    stopped = true;
-    unlisten();
-    stopListening().catch(() => {
-      // Recognition session may already have ended (e.g. after an error event).
-    });
+    if (!stopping) {
+      unlisten();
+      stopping = stopListening().catch(() => {
+        // Recognition session may already have ended (e.g. after an error event).
+      });
+    }
+    return stopping;
   };
   try {
     await startListening({ language: navigator.language, interimResults: true });
