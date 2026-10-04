@@ -31,6 +31,7 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
   #listRef = createRef<HTMLElement>();
   #listContentRef = createRef<HTMLElement>();
   #pressed = false;
+  #releasePress?: () => void;
   #stopRecording?: () => void;
   // A voice chat prompt was accepted; its reply is read aloud once the turn ends.
   #awaiting = false;
@@ -57,13 +58,15 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
   };
 
   #startTalk = async (event: PointerEvent) => {
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    const button = event.currentTarget as HTMLElement;
+    button.setPointerCapture(event.pointerId);
     if (!this.ready || this.#pending) {
       hapticWarning();
       this.#say(i18n.get(this.ready ? 'voiceChat.busy' : 'voiceChat.notReady'));
       return;
     }
     this.#pressed = true;
+    this.#trackPress(button, event.pointerId);
     stopSpeaking().catch(() => {});
     try {
       if (!(await ensureRecognitionPermission())) {
@@ -92,13 +95,34 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
   };
 
   // Sliding off the button cancels, like letting go outside it.
-  #moveTalk = (event: PointerEvent) => {
-    if (!this.#pressed) return;
-    const { left, right, top, bottom } = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const outside = event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom;
-    if (outside === this.#state.outside) return;
-    hapticSelection();
-    this.#state({ outside });
+  // The sheet's drag gesture captures the pointer once it moves vertically, so the press is tracked on window
+  // ahead of it and its moves are kept from the sheet.
+  #trackPress = (button: HTMLElement, pointerId: number) => {
+    const isOutside = ({ clientX, clientY }: PointerEvent) => {
+      const { left, right, top, bottom } = button.getBoundingClientRect();
+      return clientX < left || clientX > right || clientY < top || clientY > bottom;
+    };
+    const controller = new AbortController();
+    const options = { capture: true, signal: controller.signal };
+    addEventListener(
+      'pointermove',
+      (event) => {
+        if (event.pointerId !== pointerId) return;
+        event.stopPropagation();
+        const outside = isOutside(event);
+        if (outside === this.#state.outside) return;
+        hapticSelection();
+        this.#state({ outside });
+      },
+      options,
+    );
+    const end = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      this.#finishTalk(event.type === 'pointerup' && !isOutside(event));
+    };
+    addEventListener('pointerup', end, options);
+    addEventListener('pointercancel', end, options);
+    this.#releasePress = () => controller.abort();
   };
 
   #stopListening = () => {
@@ -109,6 +133,7 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
 
   #finishTalk = async (send: boolean) => {
     this.#pressed = false;
+    this.#releasePress?.();
     this.#state({ outside: false });
     if (!this.#state.listening) return;
     this.#stopListening();
@@ -176,6 +201,7 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
 
   @unmounted()
   #cleanup = () => {
+    this.#releasePress?.();
     this.#stopListening();
     stopSpeaking().catch(() => {});
   };
@@ -233,9 +259,6 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
           })}
           aria-label=${i18n.get('voiceChat.hold')}
           @pointerdown=${this.#startTalk}
-          @pointermove=${this.#moveTalk}
-          @pointerup=${() => this.#finishTalk(!this.#state.outside)}
-          @pointercancel=${() => this.#finishTalk(false)}
           @contextmenu=${(event: Event) => event.preventDefault()}
         >
           <tap-use class="size-[18px]" .element=${icons.mic}></tap-use>
