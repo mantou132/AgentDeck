@@ -88,6 +88,7 @@ test('rejected session list and pending session creation both leave a usable ret
   const created = fixture.app.promotePendingSession(pendingSession, 'pending session task');
   await fixture.settleHost();
   assert.equal((await created).sessionId, 'created');
+  fixture.app.resetPendingSession();
   const prompt = fixture.requests.at(-1);
   fixture.reply(prompt, { answer: 'created and sent' });
   await tick();

@@ -31,7 +31,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 ## 命名
 
-- `pendingSession` / `pendingCreation`：尚未在远端创建的会话，本地 sessionId 为 `pending-session`，首次发送时由 `promotePendingSession` 转为正式会话。
+- `pendingSession` / `pendingCreation`：尚未在远端创建的会话，本地 sessionId 为 `pending-session`，首次发送时由 `promotePendingSession` 转为正式会话；页面先切到正式 ID 再调用 `resetPendingSession` 清理，避免中间一帧找不到会话而重建页面。
 - `pendingSessionIds`：正在执行任务的会话 ID 列表，和 `pendingCreation` 无关。
 - `draft` / `ComposerDraft`：只指未发送的输入文字和附件。
 

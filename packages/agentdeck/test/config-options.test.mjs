@@ -253,6 +253,7 @@ test('pending session mode rejected keeps the created session and input recovera
   await tick();
   failed(f, request(f, 'agent_session_set_mode'));
   const live = await promotion;
+  f.app.resetPendingSession();
   assert.equal(live.sessionId, 'created');
   assert.equal(request(f, 'agent_prompt'), undefined);
   assert.equal(f.app.agentdeckStore.pendingSessionIds.length, 0);

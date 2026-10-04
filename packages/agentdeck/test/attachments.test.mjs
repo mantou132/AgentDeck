@@ -82,8 +82,8 @@ test('attachment-only prompts work in both a pending session and an existing ses
   const creation = fixture.app.promotePendingSession(pendingSession, '', [text]);
   await fixture.settleHost();
   const session = await creation;
+  fixture.app.resetPendingSession();
   assert.equal(session.title, text.name);
-  assert.equal(fixture.app.agentdeckStore.pendingSession, null);
   assert.deepEqual(fixture.app.agentdeckStore.messagesBySession[session.sessionId][0].attachments, [text]);
   const request = fixture.requests.at(-1);
   assert.equal(request.payload.params.prompt, '');

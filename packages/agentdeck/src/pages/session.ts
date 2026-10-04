@@ -148,7 +148,9 @@ export class AgentDeckSessionPageElement extends GemElement {
         const liveSession = await promotePendingSession(session, text, attachments, onFailed, voiceChat);
         if (liveSession) {
           targetSession = liveSession;
+          // Switch to the live session before dropping the pending one, so the page never renders without a session.
           this.sessionId = liveSession.sessionId;
+          resetPendingSession();
           accepted = true;
         }
       } else {

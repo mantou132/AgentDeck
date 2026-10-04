@@ -645,16 +645,8 @@ export const promotePendingSession = async (
   agentdeckStore({
     sessions: nextSessions,
     sessionGroups: getSortedSessionGroups(nextSessions, agentdeckStore.sessionGroups),
-    messagesBySession: {
-      ...agentdeckStore.messagesBySession,
-      [liveSession.sessionId]: stagedMessages,
-      'pending-session': [],
-    },
-    pendingSession: null,
+    messagesBySession: { ...agentdeckStore.messagesBySession, [liveSession.sessionId]: stagedMessages },
   });
-
-  setSessionFlag('loadedSessionIds', 'pending-session', false);
-  setSessionFlag('pendingSessionIds', 'pending-session', false);
   setSessionFlag('loadedSessionIds', liveSession.sessionId, true);
 
   if (configError) {
