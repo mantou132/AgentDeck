@@ -48,7 +48,7 @@ html {
 tap-navbar,
 tap-browser::part(navbar) {
   grid-template-rows: 44px;
-  padding-block: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) 6px;
+  padding-block: max(6px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 6px;
   border-block-end-width: var(--default-border-width);
   border-block-end-color: var(--color-border-strong);
 }

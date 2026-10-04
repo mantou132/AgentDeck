@@ -30,7 +30,7 @@ import { icons } from '../styles/icons';
 
 const style = css`
   .session-header {
-    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    padding-top: max(6px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
 `;
 

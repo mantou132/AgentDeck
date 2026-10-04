@@ -1,6 +1,7 @@
 import { Dialog } from '@mantou/tap-ui/elements/dialog';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { isTauri } from '@tauri-apps/api/core';
 import { isRelayUrl, RELAY_GUIDE_SEEN_KEY } from '../config';
 import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
@@ -10,7 +11,7 @@ import { icons } from '../styles/icons';
 
 const style = css`
   .settings-header {
-    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    padding-top: max(6px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
 
   .settings-scroll {
@@ -132,6 +133,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
           </div>
           <button
             type="button"
+            v-if=${isTauri()}
             class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft"
             aria-label=${i18n.get('settings.scanRelayId')}
             title=${i18n.get('settings.scanRelayId')}
