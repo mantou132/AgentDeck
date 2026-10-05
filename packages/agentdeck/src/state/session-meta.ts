@@ -8,7 +8,8 @@ export type LocalSessionMeta = {
 
 type CompactMeta = {
   t?: string;
-  u?: string;
+  /** `updatedAt` as epoch milliseconds */
+  u?: number;
   d?: 1;
 };
 
@@ -25,9 +26,10 @@ const syncToLocalStorage = () => {
     for (const [id, meta] of memoryStore) {
       const item: CompactMeta = {};
       if (meta.title) item.t = meta.title;
-      if (meta.updatedAt) item.u = meta.updatedAt;
+      const updatedAt = Date.parse(meta.updatedAt || '');
+      if (updatedAt) item.u = updatedAt;
       if (meta.deleted) item.d = 1;
-      if (item.t !== undefined || item.u !== undefined || item.d !== undefined) {
+      if (Object.keys(item).length) {
         record[id] = item;
       }
     }
@@ -46,7 +48,8 @@ const loadFromLocalStorage = () => {
       if (id && item && typeof item === 'object') {
         memoryStore.set(id, {
           title: item.t,
-          updatedAt: item.u,
+          // Older records hold an ISO string, which `Date` parses as well
+          updatedAt: item.u ? new Date(item.u).toISOString() : undefined,
           deleted: item.d === 1,
         });
       }

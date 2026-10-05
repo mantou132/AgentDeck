@@ -48,12 +48,16 @@ const applyRemoteConfig = async (
 };
 
 /**
- * Apply selections from a pending-creation session item-by-item to the newly created remote session; skip items or values no longer supported by remote.
+ * Apply selections (config id → value) item-by-item to a newly created or loaded remote session; skip items or values no longer supported by remote.
  * Uses the session-creation timeout: the agent may still be starting up and handle these requests only after it is ready.
  */
-export const applyConfigSelection = async (session: DeckSession, created: SessionOptions, selected: SessionOptions) => {
-  let options = created;
-  for (const { id, currentValue } of getConfigSelects(selected)) {
+export const applyConfigSelection = async (
+  session: DeckSession,
+  remote: SessionOptions,
+  selected: Record<string, string>,
+) => {
+  let options = remote;
+  for (const [id, currentValue] of Object.entries(selected)) {
     const select = getConfigSelects(options).find((item) => item.id === id);
     if (!select || select.currentValue === currentValue) continue;
     if (!select.choices.some((choice) => choice.value === currentValue)) continue;

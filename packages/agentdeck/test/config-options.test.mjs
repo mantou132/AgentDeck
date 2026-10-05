@@ -338,6 +338,60 @@ test('chosen settings persist per agent and are applied to new sessions after re
   await tick();
 });
 
+test('a reopened session re-applies the agent selection after load', async () => {
+  const model = { ...configOptions[1], options: [...configOptions[1].options, { value: 'model-b', name: 'Model B' }] };
+  const f = await opened({ configOptions: [configOptions[0], model] });
+  const session = f.app.getSession('s1');
+  for (const [configId, value, current] of [
+    ['permission', 'plan', [{ ...configOptions[0], currentValue: 'plan' }, model]],
+    [
+      'model',
+      'model-b',
+      [
+        { ...configOptions[0], currentValue: 'plan' },
+        { ...model, currentValue: 'model-b' },
+      ],
+    ],
+  ]) {
+    const change = f.app.changeSessionConfig(session, configId, value);
+    await tick();
+    f.reply(request(f, 'agent_session_set_config_option'), { configOptions: current });
+    assert.equal(await change, true);
+  }
+
+  const restarted = documentFixture(f);
+  restarted.heldMethods.add('agent_session_load');
+  await restarted.connect();
+  const loading = restarted.app.ensureSessionLoaded('s1');
+  await restarted.settleHost();
+  restarted.reply(request(restarted, 'agent_session_load'), {
+    sessionId: 's1',
+    configOptions: [configOptions[0], model],
+  });
+  await tick();
+  const setMode = request(restarted, 'agent_session_set_config_option');
+  assert.deepEqual([setMode.payload.params.configId, setMode.payload.params.value], ['permission', 'plan']);
+  assert.equal(restarted.app.agentdeckStore.loadedSessionIds.includes('s1'), false);
+  restarted.reply(setMode, { configOptions: [{ ...configOptions[0], currentValue: 'plan' }, model] });
+  await tick();
+  const setModel = request(restarted, 'agent_session_set_config_option');
+  assert.deepEqual([setModel.payload.params.configId, setModel.payload.params.value], ['model', 'model-b']);
+  restarted.reply(setModel, {
+    configOptions: [
+      { ...configOptions[0], currentValue: 'plan' },
+      { ...model, currentValue: 'model-b' },
+    ],
+  });
+  await loading;
+  assert.equal(restarted.app.agentdeckStore.loadedSessionIds.includes('s1'), true);
+  assert.equal(
+    selects(restarted)
+      .map((select) => select.currentValue)
+      .join(','),
+    'plan,model-b',
+  );
+});
+
 test('first pending session uses agent default and captures capabilities; cancel during mode setup sends no prompt', async () => {
   const f = documentFixture();
   await f.connect();

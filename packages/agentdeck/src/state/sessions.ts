@@ -4,7 +4,7 @@ import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { draftKey, removeDraft } from '../composer/drafts';
 import { i18n } from '../i18n';
-import { getConfigSelects } from '../session/config-options';
+import { getConfigSelects, getConfigValues } from '../session/config-options';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
 import {
@@ -404,15 +404,26 @@ export const ensureSessionLoaded = async (sessionId: string) => {
       panelContext: REMOTE_APP_PANEL_CONTEXT,
     });
     if (sessionLoads.get(sessionId) !== token) return;
+    let loadedOptions: SessionOptions = { modes: loaded.modes, configOptions: loaded.configOptions ?? [] };
+    const defaults = getConfigDefaults(session.agent);
+    // Agents reset mode / model on load; re-apply the agent's saved selection
+    if (getConfigSelects(defaults).length) {
+      try {
+        loadedOptions = await applyConfigSelection(session, loadedOptions, getConfigValues(defaults));
+      } catch (error) {
+        Toast.open('error', error instanceof Error ? error.message : i18n.get('error.switchConfigFailed'));
+      }
+      if (sessionLoads.get(sessionId) !== token) return;
+    } else {
+      // No selection saved for this agent yet: use the first loaded session as defaults for new sessions
+      saveConfigDefaults(session.agent, loadedOptions);
+    }
     failedSessionLoads.delete(sessionId);
     openedSessionIds.add(sessionId);
     setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
     setSessionFlag('loadingSessionIds', sessionId, false);
     setSessionFlag('loadedSessionIds', sessionId, true);
-    const loadedOptions = { modes: loaded.modes, configOptions: loaded.configOptions ?? [] };
     updateSessionOptions(sessionId, loadedOptions);
-    // When configuration for this agent has not been saved yet, use the first loaded session as defaults for new sessions
-    if (!getConfigSelects(getConfigDefaults(session.agent)).length) saveConfigDefaults(session.agent, loadedOptions);
 
     const meta = getSessionMeta(sessionId);
     const title = isPlaceholderTitle(loaded.title) && meta?.title ? meta.title : loaded.title || meta?.title;
@@ -623,7 +634,7 @@ export const promotePendingSession = async (
   let options: SessionOptions = { modes: created.modes, configOptions: created.configOptions };
   let configError = '';
   try {
-    options = await applyConfigSelection(liveSession, options, selectedOptions);
+    options = await applyConfigSelection(liveSession, options, getConfigValues(selectedOptions));
     saveConfigDefaults(liveSession.agent, options);
   } catch (error) {
     configError = error instanceof Error ? error.message : i18n.get('error.switchConfigFailed');

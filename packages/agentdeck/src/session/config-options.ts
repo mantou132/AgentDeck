@@ -43,6 +43,9 @@ export const getConfigSelects = (options?: SessionOptions): ConfigSelect[] => {
   return selects;
 };
 
+export const getConfigValues = (options?: SessionOptions): Record<string, string> =>
+  Object.fromEntries(getConfigSelects(options).map((select) => [select.id, select.currentValue]));
+
 export const isModelSelect = (select: ConfigSelect) => select.category === 'model' || select.id === 'model';
 
 /** Composer displays only the current model; shows first item when no model option exists. */

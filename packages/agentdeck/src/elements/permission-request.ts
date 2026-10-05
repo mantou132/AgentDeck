@@ -4,7 +4,7 @@ import type { PermissionRequest } from '../agent/api';
 import { i18n } from '../i18n';
 
 const button =
-  'min-h-11 flex-auto cursor-pointer whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98]';
+  'min-h-11 min-w-0 max-w-full flex-auto cursor-pointer truncate rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98]';
 const style = {
   reject: `${button} border-border bg-bg-light text-describe`,
   allowAlways: `${button} border-primary bg-bg-light text-primary`,
