@@ -1303,8 +1303,12 @@ async fn run_prompt_turn(
             Stop(Result<PromptResponse, agent_client_protocol::Error>),
             Command(SessionCommand),
         }
+        // `biased` drains updates the agent sent before its prompt response;
+        // a random pick could take Stop first and leave the final chunks
+        // queued until the next turn.
         let input = match incoming.as_deref_mut() {
             Some(incoming) => tokio::select! {
+                biased;
                 update = session.read_update() => TurnInput::Update(update),
                 stop_result = &mut stop => TurnInput::Stop(stop_result),
                 command = incoming.recv() => match command {
@@ -1314,6 +1318,7 @@ async fn run_prompt_turn(
                 },
             },
             None => tokio::select! {
+                biased;
                 update = session.read_update() => TurnInput::Update(update),
                 stop_result = &mut stop => TurnInput::Stop(stop_result),
             },
