@@ -88,6 +88,13 @@ export const openScreen = (target: string) => {
   });
 };
 
+export const openMap = (source: string) => {
+  Stack.push({
+    content: html`<deck-map-page .source=${source}></deck-map-page>`,
+    gesture: true,
+  });
+};
+
 export const openFileBrowser = (
   path: string,
   cwd: string,

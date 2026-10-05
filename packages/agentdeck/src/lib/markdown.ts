@@ -6,6 +6,7 @@ import { parseMessageLink } from './links';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
 
 import '../elements/chart';
+import '../elements/map';
 import '../elements/preview';
 import '../elements/screen';
 
@@ -110,6 +111,7 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
           const attrs = ['edge-to-edge', 'headerless'].filter((flag) => flags.includes(flag)).join(' ');
           return `<deck-preview path="${source}" ${attrs}></deck-preview>`;
         }
+        if (closed && language === 'agentdeck-map') return `<deck-map source="${source}"></deck-map>`;
         if (closed && language === 'agentdeck-screen') return `<deck-screen target="${source}"></deck-screen>`;
         if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
@@ -190,7 +192,7 @@ const baseMarkdownStyle = `
   a { color: ${agentDeckTheme.primaryStrongColor}; text-underline-offset: 2px; }
   code {
     border-radius: 5px;
-    background: ${agentDeckTheme.primarySoftColor};
+    background: color-mix(in srgb, currentColor 7%, transparent);
     padding: .1em .32em;
     font-family: ${agentDeckTheme.codeFont};
     font-size: .9em;
@@ -200,6 +202,7 @@ const baseMarkdownStyle = `
   gem-bind-mermaid,
   .table-scroll,
   deck-chart,
+  deck-map,
   deck-preview,
   deck-screen {
     border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
@@ -263,11 +266,12 @@ userMarkdownStyle.replaceSync(`
   ul, ol { margin: .35rem 0; padding-left: 1.3rem; }
   blockquote { margin: .5rem 0; border-left: 2px solid currentColor; padding-left: .65rem; opacity: .85; }
   a, a:visited { color: ${agentDeckTheme.primaryStrongColor}; text-underline-offset: 2px; }
-  code { border-radius: ${agentDeckTheme.smallRound}; background: ${agentDeckTheme.lightBackgroundColor}; padding: .1em .3em; font-family: ${agentDeckTheme.codeFont}; }
+  code { border-radius: ${agentDeckTheme.smallRound}; background: color-mix(in srgb, currentColor 7%, transparent); padding: .1em .3em; font-family: ${agentDeckTheme.codeFont}; }
   pre,
   gem-bind-mermaid,
   .table-scroll,
   deck-chart,
+  deck-map,
   deck-preview,
   deck-screen {
     max-width: 100%;

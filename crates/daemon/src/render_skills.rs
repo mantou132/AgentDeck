@@ -34,6 +34,10 @@ const SKILLS: &[RenderSkill] = &[
         skill_md: include_str!("render_skills/chart/SKILL.md"),
     },
     RenderSkill {
+        capability: "map",
+        skill_md: include_str!("render_skills/map/SKILL.md"),
+    },
+    RenderSkill {
         capability: "preview",
         skill_md: include_str!("render_skills/preview/SKILL.md"),
     },

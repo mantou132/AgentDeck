@@ -15,6 +15,11 @@ export default defineConfig(({ command }) => ({
     distPath: {
       root: 'dist',
     },
+    // Loaded at runtime by `elements/map.ts`, so the main thread and the worker share these modules.
+    copy: ['maplibre-gl.mjs', 'maplibre-gl-shared.mjs', 'maplibre-gl-worker.mjs', 'maplibre-gl.css'].map((file) => ({
+      from: path.resolve(import.meta.dirname, 'node_modules/maplibre-gl/dist', file),
+      to: 'maplibre',
+    })),
   },
   server: {
     host: '0.0.0.0',
@@ -39,7 +44,7 @@ export default defineConfig(({ command }) => ({
                 'tap-*': '/elements/*',
               },
               'src/elements': {
-                'deck-(sheet|file-browser|changes-diff|changes|git-log|screen)-*': '/$1',
+                'deck-(sheet|file-browser|changes-diff|changes|git-log|screen|map)-*': '/$1',
                 'deck-*': '/*',
               },
             },

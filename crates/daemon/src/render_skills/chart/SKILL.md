@@ -33,6 +33,7 @@ The AgentDeck client renders a fenced code block with the `agentdeck-chart` lang
 ## Rules
 
 - The chart is shown on phones about 350px wide and 300px tall: keep labels short, rely on `legend` and `tooltip` instead of outside pie labels (`"label": { "show": false }` or `"position": "inside"`), and avoid `toolbox`, fixed sizes and custom colors or backgrounds, which the client themes.
+- If a data-visualization design skill (such as `dataviz`) is available, follow it for choosing the chart form, encoding and labeling, but keep this skill's constraints: render with `agentdeck-chart`, and leave colors and backgrounds to the client theme.
 - Write the block directly in your reply; do not create files or call tools to draw the chart.
 - Keep data to what the chart needs (at most a few hundred points); aggregate larger data first.
 - Do not repeat the plotted numbers as a table or list; add at most one or two sentences with the takeaway.
