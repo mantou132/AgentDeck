@@ -2592,7 +2592,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -5852,7 +5852,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-webproxy"
 version = "0.1.0"
-source = "git+https://github.com/mantou132/tauri-plugin-webproxy#cca5ccc84d736239fe1429f46ae50c17ce592fe9"
+source = "git+https://github.com/mantou132/tauri-plugin-webproxy#68e72eefd71b1920afc885b63a6ec02b66f23a8f"
 dependencies = [
  "http-cache-reqwest",
  "reqwest 0.12.28",

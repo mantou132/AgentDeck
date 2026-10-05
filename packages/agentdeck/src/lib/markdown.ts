@@ -105,7 +105,11 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
         if (closed && language === 'mermaid')
           return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
         if (closed && language === 'agentdeck-chart') return `<deck-chart source="${source}"></deck-chart>`;
-        if (closed && language === 'agentdeck-preview') return `<deck-preview path="${source}"></deck-preview>`;
+        if (closed && language === 'agentdeck-preview') {
+          const flags = (lang || '').trim().split(/\s+/);
+          const attrs = ['edge-to-edge', 'headerless'].filter((flag) => flags.includes(flag)).join(' ');
+          return `<deck-preview path="${source}" ${attrs}></deck-preview>`;
+        }
         if (closed && language === 'agentdeck-screen') return `<deck-screen target="${source}"></deck-screen>`;
         if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;

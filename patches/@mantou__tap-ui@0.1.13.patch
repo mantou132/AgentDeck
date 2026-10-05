@@ -126,6 +126,115 @@ index 224ef28488e4aeecf7b8f6f48f86b6a59c3d3730..a3a2b7180c0a1a0cc535763aff898133
          intersectionRootMargin = (__runInitializers(this, _intersectionRoot_extraInitializers), __runInitializers(this, _intersectionRootMargin_initializers, void 0));
          trackVisibility = (__runInitializers(this, _intersectionRootMargin_extraInitializers), __runInitializers(this, _trackVisibility_initializers, void 0));
          delay = (__runInitializers(this, _trackVisibility_extraInitializers), __runInitializers(this, _delay_initializers, void 0));
+diff --git a/elements/browser.d.ts b/elements/browser.d.ts
+index 87cd4f2c58f3977cde676714bec36ab8c53e3dd4..31e52cfcee2fb14155308bf5ad9ee791eb0b8700 100644
+--- a/elements/browser.d.ts
++++ b/elements/browser.d.ts
+@@ -14,6 +14,10 @@ export interface BrowserOptions<T = unknown> {
+     actions?: BrowserItem<T>[];
+     groups?: ActionSheetGroup<T>[];
+     animated?: boolean;
++    /**Hide the navbar; close via the edge swipe-back gesture or `close` */
++    headerless?: boolean;
++    /**Navbar overlays the frame with a transparent background */
++    floatheader?: boolean;
+     /**
+      * Target stack or context element used to find the closest `<tap-stack>`.
+      * When omitted, defaults to the global root `Stack`.
+@@ -28,6 +32,13 @@ export declare class TapBrowserElement<T = unknown> extends GemElement {
+     static action: string;
+     src: string;
+     title: string;
++    /**Hide the navbar; close via the edge swipe-back gesture or `close` */
++    headerless: boolean;
++    /**
++     * Navbar overlays the frame and stays transparent, since the frame's own scroll can't be observed.
++     * The page in the frame needs to handle the top inset itself.
++     */
++    floatheader: boolean;
+     items?: BrowserItem<T>[];
+     actions?: BrowserItem<T>[];
+     groups?: ActionSheetGroup<T>[];
+diff --git a/elements/browser.js b/elements/browser.js
+index 476e0768bf2cd52dda6a88e5de2ead705370cea5..08224253f876c47333e16255ca4dcb3348e459c7 100644
+--- a/elements/browser.js
++++ b/elements/browser.js
+@@ -32,7 +32,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
+     }
+     return useValue ? value : void 0;
+ };
+-import { adoptedStyle, aria, attribute, customElement, effect, emitter, mounted, part, property, shadow, template, } from '@mantou/gem/lib/decorators';
++import { adoptedStyle, aria, attribute, boolattribute, customElement, effect, emitter, mounted, part, property, shadow, template, } from '@mantou/gem/lib/decorators';
+ import { createRef, createState, css, GemElement, html } from '@mantou/gem/lib/element';
+ import { addListener } from '@mantou/gem/lib/utils';
+ import { icons } from '../lib/icons';
+@@ -83,6 +83,12 @@ let TapBrowserElement = (() => {
+     let _title_decorators;
+     let _title_initializers = [];
+     let _title_extraInitializers = [];
++    let _headerless_decorators;
++    let _headerless_initializers = [];
++    let _headerless_extraInitializers = [];
++    let _floatheader_decorators;
++    let _floatheader_initializers = [];
++    let _floatheader_extraInitializers = [];
+     let _items_decorators;
+     let _items_initializers = [];
+     let _items_extraInitializers = [];
+@@ -117,6 +123,8 @@ let TapBrowserElement = (() => {
+             _static_action_decorators = [part];
+             _src_decorators = [attribute];
+             _title_decorators = [attribute];
++            _headerless_decorators = [boolattribute];
++            _floatheader_decorators = [boolattribute];
+             _items_decorators = [property];
+             _actions_decorators = [property];
+             _groups_decorators = [property];
+@@ -131,6 +139,8 @@ let TapBrowserElement = (() => {
+             __esDecorate(null, null, _static_action_decorators, { kind: "field", name: "action", static: true, private: false, access: { has: obj => "action" in obj, get: obj => obj.action, set: (obj, value) => { obj.action = value; } }, metadata: _metadata }, _static_action_initializers, _static_action_extraInitializers);
+             __esDecorate(null, null, _src_decorators, { kind: "field", name: "src", static: false, private: false, access: { has: obj => "src" in obj, get: obj => obj.src, set: (obj, value) => { obj.src = value; } }, metadata: _metadata }, _src_initializers, _src_extraInitializers);
+             __esDecorate(null, null, _title_decorators, { kind: "field", name: "title", static: false, private: false, access: { has: obj => "title" in obj, get: obj => obj.title, set: (obj, value) => { obj.title = value; } }, metadata: _metadata }, _title_initializers, _title_extraInitializers);
++            __esDecorate(null, null, _headerless_decorators, { kind: "field", name: "headerless", static: false, private: false, access: { has: obj => "headerless" in obj, get: obj => obj.headerless, set: (obj, value) => { obj.headerless = value; } }, metadata: _metadata }, _headerless_initializers, _headerless_extraInitializers);
++            __esDecorate(null, null, _floatheader_decorators, { kind: "field", name: "floatheader", static: false, private: false, access: { has: obj => "floatheader" in obj, get: obj => obj.floatheader, set: (obj, value) => { obj.floatheader = value; } }, metadata: _metadata }, _floatheader_initializers, _floatheader_extraInitializers);
+             __esDecorate(null, null, _items_decorators, { kind: "field", name: "items", static: false, private: false, access: { has: obj => "items" in obj, get: obj => obj.items, set: (obj, value) => { obj.items = value; } }, metadata: _metadata }, _items_initializers, _items_extraInitializers);
+             __esDecorate(null, null, _actions_decorators, { kind: "field", name: "actions", static: false, private: false, access: { has: obj => "actions" in obj, get: obj => obj.actions, set: (obj, value) => { obj.actions = value; } }, metadata: _metadata }, _actions_initializers, _actions_extraInitializers);
+             __esDecorate(null, null, _groups_decorators, { kind: "field", name: "groups", static: false, private: false, access: { has: obj => "groups" in obj, get: obj => obj.groups, set: (obj, value) => { obj.groups = value; } }, metadata: _metadata }, _groups_initializers, _groups_extraInitializers);
+@@ -149,7 +159,14 @@ let TapBrowserElement = (() => {
+         static action = (__runInitializers(_classThis, _static_more_extraInitializers), __runInitializers(_classThis, _static_action_initializers, void 0));
+         src = __runInitializers(this, _src_initializers, void 0);
+         title = (__runInitializers(this, _src_extraInitializers), __runInitializers(this, _title_initializers, void 0));
+-        items = (__runInitializers(this, _title_extraInitializers), __runInitializers(this, _items_initializers, void 0));
++        /**Hide the navbar; close via the edge swipe-back gesture or `close` */
++        headerless = (__runInitializers(this, _title_extraInitializers), __runInitializers(this, _headerless_initializers, void 0));
++        /**
++         * Navbar overlays the frame and stays transparent, since the frame's own scroll can't be observed.
++         * The page in the frame needs to handle the top inset itself.
++         */
++        floatheader = (__runInitializers(this, _headerless_extraInitializers), __runInitializers(this, _floatheader_initializers, void 0));
++        items = (__runInitializers(this, _floatheader_extraInitializers), __runInitializers(this, _items_initializers, void 0));
+         actions = (__runInitializers(this, _items_extraInitializers), __runInitializers(this, _actions_initializers, void 0));
+         groups = (__runInitializers(this, _actions_extraInitializers), __runInitializers(this, _groups_initializers, void 0));
+         close = (__runInitializers(this, _groups_extraInitializers), __runInitializers(this, _close_initializers, void 0));
+@@ -160,6 +177,8 @@ let TapBrowserElement = (() => {
+             browser.title = options.title || '';
+             browser.items = options.items || options.actions;
+             browser.groups = options.groups;
++            browser.headerless = !!options.headerless;
++            browser.floatheader = !!options.floatheader;
+             const result = DyPromise.new((resolve) => {
+                 browser.#onClosed = resolve;
+             }, { browser });
+@@ -242,8 +261,9 @@ let TapBrowserElement = (() => {
+         #render = (__runInitializers(this, _private_init_extraInitializers), __runInitializers(this, _private_render_initializers, () => {
+             const directAction = this.#directAction;
+             return html `
+-    <tap-page loading=${this.#state.loading}>
++    <tap-page loading=${this.#state.loading} ?floatheader=${this.floatheader}>
+       <tap-navbar
++        v-if=${!this.headerless}
+         slot="header"
+         part=${TapBrowserElement.navbar}
+         title=${this.title}
 diff --git a/elements/cell.d.ts b/elements/cell.d.ts
 index ae4a949442c17a5d426b5efe705c52ee06ffdbdc..428296b997c564fe7e8f9d9d7ece3a491d320502 100644
 --- a/elements/cell.d.ts

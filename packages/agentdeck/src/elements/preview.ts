@@ -56,12 +56,14 @@ const style = css`
   }
 `;
 
-/** Body of an `agentdeck-preview` fenced block: the entry HTML path, as taught by the host's preview skill. */
+/** Body of an `agentdeck-preview` fenced block: the entry HTML path, as taught by the host's preview skill; `edge-to-edge` / `headerless` follow the language. */
 @customElement('deck-preview')
 @adoptedStyle(style)
 @shadow()
 export class DeckPreviewElement extends GemElement {
   @attribute path: string;
+  @boolattribute edgeToEdge: boolean;
+  @boolattribute headerless: boolean;
 
   @template()
   #render = () => {
@@ -69,7 +71,7 @@ export class DeckPreviewElement extends GemElement {
     const slash = path.search(/[\\/][^\\/]*$/);
     const openable = previewSupported && isAbsoluteHostPath(path);
     return html`
-      <button class="card" type="button" ?disabled=${!openable} @click=${() => openPreview(path)}>
+      <button class="card" type="button" ?disabled=${!openable} @click=${() => openPreview(path, { edgeToEdge: this.edgeToEdge, headerless: this.headerless })}>
         <tap-use .element=${icons.code}></tap-use>
         <div class="text">
           <div class="name">${path.slice(slash + 1)}</div>

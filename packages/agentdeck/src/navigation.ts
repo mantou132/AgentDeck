@@ -53,9 +53,19 @@ export const openWebBrowser = async (url: string, title = '', stack?: TapStackEl
   return result;
 };
 
-export const openPreview = (path: string, stack?: TapStackElement) => {
+type PreviewOptions = {
+  /** The page extends under a floating navbar */
+  edgeToEdge?: boolean;
+  /** No navbar, close with the edge swipe-back gesture */
+  headerless?: boolean;
+  stack?: TapStackElement;
+};
+
+export const openPreview = (path: string, { edgeToEdge, headerless, stack }: PreviewOptions = {}) => {
   const result = Browser.open({
-    src: toPreviewUrl(path),
+    src: toPreviewUrl(path, edgeToEdge || headerless),
+    floatheader: edgeToEdge,
+    headerless,
     title: path.split(/[\\/]/).pop(),
     stack,
     actions: [

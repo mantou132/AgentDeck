@@ -12,7 +12,7 @@ patchedDependencies:
     hash: c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223
     path: patches/@gem-bind__mermaid@0.0.6.patch
   '@mantou/tap-ui@0.1.13':
-    hash: 1e4fc03f444fe88715de1ff60bde512e27eacc17c3fdc94a6f1915b7392d819d
+    hash: 52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218
     path: patches/@mantou__tap-ui@0.1.13.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
@@ -66,7 +66,7 @@ importers:
         version: 2.2.13
       '@mantou/tap-ui':
         specifier: ^0.1.13
-        version: 0.1.13(patch_hash=1e4fc03f444fe88715de1ff60bde512e27eacc17c3fdc94a6f1915b7392d819d)(@mantou/gem@2.2.13)
+        version: 0.1.13(patch_hash=52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218)(@mantou/gem@2.2.13)
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -110,8 +110,8 @@ importers:
         specifier: ^0.2.1
         version: 0.2.1
       tauri-plugin-webproxy-api:
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: ^0.1.4
+        version: 0.1.4
     devDependencies:
       '@rsbuild/core':
         specifier: ^2.1.10
@@ -4413,8 +4413,8 @@ packages:
   tauri-plugin-tts-api@0.2.1:
     resolution: {integrity: sha512-iVTT+3fZbo7WotupbLGrpeHXzyh/z/KgCSN7pM9Wvc1cyxIOM/r+w7elAIUSg7fP1IjfJqOuwxuJOI84/Z8OVw==}
 
-  tauri-plugin-webproxy-api@0.1.2:
-    resolution: {integrity: sha512-9F80wPJtfofRJxg5B0Yvn+u5alph+4PAOfh5DkDkBHOA7iQN3fnercaB3DQsNMTb/siInbC8B16WzoBJzDm9YQ==}
+  tauri-plugin-webproxy-api@0.1.4:
+    resolution: {integrity: sha512-nS+uKD4lptYqco4xOPsWC822RtHSAxJIKEEP386kthGoYXvfxlua20ND7o87zZYpprDXq2sKpubKsr/Zlhj1Lw==}
 
   temp-dir@1.0.0:
     resolution: {integrity: sha512-xZFXEGbG7SNC3itwBzI3RYjq/cEhBkx2hJuKGIUOcEULmkQExXiHat2z/qkISYsuR+IKumhEfKKbV5qXmhICFQ==}
@@ -5380,7 +5380,7 @@ snapshots:
 
   '@mantou/gem@2.2.13': {}
 
-  '@mantou/tap-ui@0.1.13(patch_hash=1e4fc03f444fe88715de1ff60bde512e27eacc17c3fdc94a6f1915b7392d819d)(@mantou/gem@2.2.13)':
+  '@mantou/tap-ui@0.1.13(patch_hash=52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218)(@mantou/gem@2.2.13)':
     dependencies:
       '@mantou/gem': 2.2.13
 
@@ -7012,7 +7012,7 @@ snapshots:
   duoyun-ui@2.2.16(@mantou/gem@2.2.13):
     dependencies:
       '@mantou/gem': 2.2.13
-      '@mantou/tap-ui': 0.1.13(patch_hash=1e4fc03f444fe88715de1ff60bde512e27eacc17c3fdc94a6f1915b7392d819d)(@mantou/gem@2.2.13)
+      '@mantou/tap-ui': 0.1.13(patch_hash=52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218)(@mantou/gem@2.2.13)
       deep-query-selector: 1.0.2
 
   eastasianwidth@0.2.0: {}
@@ -9324,7 +9324,7 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
-  tauri-plugin-webproxy-api@0.1.2:
+  tauri-plugin-webproxy-api@0.1.4:
     dependencies:
       '@tauri-apps/api': 2.11.1
 

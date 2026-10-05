@@ -18,6 +18,7 @@ The user reads your replies in the AgentDeck app, usually on a phone away from t
 - The body is one line: the absolute path of the entry HTML file on this machine. Relative paths are not resolved.
 - The directory containing the entry file is the site root: relative URLs and root-absolute URLs (`/assets/app.js`) both resolve inside it, so point at a build's own `index.html`, not a file above it.
 - A URL ending in `/` loads that directory's `index.html`.
+- Add `edge-to-edge` or `headerless` after the language (```` ```agentdeck-preview edge-to-edge ````) to open the page edge to edge; see below.
 
 ## Rules
 
@@ -25,5 +26,40 @@ The user reads your replies in the AgentDeck app, usually on a phone away from t
 - Files above the site root cannot be loaded, and each file must stay under about 5 MB.
 - External resources (CDN scripts, fonts, images) load from the phone's own network.
 - The page is viewed on a phone about 390px wide: include `<meta name="viewport" content="width=device-width, initial-scale=1">` and `<meta charset="utf-8">`.
+- Full-screen mobile UI (app prototypes, screens with their own top bar, tab bar or full-bleed media) should be edge to edge; documents, reports and slides should not. See below.
 - Write the block after the files exist, once per page, next to a short note about what to look at. Do not repeat the page content in the reply.
 - If you already have a way to screenshot the page (e.g. a browser automation tool), you may also show a PNG screenshot with a Markdown image using its absolute path, like `![Home](/Users/me/project/shot.png)`. Do not install tools just to take a screenshot.
+
+## Edge to edge
+
+By default the page sits below the in-app browser's navbar. Two flags extend the page to the screen edges:
+
+- `edge-to-edge`: the navbar turns transparent and floats over the page. Use it for most app screens.
+- `headerless`: no navbar at all; the user goes back with the edge swipe gesture. Use it for immersive screens (full-screen media, games, onboarding) or when the page's own top bar would clash with the floating navbar.
+
+With either flag the client sets `--safe-area-inset-top/right/bottom/left` on `<html>` (the top inset is the status bar), so pad with these variables instead of hard-coded values. With `edge-to-edge` the navbar's back button, title and menu float over the top of the page, so lead with a header or hero rather than controls right under the status bar. Keep `viewport-fit=cover` and the `env()` fallback so the page also works in a regular mobile browser:
+
+````markdown
+```agentdeck-preview edge-to-edge
+/Users/me/project/prototype/index.html
+```
+````
+
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  .app-bar {
+    position: sticky;
+    top: 0;
+    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  }
+  .tab-bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  }
+</style>
+```
+
+Let backgrounds and full-bleed media fill the insets, but keep text and controls inside them.
