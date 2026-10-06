@@ -6,6 +6,9 @@ globalThis.chrome = {
   i18n: {
     getMessage: (key) => key,
   },
+  tabs: {
+    query: async () => [{ id: 1, url: 'https://example.com/' }],
+  },
   storage: {
     local: {
       get: async (key) => ({ [key]: storage[key] }),
@@ -115,11 +118,16 @@ describe('agent panel runtime', () => {
     const state = createPanelState();
     const runtime = createSessionRuntime(state);
     let resolveCreate;
+    let onCreateStarted;
+    const createStarted = new Promise((resolve) => {
+      onCreateStarted = resolve;
+    });
     const askCalls = [];
     const api = {
       createSession: () =>
         new Promise((resolve) => {
           resolveCreate = resolve;
+          onCreateStarted();
         }),
       setSessionConfigOption: async () => ({ configOptions: [] }),
       closeSession: async () => true,
@@ -149,6 +157,7 @@ describe('agent panel runtime', () => {
     turns.send({ prompt: 'Queued while creating', attachments: [] });
     assert.equal(state.queue[0].prompt, 'Queued while creating');
 
+    await createStarted;
     resolveCreate({ sessionId: 'acp-1', title: 'ACP title', configOptions: [] });
     await starting;
 

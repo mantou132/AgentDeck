@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "extension dev",
     "build": "extension build",
-    "test": "node --test"
+    "test": "node --test --test-timeout=30000"
   },
   "dependencies": {
     "@gem-bind/diff2html": "^0.0.6",

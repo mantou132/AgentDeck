@@ -12,7 +12,7 @@
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "preview": "rsbuild preview",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test --test-timeout=30000 test/*.test.mjs"
   },
   "dependencies": {
     "@gem-bind/diff2html": "^0.0.6",
