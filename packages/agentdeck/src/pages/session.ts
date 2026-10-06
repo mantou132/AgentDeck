@@ -12,6 +12,7 @@ import { hapticImpact } from '../lib/haptics';
 import { displayPath } from '../lib/path';
 import { openChanges, openSettings, replaceSession } from '../navigation';
 import { getConfigLabel, getConfigSelects } from '../session/config-options';
+import { hasPendingElicitation } from '../session/elicitation';
 import type { Attachment, DeckSession } from '../session/types';
 import {
   cancelTurn,
@@ -21,11 +22,11 @@ import {
   getSession,
   promotePendingSession,
   resetPendingSession,
-  resolvePermission,
   retrySessionLoad,
   sendPrompt,
 } from '../state/sessions';
 import { agentdeckStore, clearSessionError, setSessionError, setSessionFlag } from '../state/store';
+import { resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -288,6 +289,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 .sessionKey=${this.sessionId}
                 .cwd=${session.cwd}
                 .messages=${messages}
+                .elicitations=${agentdeckStore.elicitationsBySession[session.sessionId] ?? []}
                 ?pending=${pending}
                 @preview=${this.#previewAttachment}
                 @ask=${this.#onAsk}
@@ -360,7 +362,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             .draftKey=${draftKey(session)}
             config-label=${getConfigLabel(getConfigSelects(agentdeckStore.optionsBySession[session.sessionId]))}
             @config-open=${() => openSessionConfig(session.sessionId)}
-            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get('session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
+            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(hasPendingElicitation(agentdeckStore.elicitationsBySession[session.sessionId]) ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
             .suggestion=${connected && loaded ? (agentdeckStore.suggestionsBySession[session.sessionId] ?? '') : ''}
             .submit=${this.#send}
             ?disabled=${!loaded}

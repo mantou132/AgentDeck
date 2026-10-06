@@ -8,7 +8,7 @@ import {
 } from 'relay-client-ts';
 import { DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
-import { AgentApi, type ClientCapabilities, type PermissionRequest, type SessionEvent } from './api';
+import { AgentApi, type ClientCapabilities, type SessionEvent, type UserInput } from './api';
 import { isPairingId } from './encryption';
 import { RelayCodec } from './relay-codec';
 import type { RpcId, RpcMessage } from './rpc';
@@ -25,7 +25,7 @@ type HostSyncOptions = {
 type InitTransportOptions = {
   initialRelayId: string;
   initialRelayUrl?: string;
-  onRequestPermission: (request: PermissionRequest) => Promise<string>;
+  onUserInput: (input: UserInput) => void;
   onMessage: MessageHandler;
   onBeforePayload?: () => Promise<unknown> | undefined;
   ackHead?: boolean;
@@ -538,7 +538,7 @@ export const initTransport = (options: InitTransportOptions) => {
   transport.setBeforePayloadHook(options.onBeforePayload);
   if (transportInitialized) return;
   transportInitialized = true;
-  agentApi.setPermissionHandler(options.onRequestPermission);
+  agentApi.setUserInputHandler(options.onUserInput);
   agentApi.setSessionEndedHandler(({ sessionId }) => transport.dispatchMessage({ type: 'session_ended', sessionId }));
   agentApi.setPromptSuggestionHandler(({ sessionId, suggestion }) =>
     transport.dispatchMessage({ type: 'prompt_suggestion', sessionId, suggestion }),

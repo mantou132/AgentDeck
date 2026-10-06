@@ -1,7 +1,6 @@
-import type { PermissionRequest, SessionEvent } from '../agent/api';
+import type { SessionEvent } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
-import { hapticWarning } from '../lib/haptics';
 import type { DeckSession, TextMessage } from './types';
 
 type TurnHandlers = {
@@ -9,31 +8,6 @@ type TurnHandlers = {
   onAnswer: (answer: string) => void;
   onError: (error: string) => void;
   onDone: (completed: boolean) => void;
-};
-
-const permissionResolvers = new Map<string, { resolve: (optionId: string) => void; reject: (error: Error) => void }>();
-
-export const requestPermission = (request: PermissionRequest, onNotify: (request: PermissionRequest) => void) => {
-  if (!request?.sessionId) return Promise.reject(new Error(i18n.get('error.permissionMissingSessionId')));
-  permissionResolvers.get(request.sessionId)?.reject(new Error(i18n.get('error.permissionReplaced')));
-  onNotify(request);
-  hapticWarning();
-  return new Promise<string>((resolve, reject) => permissionResolvers.set(request.sessionId, { resolve, reject }));
-};
-
-export const resolvePermission = (sessionId: string, optionId: string | null, onClean: (sessionId: string) => void) => {
-  const resolver = permissionResolvers.get(sessionId);
-  permissionResolvers.delete(sessionId);
-  onClean(sessionId);
-  if (!resolver) return;
-  if (optionId) resolver.resolve(optionId);
-  else resolver.reject(new Error(i18n.get('error.permissionUserCancelled')));
-};
-
-export const declineAllPermissions = (onClean: (sessionId: string) => void) => {
-  for (const sessionId of permissionResolvers.keys()) {
-    resolvePermission(sessionId, null, onClean);
-  }
 };
 
 let pendingSessionCanceled = false;

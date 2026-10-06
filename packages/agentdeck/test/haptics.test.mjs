@@ -38,12 +38,12 @@ test('triggers warning notification haptic when agent encounters permission requ
 
   // Agent emits permission request
   f.deliver({
-    id: 'perm-req-1',
     method: 'agent_permission_request',
     peerId: 1,
     params: {
       agent: 'codex',
       sessionId: 's1',
+      requestId: 'p1',
       toolCall: { title: 'Execute bash command' },
       options: [
         { optionId: 'approve', name: 'Approve' },

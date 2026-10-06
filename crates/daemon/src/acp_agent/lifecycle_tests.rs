@@ -2,7 +2,7 @@ use super::*;
 use agent_client_protocol::{Channel, TransportFrame};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
-use std::{future, time::Duration};
+use std::time::Duration;
 use tokio::task::JoinHandle;
 
 fn frame(message: Value) -> TransportFrame {
@@ -60,6 +60,10 @@ impl MockAcp {
         });
         let request = frame_json(peer.rx.next().await.unwrap());
         assert_eq!(request["method"], "initialize");
+        assert_eq!(
+            request["params"]["clientCapabilities"]["elicitation"],
+            json!({"form": {}})
+        );
         peer.tx
             .unbounded_send(frame(json!({
                 "jsonrpc": "2.0", "id": request["id"], "result": {
@@ -138,7 +142,16 @@ impl MockAcp {
         let id = id.to_string();
         tokio::spawn(async move {
             manager
-                .prompt("codex-acp", &id, "test".into(), vec![], 30, None, None, None)
+                .prompt(
+                    "codex-acp",
+                    &id,
+                    "test".into(),
+                    vec![],
+                    30,
+                    None,
+                    None,
+                    None,
+                )
                 .await
         })
     }
@@ -196,9 +209,9 @@ async fn close_timeout_releases_pending_turn_and_permissions_but_preserves_other
     mock.create("other").await;
     let runtime = mock.manager.runtime("codex-acp");
     // Closing must latch cancellation even before a permission handler subscribes.
-    let cancel = runtime.permission_cancels.lock().await["session"].clone();
+    let cancel = runtime.request_cancels.lock().await["session"].clone();
     runtime
-        .set_session_resolver("session", Arc::new(|_| Box::pin(future::pending())))
+        .set_user_input_sink("session", Arc::new(|_| {}))
         .await;
     let prompt = mock.prompt("session");
     let old_prompt = mock.next("session/prompt").await;
@@ -219,16 +232,10 @@ async fn close_timeout_releases_pending_turn_and_permissions_but_preserves_other
             .unwrap()
             .unwrap()
     );
+    assert!(!runtime.request_cancels.lock().await.contains_key("session"));
     assert!(
         !runtime
-            .permission_cancels
-            .lock()
-            .await
-            .contains_key("session")
-    );
-    assert!(
-        !runtime
-            .session_resolvers
+            .user_input_sinks
             .lock()
             .await
             .contains_key("session")
@@ -338,12 +345,7 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     // Wait for attach, then supply a replay event to establish that the actor is draining history.
     let runtime = mock.manager.runtime("codex-acp");
     tokio::time::timeout(Duration::from_secs(1), async {
-        while !runtime
-            .permission_cancels
-            .lock()
-            .await
-            .contains_key("session")
-        {
+        while !runtime.request_cancels.lock().await.contains_key("session") {
             tokio::task::yield_now().await;
         }
     })
@@ -366,12 +368,7 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     let request = mock.next("session/close").await;
     mock.respond(&request, json!({}));
     tokio::time::timeout(Duration::from_secs(1), async {
-        while runtime
-            .permission_cancels
-            .lock()
-            .await
-            .contains_key("session")
-        {
+        while runtime.request_cancels.lock().await.contains_key("session") {
             tokio::task::yield_now().await;
         }
     })
@@ -409,10 +406,8 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
     let mut mock = MockAcp::new().await;
     mock.create("session").await;
     let (permission_tx, mut permission_rx) = mpsc::unbounded_channel();
-    let resolver: PermissionResolver = Arc::new(move |request| {
-        permission_tx.send(request).unwrap();
-        Box::pin(future::pending())
-    });
+    let sink: UserInputSink =
+        Arc::new(move |input| permission_tx.send(input.params().clone()).unwrap());
     let manager = mock.manager.clone();
     let prompt = tokio::spawn(async move {
         manager
@@ -423,7 +418,7 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
                 vec![],
                 30,
                 None,
-                Some(resolver),
+                Some(sink),
                 None,
             )
             .await
@@ -471,6 +466,131 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
     assert!(close.await.unwrap());
     assert!(prompt.await.unwrap().is_err());
     mock.load("session").await;
+}
+
+#[tokio::test]
+async fn user_input_is_answered_after_delivery_and_close_cancels_it() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel();
+    let sink: UserInputSink = Arc::new(move |input| request_tx.send(input.clone()).unwrap());
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                30,
+                None,
+                Some(sink),
+                None,
+            )
+            .await
+    });
+    mock.next("session/prompt").await;
+    let elicitation = |id: &str| {
+        frame(json!({
+            "jsonrpc": "2.0", "id": id, "method": "elicitation/create",
+            "params": {
+                "mode": "form", "sessionId": "session", "toolCallId": "tool",
+                "message": "Which?",
+                "requestedSchema": {"type": "object", "properties": {
+                    "question_0": {"type": "string", "oneOf": [{"const": "A", "title": "A"}]}
+                }}
+            }
+        }))
+    };
+    mock.peer.tx.unbounded_send(elicitation("ask")).unwrap();
+    let input = request_rx.recv().await.unwrap();
+    let UserInput::Elicitation(request) = input.clone() else {
+        panic!("expected an elicitation: {input:?}");
+    };
+    assert_eq!(request["agent"], "codex-acp");
+    assert_eq!(request["sessionId"], "session");
+    assert_eq!(request["toolCallId"], "tool");
+    assert_eq!(
+        request["requestedSchema"]["properties"]["question_0"]["oneOf"][0]["const"],
+        "A"
+    );
+    // A reloaded device finds the question again and answers it.
+    assert_eq!(
+        serde_json::to_value(mock.manager.pending_user_inputs().await).unwrap(),
+        json!([{"method": "agent_elicitation_request", "params": request}])
+    );
+    let request_id = request["requestId"].as_str().unwrap();
+    let response = json!({"action": "accept", "content": {"question_0": "A"}});
+    assert!(
+        !mock
+            .manager
+            .answer_user_input("codex-acp", "session", "stale", response.clone())
+            .await
+    );
+    assert!(
+        mock.manager
+            .answer_user_input("codex-acp", "session", request_id, response.clone())
+            .await
+    );
+    let answer = frame_json(mock.peer.rx.next().await.unwrap());
+    assert_eq!(answer["id"], "ask");
+    assert_eq!(answer["result"], response);
+    assert!(mock.manager.pending_user_inputs().await.is_empty());
+
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "id": "permission", "method": "session/request_permission",
+            "params": {
+                "sessionId": "session",
+                "toolCall": {"toolCallId": "tool", "title": "Test permission", "status": "pending"},
+                "options": [{"optionId": "allow", "name": "Allow once", "kind": "allow_once"}]
+            }
+        })))
+        .unwrap();
+    let UserInput::Permission(request) = request_rx.recv().await.unwrap() else {
+        panic!("expected a permission request");
+    };
+    let request_id = request["requestId"].as_str().unwrap();
+    assert!(
+        mock.manager
+            .answer_user_input(
+                "codex-acp",
+                "session",
+                request_id,
+                json!({"optionId": "allow"})
+            )
+            .await
+    );
+    let answer = frame_json(mock.peer.rx.next().await.unwrap());
+    assert_eq!(answer["id"], "permission");
+    assert_eq!(answer["result"]["outcome"]["optionId"], "allow");
+
+    mock.peer.tx.unbounded_send(elicitation("pending")).unwrap();
+    request_rx.recv().await.unwrap();
+    let close = mock.close("session");
+    tokio::time::timeout(Duration::from_secs(1), async {
+        let (mut closed, mut elicitation_cancelled) = (false, false);
+        while !(closed && elicitation_cancelled) {
+            let message = frame_json(mock.peer.rx.next().await.unwrap());
+            match message["method"].as_str() {
+                Some("$/cancel_request" | "session/cancel") => {}
+                Some("session/close") => {
+                    mock.respond(&message, json!({}));
+                    closed = true;
+                }
+                None if message["id"] == "pending" => {
+                    assert_eq!(message["result"]["action"], "cancel");
+                    elicitation_cancelled = true;
+                }
+                _ => panic!("Unexpected ACP message: {message}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert!(close.await.unwrap());
+    assert!(prompt.await.unwrap().is_err());
 }
 
 #[tokio::test]

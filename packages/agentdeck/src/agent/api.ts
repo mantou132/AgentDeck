@@ -139,9 +139,47 @@ export type LoadedSession = {
 export type PermissionRequest = {
   agent: string;
   sessionId: string;
+  requestId: string;
   toolCall?: { title?: string; kind?: string; rawInput?: unknown };
   options?: { optionId: string; name: string; kind?: string }[];
 };
+
+export type ElicitationOption = { const: string; title?: string; description?: string };
+
+/** A form field of an ACP form elicitation (a restricted JSON Schema). */
+export type ElicitationProperty = {
+  type: 'string' | 'number' | 'integer' | 'boolean' | 'array';
+  title?: string;
+  description?: string;
+  enum?: string[];
+  oneOf?: ElicitationOption[];
+  items?: { enum?: string[]; anyOf?: ElicitationOption[] };
+};
+
+/** ACP form elicitation forwarded by the host; `requestId` identifies it when answering. */
+export type ElicitationRequest = {
+  agent: string;
+  sessionId: string;
+  requestId: string;
+  toolCallId?: string;
+  message: string;
+  requestedSchema: { properties: Record<string, ElicitationProperty>; required?: string[] };
+};
+
+export type ElicitationValue = string | number | boolean | string[];
+
+export type ElicitationResponse =
+  | { action: 'accept'; content: Record<string, ElicitationValue> }
+  | { action: 'decline' }
+  | { action: 'cancel' };
+
+/** Without `optionId` the tool call is cancelled. */
+export type PermissionResponse = { optionId?: string };
+
+/** A request waiting for the user, as the host lists it after reconnecting. */
+export type UserInput =
+  | { method: 'agent_permission_request'; params: PermissionRequest }
+  | { method: 'agent_elicitation_request'; params: ElicitationRequest };
 
 export type CreatedSession = {
   agent?: string;
@@ -186,10 +224,12 @@ export class AgentApi {
 
   rejectAll = (error: Error) => this.#peer.rejectAll(error);
 
-  setPermissionHandler = (handler?: ((request: PermissionRequest) => Promise<string | null | undefined>) | null) =>
-    this.#peer.handle('agent_permission_request', async (params) =>
-      handler?.(params as PermissionRequest).then((optionId) => ({ optionId })),
-    );
+  /** Requests waiting for the user arrive as notifications; answers go through `respondUserInput`. */
+  setUserInputHandler = (handler?: ((input: UserInput) => void) | null) => {
+    for (const method of ['agent_permission_request', 'agent_elicitation_request'] as const) {
+      this.#peer.onNotify(method, (params) => handler?.({ method, params } as UserInput));
+    }
+  };
 
   setSessionEndedHandler = (handler?: ((params: { agent: string; sessionId: string }) => void) | null) =>
     this.#peer.onNotify('agent_session_ended', (params) => handler?.(params as { agent: string; sessionId: string }));
@@ -403,9 +443,20 @@ export class AgentApi {
   forgetPrompt = (rpcId: RpcId) => this.#peer.forget(rpcId);
 
   listRunningPrompts = () =>
-    this.#peer.call<{ sessions: { agent: string; sessionId: string }[] }>('agent_prompts_running', {}, undefined, {
-      timeoutMs: 10_000,
-      timeoutMessage: 'List running prompts timeout',
+    this.#peer.call<{ sessions: { agent: string; sessionId: string }[]; userInputs?: UserInput[] }>(
+      'agent_prompts_running',
+      {},
+      undefined,
+      { timeoutMs: 10_000, timeoutMessage: 'List running prompts timeout' },
+    );
+
+  respondUserInput = (
+    { agent, sessionId, requestId }: PermissionRequest | ElicitationRequest,
+    response: PermissionResponse | ElicitationResponse,
+  ) =>
+    this.#peer.call('agent_user_input_respond', { agent, sessionId, requestId, response }, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: i18n.get('error.userInputTimeout'),
     });
 
   cancelPrompt = (sessionId: string, agent: string) =>

@@ -3,6 +3,7 @@ import { sleep } from '@mantou/tap-ui/lib/timer';
 import { hapticWarning } from 'src/lib/haptics';
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
+import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
@@ -95,7 +96,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
     const unreadSessionSet = new Set(agentdeckStore.unreadSessionIds);
     const pendingSessionSet = new Set(agentdeckStore.pendingSessionIds);
-    const permissionSessionSet = new Set(Object.keys(agentdeckStore.permissionsBySession));
+    const permissionSessionSet = new Set([
+      ...Object.keys(agentdeckStore.permissionsBySession),
+      ...Object.entries(agentdeckStore.elicitationsBySession)
+        .filter(([, elicitations]) => hasPendingElicitation(elicitations))
+        .map(([sessionId]) => sessionId),
+    ]);
     const deletingSessionSet = new Set(agentdeckStore.deletingSessionIds);
 
     return html`

@@ -23,9 +23,8 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
       await tick();
       if (operation === 'permission') {
         old.deliver({
-          id: 'old-permission',
           method: 'agent_permission_request',
-          params: { agent: 'codex', sessionId: 's1', options: [{ optionId: 'allow', name: 'Allow' }] },
+          params: { agent: 'codex', sessionId: 's1', requestId: 'p1', options: [{ optionId: 'allow', name: 'Allow' }] },
           peerId: 1,
         });
         await tick();
@@ -67,15 +66,13 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
     // A live old host may still emit replies and permission requests after reset.
     fresh.reply(staleRequest, { answer: 'old answer', sessionId: 'old-created' });
     fresh.deliver({
-      id: 'late-permission',
       method: 'agent_permission_request',
-      params: { agent: 'codex', sessionId: 's1' },
+      params: { agent: 'codex', sessionId: 's1', requestId: 'p2' },
       peerId: 1,
     });
     await tick();
     assert.equal(Object.keys(fresh.app.agentdeckStore.messagesBySession).length, 0);
     assert.equal(Object.keys(fresh.app.agentdeckStore.permissionsBySession).length, 0);
-    assert.ok(fresh.requests.find((request) => request.payload.id === 'late-permission')?.payload.error);
 
     await fresh.openSession();
     const methods = fresh.requests.map((request) => request.payload.method);

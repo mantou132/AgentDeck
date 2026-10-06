@@ -237,6 +237,8 @@ export function documentFixture(previous, options = {}) {
       'session/events',
       'session/timeline',
       'session/voice-chat',
+      'session/elicitation',
+      'state/user-input',
       'agent/transport',
     ].map((name) => load(path.join(root, `src/${name}.ts`))),
   );

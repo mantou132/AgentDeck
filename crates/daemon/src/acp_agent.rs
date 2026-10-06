@@ -12,12 +12,15 @@ use agent_client_protocol::{
     schema::{
         ProtocolVersion,
         v1::{
-            AgentCapabilities, CancelNotification, CloseSessionRequest, ContentBlock, ContentChunk,
-            DeleteSessionRequest, ImageContent, Implementation, InitializeRequest,
-            ListSessionsRequest, LoadSessionRequest, NewSessionRequest, PermissionOptionId,
-            PromptRequest, PromptResponse, RequestPermissionOutcome, RequestPermissionRequest,
-            RequestPermissionResponse, ResourceLink, SelectedPermissionOutcome, SessionConfigId,
-            SessionConfigValueId, SessionId, SessionModeId, SessionNotification, SessionUpdate,
+            AgentCapabilities, CancelNotification, ClientCapabilities as AcpClientCapabilities,
+            CloseSessionRequest, ContentBlock, ContentChunk, CreateElicitationRequest,
+            CreateElicitationResponse, DeleteSessionRequest, ElicitationAction,
+            ElicitationCapabilities, ElicitationFormCapabilities, ElicitationScope, ImageContent,
+            Implementation, InitializeRequest, ListSessionsRequest, LoadSessionRequest,
+            NewSessionRequest, PermissionOptionId, PromptRequest, PromptResponse,
+            RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
+            ResourceLink, SelectedPermissionOutcome, SessionConfigId, SessionConfigValueId,
+            SessionId, SessionModeId, SessionNotification, SessionUpdate,
             SetSessionConfigOptionRequest, SetSessionModeRequest, TextContent,
         },
     },
@@ -28,10 +31,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    peer::BoxFuture,
-    render_skills::{self, ClientCapabilities},
-};
+use crate::render_skills::{self, ClientCapabilities};
 
 mod catalog;
 mod provision;
@@ -49,11 +49,47 @@ fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-/// Resolve an ACP permission request (forwarded as JSON with `sessionId`,
-/// `toolCall`, `options`) to the id of the option the user picked.
-/// `None` cancels the pending tool call.
-pub type PermissionResolver =
-    Arc<dyn Fn(serde_json::Value) -> BoxFuture<'static, Option<String>> + Send + Sync>;
+/// Delivers an agent request that needs the user (permission or form
+/// elicitation) to the prompting device as a `(method, params)` notification;
+/// the device answers through `answer_user_input`.
+pub type UserInputSink = Arc<dyn Fn(&UserInput) + Send + Sync>;
+
+/// A request waiting for the user, sent to the device as the `method`
+/// notification. `params` carry `agent`, `sessionId` and `requestId`.
+#[derive(Debug, Clone)]
+pub enum UserInput {
+    Permission(serde_json::Value),
+    Elicitation(serde_json::Value),
+}
+
+/// Listed as `{ method, params }`, the shape of the notification.
+impl Serialize for UserInput {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serde_json::json!({ "method": self.method(), "params": self.params() })
+            .serialize(serializer)
+    }
+}
+
+impl UserInput {
+    pub fn method(&self) -> &'static str {
+        match self {
+            Self::Permission(_) => "agent_permission_request",
+            Self::Elicitation(_) => "agent_elicitation_request",
+        }
+    }
+
+    pub fn params(&self) -> &serde_json::Value {
+        match self {
+            Self::Permission(params) | Self::Elicitation(params) => params,
+        }
+    }
+
+    fn params_mut(&mut self) -> &mut serde_json::Value {
+        match self {
+            Self::Permission(params) | Self::Elicitation(params) => params,
+        }
+    }
+}
 
 /// Receives the agent's predicted next user prompt for a session.
 pub type SuggestionSink = Arc<dyn Fn(String) + Send + Sync>;
@@ -118,11 +154,19 @@ struct StartedSession {
 struct AcpRuntime {
     agent: String,
     state: Arc<Mutex<RuntimeState>>,
-    session_resolvers: Arc<Mutex<HashMap<String, PermissionResolver>>>,
+    user_input_sinks: Arc<Mutex<HashMap<String, UserInputSink>>>,
     /// Kept after the turn: suggestions arrive once the prompt has settled.
     suggestion_sinks: Arc<Mutex<HashMap<String, SuggestionSink>>>,
-    permission_cancels: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
+    request_cancels: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
+    /// The unanswered request of each session (the agent waits for one at a
+    /// time), kept so a reloaded or reconnected device can show it again.
+    user_inputs: Arc<Mutex<HashMap<String, PendingUserInput>>>,
     disconnects: watch::Sender<u64>,
+}
+
+struct PendingUserInput {
+    input: UserInput,
+    answer: oneshot::Sender<serde_json::Value>,
 }
 
 impl AcpRuntime {
@@ -136,9 +180,10 @@ impl AcpRuntime {
                 generation: 0,
                 waiters: Vec::new(),
             })),
-            session_resolvers: Arc::new(Mutex::new(HashMap::new())),
+            user_input_sinks: Arc::new(Mutex::new(HashMap::new())),
             suggestion_sinks: Arc::new(Mutex::new(HashMap::new())),
-            permission_cancels: Arc::new(Mutex::new(HashMap::new())),
+            request_cancels: Arc::new(Mutex::new(HashMap::new())),
+            user_inputs: Arc::new(Mutex::new(HashMap::new())),
             disconnects,
         }
     }
@@ -203,55 +248,63 @@ impl AcpRuntime {
         generation: u64,
         agent: impl agent_client_protocol::ConnectTo<Client>,
     ) -> Result<()> {
-        let session_resolvers = self.session_resolvers.clone();
-        let permission_cancels = self.permission_cancels.clone();
+        let permission_runtime = self.clone();
+        let elicitation_runtime = self.clone();
         let suggestion_sinks = self.suggestion_sinks.clone();
         let runtime = self.clone();
-        let agent_id = self.agent.clone();
 
         Client
             .builder()
             .name("agentdeck")
             .on_receive_request(
                 async move |request: RequestPermissionRequest, responder, connection| {
-                    let session_resolvers = session_resolvers.clone();
-                    let permission_cancels = permission_cancels.clone();
-                    let agent_id = agent_id.clone();
+                    let runtime = permission_runtime.clone();
                     connection.spawn(async move {
                         let session_id = request.session_id.to_string();
                         let payload = serde_json::json!({
-                            "agent": agent_id,
+                            "agent": runtime.agent,
                             "sessionId": session_id,
                             "toolCall": to_json(request.tool_call),
                             "options": to_json(request.options),
                         });
-                        let resolver = session_resolvers.lock().await.get(&session_id).cloned();
-                        let cancel = permission_cancels.lock().await.get(&session_id).cloned();
-                        let resolution = match (resolver, cancel) {
-                            (Some(resolver), Some(cancel)) => {
-                                let mut cancel_rx = cancel.subscribe();
-                                if *cancel_rx.borrow() {
-                                    None
-                                } else {
-                                    tokio::select! {
-                                        resolution = resolver(payload) => resolution,
-                                        _ = cancel_rx.changed() => None,
-                                    }
-                                }
-                            }
-                            // Missing live-session cancellation state means the request is stale.
-                            _ => None,
+                        let option_id = runtime
+                            .wait_user_input(&session_id, UserInput::Permission(payload))
+                            .await
+                            .and_then(|response| {
+                                response.get("optionId")?.as_str().map(str::to_string)
+                            });
+                        let outcome = match option_id {
+                            Some(option_id) => RequestPermissionOutcome::Selected(
+                                SelectedPermissionOutcome::new(PermissionOptionId::from(option_id)),
+                            ),
+                            None => RequestPermissionOutcome::Cancelled,
                         };
-                        match resolution {
-                            Some(option_id) => responder.respond(RequestPermissionResponse::new(
-                                RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(
-                                    PermissionOptionId::from(option_id),
-                                )),
-                            )),
-                            None => responder.respond(RequestPermissionResponse::new(
-                                RequestPermissionOutcome::Cancelled,
-                            )),
-                        }
+                        responder.respond(RequestPermissionResponse::new(outcome))
+                    })
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_request(
+                async move |request: CreateElicitationRequest, responder, connection| {
+                    let runtime = elicitation_runtime.clone();
+                    connection.spawn(async move {
+                        // Only form mode is advertised, and its requests are session-scoped.
+                        let ElicitationScope::Session(scope) = request.scope() else {
+                            return responder.respond(CreateElicitationResponse::new(
+                                ElicitationAction::Cancel,
+                            ));
+                        };
+                        let session_id = scope.session_id.to_string();
+                        let mut payload = to_json(&request);
+                        payload["agent"] = runtime.agent.clone().into();
+                        let response = runtime
+                            .wait_user_input(&session_id, UserInput::Elicitation(payload))
+                            .await
+                            .and_then(|response| serde_json::from_value(response).ok())
+                            .unwrap_or_else(|| {
+                                CreateElicitationResponse::new(ElicitationAction::Cancel)
+                            });
+                        responder.respond(response)
                     })
                 },
                 agent_client_protocol::on_receive_request!(),
@@ -275,9 +328,16 @@ impl AcpRuntime {
                 agent_client_protocol::on_receive_notification!(),
             )
             .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
-                let request = InitializeRequest::new(ProtocolVersion::V1).client_info(
-                    Implementation::new("agentdeck", env!("CARGO_PKG_VERSION")).title("AgentDeck"),
+                // Form elicitation lets Claude ask the user (`AskUserQuestion`).
+                let capabilities = AcpClientCapabilities::new().elicitation(
+                    ElicitationCapabilities::new().form(ElicitationFormCapabilities::new()),
                 );
+                let request = InitializeRequest::new(ProtocolVersion::V1)
+                    .client_capabilities(capabilities)
+                    .client_info(
+                        Implementation::new("agentdeck", env!("CARGO_PKG_VERSION"))
+                            .title("AgentDeck"),
+                    );
                 let response = connection.send_request(request).block_task().await?;
                 if response.protocol_version != ProtocolVersion::V1 {
                     return Err(agent_client_protocol::Error::internal_error().data(format!(
@@ -403,11 +463,11 @@ impl AcpRuntime {
             }
         };
         let (cancel, _) = watch::channel(false);
-        let mut permission_cancels = self.permission_cancels.lock().await;
-        if permission_cancels.contains_key(&ready.session_id) {
+        let mut request_cancels = self.request_cancels.lock().await;
+        if request_cancels.contains_key(&ready.session_id) {
             anyhow::bail!("ACP agent session is already active: {}", ready.session_id);
         }
-        permission_cancels.insert(ready.session_id.clone(), cancel.clone());
+        request_cancels.insert(ready.session_id.clone(), cancel.clone());
         Ok(StartedSession {
             session,
             ready,
@@ -418,15 +478,84 @@ impl AcpRuntime {
         })
     }
 
-    async fn set_session_resolver(&self, session_id: &str, resolver: PermissionResolver) {
-        self.session_resolvers
+    /// Show a request on the prompting device and wait until a device answers
+    /// it through `answer_user_input`; delivery is not the answer, so a device
+    /// that reloaded can still answer. Closing or cancelling the session settles
+    /// the wait with `None`, as does a session without a running turn.
+    async fn wait_user_input(
+        &self,
+        session_id: &str,
+        mut input: UserInput,
+    ) -> Option<serde_json::Value> {
+        let sink = self
+            .user_input_sinks
+            .lock()
+            .await
+            .get(session_id)
+            .cloned()?;
+        let mut cancel = self
+            .request_cancels
+            .lock()
+            .await
+            .get(session_id)?
+            .subscribe();
+        if *cancel.borrow() {
+            return None;
+        }
+        let request_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+            .to_string();
+        input.params_mut()["requestId"] = request_id.into();
+        sink(&input);
+        let (answer, answer_rx) = oneshot::channel();
+        self.user_inputs
+            .lock()
+            .await
+            .insert(session_id.to_string(), PendingUserInput { input, answer });
+        let answer = tokio::select! {
+            answer = answer_rx => answer.ok(),
+            _ = cancel.changed() => None,
+        };
+        self.user_inputs.lock().await.remove(session_id);
+        answer
+    }
+
+    async fn pending_user_inputs(&self) -> Vec<UserInput> {
+        let user_inputs = self.user_inputs.lock().await;
+        user_inputs
+            .values()
+            .map(|pending| pending.input.clone())
+            .collect()
+    }
+
+    async fn answer_user_input(
+        &self,
+        session_id: &str,
+        request_id: &str,
+        response: serde_json::Value,
+    ) -> bool {
+        let mut user_inputs = self.user_inputs.lock().await;
+        if user_inputs
+            .get(session_id)
+            .is_none_or(|pending| pending.input.params()["requestId"] != request_id)
+        {
+            return false;
+        }
+        let pending = user_inputs.remove(session_id).expect("checked above");
+        pending.answer.send(response).is_ok()
+    }
+
+    async fn set_user_input_sink(&self, session_id: &str, resolver: UserInputSink) {
+        self.user_input_sinks
             .lock()
             .await
             .insert(session_id.to_string(), resolver);
     }
 
-    async fn clear_session_resolver(&self, session_id: &str) {
-        self.session_resolvers.lock().await.remove(session_id);
+    async fn clear_user_input_sink(&self, session_id: &str) {
+        self.user_input_sinks.lock().await.remove(session_id);
     }
 
     async fn set_suggestion_sink(&self, session_id: &str, sink: SuggestionSink) {
@@ -437,8 +566,9 @@ impl AcpRuntime {
     }
 
     async fn unregister_session(&self, session_id: &str) {
-        self.permission_cancels.lock().await.remove(session_id);
-        self.session_resolvers.lock().await.remove(session_id);
+        self.request_cancels.lock().await.remove(session_id);
+        self.user_input_sinks.lock().await.remove(session_id);
+        self.user_inputs.lock().await.remove(session_id);
         self.suggestion_sinks.lock().await.remove(session_id);
     }
 }
@@ -581,7 +711,7 @@ enum SessionCommand {
         prompt: String,
         attachments: Vec<Attachment>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-        permission_resolver: Option<PermissionResolver>,
+        user_input_sink: Option<UserInputSink>,
         suggestion_sink: Option<SuggestionSink>,
         reply: oneshot::Sender<Result<String, String>>,
     },
@@ -752,7 +882,7 @@ impl AgentSessionManager {
         attachments: Vec<Attachment>,
         timeout_secs: u64,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-        permission_resolver: Option<PermissionResolver>,
+        user_input_sink: Option<UserInputSink>,
         suggestion_sink: Option<SuggestionSink>,
     ) -> Result<String> {
         let session = self.session(agent, session_id).await?;
@@ -790,7 +920,7 @@ impl AgentSessionManager {
                 prompt,
                 attachments,
                 event_tx: turn_event_tx,
-                permission_resolver,
+                user_input_sink,
                 suggestion_sink,
                 reply: reply_tx,
             })
@@ -850,6 +980,38 @@ impl AgentSessionManager {
             .filter(|(_, session)| session.busy.load(Ordering::Acquire))
             .map(|(key, _)| (key.agent.clone(), key.session_id.clone()))
             .collect()
+    }
+
+    /// Unanswered user input requests of all sessions.
+    pub async fn pending_user_inputs(&self) -> Vec<UserInput> {
+        let runtimes: Vec<AcpRuntime> = self
+            .runtimes
+            .lock()
+            .expect("runtimes lock poisoned")
+            .values()
+            .cloned()
+            .collect();
+        let mut pending = Vec::new();
+        for runtime in runtimes {
+            pending.extend(runtime.pending_user_inputs().await);
+        }
+        pending
+    }
+
+    /// Answer a pending user input request: `{ optionId }` for a permission
+    /// (without it the tool call is cancelled), an ACP
+    /// `CreateElicitationResponse` for a form elicitation. `false` when it is
+    /// no longer pending.
+    pub async fn answer_user_input(
+        &self,
+        agent: &str,
+        session_id: &str,
+        request_id: &str,
+        response: serde_json::Value,
+    ) -> bool {
+        self.runtime(agent)
+            .answer_user_input(session_id, request_id, response)
+            .await
     }
 
     /// Cancel the in-flight prompt of a session. The prompt settles with the
@@ -1049,12 +1211,12 @@ async fn run_session_actor_inner(
                     prompt,
                     attachments,
                     event_tx,
-                    permission_resolver,
+                    user_input_sink,
                     suggestion_sink,
                     reply,
                 } => {
-                    if let Some(resolver) = permission_resolver {
-                        runtime.set_session_resolver(&session_id, resolver).await;
+                    if let Some(resolver) = user_input_sink {
+                        runtime.set_user_input_sink(&session_id, resolver).await;
                     }
                     if let Some(sink) = suggestion_sink {
                         runtime.set_suggestion_sink(&session_id, sink).await;
@@ -1068,7 +1230,7 @@ async fn run_session_actor_inner(
                         Some(&mut rx),
                     )
                     .await;
-                    runtime.clear_session_resolver(&session_id).await;
+                    runtime.clear_user_input_sink(&session_id).await;
                     match turn_result {
                         Ok((answer, new_deferred)) => {
                             let _ = reply.send(Ok(answer));
@@ -1110,7 +1272,7 @@ async fn run_session_actor_inner(
         } => Err(agent_client_protocol::Error::internal_error().data("ACP connection stopped")),
     };
     if closing.is_cancelled() {
-        // This also interrupts a stuck mode/config request or permission wait;
+        // This also interrupts a stuck mode/config request or a user input wait;
         // close must not queue behind the operation the user is resetting.
         cancel_prompt(&session, &cancel_flag);
         if close_supported {
@@ -1127,7 +1289,7 @@ async fn run_session_actor_inner(
 }
 
 fn cancel_prompt(session: &ActiveSession<'_, Agent>, cancel_flag: &watch::Sender<bool>) {
-    // Pending permission requests of this turn must settle cancelled.
+    // Pending permission and elicitation requests of this turn must settle cancelled.
     cancel_flag.send_replace(true);
     let notification = CancelNotification::new(session.session_id().clone());
     if let Err(err) = session.connection().send_notification(notification) {

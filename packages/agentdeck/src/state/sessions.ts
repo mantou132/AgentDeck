@@ -1,20 +1,13 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent } from '../agent/api';
+import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent, type UserInput } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
 import { draftKey, removeDraft } from '../composer/drafts';
 import { i18n } from '../i18n';
 import { getConfigSelects, getConfigValues } from '../session/config-options';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
-import {
-  cancelTurnPrompt,
-  declineAllPermissions,
-  isPendingSessionCanceled,
-  performTurn,
-  resolvePermission as resolveTurnPermission,
-  setPendingSessionCanceled,
-} from '../session/turn';
+import { cancelTurnPrompt, isPendingSessionCanceled, performTurn, setPendingSessionCanceled } from '../session/turn';
 import type { Attachment, DeckSession, SessionOptions, TextMessage } from '../session/types';
 import { applyConfigSelection, getConfigDefaults, saveConfigDefaults } from './config-options';
 import {
@@ -35,6 +28,7 @@ import {
   setSessionFlag,
   updateSessionOptions,
 } from './store';
+import { removeElicitations, settleUserInput, showElicitation, showPermission } from './user-input';
 
 let sessionsRequest = 0;
 const sessionLoads = new Map<string, number>();
@@ -77,12 +71,11 @@ export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
   if (reduction.optionsPatch) updateSessionOptions(sessionId, reduction.optionsPatch);
 };
 
-export const resolvePermission = (sessionId: string, optionId: string | null) => {
-  resolveTurnPermission(sessionId, optionId, (id) => {
-    const permissionsBySession = { ...agentdeckStore.permissionsBySession };
-    delete permissionsBySession[id];
-    agentdeckStore({ permissionsBySession });
-  });
+/** Permission requests and questions are shown only for the running turn of the device that started it. */
+export const showUserInput = ({ method, params }: UserInput) => {
+  if (getSession(params.sessionId)?.agent !== params.agent) return;
+  if (method === 'agent_permission_request') showPermission(params);
+  else showElicitation(params);
 };
 
 export const resetRemoteState = () => {
@@ -93,11 +86,6 @@ export const resetRemoteState = () => {
   inFlightSessions.clear();
   openedSessionIds.clear();
   clearAllInFlight();
-  declineAllPermissions((id) => {
-    const permissionsBySession = { ...agentdeckStore.permissionsBySession };
-    delete permissionsBySession[id];
-    agentdeckStore({ permissionsBySession });
-  });
   agentdeckStore({
     pendingSession: null,
     sessions: [],
@@ -114,6 +102,7 @@ export const resetRemoteState = () => {
     errorsBySession: {},
     optionsBySession: {},
     permissionsBySession: {},
+    elicitationsBySession: {},
   });
 };
 
@@ -265,7 +254,8 @@ export const deleteSession = async (sessionId: string) => {
     openedSessionIds.delete(sessionId);
     removeInFlight(sessionId);
     removeDraft(draftKey(session)).catch(console.error);
-    resolvePermission(sessionId, null);
+    settleUserInput(sessionId);
+    removeElicitations(sessionId);
     const sessions = agentdeckStore.sessions.filter((item) => item.sessionId !== sessionId);
     const messagesBySession = { ...agentdeckStore.messagesBySession };
     const errorsBySession = { ...agentdeckStore.errorsBySession };
@@ -304,7 +294,7 @@ export const closeSession = async (sessionId: string) => {
   setSessionFlag('loadingSessionIds', sessionId, false);
   setSessionFlag('pendingSessionIds', sessionId, false);
   setSessionFlag('unreadSessionIds', sessionId, false);
-  resolvePermission(sessionId, null);
+  settleUserInput(sessionId);
   removeInFlight(sessionId);
   setMessages(sessionId, finishStreaming(agentdeckStore.messagesBySession[sessionId] ?? []));
   clearSessionError(sessionId);
@@ -504,7 +494,7 @@ const runPromptTurn = (
       },
       onDone: (completed) => {
         removeInFlight(session.sessionId);
-        resolvePermission(session.sessionId, null);
+        settleUserInput(session.sessionId);
         setMessages(session.sessionId, finishStreaming(agentdeckStore.messagesBySession[session.sessionId] ?? []));
         if (completed && agentdeckStore.pendingSessionIds.includes(session.sessionId)) {
           setSessionFlag('unreadSessionIds', session.sessionId, true);
@@ -525,7 +515,7 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
     onEvent: (event) => applySessionEvent(sessionId, event),
     resolve: (result) => {
       removeInFlight(sessionId);
-      resolvePermission(sessionId, null);
+      settleUserInput(sessionId);
       if (result?.answer) {
         const current = agentdeckStore.messagesBySession[sessionId] ?? [];
         const hasAnswer = current.some((m) => 'role' in m && m.role === 'agent' && m.text);
@@ -554,7 +544,7 @@ export const resumeInFlightTurn = (inFlight: InFlightSession) => {
  */
 export const settleLostTurns = async () => {
   if (!agentdeckStore.pendingSessionIds.some((sessionId) => turnRpcIds.has(sessionId))) return;
-  const { sessions } = await agentApi.listRunningPrompts();
+  const { sessions, userInputs = [] } = await agentApi.listRunningPrompts();
   const running = new Set(sessions.map((session) => session.sessionId));
   // Responses prior to the query reply are already processed; any turns still pending whose daemon is no longer running are lost-reply turns
   for (const sessionId of agentdeckStore.pendingSessionIds) {
@@ -564,12 +554,14 @@ export const settleLostTurns = async () => {
     agentApi.forgetPrompt(rpcId);
     turnRpcIds.delete(sessionId);
     removeInFlight(sessionId);
-    resolvePermission(sessionId, null);
+    settleUserInput(sessionId);
     setSessionFlag('pendingSessionIds', sessionId, false);
     setSessionFlag('unreadSessionIds', sessionId, true);
     openedSessionIds.delete(sessionId);
     ensureSessionLoaded(sessionId);
   }
+  // Permission requests and questions delivered before a reload are shown again.
+  for (const input of userInputs) showUserInput(input);
 };
 
 export const promotePendingSession = async (
@@ -701,7 +693,7 @@ export const sendPrompt = (
 export const cancelTurn = (sessionId: string) => {
   const session = getSession(sessionId);
   if (!session || !agentdeckStore.pendingSessionIds.includes(sessionId)) return;
-  resolvePermission(sessionId, null);
+  settleUserInput(sessionId);
   if (session.pendingCreation) {
     setPendingSessionCanceled(true);
     setSessionFlag('pendingSessionIds', sessionId, false);
@@ -720,7 +712,7 @@ export const endSession = (sessionId: string) => {
   setSessionFlag('loadingSessionIds', sessionId, false);
   setSessionFlag('pendingSessionIds', sessionId, false);
   openedSessionIds.delete(sessionId);
-  resolvePermission(sessionId, null);
+  settleUserInput(sessionId);
   setSessionError(sessionId, i18n.get('error.remoteSessionEnded'));
   removeInFlight(sessionId);
 };

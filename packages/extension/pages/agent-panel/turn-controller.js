@@ -1,40 +1,34 @@
 import { agentSessionKey, sessionTitleFromPrompt } from '../../shared/agent-session-store.js';
 
 export function createTurnController({ state, runtime, api, scrollToLatest, startDraftTurn }) {
-  const permissionResolves = new Map();
   const runningTurns = new Map();
   const canceledSessions = new Set();
 
-  /** Await the user's pick for one permission request; keyed by session so
-   * requests survive switching and are answered when their session shows. */
-  const requestPermission = (request) => {
-    const { agent, sessionId } = request || {};
-    if (typeof agent !== 'string' || !agent || typeof sessionId !== 'string' || !sessionId) {
-      return Promise.reject(new Error('Permission request without agent session'));
+  /** Show a permission request of the host (a notification); keyed by session so
+   * requests survive switching and are answered when their session shows. The panel
+   * has no question card, so form elicitations are skipped (declined) at once. */
+  const handleUserInput = ({ method, params }) => {
+    if (method === 'agent_elicitation_request') {
+      api.respondUserInput(params, { action: 'decline' }).catch(console.error);
+      return;
     }
-    const sessionKey = agentSessionKey(agent, sessionId);
-    // At most one outstanding request per session: decline a stray old one.
-    decidePermission(sessionKey, null);
-    return new Promise((resolve) => {
-      permissionResolves.set(sessionKey, resolve);
-      state({ permissions: { ...state.permissions, [sessionKey]: request } });
-    });
+    const { agent, sessionId } = params;
+    // The host waits for one request per session; a newer one replaces the card.
+    state({ permissions: { ...state.permissions, [agentSessionKey(agent, sessionId)]: params } });
   };
 
-  /** Resolve the awaited permission of one session; `null` declines it. */
+  /** Answer the permission of one session through the host; `null` cancels the tool call. */
   const decidePermission = (sessionKey, optionId) => {
-    if (!sessionKey) return;
-    const resolve = permissionResolves.get(sessionKey);
-    if (!resolve && !state.permissions[sessionKey]) return;
-    permissionResolves.delete(sessionKey);
+    const request = sessionKey && state.permissions[sessionKey];
+    if (!request) return;
     const permissions = { ...state.permissions };
     delete permissions[sessionKey];
     state({ permissions });
-    resolve?.(optionId);
+    api.respondUserInput(request, optionId ? { optionId } : {}).catch(console.error);
   };
 
   const declineAllPermissions = () => {
-    for (const sessionKey of [...permissionResolves.keys()]) decidePermission(sessionKey, null);
+    for (const sessionKey of Object.keys(state.permissions)) decidePermission(sessionKey, null);
   };
 
   /** Show a submitted prompt immediately, before the host starts answering. */
@@ -184,7 +178,7 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   return {
-    requestPermission,
+    handleUserInput,
     decidePermission,
     declineAllPermissions,
     clearCanceledSessions: () => canceledSessions.clear(),

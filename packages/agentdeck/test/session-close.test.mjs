@@ -62,12 +62,12 @@ test('closeSession dismisses pending permissions with error', async () => {
   await tick();
 
   f.deliver({
-    id: 'perm-req-close',
     method: 'agent_permission_request',
     peerId: 1,
     params: {
       agent: 'codex',
       sessionId: 's1',
+      requestId: 'p1',
       options: [{ optionId: 'allow', name: 'Allow' }],
     },
   });
@@ -79,9 +79,11 @@ test('closeSession dismisses pending permissions with error', async () => {
   await closing;
 
   assert.equal(f.app.agentdeckStore.permissionsBySession.s1, undefined);
-  const permReply = f.requests.find((r) => r.payload.id === 'perm-req-close');
-  assert.ok(permReply);
-  assert.ok(permReply.payload.error);
+  // The host cancels the request when the session closes; nothing is answered.
+  assert.equal(
+    f.requests.find((r) => r.payload.method === 'agent_user_input_respond'),
+    undefined,
+  );
 });
 
 test('closeSession on a pending session cancels creation and resets pending state', async () => {

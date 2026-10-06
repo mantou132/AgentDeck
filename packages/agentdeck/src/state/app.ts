@@ -5,17 +5,16 @@ import { clearTransportStorage, initTransport, startTransport, type TransportMes
 import { clearDrafts } from '../composer/drafts';
 import { type AppSettings, MIN_DAEMON_VERSION, RENDER_CAPABILITIES, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
 import { i18n } from '../i18n';
-import { requestPermission as requestTurnPermission } from '../session/turn';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
 import {
   applySessionEvent,
   endSession,
-  getSession,
   recordInFlightSession,
   refreshSessions,
   resetRemoteState,
   resumeInFlightTurn,
   settleLostTurns,
+  showUserInput,
 } from './sessions';
 import { agentdeckStore, setPromptSuggestion } from './store';
 
@@ -136,17 +135,7 @@ export const startApp = () => {
     initialRelayUrl: agentdeckStore.settings.relayUrl,
     ackHead: shouldAckHead,
     capabilities: RENDER_CAPABILITIES,
-    onRequestPermission: (request) => {
-      const session = getSession(request.sessionId);
-      if (session?.agent !== request.agent || !agentdeckStore.pendingSessionIds.includes(request.sessionId)) {
-        return Promise.reject(new Error(i18n.get('error.permissionTaskExpired')));
-      }
-      return requestTurnPermission(request, (req) => {
-        agentdeckStore({
-          permissionsBySession: { ...agentdeckStore.permissionsBySession, [req.sessionId]: req },
-        });
-      });
-    },
+    onUserInput: showUserInput,
     onMessage: handleTransportMessage,
     onBeforePayload: () => restoreInFlights,
   });

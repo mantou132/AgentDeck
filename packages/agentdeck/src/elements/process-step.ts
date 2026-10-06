@@ -119,11 +119,13 @@ export class DeckProcessStepElement extends GemElement {
     i.groupId,
     agentdeckStore.messagesBySession[i.sessionId],
     agentdeckStore.pendingSessionIds.includes(i.sessionId),
+    agentdeckStore.elicitationsBySession[i.sessionId],
   ])
   get #group() {
     return groupTimelineMessages(
       agentdeckStore.messagesBySession[this.sessionId] ?? [],
       agentdeckStore.pendingSessionIds.includes(this.sessionId),
+      agentdeckStore.elicitationsBySession[this.sessionId],
     ).find(
       (item): item is { type: 'group'; group: ProcessGroup } => item.type === 'group' && item.group.id === this.groupId,
     )?.group;

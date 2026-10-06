@@ -140,16 +140,16 @@ test('encrypted attachments, file reads and permission decisions use the same pr
   const prompt = fixture.requests.at(-1);
   assert.match(prompt.payload.params.attachments[0].text, /private document/);
   fixture.deliver({
-    id: 'permission',
     method: 'agent_permission_request',
-    params: { agent: 'codex', sessionId: 's1', options: [{ optionId: 'allow', name: 'Allow' }] },
+    params: { agent: 'codex', sessionId: 's1', requestId: 'p1', options: [{ optionId: 'allow', name: 'Allow' }] },
     peerId: 1,
   });
   await tick();
   fixture.app.resolvePermission('s1', 'allow');
   await tick();
-  const permission = fixture.requests.find((request) => request.payload.id === 'permission');
-  assert.equal(permission.payload.result.optionId, 'allow');
+  const answer = fixture.requests.find((request) => request.payload.method === 'agent_user_input_respond');
+  assert.equal(answer.payload.params.response.optionId, 'allow');
+  fixture.reply(answer, {});
   const file = fixture.app.agentApi.readFile('/tmp/secret.md', '/tmp');
   await tick();
   fixture.reply(fixture.requests.at(-1), { type: 'text', text: 'private file' });

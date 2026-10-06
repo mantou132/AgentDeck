@@ -55,7 +55,7 @@ export function mountCompactMode(state) {
 }
 
 export function mountAgentApi({ sessions, turns, state }) {
-  agentApi.setPermissionHandler(turns.requestPermission);
+  agentApi.setUserInputHandler(turns.handleUserInput);
   agentApi.setSessionEndedHandler(sessions.handleSessionEnded);
   agentApi.setHostReconnectedHandler(sessions.handleHostReconnect);
 
@@ -88,7 +88,7 @@ export function mountAgentApi({ sessions, turns, state }) {
   return () => {
     unsubscribeTransport?.();
     turns.declineAllPermissions();
-    agentApi.setPermissionHandler(null);
+    agentApi.setUserInputHandler(null);
     agentApi.setSessionEndedHandler(null);
     agentApi.setHostReconnectedHandler(null);
   };

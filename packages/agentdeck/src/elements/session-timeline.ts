@@ -5,8 +5,10 @@ import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { setSelectionMenuItems } from 'src/lib/selection-menu';
+import type { ElicitationResponse } from '../agent/api';
 import { i18n } from '../i18n';
 import { openMessageLink } from '../navigation';
+import type { Elicitation } from '../session/elicitation';
 import {
   extractDataImageAttachments,
   getProcessSummary,
@@ -16,6 +18,7 @@ import {
 } from '../session/timeline';
 import type { Attachment, ChatMessage, TextMessage } from '../session/types';
 import { stripVoiceChatMarker } from '../session/voice-chat';
+import { answerElicitation } from '../state/user-input';
 import { icons } from '../styles/icons';
 
 @customElement('deck-session-timeline')
@@ -24,6 +27,7 @@ export class DeckSessionTimelineElement extends GemElement {
   @property sessionKey = '';
   @property cwd = '';
   @property messages: ChatMessage[] = [];
+  @property elicitations: Elicitation[] = [];
   @boolattribute pending: boolean;
   @emitter preview: Emitter<Attachment>;
   @emitter ask: Emitter<string>;
@@ -134,6 +138,14 @@ export class DeckSessionTimelineElement extends GemElement {
     `;
   };
 
+  #renderElicitation = (elicitation: Elicitation) => html`
+    <deck-elicitation
+      class="mb-4"
+      .elicitation=${elicitation}
+      @respond=${(event: CustomEvent<ElicitationResponse>) => answerElicitation(elicitation.request, event.detail)}
+    ></deck-elicitation>
+  `;
+
   #setSelectionMenu = () => {
     const selection = window.getSelection();
     const ele = selection?.anchorNode?.parentElement;
@@ -152,15 +164,25 @@ export class DeckSessionTimelineElement extends GemElement {
     const timelineItems = groupTimelineMessages(
       this.messages.filter((message) => !('failed' in message && message.failed)),
       this.pending,
+      this.elicitations,
     );
     const last = timelineItems.at(-1);
 
     return html`
       ${repeat(
         timelineItems,
-        (item) => (item.type === 'group' ? item.group.id : item.message.id),
         (item) =>
-          item.type === 'group' ? this.#renderProcessGroup(item.group) : this.#renderTextMessage(item.message),
+          item.type === 'group'
+            ? item.group.id
+            : item.type === 'elicitation'
+              ? item.elicitation.request.requestId
+              : item.message.id,
+        (item) =>
+          item.type === 'group'
+            ? this.#renderProcessGroup(item.group)
+            : item.type === 'elicitation'
+              ? this.#renderElicitation(item.elicitation)
+              : this.#renderTextMessage(item.message),
       )}
       <div
         v-if=${this.pending && last?.type === 'message' && last.message.role === 'user'}

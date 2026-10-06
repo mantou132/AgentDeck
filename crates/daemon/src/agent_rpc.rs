@@ -377,7 +377,30 @@ impl AgentService {
                     .into_iter()
                     .map(|(agent, session_id)| json!({ "agent": agent, "sessionId": session_id }))
                     .collect();
-                Ok(json!({ "sessions": running }))
+                let user_inputs = sessions.pending_user_inputs().await;
+                Ok(json!({ "sessions": running, "userInputs": user_inputs }))
+            }
+        });
+
+        let user_input_sessions = sessions.clone();
+        peer.handle("agent_user_input_respond", move |params, _ctx| {
+            let sessions = user_input_sessions.clone();
+            async move {
+                let method = "agent_user_input_respond";
+                let (agent, session_id) = required_agent_session(&params, method)?;
+                let request_id = required_str(&params, "requestId", method)?;
+                let response = params
+                    .get("response")
+                    .cloned()
+                    .ok_or_else(|| format!("{method} requires response"))?;
+                if sessions
+                    .answer_user_input(agent, session_id, request_id, response)
+                    .await
+                {
+                    Ok(json!({}))
+                } else {
+                    Err("The request is no longer pending".to_string())
+                }
             }
         });
 
@@ -409,30 +432,11 @@ impl AgentService {
                     });
                 }
 
-                let permission_peer = peer.clone();
-                let permission_resolver: acp_agent::PermissionResolver = Arc::new(move |request| {
-                    let peer = permission_peer.clone();
-                    Box::pin(async move {
-                        let result = tokio::time::timeout(
-                            Duration::from_secs(300),
-                            peer.call("agent_permission_request", request),
-                        )
-                        .await;
-                        match result {
-                            Ok(Ok(response)) => response
-                                .get("optionId")
-                                .and_then(|v| v.as_str())
-                                .map(str::to_string),
-                            Ok(Err(err)) => {
-                                tracing::debug!("Permission request declined: {err}");
-                                None
-                            }
-                            Err(_) => {
-                                tracing::debug!("Permission request timed out");
-                                None
-                            }
-                        }
-                    })
+                // Permission requests and questions go to the device that sent
+                // this prompt; any device answers with `agent_user_input_respond`.
+                let user_input_peer = peer.clone();
+                let user_input_sink: acp_agent::UserInputSink = Arc::new(move |input| {
+                    user_input_peer.notify(input.method(), input.params().clone())
                 });
 
                 // Claude predicts the next prompt after the turn settles; only the
@@ -465,7 +469,7 @@ impl AgentService {
                         attachments,
                         timeout_secs,
                         event_tx,
-                        Some(permission_resolver),
+                        Some(user_input_sink),
                         Some(suggestion_sink),
                     )
                     .await;

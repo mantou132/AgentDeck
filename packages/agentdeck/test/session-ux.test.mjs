@@ -16,12 +16,12 @@ for (const outcome of ['completed', 'failed']) {
     const f = await running();
     const prompt = f.requests.at(-1);
     f.deliver({
-      id: 'permission',
       method: 'agent_permission_request',
       peerId: 1,
       params: {
         agent: 'codex',
         sessionId: 's1',
+        requestId: 'p1',
         options: [{ optionId: 'allow', name: 'Allow' }],
       },
     });
@@ -31,7 +31,11 @@ for (const outcome of ['completed', 'failed']) {
     else f.reply(prompt, { answer: 'Done' });
     await tick();
     assert.equal(f.app.agentdeckStore.permissionsBySession.s1, undefined);
-    assert.ok(f.requests.find((request) => request.payload.id === 'permission')?.payload.error);
+    // The host settles the request with the turn; nothing is answered.
+    assert.equal(
+      f.requests.find((request) => request.payload.method === 'agent_user_input_respond'),
+      undefined,
+    );
     assert.equal(f.app.agentdeckStore.pendingSessionIds.length, 0);
     assert.equal(f.app.sendPrompt('s1', 'Next task'), true);
     await tick();
@@ -124,12 +128,12 @@ test('pending permission requests expose active permission status for session li
   const f = await running();
   assert.equal(Object.keys(f.app.agentdeckStore.permissionsBySession).length, 0);
   f.deliver({
-    id: 'permission',
     method: 'agent_permission_request',
     peerId: 1,
     params: {
       agent: 'codex',
       sessionId: 's1',
+      requestId: 'p1',
       options: [{ optionId: 'allow', name: 'Allow' }],
     },
   });

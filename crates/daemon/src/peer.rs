@@ -87,11 +87,13 @@ impl Peer {
     }
 
     /// Call the peer and await its final result.
+    #[allow(dead_code)]
     pub async fn call(&self, method: &str, params: Value) -> Result<Value> {
         self.call_stream(method, params, None).await
     }
 
     /// Like [`Peer::call`], but also receives intermediate stream events.
+    #[allow(dead_code)]
     pub async fn call_stream(
         &self,
         method: &str,

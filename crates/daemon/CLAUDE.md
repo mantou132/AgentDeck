@@ -25,7 +25,8 @@
 - **端到端加密**：`adk1_` 配对必须加密，Relay 只做帧路由，禁止自动退回明文。
 - **信任模型**：Pairing ID 是唯一凭证，所有设备共用同一把密钥，deviceId 由设备自报，不能按设备吊销（只能 `reset` 整体轮换）。所有设备共享全部会话。文件和 Git 接口直接使用客户端传入的路径，**没有目录限制**；`file_read` 带 `raw: true` 时，任意文件都返回原始字节（`type: "binary"`，附文件总大小 `size`），供 App 预览协议使用；再带 `offset` + `length` 时只读该片段且不受整文件 8MB 上限约束（单片仍不超过 8MB），用于视频等媒体的 Range 请求。
 - **工具图片瘦身**：转发 `tool_call` / `tool_call_update`（含 load 回放）前，删除 `content` 与 `rawOutput` 中图片的 base64 数据（`update_to_json`）。App 不渲染工具图片，而截图类结果会让回放达到几十 MB，堵住有序的 Relay 队列。
-- **会话并发**：同一会话同时只能被一处 load；同一会话的 prompt 互斥。权限请求只发给发起 prompt 的设备。
+- **会话并发**：同一会话同时只能被一处 load；同一会话的 prompt 互斥。权限请求与问题只发给发起 prompt 的设备。
+- **等待用户输入**：权限请求（`session/request_permission`）与问题（`elicitation/create`）走同一套。`initialize` 声明 `elicitation.form`（不声明 url），claude-agent-acp 因此启用 `AskUserQuestion`（MCP 与模型拒答回退也会走 elicitation）。daemon 给请求加 `requestId`，按会话保存未作答的一个，以 `agent_permission_request` / `agent_elicitation_request` 通知投递给发起 prompt 的设备；任意设备用 `agent_user_input_respond`（`{ agent, sessionId, requestId, response }`；权限为 `{ optionId? }`，缺 optionId 即取消；问题为 ACP `CreateElicitationResponse`）作答。`agent_prompts_running` 同时返回 `userInputs: [{ method, params }]`，App 重载或重连后据此重新显示。等待不设单独时限，回合取消、会话关闭或回合空闲超时都按取消结束。
 - **配置**：`daemon.json` 自启时读取；Relay 配置变更需要重启，awake 配置会自动重载。显示 Pairing ID 时必须带安全警示边框。配对二维码为 `agentdeck://connect?pairingId=…`，使用非默认 Relay 时追加 `relayUrl`。
 - **防自动睡眠**：默认和 reset 后均为 `never`。`active` 以最后一次 RPC 收发时间计时，一小时无 RPC 后释放；状态写入 `awake_status.json`，daemon 退出时清理。
 - **reset**：停止服务并持锁后，删除 `remote_peers_v1.json`、`logs/` 和 `agents/*/install/`；未传 `--pairing-id` 时生成新的 `adk1_` ID，未传 `--relay-url` 时恢复默认 Relay。保留已安装的 Agent 及其历史，完成后恢复原来的运行/停止状态，并输出 status。

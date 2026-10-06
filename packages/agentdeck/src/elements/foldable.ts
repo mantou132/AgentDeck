@@ -97,8 +97,9 @@ export class DeckFoldableElement extends GemElement {
         >
       `,
     });
+    if (!Stack.instance) throw new Error('unreachable');
     // Sheet overlays the page stack; close when content triggers page stack changes (opening file, webpage, preview, etc.)
-    const { store } = Stack.instance!;
+    const { store } = Stack.instance;
     const top = store.pages.at(-1);
     result.finally(connect(store, () => store.pages.at(-1) !== top && result.sheet.close(null)));
   };

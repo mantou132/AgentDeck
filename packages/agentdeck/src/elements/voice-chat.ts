@@ -1,14 +1,16 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { DuoyunWakeLockBaseElement } from 'duoyun-ui/elements/base/wake-lock';
+import type { ElicitationResponse } from '../agent/api';
 import { i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { hapticImpact, hapticSelection, hapticWarning } from '../lib/haptics';
 import { ensureRecognitionPermission, startRecognitionSession } from '../lib/speech-recognition';
 import { speakText, stopSpeaking } from '../lib/speech-synthesis';
+import { getElicitationQuestions } from '../session/elicitation';
 import { replySpeech } from '../session/voice-chat';
-import { resolvePermission } from '../state/sessions';
 import { agentdeckStore } from '../state/store';
+import { answerElicitation, resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 import type { ComposerInput } from './composer';
 
@@ -81,6 +83,10 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
 
   get #permission() {
     return agentdeckStore.permissionsBySession[this.sessionId];
+  }
+
+  get #elicitation() {
+    return agentdeckStore.elicitationsBySession[this.sessionId]?.find((elicitation) => !elicitation.response);
   }
 
   #say = async (text: string) => {
@@ -287,6 +293,14 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
     );
   };
 
+  // Only the number of questions is read; options are picked on screen.
+  @effect((i) => [i.#elicitation?.request])
+  #announceElicitation = () => {
+    const request = this.#elicitation?.request;
+    if (!this.active || !request) return;
+    this.#say(getStringFromTemplate(i18n.get('voiceChat.question', String(getElicitationQuestions(request).length))));
+  };
+
   @effect((i) => [i.#listRef.value, i.#listContentRef.value])
   #followList = () => {
     this.#follow = followBottom(this.#listRef.value, this.#listContentRef.value);
@@ -353,6 +367,7 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
     const { entries, listening, recording, starting, zone, anchor } = this.#state;
     const pending = this.#pending;
     const permission = this.#permission;
+    const elicitation = this.#elicitation;
     return html`
       <div class="flex h-full flex-col gap-3">
         <div ${this.#listRef} class="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
@@ -398,6 +413,13 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
           .request=${permission}
           @resolve=${(event: CustomEvent<string | null>) => resolvePermission(this.sessionId, event.detail)}
         ></deck-permission-request>
+        <deck-elicitation
+          v-if=${!!elicitation}
+          class="max-h-[45dvh] shrink-0 overflow-y-auto overscroll-y-contain"
+          .elicitation=${elicitation}
+          @respond=${(event: CustomEvent<ElicitationResponse>) =>
+            elicitation && answerElicitation(elicitation.request, event.detail)}
+        ></deck-elicitation>
         <div class="relative shrink-0">
           ${listening && anchor !== undefined ? this.#renderRuler(anchor) : ''}
           <button

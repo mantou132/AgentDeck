@@ -1,11 +1,15 @@
 import { Cache } from '@mantou/tap-ui/lib/cache';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { i18n } from '../i18n';
+import type { Elicitation } from './elicitation';
 import type { Attachment, ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
 
 export type ProcessGroup = { id: string; items: (ThoughtMessage | ToolMessage)[]; pending: boolean };
 
-type TimelineItem = { type: 'message'; message: TextMessage } | { type: 'group'; group: ProcessGroup };
+type TimelineItem =
+  | { type: 'message'; message: TextMessage }
+  | { type: 'group'; group: ProcessGroup }
+  | { type: 'elicitation'; elicitation: Elicitation };
 
 export type ToolStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'ended';
 
@@ -113,8 +117,14 @@ export const extractDataImageAttachments = (text: string): { attachments: Attach
   return parsed ?? { attachments: [], markdown: text };
 };
 
-export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: boolean): TimelineItem[] => {
+/** Questions follow the tool call that asked them, splitting its process group; others go last. */
+export const groupTimelineMessages = (
+  messages: ChatMessage[],
+  sessionPending: boolean,
+  elicitations: Elicitation[] = [],
+): TimelineItem[] => {
   const result: TimelineItem[] = [];
+  const unplaced = new Set(elicitations);
   let currentGroup: ProcessGroup | null = null;
   const lastUserIndex = messages.findLastIndex((message) => 'role' in message && message.role === 'user');
 
@@ -143,6 +153,14 @@ export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: b
           currentGroup.pending = true;
         }
       }
+      if (msg.type === 'tool') {
+        for (const elicitation of unplaced) {
+          if (elicitation.request.toolCallId !== msg.data.toolCallId) continue;
+          unplaced.delete(elicitation);
+          result.push({ type: 'elicitation', elicitation });
+          currentGroup = null;
+        }
+      }
     } else {
       const textMsg = msg as TextMessage;
       if (textMsg.role === 'agent' && !textMsg.text?.trim() && !textMsg.attachments?.length) {
@@ -156,6 +174,8 @@ export const groupTimelineMessages = (messages: ChatMessage[], sessionPending: b
   // While a task is still running, the trailing group remains waiting for follow-up events even if all tools have completed
   const last = result.at(-1);
   if (sessionPending && last?.type === 'group') last.group.pending = true;
+
+  for (const elicitation of unplaced) result.push({ type: 'elicitation', elicitation });
 
   return result;
 };

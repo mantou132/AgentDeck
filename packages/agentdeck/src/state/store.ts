@@ -1,6 +1,7 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
 import { popularAgents, readSettings } from '../config';
+import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
 import type { ChatMessage, DeckSession, SessionOptions } from '../session/types';
 
@@ -26,6 +27,8 @@ export const agentdeckStore = createStore({
   errorsBySession: {} as Record<string, string>,
   optionsBySession: {} as Record<string, SessionOptions>,
   permissionsBySession: {} as Record<string, PermissionRequest>,
+  /** Form elicitations of this device's turns, kept read-only once answered; memory only. */
+  elicitationsBySession: {} as Record<string, Elicitation[]>,
   /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
   suggestionsBySession: {} as Record<string, string>,
 });
