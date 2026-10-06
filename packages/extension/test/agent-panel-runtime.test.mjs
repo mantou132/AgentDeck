@@ -232,6 +232,42 @@ describe('agent panel runtime', () => {
     assert.deepEqual(state.configOptions, [{ id: 'model' }]);
   });
 
+  it("re-applies the agent's saved config after loading a session", async () => {
+    const key = agentSessionKey('claude-acp', 'acp-1');
+    const select = (id, currentValue) => ({
+      id,
+      type: 'select',
+      currentValue,
+      options: [{ value: 'a' }, { value: 'b' }],
+    });
+    const state = createPanelState({
+      sessions: [{ key, agent: 'claude-acp', sessionId: 'acp-1' }],
+      defaults: { agent: '', configOptionsByAgent: { 'claude-acp': [select('mode', 'b'), select('model', 'a')] } },
+    });
+    const calls = [];
+    const controller = createSessionController({
+      state,
+      runtime: createSessionRuntime(state),
+      turns: noopTurns,
+      api: {
+        closeSession: async () => true,
+        loadSession: async () => ({ configOptions: [select('mode', 'a'), select('model', 'a')] }),
+        setSessionConfigOption: async (agent, sessionId, configId, value) => {
+          calls.push([agent, sessionId, configId, value]);
+          return { configOptions: [select('mode', value), select('model', 'a')] };
+        },
+      },
+    });
+
+    await controller.openSession(key);
+
+    assert.deepEqual(calls, [['claude-acp', 'acp-1', 'mode', 'b']]);
+    assert.deepEqual(
+      state.configOptions.map((option) => option.currentValue),
+      ['b', 'a'],
+    );
+  });
+
   it('stays on the selected session and records the error when loadSession fails', async () => {
     const previousKey = agentSessionKey('codex-acp', 'prev');
     const targetKey = agentSessionKey('codex-acp', 'target');

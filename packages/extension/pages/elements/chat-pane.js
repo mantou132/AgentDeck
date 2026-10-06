@@ -1,3 +1,4 @@
+import { followBottom } from 'agentdeck/lib/follow-bottom';
 import { t } from '../../shared/i18n.js';
 
 @customElement('agent-chat-pane')
@@ -24,44 +25,26 @@ class AgentChatPaneElement extends GemElement {
   @emitter queueremove; // detail: queued item id
 
   #messagesRef = createRef();
+  #messagesContentRef = createRef();
   #composerRef = createRef();
-  #followMessages = true;
-  #scrollFrame = 0;
+  #following;
 
-  @effect()
-  #clearScrollFrame = () => () => cancelAnimationFrame(this.#scrollFrame);
-
-  /** A new session view starts pinned to the bottom, and the prompt gets
-   * focus once it becomes chattable. */
+  /** The prompt gets focus once a session view becomes chattable. */
   @effect((i) => [i.sessionKey, i.loadingSession])
   #onSessionViewChange = () => {
-    this.#followMessages = true;
     if (!this.sessionKey || this.loadingSession) return;
     this.#composerRef.value?.focus();
   };
 
-  #onMessagesScroll = () => {
-    const element = this.#messagesRef.value;
-    if (!element) return;
-    this.#followMessages = element.scrollHeight - element.clientHeight - element.scrollTop <= 32;
+  /** Each session view starts pinned to the bottom and stays there unless the user scrolls up. */
+  @effect((i) => [i.sessionKey, i.#messagesRef.value, i.#messagesContentRef.value])
+  #followMessages = () => {
+    this.#following = followBottom(this.#messagesRef.value, this.#messagesContentRef.value);
+    return this.#following?.disconnect;
   };
 
-  /** Stick to the latest message unless the user scrolled up; `force`
-   * re-enables following (used when the user sends a message). */
-  scrollToLatest = (force = false) => {
-    if (force) this.#followMessages = true;
-    if (!this.#followMessages) return;
-    cancelAnimationFrame(this.#scrollFrame);
-    this.#scrollFrame = requestAnimationFrame(() => {
-      const element = this.#messagesRef.value;
-      if (element) element.scrollTop = element.scrollHeight;
-    });
-  };
-
-  @effect((i) => [i.messages, i.loadingSession, i.permissionRequest])
-  #followLatestMessage = () => {
-    if (!this.loadingSession) this.scrollToLatest();
-  };
+  /** Re-enable following, e.g. when the user sends a message. */
+  scrollToLatest = () => this.#following?.resume();
 
   @template()
   #content = () => {
@@ -107,24 +90,25 @@ class AgentChatPaneElement extends GemElement {
         <div
           v-if=${!loadingSession && canChat}
           ${this.#messagesRef}
-          class="flex min-h-0 flex-1 flex-col overflow-auto px-4 py-2"
-          @scroll=${this.#onMessagesScroll}
+          class="min-h-0 flex-1 overflow-auto px-4 py-2"
         >
-          ${messages.map(
-            (msg) => html`
-                <agent-message-bubble
-                  .message=${msg}
-                  .streamKey=${sessionKey}
-                  ?streaming=${turnPending && (msg.role === 'agent' || (msg.type === 'thought' && msg.pending))}
-                ></agent-message-bubble>
-            `,
-          )}
-          <agent-permission-request
-            v-if=${permissionRequest}
-            class="mb-1 mt-2 block"
-            .request=${permissionRequest}
-            @decision=${(e) => this.decision(e.detail)}
-          ></agent-permission-request>
+          <div ${this.#messagesContentRef} class="flex flex-col">
+            ${messages.map(
+              (msg) => html`
+                  <agent-message-bubble
+                    .message=${msg}
+                    .streamKey=${sessionKey}
+                    ?streaming=${turnPending && (msg.role === 'agent' || (msg.type === 'thought' && msg.pending))}
+                  ></agent-message-bubble>
+              `,
+            )}
+            <agent-permission-request
+              v-if=${permissionRequest}
+              class="mb-1 mt-2 block"
+              .request=${permissionRequest}
+              @decision=${(e) => this.decision(e.detail)}
+            ></agent-permission-request>
+          </div>
         </div>
         <div v-if=${bannerError} class="border-t border-negative/30 bg-negative/5 px-4 py-2 text-xs text-negative">
           ${bannerError}

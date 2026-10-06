@@ -160,6 +160,20 @@ export function createSessionController({ state, runtime, turns, api }) {
         panelContext: await getPanelContext(),
       });
       if (!record.alive) return;
+      const defaults = state.defaults.configOptionsByAgent[selected.agent];
+      let loadedOptions = configOptions || [];
+      // Agents reset mode / model on load; re-apply the agent's saved selection
+      if (defaults?.length) {
+        try {
+          loadedOptions = await applyComposerConfig(selected, loadedOptions, defaults);
+        } catch (e) {
+          runtime.setError(sessionKey, e.message);
+        }
+        if (!record.alive) return;
+      } else if (loadedOptions.length) {
+        // No selection saved for this agent yet: use the first loaded session as defaults for new sessions
+        await runtime.persistConfigOptions(selected.agent, loadedOptions);
+      }
       runtime.finishThought(sessionKey);
       if (title || updatedAt) {
         runtime.patchRecord(sessionKey, {
@@ -170,7 +184,7 @@ export function createSessionController({ state, runtime, turns, api }) {
       if (state.sessionKey === sessionKey) {
         const pane = {
           messages: state.messages,
-          configOptions: configOptions || [],
+          configOptions: loadedOptions,
           cwd: state.cwd,
           queue: [],
         };
@@ -181,7 +195,7 @@ export function createSessionController({ state, runtime, turns, api }) {
         runtime.setCachedPane(sessionKey, {
           ...pane,
           messages: completeThought(pane.messages),
-          configOptions: configOptions || [],
+          configOptions: loadedOptions,
         });
       }
     } catch (e) {

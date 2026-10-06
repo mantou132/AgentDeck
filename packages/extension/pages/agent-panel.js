@@ -60,7 +60,7 @@ class AgentPanelPageElement extends GemElement {
     state: this.#s,
     runtime: this.#runtime,
     api: agentApi,
-    scrollToLatest: () => this.#chatPaneRef.value?.scrollToLatest(true),
+    scrollToLatest: () => this.#chatPaneRef.value?.scrollToLatest(),
     startDraftTurn: (...args) => this.#sessions.startDraftTurn(...args),
   });
   #sessions = createSessionController({
