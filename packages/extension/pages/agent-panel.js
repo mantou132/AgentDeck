@@ -100,10 +100,6 @@ class AgentPanelPageElement extends GemElement {
     );
   }
 
-  get #currentAgent() {
-    return this.#runtime.record(this.#s.sessionKey)?.agent || '';
-  }
-
   get #currentTitle() {
     return this.#runtime.record(this.#s.sessionKey)?.title || t('devtoolsPanelNewSession');
   }
@@ -179,7 +175,6 @@ class AgentPanelPageElement extends GemElement {
           .messages=${visibleMessages}
           .permissionRequest=${sessionKey ? permissions[sessionKey] : null}
           .bannerError=${bannerError}
-          .agent=${this.#currentAgent}
           .configOptions=${this.#configSelects}
           ?turn-pending=${pendingIds.includes(sessionKey)}
           .queue=${queue}

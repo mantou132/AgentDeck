@@ -5,7 +5,8 @@ import { t } from '../../shared/i18n.js';
 const MAX_ATTACHMENTS = 10;
 const MAX_TEXT_ATTACHMENT_BYTES = 256 * 1024;
 const LONG_PASTE_CHAR_THRESHOLD = 2_000;
-const CODEX_COMBINED_CONFIG_IDS = new Set(['model', 'reasoning_effort', 'fast-mode']);
+// ACP categories merged into one picker; trigger shows model + effort, e.g. Codex and Claude Agent
+const MODEL_CONFIG_CATEGORIES = ['model', 'thought_level', 'model_config'];
 // Cap images at what vision models can use anyway; compressionImage scales down.
 const IMAGE_DIMENSION = { width: 1568, height: 1568 };
 const TEXT_EXTENSION =
@@ -36,7 +37,6 @@ const stopButtonClass =
 @customElement('agent-composer')
 class AgentComposerElement extends GemElement {
   @boolattribute turnPending;
-  @property agent;
   @property configOptions;
   @property sessionKey;
   @property queue; // staged prompts while one is in flight
@@ -327,9 +327,9 @@ class AgentComposerElement extends GemElement {
     this.focus();
   };
 
-  #renderCodexConfigValue = (value) =>
-    ['model', 'reasoning_effort']
-      .map((id) => this.configOptions?.find((option) => option.id === id))
+  #renderModelConfigValue = (value) =>
+    ['model', 'thought_level']
+      .map((category) => this.configOptions?.find((option) => option.category === category))
       .map((option) => option?.options.find((item) => item.value === value?.[option.id])?.name)
       .filter(Boolean)
       .join(' ');
@@ -339,12 +339,9 @@ class AgentComposerElement extends GemElement {
     const { input, attachments, editingId } = this.#s;
     const pending = this.turnPending;
     const configOptions = this.configOptions || [];
-    const codexConfigOptions =
-      this.agent === 'codex-acp' ? configOptions.filter((option) => CODEX_COMBINED_CONFIG_IDS.has(option.id)) : [];
-    const standaloneConfigOptions = codexConfigOptions.length
-      ? configOptions.filter((option) => !CODEX_COMBINED_CONFIG_IDS.has(option.id))
-      : configOptions;
-    const codexPickerOptions = codexConfigOptions.map((option) => ({
+    const modelConfigOptions = configOptions.filter((option) => MODEL_CONFIG_CATEGORIES.includes(option.category));
+    const standaloneConfigOptions = configOptions.filter((option) => !modelConfigOptions.includes(option));
+    const modelPickerOptions = modelConfigOptions.map((option) => ({
       label: option.name,
       description: option.description,
       value: option.id,
@@ -354,8 +351,8 @@ class AgentComposerElement extends GemElement {
         value: item.value,
       })),
     }));
-    const codexPickerValue = Object.fromEntries(codexConfigOptions.map((option) => [option.id, option.currentValue]));
-    const codexConfigSummary = codexConfigOptions
+    const modelPickerValue = Object.fromEntries(modelConfigOptions.map((option) => [option.id, option.currentValue]));
+    const modelConfigSummary = modelConfigOptions
       .map(
         (option) =>
           `${option.name}: ${option.options.find((item) => item.value === option.currentValue)?.name || option.currentValue}`,
@@ -476,7 +473,7 @@ class AgentComposerElement extends GemElement {
             </button>
             <div class="ml-auto flex min-w-0 items-center">
               <div
-                v-if=${standaloneConfigOptions.length || codexConfigOptions.length}
+                v-if=${standaloneConfigOptions.length || modelConfigOptions.length}
                 class="flex min-w-0 flex-wrap items-center gap-1"
               >
                 ${standaloneConfigOptions.map(
@@ -498,15 +495,15 @@ class AgentComposerElement extends GemElement {
                   `,
                 )}
                 <agent-grouped-picker
-                  v-if=${codexConfigOptions.length}
+                  v-if=${modelConfigOptions.length}
                   borderless
                   class="max-w-40"
-                  placeholder=${codexConfigOptions[0]?.name}
-                  .options=${codexPickerOptions}
-                  .value=${codexPickerValue}
-                  .renderValue=${this.#renderCodexConfigValue}
-                  aria-label=${codexConfigSummary}
-                  title=${codexConfigSummary}
+                  placeholder=${modelConfigOptions[0]?.name}
+                  .options=${modelPickerOptions}
+                  .value=${modelPickerValue}
+                  .renderValue=${this.#renderModelConfigValue}
+                  aria-label=${modelConfigSummary}
+                  title=${modelConfigSummary}
                   @change=${(event) => this.configchange({ configId: event.detail.group, value: event.detail.value })}
                 ></agent-grouped-picker>
               </div>
