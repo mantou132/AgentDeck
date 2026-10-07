@@ -12,7 +12,7 @@ patchedDependencies:
     hash: c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223
     path: patches/@gem-bind__mermaid@0.0.6.patch
   '@mantou/tap-ui@0.1.13':
-    hash: 52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218
+    hash: 55f64829f4d8cd4ab5cc504e61a60c72a73924d8ae727c1a2a131d1841d81614
     path: patches/@mantou__tap-ui@0.1.13.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
@@ -66,7 +66,7 @@ importers:
         version: 2.2.13
       '@mantou/tap-ui':
         specifier: ^0.1.13
-        version: 0.1.13(patch_hash=52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218)(@mantou/gem@2.2.13)
+        version: 0.1.13(patch_hash=55f64829f4d8cd4ab5cc504e61a60c72a73924d8ae727c1a2a131d1841d81614)(@mantou/gem@2.2.13)
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -5453,7 +5453,7 @@ snapshots:
 
   '@mantou/gem@2.2.13': {}
 
-  '@mantou/tap-ui@0.1.13(patch_hash=52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218)(@mantou/gem@2.2.13)':
+  '@mantou/tap-ui@0.1.13(patch_hash=55f64829f4d8cd4ab5cc504e61a60c72a73924d8ae727c1a2a131d1841d81614)(@mantou/gem@2.2.13)':
     dependencies:
       '@mantou/gem': 2.2.13
 
@@ -7126,7 +7126,7 @@ snapshots:
   duoyun-ui@2.2.16(@mantou/gem@2.2.13):
     dependencies:
       '@mantou/gem': 2.2.13
-      '@mantou/tap-ui': 0.1.13(patch_hash=52c5c51d62c6363d10cc1009967e001a8f899c26afa3d8a6e556953a99a61218)(@mantou/gem@2.2.13)
+      '@mantou/tap-ui': 0.1.13(patch_hash=55f64829f4d8cd4ab5cc504e61a60c72a73924d8ae727c1a2a131d1841d81614)(@mantou/gem@2.2.13)
       deep-query-selector: 1.0.2
 
   earcut@3.2.4: {}
