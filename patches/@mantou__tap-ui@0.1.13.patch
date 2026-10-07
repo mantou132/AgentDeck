@@ -505,6 +505,213 @@ index 025c83a37ec167a1ec7e306908be392860a85e78..e09d55aebd4d131cd64f350e8032f06d
      font: inherit;
      cursor: pointer;
    }
+diff --git a/elements/page.js b/elements/page.js
+index 00074fbe85f10874d9201cf2d091f300edc07824..60fdb532204ef86892dc3819c87e5c0ee248dea9 100644
+--- a/elements/page.js
++++ b/elements/page.js
+@@ -132,23 +132,25 @@ const style = css `
+       height: 0;
+     }
+   }
+-  .refresh {
+-    position: relative;
+-    overflow: hidden;
+-    height: 0;
+-    color: ${theme.describeColor};
+-    transition: height 200ms ${theme.timingFunction};
++  /* Pull moves the slotted content itself, so the main layout stays untouched */
++  .main ::slotted(*) {
++    translate: 0 var(--pull);
++    transition: translate 200ms ${theme.timingFunction};
+   }
+-  .refresh.dragging {
+-    transition: none;
+-  }
+-  .refresh .icon {
++  /* Sits in the gap above the content; .main clips it, centered once the gap fits */
++  .refresh {
+     position: absolute;
++    inset-block-start: 0;
+     left: 50%;
+-    bottom: max(0px, calc(50% - 0.625em));
+-    translate: -50% 0;
+     width: 1.25em;
+     height: 1.25em;
++    color: ${theme.describeColor};
++    translate: -50% min(calc(var(--pull, 0px) - 1.25em), calc(var(--pull, 0px) / 2 - 0.625em));
++    transition: translate 200ms ${theme.timingFunction};
++  }
++  .dragging ::slotted(*),
++  .dragging .refresh {
++    transition: none;
+   }
+   .gesture {
+     position: absolute;
+@@ -396,6 +398,7 @@ let TapPageElement = (() => {
+             };
+         });
+         #onPull = (__runInitializers(this, _private_spinIcon_extraInitializers), (evt) => {
++            this.#closeSwipeout();
+             const pull = this.#damp(evt.detail.distance);
+             this.#state({ pull, dragging: true, rotate: this.#pullRotate(pull) });
+         });
+@@ -417,7 +420,8 @@ let TapPageElement = (() => {
+                 el.transparent = transparent;
+             });
+         });
+-        #scrolling = () => {
++        /** Like iOS, scrolling or pulling closes an open swipeout without interrupting the gesture */
++        #closeSwipeout = () => {
+             TapSwipeoutElement.activeSwipeout?.close();
+         };
+         #watchHeader = __runInitializers(this, _private_watchHeader_initializers, () => {
+@@ -460,38 +464,35 @@ let TapPageElement = (() => {
+         }));
+         #content = (__runInitializers(this, _private_watchLoading_extraInitializers), __runInitializers(this, _private_content_initializers, () => {
+             const { pull, dragging, refreshing, rotate } = this.#state;
+-            const height = refreshing ? Math.max(pull, PULL_HOLD) : pull;
++            const offset = this.refreshable ? (refreshing ? Math.max(pull, PULL_HOLD) : pull) : 0;
+             return html `
+       <div class="header" part=${TapPageElement.header}>
+         <slot ${this.#headerSlotRef} name=${TapPageElement.header}></slot>
+       </div>
+       <tap-pull-container
+         ${this.#mainRef}
+-        class="main"
++        class=${classMap({ main: true, dragging })}
+         part=${TapPageElement.main}
++        style=${styleMap({ '--pull': offset ? `${offset}px` : undefined })}
+         ?disable-scroll-mask=${!this.scrollMask}
+-        ?disable-gesture=${!this.refreshable || refreshing}
++        ?disable-gesture=${!this.refreshable || refreshing || pageStore.shouldDim}
+         @pull=${this.#onPull}
+         @pull-end=${this.#onPullEnd}
+-        @scroll=${this.#scrolling}
++        @scroll=${this.#closeSwipeout}
+       >
+-        <div
+-          class=${classMap({ refresh: true, dragging })}
+-          part=${TapPageElement.refresh}
+-          style=${styleMap({ height: this.refreshable && height > 0 ? `${height}px` : '0px' })}
+-        >
+-          <tap-use
+-            ${this.#iconRef}
+-            class="icon"
+-            style=${styleMap({ transform: !refreshing && `rotate(${rotate}deg)` })}
+-            .element=${icons.refresh}
+-          ></tap-use>
+-        </div>
+         <div
+           v-if=${this.#state.showProgress}
+           class="progress"
+           style=${styleMap({ scale: `${this.#state.progress / 100} 1` })}
+         ></div>
++        <tap-use
++          v-if=${this.refreshable}
++          ${this.#iconRef}
++          class="refresh"
++          part=${TapPageElement.refresh}
++          style=${styleMap({ transform: !refreshing && `rotate(${rotate}deg)` })}
++          .element=${icons.refresh}
++        ></tap-use>
+         <slot></slot>
+       </tap-pull-container>
+       <div ${this.#footerRef} class="footer" part=${TapPageElement.footer}>
+diff --git a/elements/pull-container.js b/elements/pull-container.js
+index 8f82e01463a0e895ba59a64f250495aad4a300ce..2cf55b2debdb06066d727ca8cba24c4be700b6ab 100644
+--- a/elements/pull-container.js
++++ b/elements/pull-container.js
+@@ -32,15 +32,13 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
+     }
+     return useValue ? value : void 0;
+ };
+-import { getSwipe } from '@mantou/gem/elements/base/gesture';
++import { getSwipe, lockAxis } from '@mantou/gem/elements/base/gesture';
+ import { adoptedStyle, boolattribute, customElement, emitter, mounted, numattribute } from '@mantou/gem/lib/decorators';
+ import { css } from '@mantou/gem/lib/element';
+ import { addListener } from '@mantou/gem/lib/utils';
+ import { TapScrollBaseElement } from './base/scroll';
+ const PULL_ACTIVATE = 10;
+ const SCROLL_DEVIATION = 0.5;
+-/** Bias the vertical/horizontal axis lock toward vertical so a dismiss drag survives thumb wobble */
+-const AXIS_LOCK_BIAS = 1.5;
+ const style = css `
+   :host(:where(:not([hidden]))) {
+     overscroll-behavior: contain;
+@@ -118,6 +116,7 @@ let TapPullContainerElement = (() => {
+         pushEnd = (__runInitializers(this, _push_extraInitializers), __runInitializers(this, _pushEnd_initializers, void 0));
+         #pointerId = __runInitializers(this, _pushEnd_extraInitializers);
+         #tracking = false;
++        #axisLocked = false;
+         #pulling = false;
+         #pushing = false;
+         #startY = 0;
+@@ -140,6 +139,7 @@ let TapPullContainerElement = (() => {
+             }
+             this.#pointerId = undefined;
+             this.#tracking = false;
++            this.#axisLocked = false;
+             this.#pulling = false;
+             this.#pushing = false;
+             this.#distance = 0;
+@@ -184,6 +184,7 @@ let TapPullContainerElement = (() => {
+             this.#pointerId = evt.pointerId;
+             this.#scrollContainers = this.#getScrollContainers(evt);
+             this.#tracking = true;
++            this.#axisLocked = false;
+             this.#pulling = false;
+             this.#pushing = false;
+             this.#distance = 0;
+@@ -223,23 +224,27 @@ let TapPullContainerElement = (() => {
+             }
+             const dy = evt.clientY - this.#startY;
+             const dx = evt.clientX - this.#startX;
+-            if (dy === 0)
+-                return;
+             const pulling = dy > 0;
+             const distance = Math.abs(dy);
+-            const canScroll = pulling ? this.#hasScrolled() : this.#canScrollDown();
+-            if (canScroll) {
++            if (dy !== 0 && (pulling ? this.#hasScrolled() : this.#canScrollDown())) {
+                 this.#startY = evt.clientY;
+                 this.#startX = evt.clientX;
+                 this.#swipeStart = evt;
+                 return;
+             }
++            if (!this.#axisLocked) {
++                const axis = lockAxis(dx, dy);
++                if (!axis)
++                    return;
++                // A horizontal drag belongs to nested gestures (e.g. swipeout) for the rest of this touch
++                if (axis === 'x') {
++                    this.#reset();
++                    return;
++                }
++                this.#axisLocked = true;
++            }
+             if (distance < this.#pullActivate)
+                 return;
+-            if (Math.abs(dx) > distance * AXIS_LOCK_BIAS) {
+-                this.#reset();
+-                return;
+-            }
+             this.#pulling = pulling;
+             this.#pushing = !pulling;
+             this.#swipeMoves.length = 0;
+diff --git a/elements/swipeout.js b/elements/swipeout.js
+index 0649c1fc5214932b90891cf3cba57060b5882130..7ffc60decc8e097040e6eaef2dc3d694159c903f 100644
+--- a/elements/swipeout.js
++++ b/elements/swipeout.js
+@@ -474,6 +474,9 @@ let TapSwipeoutElement = (() => {
+             }
+         };
+         #onPanEnd = () => {
++            // Only a drag still in progress settles; a swipe or close may have settled it already
++            if (this.#dragOffset === undefined)
++                return;
+             this.#dragOffset = undefined;
+             const long = this.#longDrag;
+             if (long) {
 diff --git a/elements/toast.d.ts b/elements/toast.d.ts
 index f60312bc5f6a8762af78cb9c06e64b5c0ccca2aa..7147e68d66d9f03fc2c5e9e78fcbc6b229143383 100644
 --- a/elements/toast.d.ts
