@@ -8,6 +8,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - 状态：`state/store.ts` 为单一全局 store；`state/sessions.ts` 会话生命周期；`state/app.ts` 启动、设置保存、重置与 transport 消息消费。
 - 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/relay-codec.ts`（RPC 消息与 Relay 载荷互转：加密、帧大小限制、二进制回复）、`agent/encryption.ts`（`adk1_` 端到端加密原语）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
 - ACP 事件：`session/events.ts` 为 reducer，`session/turn.ts` 控制流式任务；等待用户输入（权限请求与问题）的状态在 `state/user-input.ts`，问题（form elicitation）的 schema 解析在 `session/elicitation.ts`，卡片为 `elements/elicitation.ts`。
+- 附件：`attachment/`（与扩展共用，不依赖 App 的 i18n 与状态，文案由调用方传入）。`types.ts` 为 `Attachment`；`read.ts` 读取选择或粘贴的文件；`prompt.ts` 转成 `agent_prompt` 的线上格式；`message.ts` 处理消息与历史中的附件（ACP 图片、内联 data 图片、上传到主机的文件链接）。卡片与预览元素在 `elements/attachment*.ts`，粘贴引用与草稿在 `composer/`。
 - 持久化：`lib/database.ts` 为 drafts 与 in-flight 共用的 IndexedDB Store API；新增库或 store 在 `DATABASES` 声明，已有名称不得改动。
 - 原生插件：推送 `agent/push.ts`（`tauri-plugin-fcm`）；语音识别 `lib/speech-recognition.ts`（`tauri-plugin-stt`）与朗读 `lib/speech-synthesis.ts`（`tauri-plugin-tts`），均只在移动端注册，以 `speechSupported` 判断。
 
@@ -21,6 +22,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - **下一句建议**：host 的 `agent_prompt_suggestion` 存入 `suggestionsBySession`（回合进行中到达的丢弃），新回合开始时清除。composer 输入为空时用它替换 placeholder，可直接发送，长按填入输入框继续编辑（tap-ui 的 `longPress` 指令，暂由 `patches/@mantou__tap-ui@*.patch` 提供，上游发版后删除该部分 patch；iOS 只在手势中弹键盘，所以松开时再聚焦）；只在内存中，不持久化。
 - **语音对话**（`elements/voice-chat.ts`）：composer 无内容可发（含下一句建议）时发送按钮变为入口，会话页打开 Sheet；按住录音、松开发送；移出按钮即停止识别并显示弧形刻度尺，沿弧左滑按词（`Intl.Segmenter`）撤销，移回按钮在剩余文字后继续录音（识别出错停止时按钮提示如此续录），超出刻度尺松开取消；Sheet 拖拽手势会抢占指针，所以按住期间在 window 捕获阶段跟踪并拦截 move。回合进行中按下只播报提示。消息带 `voiceChat: true`，daemon 追加 `<agentdeck-voice-chat/>` 标记，`remote_app` 系统提示要求 agent 见到它时在回复末尾写 `<!-- agentdeck-speech … -->` 注释（其他客户端也不渲染）；时间线隐藏这两者（`session/voice-chat.ts`、`lib/markdown.ts`），回合结束后朗读该注释（不读系统提示的非 Claude agent、旧 daemon 或没有注释时，朗读去掉 Markdown 的回复开头）。没说话松开不发送也不提示。权限请求在 Sheet 内显示并朗读；待回答的问题卡片也在 Sheet 内显示，只朗读问题数量，不读选项。Sheet 显示时经 duoyun-ui 的 `DuoyunWakeLockBaseElement` 保持亮屏，锁屏后不可用。
 - **daemon 版本**：host 在 `peer_attach` 返回 `version`（旧版没有，视为过旧），每次启动首次连上时与 `config.ts` 的 `MIN_DAEMON_VERSION` 比较，过旧则 Toast 提示升级。只在需要 App 与 daemon 一起升级时调高该常量。
+- **附件**：图片压缩后内联，256 KB 内的文本内联，其他文件（≤ 5 MB，受 Relay 单帧限制）以 base64 的 `file` 发给 daemon 存到主机，Agent 自己读。Claude 历史回放为 `[@name](file://…/agentdeck-attachments/…)`，时间线还原成附件：App 点击打开 file-viewer，再次发送时作为 `resource` 链接。
 - **设置**：自定义 Relay URL 只能通过扫描配对二维码设置，UI 不展示；手动修改 Pairing ID 即恢复默认 Relay。
 - **草稿**（`composer/drafts.ts`）：仅 App 启用（composer 传入 draftKey），扩展不启用。新会话按 agent + 工作目录恢复，正式会话按 sessionId 恢复，跨 Relay 配置保留。提交交给 in-flight 持久化后清除；失败时回填且不覆盖新输入；删除会话和 settings 重置时清理。
 - **渲染能力**：Markdown 中已闭合的 `agentdeck-chart`（内容为 ECharts option，JSON 无效时显示原文）、`agentdeck-map`（标记点与路线 JSON）、`agentdeck-preview`（内容为入口 HTML 绝对路径）和 `agentdeck-screen`（内容为截图 target）代码块由 `lib/markdown.ts` 转成元素。能力在 `RENDER_CAPABILITIES` 声明，经 `peer_attach` 告知 host；只有 Tauri 声明 `preview`。mermaid / latex / diff2html 元素较大，由 `lib/markdown.ts` 动态导入，不进首屏包。

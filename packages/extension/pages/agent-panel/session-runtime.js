@@ -1,3 +1,4 @@
+import { imageAttachment } from 'agentdeck/attachment/message';
 import { removeStoredSession, updateAgentPanelState, upsertStoredSession } from '../../shared/agent-session-store.js';
 import { t } from '../../shared/i18n.js';
 
@@ -83,13 +84,7 @@ export function reduceSessionEvent(state, event, { agent } = {}) {
 
   if (role && update.content?.type === 'image' && update.content.data) {
     const { mimeType = 'image/png', data } = update.content;
-    const attachment = {
-      id: crypto.randomUUID(),
-      kind: 'image',
-      name: t('devtoolsPanelImageAttachment'),
-      mimeType,
-      previewUrl: `data:${mimeType};base64,${data}`,
-    };
+    const attachment = imageAttachment(data, mimeType, t('devtoolsPanelImageAttachment'));
     return {
       pane: {
         messages: appendChunk(

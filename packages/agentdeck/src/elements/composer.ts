@@ -2,8 +2,10 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { longPress } from '@mantou/tap-ui/lib/directives';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
+import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
+import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../attachment/read';
+import type { Attachment } from '../attachment/types';
 import { readDraft, saveDraft } from '../composer/drafts';
-import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../composer/files';
 import {
   createPasteReference,
   expandReferenceRange,
@@ -13,7 +15,6 @@ import {
 import { i18n } from '../i18n';
 import { hapticSelection } from '../lib/haptics';
 import { ensureRecognitionPermission, speechSupported, startRecognitionSession } from '../lib/speech-recognition';
-import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
 
 export type ComposerInput = { text: string; attachments: Attachment[]; voiceChat?: boolean };
@@ -32,6 +33,16 @@ const style = css`
     }
   }
 `;
+
+const attachmentErrorMessage = (error: unknown) =>
+  error instanceof AttachmentError
+    ? getStringFromTemplate(
+        i18n.get(
+          error.reason === 'tooLarge' ? 'composer.attachmentTooLarge' : 'composer.attachmentReadFailed',
+          error.fileName,
+        ),
+      )
+    : String(error);
 
 @customElement('deck-composer')
 @adoptedStyle(style)
@@ -267,7 +278,7 @@ export class DeckComposerElement extends GemElement {
     const errors: string[] = [];
     for (const result of results) {
       if (result.status === 'fulfilled') attachments.push(result.value);
-      else errors.push(result.reason.message);
+      else errors.push(attachmentErrorMessage(result.reason));
     }
     if (selection) this.#insertPastedAttachments(attachments, selection);
     else this.#state({ attachments: [...this.#state.attachments, ...attachments] });

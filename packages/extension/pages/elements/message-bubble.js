@@ -1,5 +1,6 @@
 import { GemBindDiff2htmlElement } from '@gem-bind/diff2html';
 import { GemBindMarkedElement, Renderer } from '@gem-bind/marked';
+import { extractMessageAttachments } from 'agentdeck/attachment/message';
 import { toolCallDiffs } from 'agentdeck/lib/diff';
 import { nextStreamingText, STREAM_REVEAL_INTERVAL } from 'agentdeck/lib/stream-text';
 import { theme } from 'duoyun-ui/lib/theme';
@@ -169,17 +170,6 @@ GemBindDiff2htmlElement[Symbol.metadata].adoptedStyleSheets.push(css`
   }
 `);
 
-const dataImageLinkPattern = /\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
-
-const extractDataImageAttachments = (text) => {
-  const attachments = [];
-  const markdown = text.replace(dataImageLinkPattern, (_, name, previewUrl) => {
-    attachments.push({ kind: 'image', name: name || 'image', previewUrl });
-    return '';
-  });
-  return { attachments, markdown };
-};
-
 @customElement('agent-message-bubble')
 class AgentMessageBubbleElement extends GemElement {
   @property message;
@@ -291,8 +281,11 @@ class AgentMessageBubbleElement extends GemElement {
     }
 
     const isUser = msg.role === 'user';
-    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(this.#messageText);
-    const attachments = [...(msg.attachments || []), ...linkedAttachments];
+    const { attachments: linked, markdown } = extractMessageAttachments(
+      this.#messageText,
+      t('devtoolsPanelImageAttachment'),
+    );
+    const attachments = [...(msg.attachments || []), ...linked];
     return html`
       <div class=${`my-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
         <div

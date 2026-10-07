@@ -30,10 +30,7 @@
     "message": "Could not read that file"
   },
   "devtoolsPanelAttachmentTooLarge": {
-    "message": "Text file too large (256 KB max)"
-  },
-  "devtoolsPanelAttachmentUnsupported": {
-    "message": "Only image and text files can be attached"
+    "message": "File too large (5 MB max)"
   },
   "devtoolsPanelCancel": {
     "message": "Cancel"
@@ -73,6 +70,9 @@
   },
   "devtoolsPanelNoSessions": {
     "message": "No sessions"
+  },
+  "devtoolsPanelPasteTooLarge": {
+    "message": "Pasted text too large (256 KB max)"
   },
   "devtoolsPanelPlaceholder": {
     "message": "Message the agent — Enter to send, Shift+Enter for a new line"

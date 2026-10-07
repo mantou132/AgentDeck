@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
+import { registerHooks } from 'node:module';
 import { beforeEach, describe, it } from 'node:test';
+
+// Shared app modules are TypeScript without extensions; Node strips the types.
+registerHooks({
+  resolve: (specifier, context, nextResolve) =>
+    specifier.startsWith('agentdeck/')
+      ? {
+          url: new URL(`../../agentdeck/src/${specifier.slice('agentdeck/'.length)}.ts`, import.meta.url).href,
+          shortCircuit: true,
+        }
+      : nextResolve(specifier, context),
+});
 
 let storage = {};
 globalThis.chrome = {

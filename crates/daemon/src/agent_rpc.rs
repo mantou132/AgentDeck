@@ -1,9 +1,14 @@
 use std::{
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Duration,
 };
+
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
@@ -1255,6 +1260,18 @@ fn message_attachments(params: &Value) -> Result<Vec<acp_agent::Attachment>, Str
                     mime_type: mime_type.to_string(),
                 })
             }
+            Some("file") => {
+                let name = non_empty_str(item, "name")
+                    .ok_or_else(|| "file attachment requires a name".to_string())?;
+                let data = non_empty_str(item, "data")
+                    .ok_or_else(|| "file attachment requires base64 data".to_string())?;
+                let path = save_file_attachment(&attachments_root(), name, data)?;
+                Ok(acp_agent::Attachment::Resource {
+                    uri: format!("file://{}", path.display()),
+                    name: name.to_string(),
+                    mime_type: non_empty_str(item, "mimeType").map(str::to_string),
+                })
+            }
             Some("resource") => {
                 let uri = non_empty_str(item, "uri")
                     .ok_or_else(|| "resource attachment requires a uri".to_string())?;
@@ -1272,6 +1289,50 @@ fn message_attachments(params: &Value) -> Result<Vec<acp_agent::Attachment>, Str
         .collect()
 }
 
+/// Uploaded files live in the temp dir, which the system cleans up; its path also
+/// has no spaces (unlike macOS Application Support), which keeps the agent's
+/// `[@name](file://…)` links intact.
+fn attachments_root() -> PathBuf {
+    std::env::temp_dir().join("agentdeck-attachments")
+}
+
+/// Writes each upload to its own directory under its original file name, so the
+/// agent sees the real name.
+fn save_file_attachment(root: &Path, name: &str, data: &str) -> Result<PathBuf, String> {
+    static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+    let bytes = STANDARD
+        .decode(data)
+        .map_err(|err| format!("file attachment is not valid base64: {err}"))?;
+    // Markdown link delimiters and whitespace would break the agent's file link.
+    let file_name: String = Path::new(name)
+        .file_name()
+        .map(|name| name.to_string_lossy())
+        .unwrap_or_default()
+        .chars()
+        .map(|c| {
+            if c.is_whitespace() || "()[]<>".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let dir = root.join(format!(
+        "{}-{}",
+        chrono::Utc::now().format("%Y%m%d%H%M%S%f"),
+        NEXT_ID.fetch_add(1, Ordering::Relaxed)
+    ));
+    let path = dir.join(if file_name.is_empty() {
+        "attachment".to_string()
+    } else {
+        file_name
+    });
+    std::fs::create_dir_all(&dir)
+        .and_then(|()| std::fs::write(&path, bytes))
+        .map_err(|err| format!("failed to save file attachment: {err}"))?;
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -1282,8 +1343,26 @@ mod tests {
     use super::{
         VOICE_CHAT_MARKER, browse_files, browser_panel_system_prompt, complete_directories,
         message_panel_system_prompt, message_voice_chat, read_raw_file, read_remote_file,
-        resolve_directory_path,
+        resolve_directory_path, save_file_attachment,
     };
+
+    #[test]
+    fn file_attachments_are_saved_under_a_link_safe_name() {
+        let root = std::env::temp_dir().join(format!(
+            "agentdeck-attachments-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        // base64 of "%PDF"
+        let path = save_file_attachment(&root, "../Q3 report (final).pdf", "JVBERg==").unwrap();
+        assert_eq!(path.file_name().unwrap(), "Q3_report__final_.pdf");
+        assert_eq!(path.parent().unwrap().parent().unwrap(), root);
+        assert_eq!(std::fs::read(&path).unwrap(), b"%PDF");
+        assert!(save_file_attachment(&root, "a.pdf", "not base64!").is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[tokio::test]
     async fn voice_chat_prompts_carry_the_marker_the_app_system_prompt_explains() {

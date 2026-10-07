@@ -1,8 +1,7 @@
-import { Cache } from '@mantou/tap-ui/lib/cache';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { i18n } from '../i18n';
 import type { Elicitation } from './elicitation';
-import type { Attachment, ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
+import type { ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
 
 export type ProcessGroup = { id: string; items: (ThoughtMessage | ToolMessage)[]; pending: boolean };
 
@@ -86,35 +85,6 @@ export const parseToolOutputs = (data: ToolCallData): ToolParsedOutputs => {
   }
 
   return { texts, raw };
-};
-
-// Inline base64 images in historical messages are no longer rendered as links, but restored as message attachments
-const dataImageLinkPattern = /!?\[([^\]\n]*)\]\((data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)\)/gi;
-
-const dataImageCache = new Cache<{ attachments: Attachment[]; markdown: string }>({ max: 100 });
-
-export const extractDataImageAttachments = (text: string): { attachments: Attachment[]; markdown: string } => {
-  if (!text?.includes('data:image/')) {
-    return { attachments: [], markdown: text };
-  }
-
-  const parsed = dataImageCache.get(text, () => {
-    const attachments: Attachment[] = [];
-    const markdown = text.replace(dataImageLinkPattern, (_, name: string, previewUrl: string) => {
-      const [header, data = ''] = previewUrl.split(',');
-      attachments.push({
-        id: crypto.randomUUID(),
-        kind: 'image',
-        name: name || i18n.get('attachment.imageDefaultName'),
-        mimeType: /^data:([^;]+);/.exec(header)?.[1] || 'image/png',
-        data,
-        previewUrl,
-      });
-      return '';
-    });
-    return { attachments, markdown };
-  });
-  return parsed ?? { attachments: [], markdown: text };
 };
 
 /** Questions follow the tool call that asked them, splitting its process group; others go last. */

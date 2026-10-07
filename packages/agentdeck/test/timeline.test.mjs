@@ -8,7 +8,7 @@ const {
   getToolStatus,
   groupTimelineMessages,
   reduceSessionEvent,
-  extractDataImageAttachments,
+  extractMessageAttachments,
   parseToolOutputs,
 } = documentFixture().app;
 
@@ -193,7 +193,7 @@ test('empty agent text messages do not split process groups, but non-empty or at
 
 test('inline base64 images in message text become attachments instead of links', () => {
   const markdown = 'before\n![shot](data:image/png;base64,QUJD) after\n[titled](data:image/jpeg;base64,REVG)';
-  const { attachments, markdown: rest } = extractDataImageAttachments(markdown);
+  const { attachments, markdown: rest } = extractMessageAttachments(markdown, 'Image');
   assert.equal(rest, 'before\n after\n');
   assert.equal(attachments.length, 2);
   assert.deepEqual(plain(attachments.map(({ name, mimeType, data }) => ({ name, mimeType, data }))), [
@@ -204,9 +204,9 @@ test('inline base64 images in message text become attachments instead of links',
     'data:image/png;base64,QUJD',
     'data:image/jpeg;base64,REVG',
   ]);
-  assert.equal(extractDataImageAttachments('no images here').attachments.length, 0);
-  assert.equal(extractDataImageAttachments('no images here').markdown, 'no images here');
-  const cached = extractDataImageAttachments(markdown);
+  assert.equal(extractMessageAttachments('no images here', 'Image').attachments.length, 0);
+  assert.equal(extractMessageAttachments('no images here', 'Image').markdown, 'no images here');
+  const cached = extractMessageAttachments(markdown, 'Image');
   assert.equal(cached.attachments, attachments);
   assert.equal(cached.attachments[0].id, attachments[0].id);
 });

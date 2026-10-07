@@ -1,7 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { Attachment } from '../attachment/types';
 
 import { i18n } from '../i18n';
-import type { Attachment } from '../session/types';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -32,7 +32,7 @@ export class DeckAttachmentElement extends GemElement {
           type="button"
           class=${classMap({
             'max-w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-bg-light text-left text-text active:bg-bg-hover': true,
-            'flex w-44 items-center gap-2 p-2': this.compact || attachment.kind === 'text',
+            'flex w-44 items-center gap-2 p-2': this.compact || attachment.kind !== 'image',
             'block p-1': !this.compact && attachment.kind === 'image',
           })}
           @click=${() => this.preview(attachment)}
@@ -49,10 +49,10 @@ export class DeckAttachmentElement extends GemElement {
           >
             <tap-use class="size-5" .element=${icons.file}></tap-use>
           </span>
-          <span class=${this.compact || attachment.kind === 'text' ? 'min-w-0 flex-1' : 'block px-1.5 py-1'}>
+          <span class=${this.compact || attachment.kind !== 'image' ? 'min-w-0 flex-1' : 'block px-1.5 py-1'}>
             <span class="block truncate text-sm font-medium">${attachment.name}</span>
-            <span v-if=${this.compact || attachment.kind === 'text'} class="block text-xs text-describe">
-              ${attachment.kind === 'image' ? i18n.get('attachment.image') : i18n.get('attachment.text')}
+            <span v-if=${this.compact || attachment.kind !== 'image'} class="block text-xs text-describe">
+              ${i18n.get(`attachment.${attachment.kind}`)}
             </span>
           </span>
         </button>

@@ -1,6 +1,6 @@
+import type { Attachment } from '../attachment/types';
 import { i18n } from '../i18n';
 import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
-import type { Attachment } from '../session/types';
 import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
@@ -73,12 +73,11 @@ export class DeckAttachmentPreviewElement extends GemElement {
     const attachment = this.attachment;
     if (!attachment) return null;
 
-    const isImage = attachment.kind === 'image';
     const text = attachment.kind === 'text' ? attachment.text : '';
     const isSmall = isSmallTextFile(text);
     const lang = attachment.name ? getCodeLang(attachment.name) : '';
     const heading = attachment.name || i18n.get('attachment.previewHeading');
-    const description = isImage ? i18n.get('attachment.imageDesc') : i18n.get('attachment.textDesc');
+    const description = i18n.get(`attachment.${attachment.kind}Desc`);
 
     return html`
       <div class="header">
@@ -86,11 +85,13 @@ export class DeckAttachmentPreviewElement extends GemElement {
         <p v-if=${!!description} class="description">${description}</p>
       </div>
       ${
-        isImage
+        attachment.kind === 'image'
           ? html`<img class="image" src=${attachment.previewUrl} alt=${attachment.name || ''} />`
-          : isSmall
-            ? html`<tap-code-block codelang=${lang} class="code-block select-text">${text}</tap-code-block>`
-            : html`<pre class="plain-text select-text">${text}</pre>`
+          : attachment.kind === 'file'
+            ? null
+            : isSmall
+              ? html`<tap-code-block codelang=${lang} class="code-block select-text">${text}</tap-code-block>`
+              : html`<pre class="plain-text select-text">${text}</pre>`
       }
     `;
   };

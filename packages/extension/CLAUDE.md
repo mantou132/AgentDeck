@@ -8,6 +8,7 @@
 - `shared/agent-storage.js`：基于 `chrome.storage.local` 适配 `relay-client-ts` 的持久化存储（RelayStore）。
 - `shared/agent-session-store.js`：本地会话状态与配置持久化。
 - **通信架构**：直接复用 `agentdeck/agent/transport`（`agentApi` / `startTransport`），经 `relay-client-ts` 接入 Relay 服务与 Daemon 通信。
+- **附件**：读取、线上格式、消息与历史中的附件解析复用 `agentdeck/attachment/*`，粘贴引用复用 `agentdeck/composer/references`（规则见 App 文档；测试经 `registerHooks` 直接加载其 TS 源码）；扩展没有 file-viewer，主机文件只显示为附件条。
 - **等待用户输入**：`agent_permission_request` 显示权限卡片，选择或取消都经 `agent_user_input_respond` 作答；面板卸载时取消所有未作答的权限。面板没有问题卡片，收到 `agent_elicitation_request` 即以 decline 作答（Claude 视为用户跳过，继续执行）。
 - **浏览器上下文**：建会话时 `panelContext` 携带当前 tab 的 `tabId` 与 `url`；Daemon 经本机 browser4agent 核实是同一浏览器后才注入浏览器提示词；扩展渲染能力提示词始终注入。
 

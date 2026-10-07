@@ -93,7 +93,11 @@ export type GitDiffResult = {
   stats?: GitDiffStats | null;
 };
 
-export type PromptAttachment = { type: 'image'; data: string; mimeType: string } | { type: 'text'; text: string };
+export type PromptAttachment =
+  | { type: 'image'; data: string; mimeType: string }
+  | { type: 'text'; text: string }
+  | { type: 'file'; name: string; data: string; mimeType: string }
+  | { type: 'resource'; uri: string; name: string };
 
 export type RemoteSession = {
   sessionId: string;

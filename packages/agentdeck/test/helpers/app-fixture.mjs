@@ -236,6 +236,7 @@ export function documentFixture(previous, options = {}) {
       'state/app',
       'session/events',
       'session/timeline',
+      'attachment/message',
       'session/voice-chat',
       'session/elicitation',
       'state/user-input',

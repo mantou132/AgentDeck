@@ -196,7 +196,7 @@ function composerFixture() {
         };
       if (name === '../i18n') return { i18n: { get: (key) => key } };
       if (name === '../composer/references') return { syncPasteReferences: (_, attachments) => attachments };
-      if (name === '../composer/files') return { MAX_ATTACHMENTS: 10 };
+      if (name === '../attachment/read') return { MAX_ATTACHMENTS: 10 };
       if (name === '../styles/icons') return { icons: {} };
       if (name === '@mantou/tap-ui/lib/directives') return { longPress: noop };
       if (name === '@mantou/tap-ui/elements/toast') return { Toast: { open: () => {} } };

@@ -2,13 +2,14 @@ import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent, type UserInput } from '../agent/api';
 import { agentApi, reconnectTransport } from '../agent/transport';
+import type { Attachment } from '../attachment/types';
 import { draftKey, removeDraft } from '../composer/drafts';
 import { i18n } from '../i18n';
 import { getConfigSelects, getConfigValues } from '../session/config-options';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
 import { cancelTurnPrompt, isPendingSessionCanceled, performTurn, setPendingSessionCanceled } from '../session/turn';
-import type { Attachment, DeckSession, SessionOptions, TextMessage } from '../session/types';
+import type { DeckSession, SessionOptions, TextMessage } from '../session/types';
 import { applyConfigSelection, getConfigDefaults, saveConfigDefaults } from './config-options';
 import {
   clearAllInFlight,

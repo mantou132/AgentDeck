@@ -1,8 +1,8 @@
 import type { SessionConfigOption, SessionEvent } from '../agent/api';
+import { imageAttachment } from '../attachment/message';
 import { i18n } from '../i18n';
 import { withCurrentMode } from './config-options';
 import type {
-  Attachment,
   ChatMessage,
   DeckSession,
   SessionOptions,
@@ -52,14 +52,7 @@ export const appendImage = (
   const data = typeof content.data === 'string' ? content.data : '';
   if (!data) return messages;
   const mimeType = typeof content.mimeType === 'string' ? content.mimeType : 'image/png';
-  const attachment: Attachment = {
-    id: crypto.randomUUID(),
-    kind: 'image',
-    name: i18n.get('attachment.imageDefaultName'),
-    data,
-    mimeType,
-    previewUrl: `data:${mimeType};base64,${data}`,
-  };
+  const attachment = imageAttachment(data, mimeType, i18n.get('attachment.imageDefaultName'));
   const next = messages.slice();
   const last = next.at(-1);
   if (last && 'role' in last && last.role === role && last.streaming === streaming) {

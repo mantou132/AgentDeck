@@ -1,5 +1,6 @@
 import type { SessionEvent } from '../agent/api';
 import { agentApi } from '../agent/transport';
+import { toPromptAttachment } from '../attachment/prompt';
 import { i18n } from '../i18n';
 import type { DeckSession, TextMessage } from './types';
 
@@ -35,13 +36,7 @@ export const performTurn = async (
         if (event.event === 'stop') cancelled = event.stop_reason === 'cancelled';
         await handlers.onEvent(event);
       },
-      attachments.map((attachment) => {
-        if (attachment.kind === 'image') {
-          return { type: 'image', data: attachment.data, mimeType: attachment.mimeType };
-        }
-        const name = attachment.name.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
-        return { type: 'text', text: `<attachment name="${name}">\n${attachment.text}\n</attachment>` };
-      }),
+      attachments.map(toPromptAttachment),
       callId,
       voiceChat,
     );

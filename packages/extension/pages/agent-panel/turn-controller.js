@@ -1,3 +1,4 @@
+import { toPromptAttachment } from 'agentdeck/attachment/prompt';
 import { agentSessionKey, sessionTitleFromPrompt } from '../../shared/agent-session-store.js';
 
 export function createTurnController({ state, runtime, api, scrollToLatest, startDraftTurn }) {
@@ -60,18 +61,13 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
       stage(sessionKey, { prompt, attachments });
     }
     const turnStart = (runtime.getPane(sessionKey)?.messages ?? []).length;
-    const wireAttachments = attachments.map((item) =>
-      item.kind === 'image'
-        ? { type: 'image', data: item.data, mimeType: item.mimeType }
-        : { type: 'text', text: `<attachment name="${item.name}">\n${item.text}\n</attachment>` },
-    );
     try {
       const result = await api.prompt(
         target.sessionId,
         target.agent,
         prompt,
         (event) => runtime.applyEvent(sessionKey, event),
-        wireAttachments,
+        attachments.map(toPromptAttachment),
       );
       const answer = result?.answer || '';
       runtime.finishThought(sessionKey);

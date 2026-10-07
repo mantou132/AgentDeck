@@ -1,29 +1,15 @@
+import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from 'agentdeck/attachment/read';
+import {
+  createPasteReference,
+  expandReferenceRange,
+  LONG_PASTE_CHAR_THRESHOLD,
+  syncPasteReferences,
+} from 'agentdeck/composer/references';
 import { icons } from 'agentdeck/styles/icons';
-import { compressionImage } from 'duoyun-ui/lib/image';
 import { t } from '../../shared/i18n.js';
 
-const MAX_ATTACHMENTS = 10;
-const MAX_TEXT_ATTACHMENT_BYTES = 256 * 1024;
-const LONG_PASTE_CHAR_THRESHOLD = 2_000;
 // ACP categories merged into one picker; trigger shows model + effort, e.g. Codex and Claude Agent
 const MODEL_CONFIG_CATEGORIES = ['model', 'thought_level', 'model_config'];
-// Cap images at what vision models can use anyway; compressionImage scales down.
-const IMAGE_DIMENSION = { width: 1568, height: 1568 };
-const TEXT_EXTENSION =
-  /\.(txt|md|markdown|json|jsonl|ndjson|csv|tsv|log|xml|svg|yaml|yml|toml|ini|cfg|conf|env|html?|css|scss|less|[jt]sx?|mjs|cjs|graphql|proto|py|rb|rs|go|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|fish|ps1|sql|r)$/i;
-
-/** Text-like files are inlined into the prompt; binaries cannot be sent
- * because a browser `File` carries no host path for a resource link. */
-function isTextFile(file) {
-  if (/^text\/|\b(?:json|xml|yaml|javascript|ecmascript|x-sh|sql|toml)\b/.test(file.type)) return true;
-  return !file.type && TEXT_EXTENSION.test(file.name);
-}
-
-async function readImageAttachment(file) {
-  const dataUrl = await compressionImage(file, { dimension: IMAGE_DIMENSION }, { type: 'url' });
-  const [header, data] = dataUrl.split(',');
-  return { mimeType: header.slice(5, header.indexOf(';')) || 'image/png', previewUrl: dataUrl, data };
-}
 
 const queueButtonClass =
   'grid size-7 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-describe transition-[background-color,color] duration-150 hover:bg-bg-light hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
@@ -51,7 +37,7 @@ class AgentComposerElement extends GemElement {
 
   #s = createState({
     input: '',
-    attachments: [], // staged prompt attachments: { id, kind: 'image'|'text', name, … }
+    attachments: [], // staged prompt attachments: { id, kind: 'image'|'text'|'file', name, … }
     editingId: null, // Queued item currently being edited: sending will update it in place instead of posting a new one
   });
 
@@ -119,29 +105,12 @@ class AgentComposerElement extends GemElement {
     e.target.value = '';
   };
 
-  #createPasteReference = (kind) => {
-    const number = this.#nextPasteReference++;
-    const label = `${kind === 'image' ? 'Image' : 'Pasted text'} #${number}`;
-    return {
-      pasteReference: number,
-      marker: `[${label}]`,
-      name: kind === 'image' ? label : `${label}.txt`,
-    };
-  };
-
   #readFile = async (file) => {
-    const base = { id: crypto.randomUUID(), name: file.name };
     try {
-      if (file.type.startsWith('image/')) {
-        return { attachment: { ...base, kind: 'image', ...(await readImageAttachment(file)) } };
-      }
-      if (isTextFile(file)) {
-        if (file.size > MAX_TEXT_ATTACHMENT_BYTES) return { reason: t('devtoolsPanelAttachmentTooLarge') };
-        return { attachment: { ...base, kind: 'text', text: await file.text() } };
-      }
-      return { reason: t('devtoolsPanelAttachmentUnsupported') };
-    } catch {
-      return { reason: t('devtoolsPanelAttachmentFailed') };
+      return { attachment: await readAttachment(file) };
+    } catch (error) {
+      const tooLarge = error instanceof AttachmentError && error.reason === 'tooLarge';
+      return { reason: t(tooLarge ? 'devtoolsPanelAttachmentTooLarge' : 'devtoolsPanelAttachmentFailed') };
     }
   };
 
@@ -163,36 +132,8 @@ class AgentComposerElement extends GemElement {
     if (added.length) this.#s({ attachments: [...this.#s.attachments, ...added] });
   };
 
-  #markerRanges = () =>
-    this.#s.attachments.flatMap((attachment) => {
-      if (!attachment.marker) return [];
-      const start = this.#s.input.indexOf(attachment.marker);
-      return start < 0 ? [] : [{ attachment, start, end: start + attachment.marker.length }];
-    });
-
-  #expandRangeOverMarkers = (start, end, includeCaretInside = false) => {
-    const collapsed = start === end;
-    const ranges = this.#markerRanges().filter(({ start: markerStart, end: markerEnd }) =>
-      collapsed
-        ? includeCaretInside && markerStart < start && start < markerEnd
-        : markerStart < end && markerEnd > start,
-    );
-    if (!ranges.length) return { start, end, attachmentIds: [] };
-    return {
-      start: Math.min(start, ...ranges.map((range) => range.start)),
-      end: Math.max(end, ...ranges.map((range) => range.end)),
-      attachmentIds: ranges.map((range) => range.attachment.id),
-    };
-  };
-
   #syncInput = (input) => {
-    const referencedAttachments = [...this.#pastedAttachments.values()]
-      .filter((attachment) => input.includes(attachment.marker))
-      .sort((a, b) => input.indexOf(a.marker) - input.indexOf(b.marker));
-    this.#s({
-      input,
-      attachments: [...this.#s.attachments.filter((attachment) => !attachment.marker), ...referencedAttachments],
-    });
+    this.#s({ input, attachments: syncPasteReferences(input, this.#s.attachments, this.#pastedAttachments.values()) });
   };
 
   #replaceInputRange = (start, end, replacement, addedAttachments = []) => {
@@ -229,9 +170,15 @@ class AgentComposerElement extends GemElement {
             start: textarea?.selectionStart ?? this.#s.input.length,
             end: textarea?.selectionEnd ?? this.#s.input.length,
           };
-    const range = this.#expandRangeOverMarkers(currentSelection.start, currentSelection.end, true);
-    const markerText = attachments.map((attachment) => attachment.marker).join(' ');
-    this.#replaceInputRange(range.start, range.end, markerText, attachments);
+    const range = expandReferenceRange(
+      this.#s.input,
+      this.#s.attachments,
+      currentSelection.start,
+      currentSelection.end,
+      true,
+    );
+    const references = attachments.map((attachment) => createPasteReference(attachment, this.#nextPasteReference++));
+    this.#replaceInputRange(range.start, range.end, references.map((item) => item.marker).join(' '), references);
   };
 
   #removeAttachment = (id) => {
@@ -249,8 +196,8 @@ class AgentComposerElement extends GemElement {
     let start = textarea.selectionStart ?? 0;
     let end = textarea.selectionEnd ?? start;
     if (e.inputType.startsWith('insert')) {
-      const range = this.#expandRangeOverMarkers(start, end, true);
-      if (range.attachmentIds.length) textarea.setSelectionRange(range.start, range.end);
+      const range = expandReferenceRange(this.#s.input, this.#s.attachments, start, end, true);
+      if (range.start !== start || range.end !== end) textarea.setSelectionRange(range.start, range.end);
       return;
     }
     if (!e.inputType.startsWith('delete')) return;
@@ -259,8 +206,8 @@ class AgentComposerElement extends GemElement {
       else if (e.inputType.endsWith('Forward')) end = Math.min(this.#s.input.length, end + 1);
       else return;
     }
-    const range = this.#expandRangeOverMarkers(start, end);
-    if (!range.attachmentIds.length) return;
+    const range = expandReferenceRange(this.#s.input, this.#s.attachments, start, end);
+    if (range.start === start && range.end === end) return;
     textarea.setSelectionRange(range.start, range.end);
   };
 
@@ -278,10 +225,7 @@ class AgentComposerElement extends GemElement {
     if (images.length) {
       e.preventDefault();
       const added = await this.#readFiles(images);
-      this.#insertPastedAttachments(
-        added.map((attachment) => ({ ...attachment, ...this.#createPasteReference('image') })),
-        selection,
-      );
+      this.#insertPastedAttachments(added, selection);
       return;
     }
 
@@ -289,21 +233,11 @@ class AgentComposerElement extends GemElement {
     if (text.length < LONG_PASTE_CHAR_THRESHOLD || this.#s.attachments.length >= MAX_ATTACHMENTS) return;
 
     e.preventDefault();
-    if (new TextEncoder().encode(text).byteLength > MAX_TEXT_ATTACHMENT_BYTES) {
-      this.attacherror(t('devtoolsPanelAttachmentTooLarge'));
+    if (new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) {
+      this.attacherror(t('devtoolsPanelPasteTooLarge'));
       return;
     }
-    this.#insertPastedAttachments(
-      [
-        {
-          id: crypto.randomUUID(),
-          kind: 'text',
-          text,
-          ...this.#createPasteReference('text'),
-        },
-      ],
-      selection,
-    );
+    this.#insertPastedAttachments([{ id: crypto.randomUUID(), kind: 'text', name: '', text }], selection);
   };
 
   /** Put a queued prompt back into the draft; sending then updates that

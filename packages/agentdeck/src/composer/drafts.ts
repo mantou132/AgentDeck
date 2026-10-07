@@ -1,6 +1,7 @@
+import type { Attachment } from '../attachment/types';
 import { DATABASES } from '../config';
 import { createDatabaseStore } from '../lib/database';
-import type { Attachment, DeckSession } from '../session/types';
+import type { DeckSession } from '../session/types';
 
 export type ComposerDraft = { text: string; attachments: Attachment[]; quote?: string };
 const drafts = createDatabaseStore<ComposerDraft>(DATABASES.drafts);

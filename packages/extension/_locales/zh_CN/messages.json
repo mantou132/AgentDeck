@@ -30,10 +30,7 @@
     "message": "读取文件失败"
   },
   "devtoolsPanelAttachmentTooLarge": {
-    "message": "文本文件过大，上限 256 KB"
-  },
-  "devtoolsPanelAttachmentUnsupported": {
-    "message": "仅支持附加图片和文本文件"
+    "message": "文件过大，上限 5 MB"
   },
   "devtoolsPanelCancel": {
     "message": "取消"
@@ -73,6 +70,9 @@
   },
   "devtoolsPanelNoSessions": {
     "message": "暂无会话"
+  },
+  "devtoolsPanelPasteTooLarge": {
+    "message": "粘贴文本过大，上限 256 KB"
   },
   "devtoolsPanelPlaceholder": {
     "message": "向 Agent 发送消息，Enter 发送，Shift+Enter 换行"

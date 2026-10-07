@@ -6,17 +6,13 @@ import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { setSelectionMenuItems } from 'src/lib/selection-menu';
 import type { ElicitationResponse } from '../agent/api';
+import { extractMessageAttachments } from '../attachment/message';
+import type { Attachment } from '../attachment/types';
 import { i18n } from '../i18n';
 import { openMessageLink } from '../navigation';
 import type { Elicitation } from '../session/elicitation';
-import {
-  extractDataImageAttachments,
-  getProcessSummary,
-  getToolStatus,
-  groupTimelineMessages,
-  type ProcessGroup,
-} from '../session/timeline';
-import type { Attachment, ChatMessage, TextMessage } from '../session/types';
+import { getProcessSummary, getToolStatus, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
+import type { ChatMessage, TextMessage } from '../session/types';
 import { stripVoiceChatMarker } from '../session/voice-chat';
 import { answerElicitation } from '../state/user-input';
 import { icons } from '../styles/icons';
@@ -86,10 +82,11 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #renderTextMessage = (message: TextMessage) => {
-    const { attachments: linkedAttachments, markdown } = extractDataImageAttachments(
+    const { attachments: linked, markdown } = extractMessageAttachments(
       message.role === 'user' ? stripVoiceChatMarker(message.text) : message.text,
+      i18n.get('attachment.imageDefaultName'),
     );
-    const attachments = [...(message.attachments ?? []), ...linkedAttachments];
+    const attachments = [...(message.attachments ?? []), ...linked];
 
     if (message.role === 'user') {
       return html`

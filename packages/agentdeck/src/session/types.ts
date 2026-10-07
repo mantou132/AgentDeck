@@ -1,4 +1,5 @@
 import type { LoadedSession, RemoteSession } from '../agent/api';
+import type { Attachment } from '../attachment/types';
 
 export type DeckSession = RemoteSession & {
   agent: string;
@@ -19,13 +20,6 @@ export type ToolCallData = {
   rawOutput?: unknown;
   content?: ToolCallContent[];
 };
-
-export type Attachment = {
-  id: string;
-  name: string;
-  pasteReference?: number;
-  marker?: string;
-} & ({ kind: 'image'; data: string; mimeType: string; previewUrl: string } | { kind: 'text'; text: string });
 
 export type TextMessage = {
   id: string;
