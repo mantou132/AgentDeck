@@ -38,6 +38,10 @@ export const agentdeckStore = createStore({
   commandsByAgent: readSavedCommands(),
 });
 
+/** Home directory of the current host, remembered from its last handshake. */
+export const hostHome = () =>
+  agentdeckStore.pairingHistory.find((item) => item.relayId === agentdeckStore.settings.relayId)?.home;
+
 export const setPromptSuggestion = (sessionId: string, suggestion: string) => {
   const next = { ...agentdeckStore.suggestionsBySession };
   if (suggestion) next[sessionId] = suggestion;

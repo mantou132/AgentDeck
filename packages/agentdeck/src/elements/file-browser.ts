@@ -7,7 +7,7 @@ import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { displayPath, getBreadcrumbs, getParentPath } from '../lib/path';
 import { openFileViewer } from '../navigation';
-import { agentdeckStore } from '../state/store';
+import { agentdeckStore, hostHome } from '../state/store';
 import { icons } from '../styles/icons';
 
 const browserStyle = css`
@@ -313,7 +313,7 @@ export class DeckFileBrowserPageElement extends GemElement {
 
   #title = () => {
     const p = this.#state.currentPath || this.path;
-    if (displayPath(p) === '~') return '~';
+    if (displayPath(p, hostHome()) === '~') return '~';
     return (
       p
         .split(/[\\/]+/)

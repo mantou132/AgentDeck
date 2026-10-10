@@ -80,7 +80,7 @@ export const readSavedCommands = () =>
   ) as Record<string, AvailableCommand[]>;
 
 /** A pairing whose host handshake succeeded; `hostname` is missing for old daemons. */
-export type PairingRecord = { relayId: string; relayUrl?: string; hostname?: string };
+export type PairingRecord = { relayId: string; relayUrl?: string; hostname?: string; home?: string };
 
 /** Most recently connected first. */
 export const readPairingHistory = (): PairingRecord[] => {

@@ -26,7 +26,7 @@ import {
   retrySessionLoad,
   sendPrompt,
 } from '../state/sessions';
-import { agentdeckStore, clearSessionError, setSessionError, setSessionFlag } from '../state/store';
+import { agentdeckStore, clearSessionError, hostHome, setSessionError, setSessionFlag } from '../state/store';
 import { resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 
@@ -219,7 +219,7 @@ export class AgentDeckSessionPageElement extends GemElement {
               openChanges(cwd);
             }}
           >
-            <span class="truncate font-mono">${displayPath(cwd || '')}</span>
+            <span class="truncate font-mono">${displayPath(cwd || '', hostHome())}</span>
           </button>
         </div>
         <button

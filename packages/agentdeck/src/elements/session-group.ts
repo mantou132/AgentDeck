@@ -5,6 +5,7 @@ import { Time } from '@mantou/tap-ui/lib/time';
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import type { DeckSession } from '../session/types';
+import { hostHome } from '../state/store';
 import { icons } from '../styles/icons';
 
 @customElement('deck-session-group')
@@ -39,7 +40,7 @@ export class DeckSessionGroupElement extends GemElement {
             <tap-use class="size-4" .element=${icons.folder}></tap-use>
           </span>
           <span class="min-w-0 flex-1 truncate font-mono text-sm font-medium text-highlight" title=${cwd}>
-            ${displayPath(cwd)}
+            ${displayPath(cwd, hostHome())}
           </span>
           <span class="rounded-lg bg-bg px-2 py-1 font-mono text-xs font-bold text-describe">${sessions.length}</span>
         </header>

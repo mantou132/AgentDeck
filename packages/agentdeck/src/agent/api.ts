@@ -257,7 +257,7 @@ export class AgentApi {
     this.#peer.onNotify('host_reconnected', () => handler?.());
 
   attachPeer = async (deviceId: string, fcmToken?: string | null, capabilities?: ClientCapabilities) => {
-    return this.#peer.call<{ peerId: number; version?: string; hostname?: string }>(
+    return this.#peer.call<{ peerId: number; version?: string; hostname?: string; home?: string }>(
       'peer_attach',
       { deviceId, fcmToken, capabilities },
       undefined,

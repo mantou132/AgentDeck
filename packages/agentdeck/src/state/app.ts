@@ -46,11 +46,11 @@ const savePairingHistory = (pairingHistory: PairingRecord[]) => {
 };
 
 /** Moves the connected pairing to the front; keeps the known hostname when an old daemon omits it. */
-const recordPairing = (hostname?: string) => {
+const recordPairing = (hostname?: string, home?: string) => {
   const { relayId, relayUrl } = agentdeckStore.settings;
   const previous = agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
   const rest = agentdeckStore.pairingHistory.filter((item) => item !== previous);
-  savePairingHistory([{ relayId, relayUrl, hostname: hostname || previous?.hostname }, ...rest]);
+  savePairingHistory([{ relayId, relayUrl, hostname: hostname || previous?.hostname, home }, ...rest]);
 };
 
 export const removePairing = (relayId: string) =>
@@ -67,14 +67,14 @@ const handleTransportMessage = (message: TransportMessage) => {
       break;
     }
     case 'connection': {
-      const { connection, error, hostVersion, hostname } = message;
+      const { connection, error, hostVersion, hostname, home } = message;
       agentdeckStore({
         connection,
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
       });
       if (connection === 'connected') {
         agentdeckStore({ hostVersion: hostVersion || '' });
-        recordPairing(hostname);
+        recordPairing(hostname, home);
         refreshSessions();
         // Older daemon has no reconciliation endpoint; stay waiting if it fails
         settleLostTurns().catch(console.error);

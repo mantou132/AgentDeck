@@ -38,8 +38,15 @@ export const connectionLabels = new Proxy({} as Record<ConnectionState, string>,
 });
 
 export type TransportMessage =
-  /** `hostVersion` and `hostname` come with `connected`; old hosts omit them. */
-  | { type: 'connection'; connection: ConnectionState; error?: string; hostVersion?: string; hostname?: string }
+  /** `hostVersion`, `hostname` and `home` come with `connected`; old hosts omit the first two. */
+  | {
+      type: 'connection';
+      connection: ConnectionState;
+      error?: string;
+      hostVersion?: string;
+      hostname?: string;
+      home?: string;
+    }
   | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
   | { type: 'session_ended'; sessionId: string }
@@ -144,6 +151,7 @@ class HostSessionManager {
   #peerId: number | undefined;
   #hostVersion: string | undefined;
   #hostname: string | undefined;
+  #home: string | undefined;
   #attachId: RpcId | undefined;
   #attaching: Promise<void> | undefined;
   #fcmToken: string | null | undefined;
@@ -164,6 +172,10 @@ class HostSessionManager {
 
   get hostname() {
     return this.#hostname;
+  }
+
+  get home() {
+    return this.#home;
   }
 
   get attachId() {
@@ -220,6 +232,7 @@ class HostSessionManager {
         this.#peerId = result.peerId;
         this.#hostVersion = result.version;
         this.#hostname = result.hostname;
+        this.#home = result.home;
         this.#syncedFcmToken = sentToken;
         if (!silent || peerChanged) options.onStateChange('connected');
       })
@@ -352,6 +365,7 @@ class AgentTransport {
       error,
       hostVersion: host?.hostVersion,
       hostname: host?.hostname,
+      home: host?.home,
     });
   }
 

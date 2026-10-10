@@ -288,16 +288,18 @@ impl RemotePeerManager {
         let version = env!("CARGO_PKG_VERSION");
         // Clients label remembered pairings with it.
         let hostname = gethostname::gethostname().to_string_lossy().into_owned();
+        // Clients shorten paths under it to `~`.
+        let home = dirs::home_dir().map(|home| home.to_string_lossy().into_owned());
         let response = match id {
             Some(req_id) => json!({
                 "peerId": peer_id,
                 "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname }
+                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home }
             }),
             None => json!({
                 "peerId": peer_id,
                 "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname }
+                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home }
             }),
         };
         let target = if device_id.is_empty() {

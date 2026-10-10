@@ -17,7 +17,7 @@ export const displayPath = (path: string, home?: string) => {
       return `~/${normalizedPath.slice(normalizedHome.length + 1).replaceAll('\\', '/')}`;
     }
   }
-  return path.replace(/^\/Users\/[^/]+(?=\/|$)/, '~').replace(/^\/home\/[^/]+(?=\/|$)/, '~');
+  return path;
 };
 
 export const getBreadcrumbs = (currentPath: string, homePath?: string): Breadcrumb[] => {

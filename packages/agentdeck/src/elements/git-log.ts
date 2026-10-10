@@ -5,7 +5,7 @@ import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import { openChanges } from '../navigation';
-import { agentdeckStore } from '../state/store';
+import { agentdeckStore, hostHome } from '../state/store';
 import { icons } from '../styles/icons';
 
 const pageStyle = css`
@@ -56,7 +56,7 @@ export class DeckGitLogPageElement extends GemElement {
     const { loading, error, result, entered } = this.#state;
     const commits = result?.commits ?? [];
     const branch = result?.branch;
-    const repoName = result?.repo ? displayPath(result.repo) : displayPath(this.cwd);
+    const repoName = result?.repo ? displayPath(result.repo, hostHome()) : displayPath(this.cwd, hostHome());
 
     return html`
       <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
