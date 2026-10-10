@@ -1,29 +1,33 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import type { AvailableCommand } from '../agent/api';
 import { agentApi } from '../agent/transport';
-import { CONFIG_DEFAULTS_KEY } from '../config';
+import { type AgentDefaults, CONFIG_DEFAULTS_KEY, readConfigDefaults } from '../config';
 import { i18n } from '../i18n';
 import { type ConfigSelect, getConfigSelects, withConfigValue, withCurrentMode } from '../session/config-options';
 import type { DeckSession, SessionOptions } from '../session/types';
 import { agentdeckStore, updateSessionOptions } from './store';
 
-const readConfigDefaults = (): Record<string, SessionOptions> => {
-  try {
-    return JSON.parse(localStorage.getItem(CONFIG_DEFAULTS_KEY) || '{}') ?? {};
-  } catch {
-    return {};
-  }
+const saveAgentDefaults = (agent: string, patch: AgentDefaults) => {
+  const defaults = readConfigDefaults();
+  localStorage.setItem(CONFIG_DEFAULTS_KEY, JSON.stringify({ ...defaults, [agent]: { ...defaults[agent], ...patch } }));
 };
 
-export const getConfigDefaults = (agent: string): SessionOptions => readConfigDefaults()[agent] ?? {};
+export const getConfigDefaults = (agent: string): SessionOptions => {
+  const { modes, configOptions } = readConfigDefaults()[agent] ?? {};
+  return { modes, configOptions };
+};
 
 /** Remember full option set per agent so new sessions can display and reuse them without first loading a session of the same agent. */
 export const saveConfigDefaults = (agent: string, options: SessionOptions) => {
   if (!getConfigSelects(options).length) return;
   const { modes, configOptions } = options;
-  localStorage.setItem(
-    CONFIG_DEFAULTS_KEY,
-    JSON.stringify({ ...readConfigDefaults(), [agent]: { modes, configOptions } }),
-  );
+  saveAgentDefaults(agent, { modes, configOptions });
+};
+
+/** The latest commands an agent announced; new sessions offer them before their own list arrives. */
+export const setAgentCommands = (agent: string, commands: AvailableCommand[]) => {
+  agentdeckStore({ commandsByAgent: { ...agentdeckStore.commandsByAgent, [agent]: commands } });
+  saveAgentDefaults(agent, { commands });
 };
 
 const applyRemoteConfig = async (

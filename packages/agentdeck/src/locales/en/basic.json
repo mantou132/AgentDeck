@@ -83,6 +83,7 @@
   "composer.draftSaveFailed": "Failed to save draft",
   "composer.stopAria": "Stop generation",
   "composer.sendAria": "Send",
+  "composer.commandsAria": "Commands",
   "composer.startDictationAria": "Start voice input",
   "composer.stopDictationAria": "Stop voice input",
   "speechRecognition.permissionDenied": "Microphone permission required",

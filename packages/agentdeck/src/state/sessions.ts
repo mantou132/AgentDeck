@@ -10,7 +10,7 @@ import { completeThought, finishStreaming, reduceSessionEvent } from '../session
 import { getSortedSessionGroups } from '../session/groups';
 import { cancelTurnPrompt, isPendingSessionCanceled, performTurn, setPendingSessionCanceled } from '../session/turn';
 import type { DeckSession, SessionOptions, TextMessage } from '../session/types';
-import { applyConfigSelection, getConfigDefaults, saveConfigDefaults } from './config-options';
+import { applyConfigSelection, getConfigDefaults, saveConfigDefaults, setAgentCommands } from './config-options';
 import {
   clearAllInFlight,
   type InFlightSession,
@@ -70,6 +70,7 @@ export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
     if (inFlight) inFlightSessions.set(sessionId, { ...inFlight, ...reduction.sessionPatch });
   }
   if (reduction.optionsPatch) updateSessionOptions(sessionId, reduction.optionsPatch);
+  if (reduction.commands) setAgentCommands(agent, reduction.commands);
 };
 
 /** Permission requests and questions are shown only for the running turn of the device that started it. */

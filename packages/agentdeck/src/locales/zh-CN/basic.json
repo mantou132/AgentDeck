@@ -83,6 +83,7 @@
   "composer.draftSaveFailed": "草稿保存失败",
   "composer.stopAria": "停止生成",
   "composer.sendAria": "发送",
+  "composer.commandsAria": "命令",
   "composer.startDictationAria": "开始语音输入",
   "composer.stopDictationAria": "停止语音输入",
   "speechRecognition.permissionDenied": "需要麦克风权限",

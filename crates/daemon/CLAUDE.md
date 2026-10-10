@@ -33,6 +33,7 @@
 - **reset**：停止服务并持锁后，删除 `remote_peers_v1.json`、`logs/` 和 `agents/*/install/`；未传 `--pairing-id` 时生成新的 `adk1_` ID，未传 `--relay-url` 时恢复默认 Relay。保留已安装的 Agent 及其历史，完成后恢复原来的运行/停止状态，并输出 status。
 - **会话指令**：面板上下文等指令一律通过 `session/new` / `session/load` 的 `_meta.systemPrompt.append` 下发，不判断 Agent 能力。OpenCode（含 `free`）忽略该字段，面板上下文对其不生效。不要用 MCP instructions 承载客户端上下文（语义不符，Codex 也不会当作指令）。正式字段见 RFD agent-client-protocol#1237。
 - **下一句建议**：`session/new` / `session/load` 一律在 `_meta.claudeCode` 中开启 `promptSuggestions`，并用 `emitRawSDKMessages` 只订阅 `prompt_suggestion`（claude-agent-acp 默认丢弃），与 `systemPrompt` 一样不判断 Agent，其他 Agent 忽略该键。建议在回合结束后以 `_claude/sdkMessage` 到达，由连接级处理器按 sessionId 转成 `agent_prompt_suggestion` 通知，只发给最近一次发起 prompt 的设备。
+- **回合间的会话更新**：会话 actor 空闲时也读取 ACP session update（如 `session/new` 返回后才推送的 `available_commands_update`），以 `agent_session_update` 通知（`{ agent, sessionId, update }`）发给创建或打开该会话的设备；回合与 load 回放中的仍随各自事件流转发。
 - **语音对话**：`agent_prompt` 带 `voiceChat: true` 时在附件末尾追加 `<agentdeck-voice-chat/>` 标记；`remote_app` 系统提示说明见到标记要在回复末尾写 `<!-- agentdeck-speech … -->` 注释作为朗读摘要（只有 Claude 读系统提示）。客户端从历史用户消息中去掉该标记。
 - **渲染 skill**：客户端在 `peer_attach` 的 `capabilities`（如 `{ "render": ["chart"] }`）中声明能力，daemon 按设备保存。Agent 声明了 `sessionCapabilities.additionalDirectories` 时，把对应 skill 目录作为 `additionalDirectories` 传入 `session/new` / `session/load`；未声明的 Agent（如 opencode）不注入；`free` 例外，进程级挂载全部 skill，不区分设备。
 

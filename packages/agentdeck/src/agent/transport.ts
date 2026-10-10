@@ -543,6 +543,9 @@ export const initTransport = (options: InitTransportOptions) => {
   agentApi.setPromptSuggestionHandler(({ sessionId, suggestion }) =>
     transport.dispatchMessage({ type: 'prompt_suggestion', sessionId, suggestion }),
   );
+  agentApi.setSessionUpdateHandler(({ sessionId, update }) =>
+    transport.dispatchMessage({ type: 'session_event', sessionId, event: { event: 'session_update', update } }),
+  );
   agentApi.setHostReconnectedHandler(() => syncHostConnection());
   if (isPairingId(options.initialRelayId))
     startTransport(options.initialRelayId, {

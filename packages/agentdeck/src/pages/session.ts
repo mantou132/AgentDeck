@@ -371,6 +371,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             @config-open=${() => openSessionConfig(session.sessionId)}
             .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(hasPendingElicitation(agentdeckStore.elicitationsBySession[session.sessionId]) ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
             .suggestion=${connected && loaded ? (agentdeckStore.suggestionsBySession[session.sessionId] ?? '') : ''}
+            .commands=${agentdeckStore.commandsByAgent[session.agent] ?? []}
             .submit=${this.#send}
             ?disabled=${!loaded}
             ?ready=${connected && loaded}

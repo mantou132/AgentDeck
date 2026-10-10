@@ -107,6 +107,9 @@ export type RemoteSession = {
   additionalDirectories?: string[];
 };
 
+/** ACP slash command; the prompt `/name args` runs it. */
+export type AvailableCommand = { name: string; description: string; input?: { hint: string } | null };
+
 export type SessionEvent =
   | { event: 'session_update'; update: Record<string, unknown> }
   | { event: 'stop'; stop_reason?: string };
@@ -241,6 +244,14 @@ export class AgentApi {
   /** Claude's predicted next prompt, sent after a turn to the device that started it. */
   setPromptSuggestionHandler = (handler?: ((params: PromptSuggestion) => void) | null) =>
     this.#peer.onNotify('agent_prompt_suggestion', (params) => handler?.(params as PromptSuggestion));
+
+  /** Session updates the agent sends between turns (e.g. available commands), to the device that created or loaded it. */
+  setSessionUpdateHandler = (
+    handler?: ((params: { agent: string; sessionId: string; update: Record<string, unknown> }) => void) | null,
+  ) =>
+    this.#peer.onNotify('agent_session_update', (params) =>
+      handler?.(params as { agent: string; sessionId: string; update: Record<string, unknown> }),
+    );
 
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());

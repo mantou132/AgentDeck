@@ -228,13 +228,15 @@ impl AgentService {
 
         let create_sessions = sessions.clone();
         let create_capabilities = capabilities.clone();
+        let create_peer = peer.clone();
         peer.handle("agent_session_create", move |params, _ctx| {
             let sessions = create_sessions.clone();
             let capabilities = create_capabilities.clone();
+            let peer = create_peer.clone();
             async move {
                 let agent = required_agent(&params, "agent_session_create")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities).await?;
+                let context = session_context(&params, &capabilities, &peer, agent).await?;
                 let timeout_secs = message_timeout_secs(&params);
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
@@ -257,13 +259,15 @@ impl AgentService {
         });
 
         let load_sessions = sessions.clone();
+        let load_peer = peer.clone();
         peer.handle("agent_session_load", move |params, ctx| {
             let sessions = load_sessions.clone();
             let capabilities = capabilities.clone();
+            let peer = load_peer.clone();
             async move {
                 let (agent, session_id) = required_agent_session(&params, "agent_session_load")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities).await?;
+                let context = session_context(&params, &capabilities, &peer, agent).await?;
                 let timeout_secs = message_timeout_secs(&params);
 
                 // The actor drains the load-time history replay into this channel
@@ -1135,10 +1139,23 @@ fn message_cwd(params: &Value) -> Option<PathBuf> {
 async fn session_context(
     params: &Value,
     capabilities: &PeerCapabilities,
+    peer: &Peer,
+    agent: &str,
 ) -> Result<SessionContext, String> {
+    // Updates between turns (e.g. available commands) go to the device that
+    // created or loaded the session.
+    let peer = peer.clone();
+    let agent = agent.to_string();
+    let idle_update_sink: acp_agent::SessionUpdateSink = Arc::new(move |session_id, update| {
+        peer.notify(
+            "agent_session_update",
+            json!({ "agent": agent, "sessionId": session_id, "update": update }),
+        );
+    });
     Ok(SessionContext {
         system_prompt: message_panel_system_prompt(params).await?,
         client_capabilities: capabilities.lock().expect("lock poisoned").clone(),
+        idle_update_sink: Some(idle_update_sink),
     })
 }
 

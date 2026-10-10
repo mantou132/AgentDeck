@@ -1,6 +1,6 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
-import { popularAgents, readSettings } from '../config';
+import { popularAgents, readSavedCommands, readSettings } from '../config';
 import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
 import type { ChatMessage, DeckSession, SessionOptions } from '../session/types';
@@ -31,6 +31,8 @@ export const agentdeckStore = createStore({
   elicitationsBySession: {} as Record<string, Elicitation[]>,
   /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
   suggestionsBySession: {} as Record<string, string>,
+  /** Latest slash commands of each agent, also saved with its config defaults. */
+  commandsByAgent: readSavedCommands(),
 });
 
 export const setPromptSuggestion = (sessionId: string, suggestion: string) => {

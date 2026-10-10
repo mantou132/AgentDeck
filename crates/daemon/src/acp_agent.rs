@@ -94,6 +94,10 @@ impl UserInput {
 /// Receives the agent's predicted next user prompt for a session.
 pub type SuggestionSink = Arc<dyn Fn(String) + Send + Sync>;
 
+/// Receives `(session_id, update)` for session updates the agent sends while no
+/// prompt or load reads them, e.g. the available commands after `session/new`.
+pub type SessionUpdateSink = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
+
 /// Raw Claude Agent SDK message forwarded by claude-agent-acp when the session
 /// opts in through `_meta.claudeCode.emitRawSDKMessages`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonRpcNotification)]
@@ -109,6 +113,7 @@ struct ClaudeSdkMessage {
 pub struct SessionContext {
     pub system_prompt: Option<String>,
     pub client_capabilities: ClientCapabilities,
+    pub idle_update_sink: Option<SessionUpdateSink>,
 }
 
 /// Snapshot returned after an ACP session actor is ready.
@@ -1167,6 +1172,7 @@ async fn run_session_actor_inner(
     ready_tx: oneshot::Sender<Result<SessionReady, String>>,
     closing: CancellationToken,
 ) -> Result<()> {
+    let idle_update_sink = context.idle_update_sink.clone();
     let started = tokio::select! {
         result = runtime.start_session(cwd, load, context) => result,
         _ = closing.cancelled() => return Ok(()),
@@ -1203,7 +1209,26 @@ async fn run_session_actor_inner(
         loop {
             let command = match deferred.pop_front() {
                 Some(command) => Some(command),
-                None => rx.recv().await,
+                // Between turns, forward what the agent sends right away instead
+                // of leaving it queued until the next prompt reads it.
+                None => tokio::select! {
+                    biased;
+                    update = session.read_update() => {
+                        if let SessionMessage::SessionMessage(dispatch) = update? {
+                            MatchDispatch::new(dispatch)
+                                .if_notification(async |notif: SessionNotification| {
+                                    if let Some(sink) = &idle_update_sink {
+                                        sink(&session_id, update_to_json(notif.update));
+                                    }
+                                    Ok(())
+                                })
+                                .await
+                                .otherwise_ignore()?;
+                        }
+                        continue;
+                    }
+                    command = rx.recv() => command,
+                },
             };
             let Some(command) = command else { break };
             match command {

@@ -3,6 +3,7 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import { longPress } from '@mantou/tap-ui/lib/directives';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
+import type { AvailableCommand } from '../agent/api';
 import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../attachment/read';
 import type { Attachment } from '../attachment/types';
 import { readDraft, saveDraft } from '../composer/drafts';
@@ -55,6 +56,8 @@ export class DeckComposerElement extends GemElement {
   @property placeholder = '';
   /** Predicted next prompt: replaces the placeholder while the input is empty, can be sent as is, long press fills it in. */
   @property suggestion = '';
+  /** Slash commands offered while the input is a single `/word`. */
+  @property commands: AvailableCommand[] = [];
   @property submit?: (input: ComposerInput) => boolean | Promise<boolean>;
   @boolattribute disabled: boolean;
   @boolattribute ready: boolean;
@@ -112,6 +115,21 @@ export class DeckComposerElement extends GemElement {
     const { draft, quote, attachments } = this.#state;
     return draft || quote || attachments.length ? '' : this.suggestion;
   }
+
+  get #matchedCommands() {
+    const query = /^\/(\S*)$/.exec(this.#state.draft)?.[1].toLowerCase();
+    if (query === undefined) return [];
+    const matched = this.commands.filter(({ name }) => name.toLowerCase().includes(query));
+    return [
+      ...matched.filter(({ name }) => name.toLowerCase().startsWith(query)),
+      ...matched.filter(({ name }) => !name.toLowerCase().startsWith(query)),
+    ];
+  }
+
+  #selectCommand = (name: string) => {
+    hapticSelection();
+    this.#replaceInputRange(0, this.#state.draft.length, `/${name} `);
+  };
 
   get #voiceChatEntry() {
     const { draft, quote, attachments } = this.#state;
@@ -397,9 +415,31 @@ export class DeckComposerElement extends GemElement {
   @template()
   #render = () => {
     const canSend = this.#canSend;
+    const commands = this.#matchedCommands;
     return html`
           <div class="composer-shell px-2.5 pt-1.5">
             <div class="composer-surface mx-auto max-w-[760px] overflow-hidden border border-primary/15 bg-bg-light shadow-card">
+              <div
+                v-if=${commands.length > 0}
+                class="max-h-52 overflow-y-auto border-b border-primary/10 py-1.5"
+                role="listbox"
+                aria-label=${i18n.get('composer.commandsAria')}
+              >
+                ${commands.map(
+                  ({ name, description }) => html`
+                    <button
+                      type="button"
+                      role="option"
+                      class="block w-full cursor-pointer border-0 bg-transparent px-3.5 py-2 text-left active:bg-bg-hover"
+                      @pointerdown=${(event: PointerEvent) => event.preventDefault()}
+                      @click=${() => this.#selectCommand(name)}
+                    >
+                      <div class="truncate text-sm font-medium text-highlight">/${name}</div>
+                      <div v-if=${!!description} class="truncate text-xs text-describe">${description}</div>
+                    </button>
+                  `,
+                )}
+              </div>
               <div v-if=${this.#state.attachments.length} class="flex max-h-40 flex-wrap gap-3 overflow-y-auto px-3.5 pt-3.5 pb-1.5">
                 ${this.#state.attachments.map(
                   (attachment) => html`

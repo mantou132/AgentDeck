@@ -678,3 +678,43 @@ async fn prompt_suggestion_after_turn_reaches_the_prompting_sink() {
         .unwrap();
     assert_eq!(suggestion.as_deref(), Some("Run the tests"));
 }
+
+#[tokio::test]
+async fn updates_between_turns_reach_the_idle_sink() {
+    let mut mock = MockAcp::new().await;
+    let (update_tx, mut update_rx) = mpsc::unbounded_channel();
+    let sink: SessionUpdateSink = Arc::new(move |session_id, update| {
+        let _ = update_tx.send((session_id.to_string(), update));
+    });
+    let manager = mock.manager.clone();
+    let call = tokio::spawn(async move {
+        let context = SessionContext {
+            idle_update_sink: Some(sink),
+            ..Default::default()
+        };
+        manager.create_session("codex-acp", None, context).await
+    });
+    let request = mock.next("session/new").await;
+    mock.respond(&request, json!({"sessionId": "session"}));
+    call.await.unwrap().unwrap();
+
+    // Agents announce their commands after the `session/new` response.
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {"sessionId": "session", "update": {
+                "sessionUpdate": "available_commands_update",
+                "availableCommands": [{"name": "review", "description": "Review changes"}],
+            }},
+        })))
+        .unwrap();
+    let (session_id, update) = tokio::time::timeout(Duration::from_secs(1), update_rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(session_id, "session");
+    assert_eq!(update["sessionUpdate"], "available_commands_update");
+    assert_eq!(update["availableCommands"][0]["name"], "review");
+}

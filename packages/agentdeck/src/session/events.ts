@@ -1,4 +1,4 @@
-import type { SessionConfigOption, SessionEvent } from '../agent/api';
+import type { AvailableCommand, SessionConfigOption, SessionEvent } from '../agent/api';
 import { imageAttachment } from '../attachment/message';
 import { i18n } from '../i18n';
 import { withCurrentMode } from './config-options';
@@ -141,6 +141,7 @@ export type EventReduction = {
   messages?: ChatMessage[];
   sessionPatch?: Partial<DeckSession>;
   optionsPatch?: Partial<SessionOptions>;
+  commands?: AvailableCommand[];
 };
 
 const getToolContent = (update: Record<string, unknown>) => {
@@ -253,6 +254,10 @@ export const reduceSessionEvent = (
 
   if (sessionUpdate === 'config_option_update' && Array.isArray(update.configOptions)) {
     return { optionsPatch: { configOptions: update.configOptions as SessionConfigOption[] } };
+  }
+
+  if (sessionUpdate === 'available_commands_update' && Array.isArray(update.availableCommands)) {
+    return { commands: update.availableCommands as AvailableCommand[] };
   }
 
   return null;

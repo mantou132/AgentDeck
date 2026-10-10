@@ -1,6 +1,7 @@
-import type { ClientCapabilities } from './agent/api';
+import type { AvailableCommand, ClientCapabilities } from './agent/api';
 import { isPairingId } from './agent/encryption';
 import { previewSupported } from './lib/preview';
+import type { SessionOptions } from './session/types';
 
 export type AppSettings = {
   relayId: string;
@@ -59,6 +60,22 @@ export const isRelayUrl = (value: string) => {
     return false;
   }
 };
+
+/** Saved per agent: the chosen config options and the latest slash commands. */
+export type AgentDefaults = SessionOptions & { commands?: AvailableCommand[] };
+
+export const readConfigDefaults = (): Record<string, AgentDefaults> => {
+  try {
+    return JSON.parse(localStorage.getItem(CONFIG_DEFAULTS_KEY) || '{}') ?? {};
+  } catch {
+    return {};
+  }
+};
+
+export const readSavedCommands = () =>
+  Object.fromEntries(
+    Object.entries(readConfigDefaults()).flatMap(([agent, { commands }]) => (commands ? [[agent, commands]] : [])),
+  ) as Record<string, AvailableCommand[]>;
 
 export const readSettings = (): AppSettings => {
   try {
