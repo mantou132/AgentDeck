@@ -1,0 +1,30 @@
+把你的编程 Agent 装进口袋。
+
+AgentDeck 让你在自己的电脑上运行 Claude Code、Codex、Cursor 或任意 ACP（Agent Client Protocol）Agent，并在手机上启动、引导和审批它们。内置免费 Agent，无需登录任何账号即可体验。
+
+一分钟上手
+1. 在运行 Agent 的电脑上安装 agentdeckd 守护进程（支持 npm、Homebrew、Scoop）。
+2. 运行 "agentdeckd start"。
+3. 用 AgentDeck 扫描终端里显示的二维码，然后选择一个 Agent。
+
+一个 App 管理所有 Agent
+支持 Claude Code、Codex、Cursor、GitHub Copilot、Google Antigravity、OpenCode、Qwen Code、Kimi CLI 等 ACP Agent，可在手机上切换 Agent、模式和模型。
+
+代码留在你自己的电脑上
+全程端到端加密，中继只转发密文，也可以自建中继。无账号、无统计、无追踪。
+
+离开键盘也能掌控
+• 任务完成时收到推送通知。
+• 在手机上审批权限请求、回答 Agent 的提问。
+• 按住说话与 Agent 语音对话，并听到每条回复的简短语音摘要。
+
+审阅真实成果，而不只是聊天
+• 浏览文件、Git 变更、diff 和历史。
+• 预览 Agent 生成的 HTML 页面、图表和地图。
+• 实时查看 Agent 正在操作的 iOS 模拟器、Android 模拟器或浏览器标签页。
+• 提示可附加任意文件。
+
+持续稳定运行
+草稿在重启后保留，守护进程可在 Agent 工作时防止电脑休眠。
+
+AgentDeck 以 MIT 协议开源。

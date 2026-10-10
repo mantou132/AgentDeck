@@ -1,0 +1,8 @@
+AgentDeck is a remote client for coding agents (ACP) running on the user's own computer, connected through the open-source agentdeckd daemon.
+
+We keep a demo computer online for review:
+1. Open AgentDeck and go to Settings → Connect to Remote.
+2. Paste this Pairing ID and tap "Save & Connect": {{PAIRING_ID}}
+3. Choose the "Free" agent, open the "workspace/trip-planner" folder and send a prompt such as "Add Paris to the city list".
+
+Push notifications are sent when an agent finishes a task. No account or login is required.

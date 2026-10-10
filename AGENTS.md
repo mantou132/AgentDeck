@@ -17,6 +17,7 @@
 - `.github/workflows/`：
   - `release.yml`：Daemon 多平台构建、npm OIDC 分发、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）；npm 实现见 `crates/daemon/CLAUDE.md`。
   - `release-android.yml`：Android 签名构建与 Google Play 发布。
+  - `release-ios.yml`：iOS 签名构建与 App Store 发布；商店资料与首次上架清单见 `distribution/appstore/`。
   - `bump-packages.yml`：版本自动递增与包依赖管理。
 - `biome.json`：代码风格格式化与 Lint 配置。
 
@@ -195,6 +196,6 @@ class DuoyunTestElement extends GemElement {
 
 # 发布
 
-- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核。
-- 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 更新说明。
+- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核；iOS 以 run number 为 build 号构建 IPA，经 fastlane 同步 `distribution/appstore/metadata` 后提交 App Store 审核，通过后自动发布。
+- 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 与 App Store 更新说明。
 - 所需 Secrets 以各 workflow 文件中的引用为准。

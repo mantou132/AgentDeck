@@ -48,6 +48,12 @@
 	<string>Speech recognition is needed to convert voice input into text</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the development server on your local network.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

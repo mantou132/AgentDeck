@@ -1,0 +1,151 @@
+name: Release iOS
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ios
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      APP_IDENTIFIER: com.mantou.agentdeck
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Resolve and sync release version
+        id: version
+        run: |
+          tauri_conf="crates/agentdeck/tauri.conf.json"
+          version=$(jq -r '.version' "$tauri_conf")
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" == v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "Syncing tauri.conf.json version to $version"
+            jq --arg v "$version" '.version = $v' "$tauri_conf" > "${tauri_conf}.tmp" && mv "${tauri_conf}.tmp" "$tauri_conf"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use a stable major.minor.patch version, got: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - run: pnpm install --frozen-lockfile
+      - name: Check frontend
+        run: |
+          pnpm run lint
+          pnpm test
+
+      - name: Select latest stable Xcode
+        run: |
+          xcode=$(ls -d /Applications/Xcode_*.app | grep -v -i -E 'beta|rc' | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.94.1
+          targets: aarch64-apple-ios
+
+      - name: Configure App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
+          const env = process.env;
+          for (const key of ['APP_STORE_CONNECT_API_KEY_ID', 'APP_STORE_CONNECT_API_ISSUER_ID', 'APP_STORE_CONNECT_API_KEY_P8', 'APPLE_TEAM_ID']) {
+            if (!env[key]) throw new Error(`Missing secret: ${key}`);
+          }
+          // xcodebuild 与 altool 都从该目录按 Key ID 查找私钥
+          const dir = `${env.HOME}/.appstoreconnect/private_keys`;
+          mkdirSync(dir, { recursive: true });
+          const keyPath = `${dir}/AuthKey_${env.APP_STORE_CONNECT_API_KEY_ID}.p8`;
+          writeFileSync(keyPath, env.APP_STORE_CONNECT_API_KEY_P8, { mode: 0o600 });
+          const fastlaneKey = { key_id: env.APP_STORE_CONNECT_API_KEY_ID, issuer_id: env.APP_STORE_CONNECT_API_ISSUER_ID, key: env.APP_STORE_CONNECT_API_KEY_P8 };
+          writeFileSync(`${env.RUNNER_TEMP}/asc-api-key.json`, JSON.stringify(fastlaneKey), { mode: 0o600 });
+          appendFileSync(env.GITHUB_ENV, [
+            `APPLE_DEVELOPMENT_TEAM=${env.APPLE_TEAM_ID}`,
+            `APPLE_API_KEY=${env.APP_STORE_CONNECT_API_KEY_ID}`,
+            `APPLE_API_ISSUER=${env.APP_STORE_CONNECT_API_ISSUER_ID}`,
+            `APPLE_API_KEY_PATH=${keyPath}`,
+          ].join('\n') + '\n');
+          NODE
+
+      - name: Build signed IPA
+        run: pnpm tauri ios build --ci --export-method app-store-connect --build-number "$GITHUB_RUN_NUMBER"
+
+      - name: Collect release files
+        id: ipa
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ipa=$(find crates/agentdeck/gen/apple/build -name '*.ipa' | head -1)
+          if [[ -z "$ipa" ]]; then
+            echo "::error::IPA not found"
+            exit 1
+          fi
+          mkdir release
+          cp "$ipa" "release/AgentDeck-$VERSION.ipa"
+          echo "path=release/AgentDeck-$VERSION.ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Save build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: AgentDeck-ios-${{ steps.version.outputs.version }}
+          path: release/
+          if-no-files-found: error
+
+      - name: Prepare App Store metadata
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          APP_REVIEW_PAIRING_ID: ${{ secrets.APP_REVIEW_PAIRING_ID }}
+        run: |
+          if [[ -z "$APP_REVIEW_PAIRING_ID" ]]; then
+            echo "::error::Missing secret: APP_REVIEW_PAIRING_ID"
+            exit 1
+          fi
+          metadata="$RUNNER_TEMP/appstore-metadata"
+          cp -R distribution/appstore/metadata "$metadata"
+          sed -i '' "s/{{PAIRING_ID}}/$APP_REVIEW_PAIRING_ID/" "$metadata/review_information/notes.txt"
+          cp distribution/whatsnew/whatsnew-en-US "$metadata/en-US/release_notes.txt"
+          cp distribution/whatsnew/whatsnew-zh-CN "$metadata/zh-Hans/release_notes.txt"
+          echo "APPSTORE_METADATA=$metadata" >> "$GITHUB_ENV"
+
+      - name: Submit App Store release for review
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          IPA: ${{ steps.ipa.outputs.path }}
+        run: |
+          command -v fastlane > /dev/null || gem install fastlane --no-document
+          fastlane deliver \
+            --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
+            --app_identifier "$APP_IDENTIFIER" \
+            --app_version "$VERSION" \
+            --ipa "$IPA" \
+            --metadata_path "$APPSTORE_METADATA" \
+            --skip_screenshots true \
+            --submit_for_review true \
+            --automatic_release true \
+            --force true \
+            --run_precheck_before_submit false \
+            --submission_information '{"add_id_info_uses_idfa": false}'
+
+      - name: Remove signing material
+        if: always()
+        run: rm -rf "$HOME/.appstoreconnect/private_keys" "$RUNNER_TEMP/asc-api-key.json" "$RUNNER_TEMP/appstore-metadata"

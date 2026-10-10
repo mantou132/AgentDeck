@@ -1,6 +1,6 @@
 # Privacy Policy for AgentDeck
 
-Last updated: September 29, 2026
+Last updated: October 9, 2026
 
 AgentDeck is an open-source Agent Client Protocol (ACP) client developed by mantou132. It consists of the AgentDeck app, the AgentDeck browser extension, and the `agentdeckd` daemon that runs on a computer you control. This policy explains what data these components handle.
 
@@ -21,9 +21,9 @@ The app, the extension, and the daemon communicate through a WebSocket relay: th
 - The relay stores undelivered encrypted messages temporarily and deletes them after delivery or when they expire.
 - Legacy UUID Pairing IDs are not encrypted, so the relay can read their message contents.
 
-## 4. Push Notifications (Android)
+## 4. Push Notifications
 
-To tell you when a task is complete, the app registers with Firebase Cloud Messaging (FCM), a Google service, and sends its FCM token to your daemon. When a task completes, the daemon sends the token, the agent ID, and the session ID to our notification forwarder (`agent-deck.xianqiao.wang/push`), which passes them to FCM. Notifications never contain prompts or replies. FCM processes the token under [Google's privacy policy](https://policies.google.com/privacy).
+To tell you when a task is complete, the app registers with Firebase Cloud Messaging (FCM), a Google service, and sends its FCM token to your daemon. On iOS, FCM delivers notifications through Apple Push Notification service (APNs). When a task completes, the daemon sends the token, the agent ID, and the session ID to our notification forwarder (`agent-deck.xianqiao.wang/push`), which passes them to FCM. Notifications never contain prompts or replies. FCM processes the token under [Google's privacy policy](https://policies.google.com/privacy).
 
 ## 5. Permissions
 

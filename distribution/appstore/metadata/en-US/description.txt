@@ -1,0 +1,30 @@
+Your coding agents, in your pocket.
+
+AgentDeck lets you run Claude Code, Codex, Cursor or any ACP (Agent Client Protocol) agent on your own computer, then start, steer and approve it from your phone. A free agent is built in, so you can try it without logging in to anything.
+
+GET STARTED IN A MINUTE
+1. Install the agentdeckd daemon on the computer where your agents run (npm, Homebrew or Scoop).
+2. Run "agentdeckd start".
+3. Scan the QR code it prints with AgentDeck, then pick an agent.
+
+ONE APP FOR EVERY AGENT
+Claude Code, Codex, Cursor, GitHub Copilot, Google Antigravity, OpenCode, Qwen Code, Kimi CLI and other ACP agents. Switch agents, modes and models from your phone.
+
+YOUR CODE STAYS ON YOUR MACHINE
+Everything is end-to-end encrypted: the relay only forwards ciphertext. You can also self-host the relay. No accounts, no analytics, no tracking.
+
+BUILT FOR BEING AWAY FROM THE KEYBOARD
+• Get a push notification when a task finishes.
+• Approve permission requests and answer your agent's questions from your phone.
+• Talk to your agent with push-to-talk voice chat and hear a short spoken summary of each reply.
+
+REVIEW REAL WORK, NOT JUST CHAT
+• Browse files, Git changes, diffs and history.
+• Preview the HTML pages, charts and maps your agent produces.
+• Watch a live view of the iOS Simulator, Android emulator or browser tab your agent is driving.
+• Attach any file to a prompt.
+
+BUILT TO KEEP RUNNING
+Drafts survive restarts, and the daemon can keep your computer awake while agents work.
+
+AgentDeck is open source under the MIT license.
