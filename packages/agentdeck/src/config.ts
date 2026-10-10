@@ -36,7 +36,7 @@ export const MIN_DAEMON_VERSION = '0.4.0';
 
 /** Markdown blocks this client renders; the host teaches agents to write them (e.g. `agentdeck-chart`). */
 export const RENDER_CAPABILITIES: ClientCapabilities = {
-  render: previewSupported ? ['chart', 'map', 'preview', 'screen'] : ['chart', 'map', 'screen'],
+  render: previewSupported ? ['widget', 'chart', 'map', 'preview', 'screen'] : ['widget', 'chart', 'map', 'screen'],
 };
 
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json

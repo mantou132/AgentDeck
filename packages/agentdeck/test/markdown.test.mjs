@@ -64,3 +64,16 @@ test('agentdeck-speech comments are hidden, even while unclosed', () => {
   assert.equal(html.call({}, { text: '<!-- agentdeck-speech\nTests pass now.\n-->' }), '');
   assert.equal(html.call({}, { text: '<!-- agentdeck-speech\nTests pass' }), '');
 });
+
+test('agentdeck-widget blocks render as apps once closed and as a placeholder while streaming', () => {
+  const { code } = exports.markdownExtensions()[0].renderer;
+  const text = '<button onclick="go()">Go</button>';
+  assert.equal(
+    code.call({}, { text, lang: 'agentdeck-widget', raw: `\`\`\`agentdeck-widget\n${text}\n\`\`\`` }),
+    '<deck-widget source="&lt;button onclick=&quot;go()&quot;&gt;Go&lt;/button&gt;"></deck-widget>',
+  );
+  assert.equal(
+    code.call({}, { text, lang: 'agentdeck-widget', raw: `\`\`\`agentdeck-widget\n${text}` }),
+    '<deck-widget pending></deck-widget>',
+  );
+});

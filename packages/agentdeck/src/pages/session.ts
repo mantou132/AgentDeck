@@ -2,6 +2,7 @@ import { history } from '@mantou/gem/lib/history';
 import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { reconnectTransport } from '../agent/transport';
 import type { Attachment } from '../attachment/types';
 import { draftKey, removeDraft, restoreDraft } from '../composer/drafts';
@@ -171,6 +172,20 @@ export class AgentDeckSessionPageElement extends GemElement {
     return accepted;
   };
 
+  // Agent-built widgets (`deck-widget`) send through the same path as the composer, one turn at a time.
+  #sendFromWidget = (event: CustomEvent<string>) => {
+    const { connection, pendingSessionIds } = agentdeckStore;
+    if (connection !== 'connected') {
+      Toast.open('warning', getConnectionLabel(connection));
+      return;
+    }
+    if (pendingSessionIds.includes(this.sessionId)) {
+      Toast.open('warning', i18n.get('widget.busy'));
+      return;
+    }
+    this.#send({ text: event.detail, attachments: [] });
+  };
+
   #previewAttachment = (event: CustomEvent<Attachment>) => {
     const attachment = event.detail;
     if (attachment.kind === 'file' && 'uri' in attachment) {
@@ -300,6 +315,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 ?pending=${pending}
                 @preview=${this.#previewAttachment}
                 @ask=${this.#onAsk}
+                @widget-send=${this.#sendFromWidget}
               ></deck-session-timeline>
               <section
                 v-if=${!loading && loaded && !messages.length}

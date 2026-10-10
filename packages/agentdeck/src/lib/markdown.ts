@@ -5,8 +5,6 @@ import { isSmallTextFile } from './file-preview';
 import { parseMessageLink } from './links';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
 
-import '../elements/chart';
-import '../elements/map';
 import '../elements/preview';
 import '../elements/screen';
 
@@ -14,6 +12,9 @@ import '../elements/screen';
 import('@gem-bind/diff2html');
 import('@gem-bind/latex');
 import('@gem-bind/mermaid');
+import('../elements/chart');
+import('../elements/map');
+import('../elements/widget');
 
 export const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -103,6 +104,9 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
         const language = languageFromInfo(lang || '');
         const source = escapeHtml(text);
         const closed = isCodeBlockClosed(raw);
+        // Half-written apps cannot run, and their code is not meant to be read.
+        if (language === 'agentdeck-widget')
+          return closed ? `<deck-widget source="${source}"></deck-widget>` : '<deck-widget pending></deck-widget>';
         if (closed && language === 'mermaid')
           return `<gem-bind-mermaid no-controls tabindex="0">${source}</gem-bind-mermaid>`;
         if (closed && language === 'agentdeck-chart') return `<deck-chart source="${source}"></deck-chart>`;
@@ -224,7 +228,7 @@ const baseMarkdownStyle = `
     overflow: hidden;
   }
   pre code { background: none; padding: 0; }
-  deck-foldable { margin: .7rem 0; }
+  deck-foldable, deck-widget { margin: .7rem 0; }
   deck-foldable > :is(pre, tap-code-block) { margin: 0; }
   .table-scroll {
     overflow-x: auto;

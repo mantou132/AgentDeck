@@ -30,6 +30,10 @@ struct RenderSkill {
 
 const SKILLS: &[RenderSkill] = &[
     RenderSkill {
+        capability: "widget",
+        skill_md: include_str!("render_skills/widget/SKILL.md"),
+    },
+    RenderSkill {
         capability: "chart",
         skill_md: include_str!("render_skills/chart/SKILL.md"),
     },

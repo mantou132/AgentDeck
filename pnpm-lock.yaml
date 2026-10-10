@@ -97,9 +97,15 @@ importers:
       duoyun-ui:
         specifier: ^2.2.16
         version: 2.2.16(@mantou/gem@2.2.13(patch_hash=acbbe1730835dad02c15d9be0f64b8cb5e0b42a783938e9f809121abd79b21de))
+      htm:
+        specifier: ^3.1.1
+        version: 3.1.1
       maplibre-gl:
         specifier: ^6.12.0
         version: 6.12.0
+      preact:
+        specifier: ^11.0.1
+        version: 11.0.1
       relay-client-ts:
         specifier: ^0.1.9
         version: 0.1.9
@@ -2801,6 +2807,9 @@ packages:
     resolution: {integrity: sha512-puUZAUKT5m8Zzvs72XWy3HtvVbTWljRE66cP60bxJzAqf2DgICo7lYTY2IHUmLnNpjYvw5bvmoHvPc0QO2a62w==}
     engines: {node: ^16.14.0 || >=18.0.0}
 
+  htm@3.1.1:
+    resolution: {integrity: sha512-983Vyg8NwUE7JkZ6NmOqpCZ+sh1bKv2iYTlUkzlWmA5JD2acKoxd4KVxbMmxX/85mtfdnDmTFoNKcg5DGAvxNQ==}
+
   http-cache-semantics@4.2.0:
     resolution: {integrity: sha512-dTxcvPXqPvXBQpq5dUr6mEMJX4oIEFv6bwom3FDwKRDsuIjjJGANqhBuoAn9c1RQJIdAKav33ED65E2ys+87QQ==}
 
@@ -4037,6 +4046,14 @@ packages:
 
   preact@10.27.3:
     resolution: {integrity: sha512-ZieIP3zQHiQsNF3BA+SNVS8dcuRIg/nsxlkFbCMBLS2L1Ww4Bkxd9n6Md2A1crfTZsEbQPADV0neYmh/EElgeQ==}
+
+  preact@11.0.1:
+    resolution: {integrity: sha512-TNNwEq++jYNHy747LziCjPRVgEwnLSOIOAw/oYcjI3Tdnubx2EXtt76I0an8PATvUWtx/DX1kFIg1eFN+O/fkw==}
+    peerDependencies:
+      preact-render-to-string: '>=6.7.0'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
 
   pretty-format@29.7.0:
     resolution: {integrity: sha512-Pdlw/oPxN+aXdmM9R00JVC9WVFoCLTKJvDVLgmJ+qAffBMxsV85l/Lu7sNx4zSzPyoL2euImuEwHhOXdEgNFZQ==}
@@ -7641,6 +7658,8 @@ snapshots:
     dependencies:
       lru-cache: 10.4.3
 
+  htm@3.1.1: {}
+
   http-cache-semantics@4.2.0: {}
 
   http-proxy-agent@7.0.2:
@@ -9051,6 +9070,8 @@ snapshots:
   potpack@2.1.0: {}
 
   preact@10.27.3: {}
+
+  preact@11.0.1: {}
 
   pretty-format@29.7.0:
     dependencies:

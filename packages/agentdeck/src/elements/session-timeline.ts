@@ -2,6 +2,7 @@ import { addListener } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { repeat } from '@mantou/gem/lib/element';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { setSelectionMenuItems } from 'src/lib/selection-menu';
@@ -81,6 +82,14 @@ export class DeckSessionTimelineElement extends GemElement {
     `;
   };
 
+  // A widget's choices answer the reply it sits in; once the user has sent another message, they are out of context.
+  #onWidgetSend = (event: Event, messageId: string) => {
+    const lastUserIndex = this.messages.findLastIndex((message) => 'role' in message && message.role === 'user');
+    if (lastUserIndex < this.messages.findIndex(({ id }) => id === messageId)) return;
+    event.stopPropagation();
+    Toast.open('warning', i18n.get('widget.stale'));
+  };
+
   #renderTextMessage = (message: TextMessage) => {
     const { attachments: linked, markdown } = extractMessageAttachments(
       message.role === 'user' ? stripVoiceChatMarker(message.text) : message.text,
@@ -122,7 +131,10 @@ export class DeckSessionTimelineElement extends GemElement {
     }
 
     return html`
-      <article @pointerdown=${this.#setSelectionMenu} class="agent-message mb-4 min-w-0 text-base leading-[1.68] text-text">
+      <article
+        @pointerdown=${this.#setSelectionMenu}
+        @widget-send=${(event: Event) => this.#onWidgetSend(event, message.id)}
+        class="agent-message mb-4 min-w-0 text-base leading-[1.68] text-text">
         <div v-if=${attachments.length} class="mb-2 flex flex-wrap gap-2">
           ${attachments.map(
             (attachment) => html`
