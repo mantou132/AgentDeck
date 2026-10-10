@@ -41,17 +41,15 @@ fn event_forwarder(
 /// Drop the event sender and wait for the forwarder to drain so streamed
 /// events never overtake the final result.
 async fn settle_forwarder(
-    forwarder: Option<(
+    (tx, done): (
         mpsc::UnboundedSender<AgentEvent>,
         tokio::task::JoinHandle<()>,
-    )>,
+    ),
     ok: bool,
 ) {
-    if let Some((tx, done)) = forwarder {
-        drop(tx);
-        if ok {
-            let _ = done.await;
-        }
+    drop(tx);
+    if ok {
+        let _ = done.await;
     }
 }
 
@@ -101,6 +99,11 @@ impl AgentService {
         on_complete: Option<PromptCompletion>,
         capabilities: PeerCapabilities,
     ) {
+        // The device each session's notifications go to; see `SessionActor::notifier`.
+        let notifier: acp_agent::Notifier = {
+            let peer = peer.clone();
+            Arc::new(move |method, params| peer.notify(method, params))
+        };
         let notify_peer = peer.clone();
         self.end_listeners
             .lock()
@@ -228,15 +231,15 @@ impl AgentService {
 
         let create_sessions = sessions.clone();
         let create_capabilities = capabilities.clone();
-        let create_peer = peer.clone();
+        let create_notifier = notifier.clone();
         peer.handle("agent_session_create", move |params, _ctx| {
             let sessions = create_sessions.clone();
             let capabilities = create_capabilities.clone();
-            let peer = create_peer.clone();
+            let notifier = create_notifier.clone();
             async move {
                 let agent = required_agent(&params, "agent_session_create")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities, &peer, agent).await?;
+                let context = session_context(&params, &capabilities, notifier).await?;
                 let timeout_secs = message_timeout_secs(&params);
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
@@ -259,27 +262,22 @@ impl AgentService {
         });
 
         let load_sessions = sessions.clone();
-        let load_peer = peer.clone();
+        let load_notifier = notifier.clone();
         peer.handle("agent_session_load", move |params, ctx| {
             let sessions = load_sessions.clone();
             let capabilities = capabilities.clone();
-            let peer = load_peer.clone();
+            let notifier = load_notifier.clone();
             async move {
                 let (agent, session_id) = required_agent_session(&params, "agent_session_load")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities, &peer, agent).await?;
+                let context = session_context(&params, &capabilities, notifier).await?;
                 let timeout_secs = message_timeout_secs(&params);
 
                 // The actor drains the load-time history replay into this channel
                 // while the load runs; afterwards the buffered frames are emitted
                 // (receiver closed, so the actor's live sender can't keep it open)
                 // before the final result, so history precedes the response.
-                let (replay_tx, mut event_rx) = if message_stream(&params) {
-                    let (tx, rx) = mpsc::unbounded_channel::<AgentEvent>();
-                    (Some(tx), Some(rx))
-                } else {
-                    (None, None)
-                };
+                let (replay_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
 
                 let result = match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
@@ -299,12 +297,10 @@ impl AgentService {
                     Err(_) => Err("Timeout loading ACP agent session".to_string()),
                 };
 
-                if let Some(rx) = event_rx.as_mut() {
-                    rx.close();
-                    while let Some(event) = rx.recv().await {
-                        let event = serde_json::to_value(&event).unwrap_or(Value::Null);
-                        ctx.emit(event);
-                    }
+                event_rx.close();
+                while let Some(event) = event_rx.recv().await {
+                    let event = serde_json::to_value(&event).unwrap_or(Value::Null);
+                    ctx.emit(event);
                 }
                 result
             }
@@ -414,11 +410,10 @@ impl AgentService {
         });
 
         let prompt_sessions = sessions.clone();
-        let prompt_peer = peer.clone();
         peer.handle("agent_prompt", move |params, ctx| {
             let on_complete = on_complete.clone();
             let sessions = prompt_sessions.clone();
-            let peer = prompt_peer.clone();
+            let notifier = notifier.clone();
             async move {
                 let agent = required_agent(&params, "agent_prompt")?;
                 // The prompt may be empty when the content lives in attachments.
@@ -441,34 +436,13 @@ impl AgentService {
                     });
                 }
 
-                // Permission requests and questions go to the device that sent
-                // this prompt; any device answers with `agent_user_input_respond`.
-                let user_input_peer = peer.clone();
-                let user_input_sink: acp_agent::UserInputSink = Arc::new(move |input| {
-                    user_input_peer.notify(input.method(), input.params().clone())
-                });
-
-                // Claude predicts the next prompt after the turn settles; only the
-                // device that sent this prompt shows it.
-                let suggestion_peer = peer.clone();
-                let suggestion_agent = agent.to_string();
-                let suggestion_session_id = session_id.to_string();
-                let suggestion_sink: acp_agent::SuggestionSink = Arc::new(move |suggestion| {
-                    suggestion_peer.notify(
-                        "agent_prompt_suggestion",
-                        json!({
-                            "agent": suggestion_agent,
-                            "sessionId": suggestion_session_id,
-                            "suggestion": suggestion,
-                        }),
-                    );
-                });
-
                 // Stream agent events as `{ id, event }` frames while the prompt
                 // runs; the forwarder is drained before the final result so no
-                // event overtakes the response.
-                let forwarder = message_stream(&params).then(|| event_forwarder(&ctx));
-                let event_tx = forwarder.as_ref().map(|(tx, _)| tx.clone());
+                // event overtakes the response. Permission requests, questions and
+                // the next-prompt suggestion go to this device as notifications;
+                // any device answers with `agent_user_input_respond`.
+                let forwarder = event_forwarder(&ctx);
+                let event_tx = forwarder.0.clone();
 
                 let result = sessions
                     .prompt(
@@ -478,8 +452,7 @@ impl AgentService {
                         attachments,
                         timeout_secs,
                         event_tx,
-                        Some(user_input_sink),
-                        Some(suggestion_sink),
+                        Some(notifier),
                     )
                     .await;
 
@@ -1139,23 +1112,12 @@ fn message_cwd(params: &Value) -> Option<PathBuf> {
 async fn session_context(
     params: &Value,
     capabilities: &PeerCapabilities,
-    peer: &Peer,
-    agent: &str,
+    notifier: acp_agent::Notifier,
 ) -> Result<SessionContext, String> {
-    // Updates between turns (e.g. available commands) go to the device that
-    // created or loaded the session.
-    let peer = peer.clone();
-    let agent = agent.to_string();
-    let idle_update_sink: acp_agent::SessionUpdateSink = Arc::new(move |session_id, update| {
-        peer.notify(
-            "agent_session_update",
-            json!({ "agent": agent, "sessionId": session_id, "update": update }),
-        );
-    });
     Ok(SessionContext {
         system_prompt: message_panel_system_prompt(params).await?,
         client_capabilities: capabilities.lock().expect("lock poisoned").clone(),
-        idle_update_sink: Some(idle_update_sink),
+        notifier: Some(notifier),
     })
 }
 
@@ -1243,13 +1205,6 @@ const VOICE_CHAT_MARKER: &str = "<agentdeck-voice-chat/>";
 fn message_voice_chat(params: &Value) -> bool {
     params
         .get("voiceChat")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-}
-
-fn message_stream(params: &Value) -> bool {
-    params
-        .get("stream")
         .and_then(|v| v.as_bool())
         .unwrap_or(false)
 }

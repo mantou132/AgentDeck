@@ -13,6 +13,11 @@ fn frame_json(frame: TransportFrame) -> Value {
     serde_json::from_str(&frame.to_json().unwrap()).unwrap()
 }
 
+/// An event channel whose receiver is dropped: the events are not under test.
+fn replay_sink() -> mpsc::UnboundedSender<AgentEvent> {
+    mpsc::unbounded_channel().0
+}
+
 fn full_capabilities() -> Value {
     json!({"loadSession": true, "sessionCapabilities": {"close": {}}})
 }
@@ -123,12 +128,17 @@ impl MockAcp {
         let id = id.to_string();
         let call = tokio::spawn(async move {
             manager
-                .load_session("codex-acp", &id, None, Default::default(), None)
+                .load_session("codex-acp", &id, None, Default::default(), replay_sink())
                 .await
         });
         let request = self.next("session/load").await;
         self.respond(&request, json!({}));
         call.await.unwrap().unwrap();
+    }
+
+    async fn registered(&self, id: &str) -> bool {
+        let key = AgentSessionKey::new("codex-acp", id);
+        self.manager.sessions.lock().await.contains_key(&key)
     }
 
     fn close(&self, id: &str) -> JoinHandle<bool> {
@@ -148,8 +158,7 @@ impl MockAcp {
                     "test".into(),
                     vec![],
                     30,
-                    None,
-                    None,
+                    replay_sink(),
                     None,
                 )
                 .await
@@ -207,18 +216,11 @@ async fn close_timeout_releases_pending_turn_and_permissions_but_preserves_other
     let mut mock = MockAcp::new().await;
     mock.create("session").await;
     mock.create("other").await;
-    let runtime = mock.manager.runtime("codex-acp");
-    // Closing must latch cancellation even before a permission handler subscribes.
-    let cancel = runtime.request_cancels.lock().await["session"].clone();
-    runtime
-        .set_user_input_sink("session", Arc::new(|_| {}))
-        .await;
     let prompt = mock.prompt("session");
     let old_prompt = mock.next("session/prompt").await;
     let close = mock.close("session");
     mock.next("session/cancel").await;
     let old_close = mock.next("session/close").await;
-    assert!(*cancel.borrow(), "pending permission must be cancelled");
     assert!(
         tokio::time::timeout(Duration::from_secs(1), prompt)
             .await
@@ -232,14 +234,7 @@ async fn close_timeout_releases_pending_turn_and_permissions_but_preserves_other
             .unwrap()
             .unwrap()
     );
-    assert!(!runtime.request_cancels.lock().await.contains_key("session"));
-    assert!(
-        !runtime
-            .user_input_sinks
-            .lock()
-            .await
-            .contains_key("session")
-    );
+    assert!(!mock.registered("session").await);
     assert!(mock.manager.session("codex-acp", "other").await.is_ok());
     // Replies from the abandoned turn/close must not invalidate the new actor.
     mock.load("session").await;
@@ -263,7 +258,13 @@ async fn concurrent_close_and_load_wait_for_one_cleanup() {
     let manager = mock.manager.clone();
     let load = tokio::spawn(async move {
         manager
-            .load_session("codex-acp", "session", None, Default::default(), None)
+            .load_session(
+                "codex-acp",
+                "session",
+                None,
+                Default::default(),
+                replay_sink(),
+            )
             .await
     });
     assert!(
@@ -315,7 +316,13 @@ async fn loading_an_active_session_is_rejected_before_contacting_acp() {
     mock.create("session").await;
     let result = mock
         .manager
-        .load_session("codex-acp", "session", None, Default::default(), None)
+        .load_session(
+            "codex-acp",
+            "session",
+            None,
+            Default::default(),
+            replay_sink(),
+        )
         .await;
     assert!(result.err().unwrap().to_string().contains("already active"));
     let prompt = mock.prompt("session");
@@ -331,26 +338,12 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     let (replay_tx, mut replay_rx) = mpsc::unbounded_channel();
     let load = tokio::spawn(async move {
         manager
-            .load_session(
-                "codex-acp",
-                "session",
-                None,
-                Default::default(),
-                Some(replay_tx),
-            )
+            .load_session("codex-acp", "session", None, Default::default(), replay_tx)
             .await
     });
     let request = mock.next("session/load").await;
     mock.respond(&request, json!({}));
-    // Wait for attach, then supply a replay event to establish that the actor is draining history.
-    let runtime = mock.manager.runtime("codex-acp");
-    tokio::time::timeout(Duration::from_secs(1), async {
-        while !runtime.request_cancels.lock().await.contains_key("session") {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .unwrap();
+    // Supply a replay event to establish that the actor is draining history.
     mock.peer.tx.unbounded_send(frame(json!({
         "jsonrpc": "2.0", "method": "session/update", "params": {
             "sessionId": "session", "update": {
@@ -368,7 +361,7 @@ async fn abandoned_load_replay_does_not_leave_an_unregistered_actor() {
     let request = mock.next("session/close").await;
     mock.respond(&request, json!({}));
     tokio::time::timeout(Duration::from_secs(1), async {
-        while runtime.request_cancels.lock().await.contains_key("session") {
+        while mock.registered("session").await {
             tokio::task::yield_now().await;
         }
     })
@@ -406,8 +399,7 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
     let mut mock = MockAcp::new().await;
     mock.create("session").await;
     let (permission_tx, mut permission_rx) = mpsc::unbounded_channel();
-    let sink: UserInputSink =
-        Arc::new(move |input| permission_tx.send(input.params().clone()).unwrap());
+    let notifier: Notifier = Arc::new(move |_, params| permission_tx.send(params).unwrap());
     let manager = mock.manager.clone();
     let prompt = tokio::spawn(async move {
         manager
@@ -417,9 +409,8 @@ async fn close_cancels_a_real_acp_permission_request_without_waiting_for_the_use
                 "test".into(),
                 vec![],
                 30,
-                None,
-                Some(sink),
-                None,
+                replay_sink(),
+                Some(notifier),
             )
             .await
     });
@@ -473,7 +464,8 @@ async fn user_input_is_answered_after_delivery_and_close_cancels_it() {
     let mut mock = MockAcp::new().await;
     mock.create("session").await;
     let (request_tx, mut request_rx) = mpsc::unbounded_channel();
-    let sink: UserInputSink = Arc::new(move |input| request_tx.send(input.clone()).unwrap());
+    let notifier: Notifier =
+        Arc::new(move |method, params| request_tx.send((method.to_string(), params)).unwrap());
     let manager = mock.manager.clone();
     let prompt = tokio::spawn(async move {
         manager
@@ -483,9 +475,8 @@ async fn user_input_is_answered_after_delivery_and_close_cancels_it() {
                 "test".into(),
                 vec![],
                 30,
-                None,
-                Some(sink),
-                None,
+                replay_sink(),
+                Some(notifier),
             )
             .await
     });
@@ -503,10 +494,8 @@ async fn user_input_is_answered_after_delivery_and_close_cancels_it() {
         }))
     };
     mock.peer.tx.unbounded_send(elicitation("ask")).unwrap();
-    let input = request_rx.recv().await.unwrap();
-    let UserInput::Elicitation(request) = input.clone() else {
-        panic!("expected an elicitation: {input:?}");
-    };
+    let (method, request) = request_rx.recv().await.unwrap();
+    assert_eq!(method, "agent_elicitation_request");
     assert_eq!(request["agent"], "codex-acp");
     assert_eq!(request["sessionId"], "session");
     assert_eq!(request["toolCallId"], "tool");
@@ -548,9 +537,8 @@ async fn user_input_is_answered_after_delivery_and_close_cancels_it() {
             }
         })))
         .unwrap();
-    let UserInput::Permission(request) = request_rx.recv().await.unwrap() else {
-        panic!("expected a permission request");
-    };
+    let (method, request) = request_rx.recv().await.unwrap();
+    assert_eq!(method, "agent_permission_request");
     let request_id = request["requestId"].as_str().unwrap();
     assert!(
         mock.manager
@@ -598,7 +586,7 @@ async fn unadvertised_session_methods_are_not_sent_to_acp() {
     let mut mock = MockAcp::with_capabilities(json!({})).await;
     let manager = mock.manager.clone();
     let load = manager
-        .load_session("codex-acp", "old", None, Default::default(), None)
+        .load_session("codex-acp", "old", None, Default::default(), replay_sink())
         .await;
     assert!(
         load.err()
@@ -633,12 +621,12 @@ async fn unadvertised_session_methods_are_not_sent_to_acp() {
 }
 
 #[tokio::test]
-async fn prompt_suggestion_after_turn_reaches_the_prompting_sink() {
+async fn prompt_suggestion_after_turn_reaches_the_prompting_device() {
     let mut mock = MockAcp::new().await;
     mock.create("session").await;
     let (suggestion_tx, mut suggestion_rx) = mpsc::unbounded_channel();
-    let sink: SuggestionSink = Arc::new(move |suggestion| {
-        let _ = suggestion_tx.send(suggestion);
+    let notifier: Notifier = Arc::new(move |method, params| {
+        let _ = suggestion_tx.send((method.to_string(), params));
     });
     let manager = mock.manager.clone();
     let prompt = tokio::spawn(async move {
@@ -649,9 +637,8 @@ async fn prompt_suggestion_after_turn_reaches_the_prompting_sink() {
                 "test".into(),
                 vec![],
                 30,
-                None,
-                None,
-                Some(sink),
+                replay_sink(),
+                Some(notifier),
             )
             .await
     });
@@ -673,23 +660,28 @@ async fn prompt_suggestion_after_turn_reaches_the_prompting_sink() {
             })))
             .unwrap();
     }
-    let suggestion = tokio::time::timeout(Duration::from_secs(1), suggestion_rx.recv())
+    let (method, params) = tokio::time::timeout(Duration::from_secs(1), suggestion_rx.recv())
         .await
+        .unwrap()
         .unwrap();
-    assert_eq!(suggestion.as_deref(), Some("Run the tests"));
+    assert_eq!(method, "agent_prompt_suggestion");
+    assert_eq!(
+        params,
+        json!({"agent": "codex-acp", "sessionId": "session", "suggestion": "Run the tests"})
+    );
 }
 
 #[tokio::test]
-async fn updates_between_turns_reach_the_idle_sink() {
+async fn updates_between_turns_reach_the_creating_device() {
     let mut mock = MockAcp::new().await;
     let (update_tx, mut update_rx) = mpsc::unbounded_channel();
-    let sink: SessionUpdateSink = Arc::new(move |session_id, update| {
-        let _ = update_tx.send((session_id.to_string(), update));
+    let notifier: Notifier = Arc::new(move |method, params| {
+        let _ = update_tx.send((method.to_string(), params));
     });
     let manager = mock.manager.clone();
     let call = tokio::spawn(async move {
         let context = SessionContext {
-            idle_update_sink: Some(sink),
+            notifier: Some(notifier),
             ..Default::default()
         };
         manager.create_session("codex-acp", None, context).await
@@ -710,11 +702,122 @@ async fn updates_between_turns_reach_the_idle_sink() {
             }},
         })))
         .unwrap();
-    let (session_id, update) = tokio::time::timeout(Duration::from_secs(1), update_rx.recv())
+    let (method, params) = tokio::time::timeout(Duration::from_secs(1), update_rx.recv())
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(session_id, "session");
-    assert_eq!(update["sessionUpdate"], "available_commands_update");
-    assert_eq!(update["availableCommands"][0]["name"], "review");
+    assert_eq!(method, "agent_session_update");
+    assert_eq!(params["agent"], "codex-acp");
+    assert_eq!(params["sessionId"], "session");
+    assert_eq!(
+        params["update"]["sessionUpdate"],
+        "available_commands_update"
+    );
+    assert_eq!(params["update"]["availableCommands"][0]["name"], "review");
+}
+
+#[tokio::test]
+async fn a_silent_turn_times_out_and_is_cancelled_while_updates_keep_it_alive() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                1,
+                replay_sink(),
+                None,
+            )
+            .await
+    });
+    let request = mock.next("session/prompt").await;
+    // Updates renew the idle deadline: activity spanning longer than the
+    // timeout does not fail the turn.
+    for _ in 0..3 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        mock.peer
+            .tx
+            .unbounded_send(frame(json!({
+                "jsonrpc": "2.0", "method": "session/update", "params": {
+                    "sessionId": "session", "update": {
+                        "sessionUpdate": "agent_message_chunk",
+                        "content": {"type": "text", "text": "working"}
+                    }
+                }
+            })))
+            .unwrap();
+    }
+    assert!(!prompt.is_finished());
+    mock.next("session/cancel").await;
+    let err = prompt.await.unwrap().unwrap_err().to_string();
+    assert!(err.contains("no activity for 1s"), "{err}");
+    // The cancelled turn settles, then the session takes the next prompt.
+    mock.respond(&request, json!({"stopReason": "cancelled"}));
+    let prompt = mock.prompt("session");
+    let request = mock.next("session/prompt").await;
+    mock.respond(&request, json!({"stopReason": "end_turn"}));
+    assert!(prompt.await.unwrap().is_ok());
+}
+
+#[tokio::test]
+async fn a_second_prompt_during_a_turn_is_rejected() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let first = mock.prompt("session");
+    let request = mock.next("session/prompt").await;
+    let second = mock.prompt("session").await.unwrap().unwrap_err();
+    assert!(
+        second
+            .to_string()
+            .contains("already has a prompt in progress")
+    );
+    assert_eq!(
+        mock.manager.running_prompts().await,
+        vec![("codex-acp".to_string(), "session".to_string())]
+    );
+    mock.respond(&request, json!({"stopReason": "end_turn"}));
+    assert!(first.await.unwrap().is_ok());
+    assert!(mock.manager.running_prompts().await.is_empty());
+}
+
+#[tokio::test]
+async fn a_session_being_loaded_cannot_be_loaded_again() {
+    let mut mock = MockAcp::new().await;
+    let manager = mock.manager.clone();
+    let first = tokio::spawn(async move {
+        manager
+            .load_session(
+                "codex-acp",
+                "session",
+                None,
+                Default::default(),
+                replay_sink(),
+            )
+            .await
+    });
+    let request = mock.next("session/load").await;
+    let second = mock
+        .manager
+        .load_session(
+            "codex-acp",
+            "session",
+            None,
+            Default::default(),
+            replay_sink(),
+        )
+        .await;
+    assert!(second.err().unwrap().to_string().contains("already active"));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(30), mock.peer.rx.next())
+            .await
+            .is_err(),
+        "the rejected load must not reach ACP"
+    );
+    mock.respond(&request, json!({}));
+    first.await.unwrap().unwrap();
+    assert!(mock.manager.session("codex-acp", "session").await.is_ok());
 }

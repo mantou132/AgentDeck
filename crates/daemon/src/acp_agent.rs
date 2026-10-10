@@ -1,11 +1,4 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use agent_client_protocol::{
     AcpAgent, ActiveSession, Agent, Client, ConnectionTo, JsonRpcNotification, SessionMessage,
@@ -49,10 +42,8 @@ fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-/// Delivers an agent request that needs the user (permission or form
-/// elicitation) to the prompting device as a `(method, params)` notification;
-/// the device answers through `answer_user_input`.
-pub type UserInputSink = Arc<dyn Fn(&UserInput) + Send + Sync>;
+/// Sends a `(method, params)` notification to one client device.
+pub type Notifier = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
 
 /// A request waiting for the user, sent to the device as the `method`
 /// notification. `params` carry `agent`, `sessionId` and `requestId`.
@@ -91,13 +82,6 @@ impl UserInput {
     }
 }
 
-/// Receives the agent's predicted next user prompt for a session.
-pub type SuggestionSink = Arc<dyn Fn(String) + Send + Sync>;
-
-/// Receives `(session_id, update)` for session updates the agent sends while no
-/// prompt or load reads them, e.g. the available commands after `session/new`.
-pub type SessionUpdateSink = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
-
 /// Raw Claude Agent SDK message forwarded by claude-agent-acp when the session
 /// opts in through `_meta.claudeCode.emitRawSDKMessages`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonRpcNotification)]
@@ -113,7 +97,8 @@ struct ClaudeSdkMessage {
 pub struct SessionContext {
     pub system_prompt: Option<String>,
     pub client_capabilities: ClientCapabilities,
-    pub idle_update_sink: Option<SessionUpdateSink>,
+    /// The device creating or loading the session; see `SessionActor::notifier`.
+    pub notifier: Option<Notifier>,
 }
 
 /// Snapshot returned after an ACP session actor is ready.
@@ -149,7 +134,6 @@ struct RuntimeState {
 struct StartedSession {
     session: ActiveSession<'static, Agent>,
     ready: SessionReady,
-    cancel: watch::Sender<bool>,
     disconnects: watch::Receiver<u64>,
     generation: u64,
     close_supported: bool,
@@ -159,23 +143,13 @@ struct StartedSession {
 struct AcpRuntime {
     agent: String,
     state: Arc<Mutex<RuntimeState>>,
-    user_input_sinks: Arc<Mutex<HashMap<String, UserInputSink>>>,
-    /// Kept after the turn: suggestions arrive once the prompt has settled.
-    suggestion_sinks: Arc<Mutex<HashMap<String, SuggestionSink>>>,
-    request_cancels: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
-    /// The unanswered request of each session (the agent waits for one at a
-    /// time), kept so a reloaded or reconnected device can show it again.
-    user_inputs: Arc<Mutex<HashMap<String, PendingUserInput>>>,
+    /// The manager's live sessions, to route agent requests to their actor.
+    sessions: SessionMap,
     disconnects: watch::Sender<u64>,
 }
 
-struct PendingUserInput {
-    input: UserInput,
-    answer: oneshot::Sender<serde_json::Value>,
-}
-
 impl AcpRuntime {
-    fn new(agent: String) -> Self {
+    fn new(agent: String, sessions: SessionMap) -> Self {
         let (disconnects, _) = watch::channel(0);
         Self {
             agent,
@@ -185,10 +159,7 @@ impl AcpRuntime {
                 generation: 0,
                 waiters: Vec::new(),
             })),
-            user_input_sinks: Arc::new(Mutex::new(HashMap::new())),
-            suggestion_sinks: Arc::new(Mutex::new(HashMap::new())),
-            request_cancels: Arc::new(Mutex::new(HashMap::new())),
-            user_inputs: Arc::new(Mutex::new(HashMap::new())),
+            sessions,
             disconnects,
         }
     }
@@ -255,7 +226,7 @@ impl AcpRuntime {
     ) -> Result<()> {
         let permission_runtime = self.clone();
         let elicitation_runtime = self.clone();
-        let suggestion_sinks = self.suggestion_sinks.clone();
+        let suggestion_runtime = self.clone();
         let runtime = self.clone();
 
         Client
@@ -319,13 +290,14 @@ impl AcpRuntime {
             .on_receive_notification(
                 async move |notification: ClaudeSdkMessage, _connection| {
                     if let Some(suggestion) = prompt_suggestion(&notification.message) {
-                        let sink = suggestion_sinks
-                            .lock()
+                        // Never wait for the actor here: this handler runs on the
+                        // connection's dispatch loop, which the actor may be
+                        // waiting on.
+                        if let Some(tx) = suggestion_runtime
+                            .session_tx(&notification.session_id)
                             .await
-                            .get(&notification.session_id)
-                            .cloned();
-                        if let Some(sink) = sink {
-                            sink(suggestion);
+                        {
+                            let _ = tx.try_send(SessionCommand::Suggestion(suggestion));
                         }
                     }
                     Ok(())
@@ -467,114 +439,35 @@ impl AcpRuntime {
                 (session, ready)
             }
         };
-        let (cancel, _) = watch::channel(false);
-        let mut request_cancels = self.request_cancels.lock().await;
-        if request_cancels.contains_key(&ready.session_id) {
-            anyhow::bail!("ACP agent session is already active: {}", ready.session_id);
-        }
-        request_cancels.insert(ready.session_id.clone(), cancel.clone());
         Ok(StartedSession {
             session,
             ready,
-            cancel,
             disconnects: self.disconnects.subscribe(),
             generation,
             close_supported: capabilities.session_capabilities.close.is_some(),
         })
     }
 
-    /// Show a request on the prompting device and wait until a device answers
+    async fn session_tx(&self, session_id: &str) -> Option<mpsc::Sender<SessionCommand>> {
+        let key = AgentSessionKey::new(&self.agent, session_id);
+        Some(self.sessions.lock().await.get(&key)?.tx.clone())
+    }
+
+    /// Show a request on the session's device and wait until a device answers
     /// it through `answer_user_input`; delivery is not the answer, so a device
-    /// that reloaded can still answer. Closing or cancelling the session settles
-    /// the wait with `None`, as does a session without a running turn.
+    /// that reloaded can still answer. `None` when it is cancelled: no turn
+    /// runs, the turn is cancelled or ends, or the session closes.
     async fn wait_user_input(
         &self,
         session_id: &str,
-        mut input: UserInput,
+        input: UserInput,
     ) -> Option<serde_json::Value> {
-        let sink = self
-            .user_input_sinks
-            .lock()
-            .await
-            .get(session_id)
-            .cloned()?;
-        let mut cancel = self
-            .request_cancels
-            .lock()
-            .await
-            .get(session_id)?
-            .subscribe();
-        if *cancel.borrow() {
-            return None;
-        }
-        let request_id = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
-            .to_string();
-        input.params_mut()["requestId"] = request_id.into();
-        sink(&input);
+        let tx = self.session_tx(session_id).await?;
         let (answer, answer_rx) = oneshot::channel();
-        self.user_inputs
-            .lock()
+        tx.send(SessionCommand::UserInput { input, answer })
             .await
-            .insert(session_id.to_string(), PendingUserInput { input, answer });
-        let answer = tokio::select! {
-            answer = answer_rx => answer.ok(),
-            _ = cancel.changed() => None,
-        };
-        self.user_inputs.lock().await.remove(session_id);
-        answer
-    }
-
-    async fn pending_user_inputs(&self) -> Vec<UserInput> {
-        let user_inputs = self.user_inputs.lock().await;
-        user_inputs
-            .values()
-            .map(|pending| pending.input.clone())
-            .collect()
-    }
-
-    async fn answer_user_input(
-        &self,
-        session_id: &str,
-        request_id: &str,
-        response: serde_json::Value,
-    ) -> bool {
-        let mut user_inputs = self.user_inputs.lock().await;
-        if user_inputs
-            .get(session_id)
-            .is_none_or(|pending| pending.input.params()["requestId"] != request_id)
-        {
-            return false;
-        }
-        let pending = user_inputs.remove(session_id).expect("checked above");
-        pending.answer.send(response).is_ok()
-    }
-
-    async fn set_user_input_sink(&self, session_id: &str, resolver: UserInputSink) {
-        self.user_input_sinks
-            .lock()
-            .await
-            .insert(session_id.to_string(), resolver);
-    }
-
-    async fn clear_user_input_sink(&self, session_id: &str) {
-        self.user_input_sinks.lock().await.remove(session_id);
-    }
-
-    async fn set_suggestion_sink(&self, session_id: &str, sink: SuggestionSink) {
-        self.suggestion_sinks
-            .lock()
-            .await
-            .insert(session_id.to_string(), sink);
-    }
-
-    async fn unregister_session(&self, session_id: &str) {
-        self.request_cancels.lock().await.remove(session_id);
-        self.user_input_sinks.lock().await.remove(session_id);
-        self.user_inputs.lock().await.remove(session_id);
-        self.suggestion_sinks.lock().await.remove(session_id);
+            .ok()?;
+        answer_rx.await.ok()
     }
 }
 
@@ -665,18 +558,21 @@ pub enum AgentEvent {
 
 pub type SessionEndCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
 
+type SessionMap = Arc<Mutex<HashMap<AgentSessionKey, AgentSession>>>;
+
 #[derive(Clone)]
 pub struct AgentSessionManager {
-    sessions: Arc<Mutex<HashMap<AgentSessionKey, AgentSession>>>,
+    sessions: SessionMap,
     /// Created on first use so agents added by the fetched registry can launch.
     runtimes: Arc<std::sync::Mutex<HashMap<String, AcpRuntime>>>,
     on_end: Option<SessionEndCallback>,
 }
 
+/// Handle to a session actor.
 #[derive(Clone)]
 struct AgentSession {
     tx: mpsc::Sender<SessionCommand>,
-    busy: Arc<AtomicBool>,
+    status: watch::Receiver<SessionStatus>,
     closing: CancellationToken,
     stopped: watch::Receiver<bool>,
 }
@@ -686,6 +582,16 @@ impl AgentSession {
         let mut stopped = self.stopped.clone();
         let _ = stopped.wait_for(|stopped| *stopped).await;
     }
+}
+
+/// Published by the actor for queries that must not wait for it.
+#[derive(Default)]
+struct SessionStatus {
+    /// A prompt turn runs, until the agent ends it.
+    busy: bool,
+    /// The unanswered request, kept so a reloaded or reconnected device can
+    /// show it again.
+    pending_input: Option<UserInput>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -703,23 +609,21 @@ impl AgentSessionKey {
     }
 }
 
-struct BusyGuard(Arc<AtomicBool>);
+/// A session to load and where its history replay goes.
+type SessionLoad = (SessionId, mpsc::UnboundedSender<AgentEvent>);
 
-impl Drop for BusyGuard {
-    fn drop(&mut self) {
-        self.0.store(false, Ordering::Release);
-    }
+struct PromptTurn {
+    prompt: String,
+    attachments: Vec<Attachment>,
+    event_tx: mpsc::UnboundedSender<AgentEvent>,
+    /// The prompting device, which gets the session's notifications from now on.
+    notifier: Option<Notifier>,
+    idle_timeout: std::time::Duration,
+    reply: oneshot::Sender<Result<String, String>>,
 }
 
 enum SessionCommand {
-    Prompt {
-        prompt: String,
-        attachments: Vec<Attachment>,
-        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-        user_input_sink: Option<UserInputSink>,
-        suggestion_sink: Option<SuggestionSink>,
-        reply: oneshot::Sender<Result<String, String>>,
-    },
+    Prompt(PromptTurn),
     Cancel,
     SetMode {
         mode_id: String,
@@ -730,12 +634,24 @@ enum SessionCommand {
         value: String,
         reply: oneshot::Sender<Result<serde_json::Value, String>>,
     },
+    /// A permission request or question from the agent; dropping `answer`
+    /// cancels it.
+    UserInput {
+        input: UserInput,
+        answer: oneshot::Sender<serde_json::Value>,
+    },
+    AnswerUserInput {
+        request_id: String,
+        response: serde_json::Value,
+        reply: oneshot::Sender<bool>,
+    },
+    Suggestion(String),
 }
 
 impl AgentSessionManager {
     pub fn new(on_end: Option<SessionEndCallback>) -> Self {
         Self {
-            sessions: Arc::new(Mutex::new(HashMap::new())),
+            sessions: Arc::default(),
             runtimes: Arc::default(),
             on_end,
         }
@@ -746,7 +662,7 @@ impl AgentSessionManager {
             .lock()
             .expect("runtimes lock poisoned")
             .entry(agent.to_string())
-            .or_insert_with(|| AcpRuntime::new(agent.to_string()))
+            .or_insert_with(|| AcpRuntime::new(agent.to_string(), self.sessions.clone()))
             .clone()
     }
 
@@ -756,128 +672,134 @@ impl AgentSessionManager {
         cwd: Option<PathBuf>,
         context: SessionContext,
     ) -> Result<SessionReady> {
-        self.start_session(agent, cwd, None, context, None).await
+        self.start_session(agent, cwd, None, context).await
     }
 
     /// Resume a persisted session by its ACP session id (requires the agent to
-    /// support `session/load`). Returns a fresh live handle to it. With
-    /// `replay_tx`, the history updates the agent replays on load are streamed
-    /// there before the session reports ready.
+    /// support `session/load`). Returns a fresh live handle to it. The history
+    /// updates the agent replays on load are streamed to `replay_tx` before the
+    /// session reports ready.
     pub async fn load_session(
         &self,
         agent: &str,
         session_id: &str,
         cwd: Option<PathBuf>,
         context: SessionContext,
-        replay_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        replay_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> Result<SessionReady> {
-        let key = AgentSessionKey::new(agent, session_id);
-        let previous = self.sessions.lock().await.get(&key).cloned();
-        if let Some(previous) = previous {
-            if !previous.closing.is_cancelled() {
-                anyhow::bail!("{agent} ACP session is already active: {session_id}");
-            }
-            previous.wait_closed().await;
-        }
-        self.start_session(
-            agent,
-            cwd,
-            Some(SessionId::from(session_id.to_string())),
-            context,
-            replay_tx,
-        )
-        .await
+        let load = (SessionId::from(session_id.to_string()), replay_tx);
+        self.start_session(agent, cwd, Some(load), context).await
     }
 
     async fn start_session(
         &self,
         agent: &str,
         cwd: Option<PathBuf>,
-        load: Option<SessionId>,
+        load: Option<SessionLoad>,
         context: SessionContext,
-        replay_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     ) -> Result<SessionReady> {
         let cwd = resolve_cwd(cwd)?;
         let (tx, rx) = mpsc::channel(8);
-        let (ready_tx, ready_rx) = oneshot::channel();
-        let (ended_tx, ended_rx) = oneshot::channel::<()>();
+        let (status_tx, status) = watch::channel(SessionStatus::default());
         let (stopped_tx, stopped) = watch::channel(false);
-        let closing = CancellationToken::new();
+        let handle = AgentSession {
+            tx,
+            status,
+            closing: CancellationToken::new(),
+            stopped,
+        };
         // A timed-out create/load must not leave a detached actor behind.
-        let close_on_drop = closing.clone().drop_guard();
-        let actor_closing = closing.clone();
-        let runtime = self.runtime(agent);
-        let agent = agent.to_string();
-        tokio::spawn(async move {
-            // ended_tx drops when the actor exits, triggering cleanup.
-            let _ended_tx = ended_tx;
-            if let Err(err) = run_session_actor_inner(
-                cwd,
-                load,
-                context,
-                runtime,
-                replay_tx,
-                rx,
-                ready_tx,
-                actor_closing,
+        let close_on_drop = handle.closing.clone().drop_guard();
+        let creating = load.is_none();
+        if let Some((session_id, _)) = &load {
+            // Claim the session before the agent loads it: a second actor would
+            // close the agent's session on its way out.
+            self.claim(
+                AgentSessionKey::new(agent, &session_id.to_string()),
+                &handle,
             )
-            .await
-            {
-                tracing::info!("ACP session actor stopped: {err}");
+            .await?;
+        }
+
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let actor = run_session_actor(
+            cwd,
+            load,
+            context,
+            self.runtime(agent),
+            rx,
+            status_tx,
+            ready_tx,
+            handle.closing.clone(),
+        );
+        let sessions = self.sessions.clone();
+        let on_end = self.on_end.clone();
+        let actor_handle = handle.clone();
+        tokio::spawn(async move {
+            let was_ready = actor.await;
+            let mut sessions = sessions.lock().await;
+            let key = sessions
+                .iter()
+                .find(|(_, session)| session.tx.same_channel(&actor_handle.tx))
+                .map(|(key, _)| key.clone());
+            if let Some(key) = key {
+                sessions.remove(&key);
+                // Explicit close already has a reply. Do not emit a late ended
+                // notification that could invalidate a reloaded session.
+                if was_ready && !actor_handle.closing.is_cancelled() {
+                    if let Some(on_end) = on_end {
+                        on_end(&key.agent, &key.session_id);
+                    }
+                }
             }
+            // Under the lock, so registering a created session sees it.
+            stopped_tx.send_replace(true);
         });
 
-        // Readiness is bounded by the caller's timeout, not here. The
-        // session id is assigned by the agent.
-        match ready_rx.await {
-            Ok(Ok(ready)) => {
-                let session_id = ready.session_id.clone();
-                let session_key = AgentSessionKey::new(&agent, &session_id);
-                let session = AgentSession {
-                    tx,
-                    busy: Arc::new(AtomicBool::new(false)),
-                    closing,
-                    stopped,
-                };
-                {
-                    let mut sessions = self.sessions.lock().await;
-                    if sessions.contains_key(&session_key) {
-                        // The drop guard closes the duplicate actor.
-                        anyhow::bail!("{agent} ACP session is already active: {session_id}");
-                    }
-                    sessions.insert(session_key.clone(), session.clone());
-                }
-                let sessions = self.sessions.clone();
-                let on_end = self.on_end.clone();
-                let ended_session_key = session_key;
-                tokio::spawn(async move {
-                    let _ = ended_rx.await;
-                    // Only report sessions that were actually registered
-                    // (actors that died before readiness never were).
-                    let mut sessions = sessions.lock().await;
-                    if sessions
-                        .get(&ended_session_key)
-                        .is_some_and(|current| current.tx.same_channel(&session.tx))
-                    {
-                        sessions.remove(&ended_session_key);
-                        // Explicit close already has a reply. Do not emit a late
-                        // ended notification that could invalidate a reloaded session.
-                        if !session.closing.is_cancelled() {
-                            if let Some(on_end) = on_end {
-                                on_end(&ended_session_key.agent, &ended_session_key.session_id);
-                            }
-                        }
-                    }
-                    stopped_tx.send_replace(true);
-                });
-                close_on_drop.disarm();
-                Ok(ready)
-            }
+        // Readiness is bounded by the caller's timeout, not here.
+        let ready = match ready_rx.await {
+            Ok(Ok(ready)) => ready,
             Ok(Err(err)) => anyhow::bail!(err),
             Err(_) => anyhow::bail!("ACP agent session stopped before it was ready"),
+        };
+        if creating {
+            // The agent assigned the session id.
+            let mut sessions = self.sessions.lock().await;
+            if *handle.stopped.borrow() {
+                anyhow::bail!("ACP agent session stopped before it was ready");
+            }
+            sessions.insert(AgentSessionKey::new(agent, &ready.session_id), handle);
+        }
+        close_on_drop.disarm();
+        Ok(ready)
+    }
+
+    /// Register a session about to be loaded, after a closing actor of it has
+    /// released it.
+    async fn claim(&self, key: AgentSessionKey, handle: &AgentSession) -> Result<()> {
+        loop {
+            let previous = {
+                let mut sessions = self.sessions.lock().await;
+                match sessions.get(&key) {
+                    None => {
+                        sessions.insert(key, handle.clone());
+                        return Ok(());
+                    }
+                    Some(previous) if !previous.closing.is_cancelled() => anyhow::bail!(
+                        "{} ACP session is already active: {}",
+                        key.agent,
+                        key.session_id
+                    ),
+                    Some(previous) => previous.clone(),
+                }
+            };
+            previous.wait_closed().await;
         }
     }
 
+    /// Run a prompt turn, streaming its events to `event_tx`. A turn without
+    /// any update for `timeout_secs` is cancelled and fails with a timeout, so
+    /// only a silent agent times out; a long but productive turn never does.
     #[allow(clippy::too_many_arguments)]
     pub async fn prompt(
         &self,
@@ -886,92 +808,27 @@ impl AgentSessionManager {
         prompt: String,
         attachments: Vec<Attachment>,
         timeout_secs: u64,
-        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-        user_input_sink: Option<UserInputSink>,
-        suggestion_sink: Option<SuggestionSink>,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
+        notifier: Option<Notifier>,
     ) -> Result<String> {
-        let session = self.session(agent, session_id).await?;
-        if session.busy.swap(true, Ordering::AcqRel) {
-            anyhow::bail!("ACP agent session already has a prompt in progress");
-        }
-        let _busy = BusyGuard(session.busy.clone());
-
-        // Streamed turns carry their events through a pump that renews an idle
-        // deadline on every frame, so only a silent agent times out; a long but
-        // productive turn never does. Without events the deadline never renews
-        // and the same wait caps the whole call.
-        let (turn_event_tx, last_activity) = match event_tx {
-            Some(tx) => {
-                let (turn_tx, mut turn_rx) = mpsc::unbounded_channel::<AgentEvent>();
-                let last_activity = Arc::new(std::sync::Mutex::new(tokio::time::Instant::now()));
-                let pump_activity = last_activity.clone();
-                tokio::spawn(async move {
-                    while let Some(event) = turn_rx.recv().await {
-                        *pump_activity.lock().expect("activity lock poisoned") =
-                            tokio::time::Instant::now();
-                        let _ = tx.send(event);
-                    }
-                });
-                (Some(turn_tx), Some(last_activity))
-            }
-            None => (None, None),
-        };
-
-        let (reply_tx, mut reply_rx) = oneshot::channel();
-        let streamed = turn_event_tx.is_some();
-        session
-            .tx
-            .send(SessionCommand::Prompt {
+        let (reply, reply_rx) = oneshot::channel();
+        self.send_command(
+            agent,
+            session_id,
+            SessionCommand::Prompt(PromptTurn {
                 prompt,
                 attachments,
-                event_tx: turn_event_tx,
-                user_input_sink,
-                suggestion_sink,
-                reply: reply_tx,
-            })
-            .await
-            .context("ACP agent session is closed")?;
-
-        let timeout = std::time::Duration::from_secs(timeout_secs);
-        loop {
-            let started_at = last_activity
-                .as_deref()
-                .map(|activity| *activity.lock().expect("activity lock poisoned"))
-                .unwrap_or_else(tokio::time::Instant::now);
-            tokio::select! {
-                reply = &mut reply_rx => {
-                    return match reply {
-                        Ok(Ok(answer)) => Ok(answer),
-                        Ok(Err(err)) => anyhow::bail!(err),
-                        Err(_) => anyhow::bail!("ACP agent session closed before responding"),
-                    };
-                }
-                _ = tokio::time::sleep_until(started_at + timeout) => {
-                    // An event may have renewed the deadline while this sleep
-                    // was firing; only give up when the turn really went quiet.
-                    let still_idle = last_activity
-                        .as_deref()
-                        .map(|activity| {
-                            activity.lock().expect("activity lock poisoned").elapsed() >= timeout
-                        })
-                        .unwrap_or(true);
-                    if !still_idle {
-                        continue;
-                    }
-                    // Callers must keep at most one prompt in flight per session
-                    // (the panel enforces this), so a timeout means the caller
-                    // abandoned its turn: cancel it so the session becomes usable
-                    // again instead of finishing unobserved.
-                    let _ = session.tx.send(SessionCommand::Cancel).await;
-                    if streamed {
-                        anyhow::bail!(
-                            "Timeout waiting for ACP agent: no activity for {timeout_secs}s"
-                        );
-                    } else {
-                        anyhow::bail!("Timeout waiting for ACP agent");
-                    }
-                }
-            }
+                event_tx,
+                notifier,
+                idle_timeout: std::time::Duration::from_secs(timeout_secs),
+                reply,
+            }),
+        )
+        .await?;
+        match reply_rx.await {
+            Ok(Ok(answer)) => Ok(answer),
+            Ok(Err(err)) => anyhow::bail!(err),
+            Err(_) => anyhow::bail!("ACP agent session closed before responding"),
         }
     }
 
@@ -982,25 +839,19 @@ impl AgentSessionManager {
             .lock()
             .await
             .iter()
-            .filter(|(_, session)| session.busy.load(Ordering::Acquire))
+            .filter(|(_, session)| session.status.borrow().busy)
             .map(|(key, _)| (key.agent.clone(), key.session_id.clone()))
             .collect()
     }
 
     /// Unanswered user input requests of all sessions.
     pub async fn pending_user_inputs(&self) -> Vec<UserInput> {
-        let runtimes: Vec<AcpRuntime> = self
-            .runtimes
+        self.sessions
             .lock()
-            .expect("runtimes lock poisoned")
+            .await
             .values()
-            .cloned()
-            .collect();
-        let mut pending = Vec::new();
-        for runtime in runtimes {
-            pending.extend(runtime.pending_user_inputs().await);
-        }
-        pending
+            .filter_map(|session| session.status.borrow().pending_input.clone())
+            .collect()
     }
 
     /// Answer a pending user input request: `{ optionId }` for a permission
@@ -1014,9 +865,14 @@ impl AgentSessionManager {
         request_id: &str,
         response: serde_json::Value,
     ) -> bool {
-        self.runtime(agent)
-            .answer_user_input(session_id, request_id, response)
-            .await
+        let (reply, reply_rx) = oneshot::channel();
+        let command = SessionCommand::AnswerUserInput {
+            request_id: request_id.to_string(),
+            response,
+            reply,
+        };
+        self.send_command(agent, session_id, command).await.is_ok()
+            && reply_rx.await.unwrap_or(false)
     }
 
     /// Cancel the in-flight prompt of a session. The prompt settles with the
@@ -1161,37 +1017,49 @@ impl AgentSessionManager {
     }
 }
 
+/// Start a session with the agent, report ready, then serve its commands and
+/// updates until it is closed or the connection stops. Returns whether it
+/// became ready.
 #[allow(clippy::too_many_arguments)]
-async fn run_session_actor_inner(
+async fn run_session_actor(
     cwd: PathBuf,
-    load: Option<SessionId>,
+    load: Option<SessionLoad>,
     context: SessionContext,
     runtime: AcpRuntime,
-    replay_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     mut rx: mpsc::Receiver<SessionCommand>,
+    status: watch::Sender<SessionStatus>,
     ready_tx: oneshot::Sender<Result<SessionReady, String>>,
     closing: CancellationToken,
-) -> Result<()> {
-    let idle_update_sink = context.idle_update_sink.clone();
+) -> bool {
+    let (load, replay_tx) = load.unzip();
+    let notifier = context.notifier.clone();
     let started = tokio::select! {
         result = runtime.start_session(cwd, load, context) => result,
-        _ = closing.cancelled() => return Ok(()),
+        _ = closing.cancelled() => return false,
     };
     let StartedSession {
         mut session,
         mut ready,
-        cancel: cancel_flag,
         mut disconnects,
         generation: connection_generation,
         close_supported,
     } = match started {
         Ok(started) => started,
         Err(err) => {
+            tracing::info!("ACP session failed to start: {err}");
             let _ = ready_tx.send(Err(err.to_string()));
-            return Err(err);
+            return false;
         }
     };
-    let session_id = ready.session_id.clone();
+    let mut actor = SessionActor {
+        agent: runtime.agent.clone(),
+        session_id: ready.session_id.clone(),
+        notifier,
+        status,
+        turn: None,
+        pending_input: None,
+    };
+    let mut was_ready = false;
     let run = async {
         // The load-time history replay is routed to the session before the load
         // response; forward it before reporting ready so the client sees the
@@ -1201,87 +1069,8 @@ async fn run_session_actor_inner(
             ready.title = metadata.title.or(ready.title);
             ready.updated_at = metadata.updated_at.or(ready.updated_at);
         }
-        let _ = ready_tx.send(Ok(ready));
-        // Commands arriving while a prompt turn runs are deferred here and
-        // processed after the turn settles — except config/mode changes, which
-        // `run_prompt_turn` applies to the live query immediately.
-        let mut deferred: VecDeque<SessionCommand> = VecDeque::new();
-        loop {
-            let command = match deferred.pop_front() {
-                Some(command) => Some(command),
-                // Between turns, forward what the agent sends right away instead
-                // of leaving it queued until the next prompt reads it.
-                None => tokio::select! {
-                    biased;
-                    update = session.read_update() => {
-                        if let SessionMessage::SessionMessage(dispatch) = update? {
-                            MatchDispatch::new(dispatch)
-                                .if_notification(async |notif: SessionNotification| {
-                                    if let Some(sink) = &idle_update_sink {
-                                        sink(&session_id, update_to_json(notif.update));
-                                    }
-                                    Ok(())
-                                })
-                                .await
-                                .otherwise_ignore()?;
-                        }
-                        continue;
-                    }
-                    command = rx.recv() => command,
-                },
-            };
-            let Some(command) = command else { break };
-            match command {
-                SessionCommand::Prompt {
-                    prompt,
-                    attachments,
-                    event_tx,
-                    user_input_sink,
-                    suggestion_sink,
-                    reply,
-                } => {
-                    if let Some(resolver) = user_input_sink {
-                        runtime.set_user_input_sink(&session_id, resolver).await;
-                    }
-                    if let Some(sink) = suggestion_sink {
-                        runtime.set_suggestion_sink(&session_id, sink).await;
-                    }
-                    let turn_result = run_prompt_turn(
-                        &mut session,
-                        prompt,
-                        attachments,
-                        event_tx,
-                        &cancel_flag,
-                        Some(&mut rx),
-                    )
-                    .await;
-                    runtime.clear_user_input_sink(&session_id).await;
-                    match turn_result {
-                        Ok((answer, new_deferred)) => {
-                            let _ = reply.send(Ok(answer));
-                            deferred.extend(new_deferred);
-                        }
-                        Err(err) => {
-                            let _ = reply.send(Err(err.to_string()));
-                        }
-                    }
-                }
-                SessionCommand::Cancel => {
-                    // No prompt running, nothing to cancel.
-                }
-                SessionCommand::SetMode { mode_id, reply } => {
-                    send_set_mode(&session, mode_id, reply).await;
-                }
-                SessionCommand::SetConfig {
-                    config_id,
-                    value,
-                    reply,
-                } => {
-                    send_set_config_option(&session, config_id, value, reply).await;
-                }
-            }
-        }
-        Ok(())
+        was_ready = ready_tx.send(Ok(ready)).is_ok();
+        actor.serve(&mut session, &mut rx).await
     };
     let result: Result<(), agent_client_protocol::Error> = tokio::select! {
         result = run => result,
@@ -1296,26 +1085,299 @@ async fn run_session_actor_inner(
             }
         } => Err(agent_client_protocol::Error::internal_error().data("ACP connection stopped")),
     };
+    // Settle the turn's caller and the pending request (cancelled) right away,
+    // without waiting for the agent to close the session.
+    drop(actor);
     if closing.is_cancelled() {
         // This also interrupts a stuck mode/config request or a user input wait;
         // close must not queue behind the operation the user is resetting.
-        cancel_prompt(&session, &cancel_flag);
+        send_cancel(&session);
         if close_supported {
             close_session_gracefully(&session).await;
         }
     }
-    runtime.unregister_session(&session_id).await;
-
     if let Err(err) = result {
-        anyhow::bail!("ACP agent session failed: {err}");
+        tracing::info!("ACP session actor stopped: ACP agent session failed: {err}");
     }
-
-    Ok(())
+    was_ready
 }
 
-fn cancel_prompt(session: &ActiveSession<'_, Agent>, cancel_flag: &watch::Sender<bool>) {
-    // Pending permission and elicitation requests of this turn must settle cancelled.
-    cancel_flag.send_replace(true);
+/// Owns everything about a live session; only its actor touches it.
+struct SessionActor {
+    agent: String,
+    session_id: String,
+    /// The device that created, loaded or last prompted the session. It gets
+    /// the session's notifications: requests waiting for the user, next-prompt
+    /// suggestions and updates sent between turns.
+    notifier: Option<Notifier>,
+    status: watch::Sender<SessionStatus>,
+    turn: Option<Turn>,
+    /// The agent waits for one request at a time.
+    pending_input: Option<PendingUserInput>,
+}
+
+struct Turn {
+    stop: std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<PromptResponse, agent_client_protocol::Error>>
+                + Send,
+        >,
+    >,
+    event_tx: mpsc::UnboundedSender<AgentEvent>,
+    answer: String,
+    idle_timeout: std::time::Duration,
+    deadline: tokio::time::Instant,
+    /// Taken when the turn times out: the caller gets the timeout right away
+    /// while the turn runs until the agent confirms the cancellation.
+    reply: Option<oneshot::Sender<Result<String, String>>>,
+    cancelled: bool,
+}
+
+struct PendingUserInput {
+    input: UserInput,
+    answer: oneshot::Sender<serde_json::Value>,
+}
+
+impl SessionActor {
+    /// Serve commands and session updates. Config/mode changes go out at once,
+    /// also mid-turn (see `send_set_mode`); a second prompt during a turn is
+    /// rejected.
+    async fn serve(
+        &mut self,
+        session: &mut ActiveSession<'_, Agent>,
+        rx: &mut mpsc::Receiver<SessionCommand>,
+    ) -> Result<(), agent_client_protocol::Error> {
+        enum Input {
+            Update(SessionMessage),
+            Stop(Result<PromptResponse, agent_client_protocol::Error>),
+            Command(SessionCommand),
+            Idle,
+        }
+        loop {
+            let deadline = self
+                .turn
+                .as_ref()
+                .filter(|turn| turn.reply.is_some())
+                .map(|turn| turn.deadline);
+            let turn = &mut self.turn;
+            // `biased` drains updates the agent sent before its prompt response;
+            // a random pick could take Stop first and leave the final chunks
+            // queued until the next turn.
+            let input = tokio::select! {
+                biased;
+                update = session.read_update() => Input::Update(update?),
+                response = async {
+                    match turn {
+                        Some(turn) => turn.stop.as_mut().await,
+                        None => std::future::pending().await,
+                    }
+                } => Input::Stop(response),
+                command = rx.recv() => match command {
+                    Some(command) => Input::Command(command),
+                    None => return Ok(()),
+                },
+                _ = tokio::time::sleep_until(deadline.unwrap_or_else(tokio::time::Instant::now)),
+                    if deadline.is_some() => Input::Idle,
+            };
+            match input {
+                Input::Update(SessionMessage::SessionMessage(dispatch)) => {
+                    MatchDispatch::new(dispatch)
+                        .if_notification(async |notif: SessionNotification| {
+                            self.on_update(notif.update);
+                            Ok(())
+                        })
+                        .await
+                        .otherwise_ignore()?;
+                }
+                Input::Update(_) => {}
+                Input::Stop(response) => self.end_turn(response),
+                Input::Idle => {
+                    // Callers keep at most one prompt in flight per session, so a
+                    // timeout means the caller abandoned its turn: cancel it so the
+                    // session becomes usable again instead of finishing unobserved.
+                    self.cancel_turn(session);
+                    let turn = self.turn.as_mut().expect("deadline of a running turn");
+                    if let Some(reply) = turn.reply.take() {
+                        let _ = reply.send(Err(format!(
+                            "Timeout waiting for ACP agent: no activity for {}s",
+                            turn.idle_timeout.as_secs()
+                        )));
+                    }
+                }
+                Input::Command(command) => self.on_command(session, command).await,
+            }
+        }
+    }
+
+    async fn on_command(&mut self, session: &ActiveSession<'_, Agent>, command: SessionCommand) {
+        match command {
+            SessionCommand::Prompt(turn) => self.begin_turn(session, turn),
+            SessionCommand::Cancel => self.cancel_turn(session),
+            SessionCommand::SetMode { mode_id, reply } => {
+                send_set_mode(session, mode_id, reply).await;
+            }
+            SessionCommand::SetConfig {
+                config_id,
+                value,
+                reply,
+            } => {
+                send_set_config_option(session, config_id, value, reply).await;
+            }
+            SessionCommand::UserInput { mut input, answer } => {
+                // Only shown while a turn runs; dropping `answer` cancels it.
+                if !self.turn.as_ref().is_some_and(|turn| !turn.cancelled) {
+                    return;
+                }
+                let Some(notifier) = self.notifier.clone() else {
+                    return;
+                };
+                let request_id = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos()
+                    .to_string();
+                input.params_mut()["requestId"] = request_id.into();
+                notifier(input.method(), input.params().clone());
+                self.pending_input = Some(PendingUserInput { input, answer });
+                self.publish();
+            }
+            SessionCommand::AnswerUserInput {
+                request_id,
+                response,
+                reply,
+            } => {
+                let pending = self
+                    .pending_input
+                    .take_if(|pending| pending.input.params()["requestId"] == request_id);
+                let answered = pending.is_some_and(|pending| pending.answer.send(response).is_ok());
+                self.publish();
+                let _ = reply.send(answered);
+            }
+            SessionCommand::Suggestion(suggestion) => {
+                let params = serde_json::json!({
+                    "agent": self.agent,
+                    "sessionId": self.session_id,
+                    "suggestion": suggestion,
+                });
+                self.notify("agent_prompt_suggestion", params);
+            }
+        }
+    }
+
+    fn begin_turn(&mut self, session: &ActiveSession<'_, Agent>, turn: PromptTurn) {
+        if self.turn.is_some() {
+            let _ = turn.reply.send(Err(
+                "ACP agent session already has a prompt in progress".to_string()
+            ));
+            return;
+        }
+        if turn.notifier.is_some() {
+            self.notifier = turn.notifier;
+        }
+        // `send_prompt` only takes text, so build the request manually to support
+        // image/resource blocks. The final stop reason then arrives as the
+        // request response instead of through the update stream. An empty prompt
+        // is fine as long as attachments carry the content (callers validate).
+        let mut content: Vec<ContentBlock> = Vec::new();
+        if !turn.prompt.is_empty() {
+            content.push(ContentBlock::Text(TextContent::new(turn.prompt)));
+        }
+        content.extend(
+            turn.attachments
+                .into_iter()
+                .map(Attachment::into_content_block),
+        );
+        let stop = session
+            .connection()
+            .send_request_to(
+                Agent,
+                PromptRequest::new(session.session_id().clone(), content),
+            )
+            .block_task();
+        self.turn = Some(Turn {
+            stop: Box::pin(stop),
+            event_tx: turn.event_tx,
+            answer: String::new(),
+            idle_timeout: turn.idle_timeout,
+            deadline: tokio::time::Instant::now() + turn.idle_timeout,
+            reply: Some(turn.reply),
+            cancelled: false,
+        });
+        self.publish();
+    }
+
+    fn on_update(&mut self, update: SessionUpdate) {
+        let Some(turn) = &mut self.turn else {
+            // Between turns, forward what the agent sends right away (e.g. the
+            // available commands after `session/new`) instead of leaving it
+            // queued until the next prompt.
+            let params = serde_json::json!({
+                "agent": self.agent,
+                "sessionId": self.session_id,
+                "update": update_to_json(update),
+            });
+            self.notify("agent_session_update", params);
+            return;
+        };
+        turn.deadline = tokio::time::Instant::now() + turn.idle_timeout;
+        if let SessionUpdate::AgentMessageChunk(ContentChunk {
+            content: ContentBlock::Text(text),
+            ..
+        }) = &update
+        {
+            turn.answer.push_str(&text.text);
+        }
+        let _ = turn.event_tx.send(AgentEvent::SessionUpdate {
+            update: update_to_json(update),
+        });
+    }
+
+    fn end_turn(&mut self, response: Result<PromptResponse, agent_client_protocol::Error>) {
+        let turn = self.turn.take().expect("stop of a running turn");
+        let result = response
+            .map(|response| {
+                let _ = turn.event_tx.send(AgentEvent::Stop {
+                    stop_reason: to_json(response.stop_reason),
+                });
+                turn.answer
+            })
+            .map_err(|err| err.to_string());
+        if let Some(reply) = turn.reply {
+            let _ = reply.send(result);
+        }
+        self.pending_input = None;
+        self.publish();
+    }
+
+    /// Cancel the running turn; its pending request settles cancelled.
+    fn cancel_turn(&mut self, session: &ActiveSession<'_, Agent>) {
+        let Some(turn) = &mut self.turn else {
+            return;
+        };
+        turn.cancelled = true;
+        send_cancel(session);
+        self.pending_input = None;
+        self.publish();
+    }
+
+    fn notify(&self, method: &str, params: serde_json::Value) {
+        if let Some(notifier) = &self.notifier {
+            notifier(method, params);
+        }
+    }
+
+    fn publish(&self) {
+        self.status.send_replace(SessionStatus {
+            busy: self.turn.is_some(),
+            pending_input: self
+                .pending_input
+                .as_ref()
+                .map(|pending| pending.input.clone()),
+        });
+    }
+}
+
+fn send_cancel(session: &ActiveSession<'_, Agent>) {
     let notification = CancelNotification::new(session.session_id().clone());
     if let Err(err) = session.connection().send_notification(notification) {
         tracing::warn!("Failed to cancel ACP session: {err}");
@@ -1391,7 +1453,7 @@ async fn drain_replay(
                     .if_notification(async |notif: SessionNotification| {
                         let update = update_to_json(notif.update);
                         metadata.apply(&update);
-                        send_agent_event(Some(event_tx), AgentEvent::SessionUpdate { update });
+                        let _ = event_tx.send(AgentEvent::SessionUpdate { update });
                         Ok(())
                     })
                     .await
@@ -1448,131 +1510,6 @@ async fn send_set_config_option(
     let _ = reply.send(result);
 }
 
-/// Run one prompt turn. While the turn runs, keeps draining `incoming` (when
-/// given) so Cancel stays actionable instead of queueing behind the turn;
-/// explicit close interrupts the entire actor independently of this queue.
-/// Config/mode changes go out live (see `send_set_mode`), other commands are
-/// deferred.
-async fn run_prompt_turn(
-    session: &mut ActiveSession<'_, Agent>,
-    prompt: String,
-    attachments: Vec<Attachment>,
-    event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-    cancel_flag: &watch::Sender<bool>,
-    mut incoming: Option<&mut mpsc::Receiver<SessionCommand>>,
-) -> Result<(String, Vec<SessionCommand>), agent_client_protocol::Error> {
-    // New turn: clear any previous cancellation before requests can arrive.
-    cancel_flag.send_replace(false);
-
-    // `send_prompt` only takes text, so build the request manually to support
-    // image/resource blocks. The final stop reason then arrives as the
-    // request response instead of through the update stream. An empty prompt
-    // is fine as long as attachments carry the content (callers validate).
-    let mut content: Vec<ContentBlock> = Vec::new();
-    if !prompt.is_empty() {
-        content.push(ContentBlock::Text(TextContent::new(prompt)));
-    }
-    content.extend(attachments.into_iter().map(Attachment::into_content_block));
-    let stop = session
-        .connection()
-        .send_request_to(
-            Agent,
-            PromptRequest::new(session.session_id().clone(), content),
-        )
-        .block_task();
-    tokio::pin!(stop);
-
-    let mut answer = String::new();
-    let mut deferred = Vec::new();
-    loop {
-        enum TurnInput {
-            Update(Result<SessionMessage, agent_client_protocol::Error>),
-            Stop(Result<PromptResponse, agent_client_protocol::Error>),
-            Command(SessionCommand),
-        }
-        // `biased` drains updates the agent sent before its prompt response;
-        // a random pick could take Stop first and leave the final chunks
-        // queued until the next turn.
-        let input = match incoming.as_deref_mut() {
-            Some(incoming) => tokio::select! {
-                biased;
-                update = session.read_update() => TurnInput::Update(update),
-                stop_result = &mut stop => TurnInput::Stop(stop_result),
-                command = incoming.recv() => match command {
-                    Some(command) => TurnInput::Command(command),
-                    // The session is being dropped mid-turn.
-                    None => break,
-                },
-            },
-            None => tokio::select! {
-                biased;
-                update = session.read_update() => TurnInput::Update(update),
-                stop_result = &mut stop => TurnInput::Stop(stop_result),
-            },
-        };
-        match input {
-            TurnInput::Update(update) => {
-                if let SessionMessage::SessionMessage(dispatch) = update? {
-                    MatchDispatch::new(dispatch)
-                        .if_notification(async |notif: SessionNotification| {
-                            handle_session_update(notif.update, &mut answer, event_tx.as_ref())?;
-                            Ok(())
-                        })
-                        .await
-                        .otherwise_ignore()?;
-                }
-            }
-            TurnInput::Stop(stop_result) => {
-                let response = stop_result?;
-                send_agent_event(
-                    event_tx.as_ref(),
-                    AgentEvent::Stop {
-                        stop_reason: to_json(response.stop_reason),
-                    },
-                );
-                break;
-            }
-            TurnInput::Command(SessionCommand::Cancel) => {
-                cancel_prompt(session, cancel_flag);
-            }
-            TurnInput::Command(SessionCommand::SetMode { mode_id, reply }) => {
-                send_set_mode(session, mode_id, reply).await;
-            }
-            TurnInput::Command(SessionCommand::SetConfig {
-                config_id,
-                value,
-                reply,
-            }) => {
-                send_set_config_option(session, config_id, value, reply).await;
-            }
-            TurnInput::Command(command) => deferred.push(command),
-        }
-    }
-    Ok((answer, deferred))
-}
-
-fn handle_session_update(
-    update: SessionUpdate,
-    answer: &mut String,
-    event_tx: Option<&mpsc::UnboundedSender<AgentEvent>>,
-) -> Result<(), agent_client_protocol::Error> {
-    if let SessionUpdate::AgentMessageChunk(ContentChunk {
-        content: ContentBlock::Text(text),
-        ..
-    }) = &update
-    {
-        answer.push_str(&text.text);
-    }
-
-    send_agent_event(
-        event_tx,
-        AgentEvent::SessionUpdate {
-            update: update_to_json(update),
-        },
-    );
-    Ok(())
-}
-
 /// Serialize a session update for the client, dropping image bytes from tool
 /// output. Tool images (e.g. screenshots the agent read) arrive twice, in
 /// `content` and `rawOutput`, at up to ~1MB each; the client does not render
@@ -1610,12 +1547,6 @@ fn omit_image_data(value: &mut serde_json::Value) {
         }
         serde_json::Value::Array(items) => items.iter_mut().for_each(omit_image_data),
         _ => {}
-    }
-}
-
-fn send_agent_event(event_tx: Option<&mpsc::UnboundedSender<AgentEvent>>, event: AgentEvent) {
-    if let Some(event_tx) = event_tx {
-        let _ = event_tx.send(event);
     }
 }
 
