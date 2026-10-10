@@ -17,6 +17,7 @@ import type { ChatMessage, TextMessage } from '../session/types';
 import { stripVoiceChatMarker } from '../session/voice-chat';
 import { answerElicitation } from '../state/user-input';
 import { icons } from '../styles/icons';
+import { DeckStreamMarkdownElement } from './stream-markdown';
 
 @customElement('deck-session-timeline')
 @adoptedStyle(blockContainer)
@@ -134,7 +135,7 @@ export class DeckSessionTimelineElement extends GemElement {
       <article
         @pointerdown=${this.#setSelectionMenu}
         @widget-send=${(event: Event) => this.#onWidgetSend(event, message.id)}
-        class="agent-message mb-4 min-w-0 text-base leading-[1.68] text-text">
+        class="mb-4 min-w-0 text-base leading-[1.68] text-text">
         <div v-if=${attachments.length} class="mb-2 flex flex-wrap gap-2">
           ${attachments.map(
             (attachment) => html`
@@ -159,7 +160,9 @@ export class DeckSessionTimelineElement extends GemElement {
     const selection = window.getSelection();
     const ele = selection?.anchorNode?.parentElement;
     if (!ele || !selection.toString().trim()) return;
-    if (!closestElement(ele, 'deck-session-timeline .agent-message')) return;
+    // Only replies: user messages render with `user`, process details live in sheets outside the timeline.
+    const markdown = closestElement(ele, DeckStreamMarkdownElement);
+    if (!markdown || markdown.user || !this.contains(markdown)) return;
     setSelectionMenuItems({ items: [{ label: 'Ask', onClick: ({ text }) => this.ask(text) }] });
   };
 
