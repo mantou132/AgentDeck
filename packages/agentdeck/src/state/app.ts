@@ -3,7 +3,15 @@ import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
-import { type AppSettings, MIN_DAEMON_VERSION, RENDER_CAPABILITIES, RESET_PENDING_KEY, SETTINGS_KEY } from '../config';
+import {
+  type AppSettings,
+  MIN_DAEMON_VERSION,
+  PAIRING_HISTORY_KEY,
+  type PairingRecord,
+  RENDER_CAPABILITIES,
+  RESET_PENDING_KEY,
+  SETTINGS_KEY,
+} from '../config';
 import { i18n } from '../i18n';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
 import {
@@ -32,6 +40,22 @@ const isDaemonOutdated = (version?: string) => {
 
 let daemonVersionChecked = false;
 
+const savePairingHistory = (pairingHistory: PairingRecord[]) => {
+  localStorage.setItem(PAIRING_HISTORY_KEY, JSON.stringify(pairingHistory));
+  agentdeckStore({ pairingHistory });
+};
+
+/** Moves the connected pairing to the front; keeps the known hostname when an old daemon omits it. */
+const recordPairing = (hostname?: string) => {
+  const { relayId, relayUrl } = agentdeckStore.settings;
+  const previous = agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
+  const rest = agentdeckStore.pairingHistory.filter((item) => item !== previous);
+  savePairingHistory([{ relayId, relayUrl, hostname: hostname || previous?.hostname }, ...rest]);
+};
+
+export const removePairing = (relayId: string) =>
+  savePairingHistory(agentdeckStore.pairingHistory.filter((item) => item.relayId !== relayId));
+
 /**
  * Single underlying message consumption hub:
  * WebSocket connection and App state are fully decoupled; App responds to state and messages only at this single point.
@@ -43,12 +67,13 @@ const handleTransportMessage = (message: TransportMessage) => {
       break;
     }
     case 'connection': {
-      const { connection, error, hostVersion } = message;
+      const { connection, error, hostVersion, hostname } = message;
       agentdeckStore({
         connection,
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
       });
       if (connection === 'connected') {
+        recordPairing(hostname);
         refreshSessions();
         // Older daemon has no reconciliation endpoint; stay waiting if it fails
         settleLostTurns().catch(console.error);

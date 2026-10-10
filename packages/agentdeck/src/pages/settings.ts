@@ -5,7 +5,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { isRelayUrl, RELAY_GUIDE_SEEN_KEY } from '../config';
 import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
-import { hardResetApp, saveSettings } from '../state/app';
+import { hardResetApp, removePairing, saveSettings } from '../state/app';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
 
@@ -87,6 +87,11 @@ export class AgentDeckSettingsPageElement extends GemElement {
     );
   };
 
+  #fillPairing = (relayId: string, relayUrl = '') => {
+    this.#state({ relayId, relayUrl });
+    Toast.open('success', i18n.get('settings.relayIdUpdated'));
+  };
+
   #save = () => {
     try {
       saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent, relayUrl: this.#state.relayUrl });
@@ -113,6 +118,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
   @template()
   #render = () => {
     const { agents } = agentdeckStore;
+    const pairings = agentdeckStore.pairingHistory.filter((item) => item.relayId !== this.#state.relayId.trim());
     return html`
       <tap-page class="bg-bg text-text" @hide=${() => this.#state({ showRelayId: false })}>
         <header
@@ -186,6 +192,36 @@ export class AgentDeckSettingsPageElement extends GemElement {
               >
                 <tap-use class="size-5" .element=${this.#state.showRelayId ? icons.visibilityOff : icons.visibility}></tap-use>
               </button>
+            </div>
+
+            <div v-if=${pairings.length > 0} class="mt-4">
+              <p class="mt-0 mb-2 text-xs font-medium text-describe">${i18n.get('settings.recentPairings')}</p>
+              <div class="flex flex-col gap-2">
+                ${pairings.map(
+                  ({ relayId, relayUrl, hostname }) => html`
+                    <div class="flex h-12 items-center rounded-xl border border-border bg-bg">
+                      <button
+                        type="button"
+                        class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent pl-3.5 text-left active:opacity-70"
+                        @click=${() => this.#fillPairing(relayId, relayUrl)}
+                      >
+                        <span class="truncate text-sm font-medium text-highlight">
+                          ${hostname || i18n.get('settings.unknownHost')}
+                        </span>
+                        <span class="shrink-0 font-mono text-xs text-describe">…${relayId.slice(-4)}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="grid h-12 w-11 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-describe transition-colors hover:text-highlight active:opacity-70"
+                        aria-label=${i18n.get('settings.removePairingAria')}
+                        @click=${() => removePairing(relayId)}
+                      >
+                        <tap-use class="size-4" .element=${icons.close}></tap-use>
+                      </button>
+                    </div>
+                  `,
+                )}
+              </div>
             </div>
           </section>
 

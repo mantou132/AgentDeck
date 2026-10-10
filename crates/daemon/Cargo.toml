@@ -40,6 +40,7 @@ rmcp = { version = "3", default-features = false, features = ["client", "transpo
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "chrono", "std"] }
+gethostname = "1.1.0"
 
 [target.'cfg(windows)'.dependencies]
 planif = "1.0.0"

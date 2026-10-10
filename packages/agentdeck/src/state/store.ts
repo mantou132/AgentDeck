@@ -1,6 +1,6 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
-import { popularAgents, readSavedCommands, readSettings } from '../config';
+import { popularAgents, readPairingHistory, readSavedCommands, readSettings } from '../config';
 import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
 import type { ChatMessage, DeckSession, SessionOptions } from '../session/types';
@@ -9,6 +9,7 @@ const initialSettings = readSettings();
 
 export const agentdeckStore = createStore({
   settings: initialSettings,
+  pairingHistory: readPairingHistory(),
   agents: popularAgents,
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',

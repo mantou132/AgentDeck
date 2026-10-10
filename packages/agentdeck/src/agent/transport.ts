@@ -38,8 +38,8 @@ export const connectionLabels = new Proxy({} as Record<ConnectionState, string>,
 });
 
 export type TransportMessage =
-  /** `hostVersion` comes with `connected`; old hosts omit it. */
-  | { type: 'connection'; connection: ConnectionState; error?: string; hostVersion?: string }
+  /** `hostVersion` and `hostname` come with `connected`; old hosts omit them. */
+  | { type: 'connection'; connection: ConnectionState; error?: string; hostVersion?: string; hostname?: string }
   | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
   | { type: 'session_ended'; sessionId: string }
@@ -143,6 +143,7 @@ class RpcOutboxStore implements RelayStore {
 class HostSessionManager {
   #peerId: number | undefined;
   #hostVersion: string | undefined;
+  #hostname: string | undefined;
   #attachId: RpcId | undefined;
   #attaching: Promise<void> | undefined;
   #fcmToken: string | null | undefined;
@@ -159,6 +160,10 @@ class HostSessionManager {
 
   get hostVersion() {
     return this.#hostVersion;
+  }
+
+  get hostname() {
+    return this.#hostname;
   }
 
   get attachId() {
@@ -214,6 +219,7 @@ class HostSessionManager {
         const peerChanged = this.#peerId !== result.peerId;
         this.#peerId = result.peerId;
         this.#hostVersion = result.version;
+        this.#hostname = result.hostname;
         this.#syncedFcmToken = sentToken;
         if (!silent || peerChanged) options.onStateChange('connected');
       })
@@ -339,8 +345,14 @@ class AgentTransport {
 
   #emitConnection(connection: ConnectionState, error = '') {
     this.#connectionState = connection;
-    const hostVersion = connection === 'connected' ? this.hostSession.hostVersion : undefined;
-    this.dispatchMessage({ type: 'connection', connection, error, hostVersion });
+    const host = connection === 'connected' ? this.hostSession : undefined;
+    this.dispatchMessage({
+      type: 'connection',
+      connection,
+      error,
+      hostVersion: host?.hostVersion,
+      hostname: host?.hostname,
+    });
   }
 
   #reportReplyFailure() {

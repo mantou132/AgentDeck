@@ -286,16 +286,18 @@ impl RemotePeerManager {
 
         // Clients compare it against their minimum supported host version.
         let version = env!("CARGO_PKG_VERSION");
+        // Clients label remembered pairings with it.
+        let hostname = gethostname::gethostname().to_string_lossy().into_owned();
         let response = match id {
             Some(req_id) => json!({
                 "peerId": peer_id,
                 "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id, "version": version }
+                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname }
             }),
             None => json!({
                 "peerId": peer_id,
                 "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id, "version": version }
+                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname }
             }),
         };
         let target = if device_id.is_empty() {

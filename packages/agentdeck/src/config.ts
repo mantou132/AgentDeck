@@ -19,6 +19,7 @@ export const ACTIVE_MARKER_KEY = 'agentdeck.active_in_flight.v1';
 export const FALLBACK_KEY = 'agentdeck.in_flight_fallback.v1';
 export const SESSION_META_KEY = 'agentdeck.meta.v1';
 export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
+export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';
 
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.
@@ -76,6 +77,21 @@ export const readSavedCommands = () =>
   Object.fromEntries(
     Object.entries(readConfigDefaults()).flatMap(([agent, { commands }]) => (commands ? [[agent, commands]] : [])),
   ) as Record<string, AvailableCommand[]>;
+
+/** A pairing whose host handshake succeeded; `hostname` is missing for old daemons. */
+export type PairingRecord = { relayId: string; relayUrl?: string; hostname?: string };
+
+/** Most recently connected first. */
+export const readPairingHistory = (): PairingRecord[] => {
+  try {
+    const value = JSON.parse(localStorage.getItem(PAIRING_HISTORY_KEY) || '[]');
+    return Array.isArray(value)
+      ? value.filter((item) => typeof item?.relayId === 'string' && isPairingId(item.relayId))
+      : [];
+  } catch {
+    return [];
+  }
+};
 
 export const readSettings = (): AppSettings => {
   try {
