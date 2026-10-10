@@ -13,6 +13,8 @@ export const agentdeckStore = createStore({
   agents: popularAgents,
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
+  /** Daemon version of the connected host; old hosts omit it. */
+  hostVersion: '',
   pendingSession: null as DeckSession | null,
   sessions: [] as DeckSession[],
   sessionGroups: [] as SessionGroup[],

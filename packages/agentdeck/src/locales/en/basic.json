@@ -153,6 +153,7 @@
   "settings.saveFailed": "Save failed",
   "settings.resetFailed": "Failed to reset",
   "settings.saveAndConnect": "Save & Connect",
+  "settings.feedback": "Feedback",
   "settings.resetApp": "Reset App",
   "settings.resetDesc": "Reloads the app and clears local session cache and unsent drafts. Pairing settings and remote history are preserved; remote tasks may still be running.",
   "relayGuide.step1Title": "Install agentdeckd",

@@ -12,6 +12,7 @@
     "selection-menu:default",
     "stt:default",
     "tts:default",
-    "vnidrop-share:default"
+    "vnidrop-share:default",
+    "opener:default"
   ]
 }

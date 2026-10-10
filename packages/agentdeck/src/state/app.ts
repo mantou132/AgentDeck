@@ -73,6 +73,7 @@ const handleTransportMessage = (message: TransportMessage) => {
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
       });
       if (connection === 'connected') {
+        agentdeckStore({ hostVersion: hostVersion || '' });
         recordPairing(hostname);
         refreshSessions();
         // Older daemon has no reconciliation endpoint; stay waiting if it fails

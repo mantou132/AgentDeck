@@ -153,6 +153,7 @@
   "settings.saveFailed": "保存失败",
   "settings.resetFailed": "重置失败",
   "settings.saveAndConnect": "保存并连接",
+  "settings.feedback": "反馈问题",
   "settings.resetApp": "重置 App",
   "settings.resetDesc": "重新加载 App，清空本地会话缓存和未发送内容。保留配对设置与远端历史，远端任务可能仍在运行。",
   "relayGuide.step1Title": "安装 agentdeckd",

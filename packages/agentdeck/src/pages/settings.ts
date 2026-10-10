@@ -1,8 +1,10 @@
 import { Dialog } from '@mantou/tap-ui/elements/dialog';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
-import { isRelayUrl, RELAY_GUIDE_SEEN_KEY } from '../config';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { FEEDBACK_URL, isRelayUrl, RELAY_GUIDE_SEEN_KEY } from '../config';
 import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
 import { hardResetApp, removePairing, saveSettings } from '../state/app';
@@ -100,6 +102,25 @@ export class AgentDeckSettingsPageElement extends GemElement {
       }
     } catch (error) {
       Toast.open('error', error instanceof Error ? error.message : i18n.get('settings.saveFailed'));
+    }
+  };
+
+  #openFeedback = async () => {
+    const platform = /Android/i.test(navigator.userAgent)
+      ? 'Android'
+      : /iPhone|iPad/i.test(navigator.userAgent)
+        ? 'iOS'
+        : navigator.platform;
+    const env = [
+      `- App: ${isTauri() ? await getVersion() : 'web'}`,
+      `- Platform: ${platform}`,
+      `- Daemon: ${agentdeckStore.hostVersion || 'unknown'}`,
+    ];
+    const url = `${FEEDBACK_URL}?body=${encodeURIComponent(`\n\n---\n${env.join('\n')}\n`)}`;
+    if (isTauri()) {
+      await openUrl(url);
+    } else {
+      window.open(url, '_blank');
     }
   };
 
@@ -258,13 +279,20 @@ export class AgentDeckSettingsPageElement extends GemElement {
             ${i18n.get('settings.saveAndConnect')}
           </button>
 
-          <button
-            v-if=${!!agentdeckStore.settings.relayId}
-            class="mt-3 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-sm font-semibold text-negative transition-colors"
-            @click=${this.#reset}
-          >
-            ${i18n.get('settings.resetApp')}
-          </button>
+          <div class="mt-3 flex h-10 items-center justify-center gap-2 text-xs text-describe">
+            <button
+              type="button"
+              class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
+              @click=${this.#openFeedback}
+            >${i18n.get('settings.feedback')}</button>
+            <span v-if=${!!agentdeckStore.settings.relayId}>·</span>
+            <button
+              type="button"
+              v-if=${!!agentdeckStore.settings.relayId}
+              class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
+              @click=${this.#reset}
+            >${i18n.get('settings.resetApp')}</button>
+          </div>
         </main>
       </tap-page>
       <deck-sheet

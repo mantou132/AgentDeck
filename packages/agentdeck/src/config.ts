@@ -29,6 +29,7 @@ export const DATABASES = {
 } as const;
 
 export const RELAY_URL = 'wss://agent-deck.xianqiao.wang/ws';
+export const FEEDBACK_URL = 'https://github.com/mantou132/AgentDeck/issues/new';
 
 /** Raise when the app needs a newer agentdeckd; older hosts get an upgrade toast once per launch. */
 export const MIN_DAEMON_VERSION = '0.4.0';
