@@ -60,17 +60,17 @@ test('mixed attachments reach the host, survive rejection, and can be sent again
   ]);
   fixture.sockets.at(-1).frame({ type: 'rejected', message_id: request.message_id, reason: 'queue_full: review' });
   await tick();
-  const message = fixture.app.agentdeckStore.messagesBySession.s1.at(-1);
+  const message = fixture.app.getMessages('s1').at(-1);
   assert.equal(message.failed, true);
   assert.deepEqual(message.attachments, [image, text, file]);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
   assert.equal(fixture.app.sendPrompt('s1', message.text, message.attachments), true);
   await tick();
   assert.deepEqual(fixture.requests.at(-1).payload.params.attachments, request.payload.params.attachments);
   fixture.reply(fixture.requests.at(-1), { answer: 'received' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.errorsBySession.s1, '');
-  assert.equal(fixture.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'received');
+  assert.equal(fixture.app.getRuntime('s1').error, '');
+  assert.equal(fixture.app.getMessages('s1').at(-1).text, 'received');
 });
 
 test('attachment-only prompts work in both a pending session and an existing session', async () => {
@@ -80,9 +80,9 @@ test('attachment-only prompts work in both a pending session and an existing ses
   const creation = fixture.app.promotePendingSession(pendingSession, '', [text]);
   await fixture.settleHost();
   const session = await creation;
-  fixture.app.resetPendingSession();
+  fixture.app.discardPendingSession(pendingSession.sessionId);
   assert.equal(session.title, text.name);
-  assert.deepEqual(fixture.app.agentdeckStore.messagesBySession[session.sessionId][0].attachments, [text]);
+  assert.deepEqual(fixture.app.getMessages(session.sessionId)[0].attachments, [text]);
   const request = fixture.requests.at(-1);
   assert.equal(request.payload.params.prompt, '');
   assert.equal(request.payload.params.attachments.length, 1);
@@ -95,7 +95,7 @@ test('attachment-only prompts work in both a pending session and an existing ses
   ]);
   fixture.reply(fixture.requests.at(-1), { answer: 'image received' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
   assert.equal(fixture.app.sendPrompt(session.sessionId, '', []), false);
 });
 
@@ -108,11 +108,11 @@ test('an oversized image stays recoverable without being enqueued', async () => 
   fixture.app.sendPrompt('s1', '', [largeImage]);
   await tick();
   assert.equal(fixture.requests.length, count);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /too large/i);
-  const message = fixture.app.agentdeckStore.messagesBySession.s1.at(-1);
+  assert.match(fixture.app.getRuntime('s1').error, /too large/i);
+  const message = fixture.app.getMessages('s1').at(-1);
   assert.equal(message.failed, true);
   assert.equal(message.attachments[0], largeImage);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('readAttachment inlines text files, sends other files to the host, and rejects oversized ones', async () => {

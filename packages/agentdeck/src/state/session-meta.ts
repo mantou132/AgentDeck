@@ -68,7 +68,7 @@ export const isSessionDeleted = (sessionId: string): boolean => {
 };
 
 export const saveSessionMeta = (sessionId: string, patch: Partial<LocalSessionMeta>): void => {
-  if (!sessionId || sessionId === 'pending-session') return;
+  if (!sessionId) return;
   const existing = memoryStore.get(sessionId) ?? {};
   const title = patch.title || existing.title;
   const updatedAt = patch.updatedAt || existing.updatedAt;

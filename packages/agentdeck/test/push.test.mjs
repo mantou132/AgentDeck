@@ -51,8 +51,8 @@ test('token refresh preserves a live prompt, allows RPCs and coalesces concurren
   await listing;
   f.reply(prompt, { answer: 'done' });
   await tick();
-  assert.equal(f.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'done');
-  assert.equal(f.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(f.app.getMessages('s1').at(-1).text, 'done');
+  assert.equal(f.app.runningSessionIds().length, 0);
   f.heldMethods.clear();
   await f.settleHost();
   assert.deepEqual(

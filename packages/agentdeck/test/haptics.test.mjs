@@ -54,7 +54,7 @@ test('triggers warning notification haptic when agent encounters permission requ
   await tick();
 
   // Permission request is displayed in store and warning haptic was triggered
-  assert.ok(f.app.agentdeckStore.permissionsBySession.s1);
+  assert.ok(f.app.getRuntime('s1').permission);
   const warningHaptics = f.haptics.filter((h) => h.type === 'notification' && h.value === 'warning');
   assert.equal(warningHaptics.length, 1);
 });

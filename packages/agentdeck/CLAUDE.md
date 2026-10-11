@@ -5,7 +5,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 ## 代码导航
 
 - 启动：`main.ts` → `app.ts`；未配置 Pairing ID 时打开 settings，否则打开 session-list。页面在 `pages/`，Stack 入口在 `navigation.ts`。
-- 状态：`state/store.ts` 为单一全局 store；`state/sessions.ts` 会话生命周期；`state/app.ts` 启动、设置保存、重置与 transport 消息消费。
+- 状态：`state/store.ts` 按变化频率拆成三个 store：`agentdeckStore`（设置、连接）、`sessionsStore`（会话列表与按会话聚合的 `runtimes`，即 `SessionRuntime`：加载状态 `load`、进行中回合 `turn`、错误、配置、权限、问题、建议等）、`messagesStore`（消息，随流式增量变化，只有显示消息的元素连接；Stack 下层页面仍挂载，所以列表页不连）。删除会话即删 runtime 与消息。`state/sessions.ts` 会话生命周期；`state/app.ts` 启动、设置保存、重置与 transport 消息消费。
 - 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/relay-codec.ts`（RPC 消息与 Relay 载荷互转：加密、帧大小限制、二进制回复）、`agent/encryption.ts`（`adk1_` 端到端加密原语）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
 - ACP 事件：`session/events.ts` 为 reducer，`session/turn.ts` 控制流式任务；等待用户输入（权限请求与问题）的状态在 `state/user-input.ts`，问题（form elicitation）的 schema 解析在 `session/elicitation.ts`，卡片为 `elements/elicitation.ts`。
 - 附件：`attachment/`（与扩展共用，不依赖 App 的 i18n 与状态，文案由调用方传入）。`types.ts` 为 `Attachment`；`read.ts` 读取选择或粘贴的文件；`prompt.ts` 转成 `agent_prompt` 的线上格式；`message.ts` 处理消息与历史中的附件（ACP 图片、内联 data 图片、上传到主机的文件链接）。卡片与预览元素在 `elements/attachment*.ts`，粘贴引用与草稿在 `composer/`。
@@ -17,9 +17,9 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - **会话**：新会话先建本地 pending session，首次发送才向远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
 - **会话配置**（`state/config-options.ts`）：所有 select 类型的 `configOptions`（mode / model / effort…）均可选，旧版 `modes` 作为 mode 一项。composer 只展示当前模型，点击打开带 Stack 的 Sheet（`elements/session-config.ts`）：根页为模型单选，其余配置点击后 push 单选页（均用 `tap-cell-group`，依赖 `patches/@mantou__tap-ui@*.patch`：group 可穿透样式、`label` 支持模板、无箭头行也触发 `onClick`；上游发版升级后删除 patch）。选择立即生效，远端失败时 toast 并回退。用户修改后按 agent 存整组选项到 `CONFIG_DEFAULTS_KEY`（未存过时以首个加载的会话为准），新会话直接沿用；create 后逐项应用，远端不支持的项或值跳过。settings 重置保留。
 - **进行中回合**：回合存入 in-flight，重启后恢复等待回复。Relay 会丢弃过期未 ack 的消息，所以每次连上 host 都调 `agent_prompts_running` 对账（`settleLostTurns`）：daemon 已不在运行的回合就地结束、标未读，并 close → load 历史；旧 daemon 无此接口时保持等待。
-- **等待用户输入**：host 以通知发来 `agent_permission_request` / `agent_elicitation_request`，只在本设备的回合进行中显示（按 `requestId` 去重），用 `agent_user_input_respond` 作答；作答后卡片立即关闭或只读，失败时 Toast 并恢复可答。回合结束、取消或会话关闭时由 host 取消，App 只清理本地状态，不发送作答。重载或重连后由 `settleLostTurns` 从 `agent_prompts_running` 的 `userInputs` 补回。权限卡片在输入框上方（`permissionsBySession`）。
-- **问题卡片**：存入 `elicitationsBySession`（仅内存）。卡片嵌在时间线中提问的工具调用之后（拆开所在过程组，process-detail / step 用同样的拆分），找不到工具调用时放在末尾。schema 渲染：`oneOf` / `enum` / boolean 为单选按钮，array 为可切换多选，紧随选择题的 string 字段是其"其他"输入框，其余 string / number 为输入框。选择后统一点提交，跳过为 decline。作答后卡片只显示每道题的问题与答案（跳过、取消时答案为对应状态）；回合结束、取消或会话关闭时未回答的标为已取消；重载后已回答的只读卡片不保留。有问题待答时输入框提示改为"请先回答上方问题"，输入框照常可用（停止按钮在其上）。会话列表的"等待操作"也包括待回答的问题。
-- **下一句建议**：host 的 `agent_prompt_suggestion` 存入 `suggestionsBySession`（回合进行中到达的丢弃），新回合开始时清除。composer 输入为空时用它替换 placeholder，可直接发送，长按填入输入框继续编辑（tap-ui 的 `longPress` 指令，暂由 `patches/@mantou__tap-ui@*.patch` 提供，上游发版后删除该部分 patch；iOS 只在手势中弹键盘，所以松开时再聚焦）；只在内存中，不持久化。
+- **等待用户输入**：host 以通知发来 `agent_permission_request` / `agent_elicitation_request`，只在本设备的回合进行中显示（按 `requestId` 去重），用 `agent_user_input_respond` 作答；作答后卡片立即关闭或只读，失败时 Toast 并恢复可答。回合结束、取消或会话关闭时由 host 取消，App 只清理本地状态，不发送作答。重载或重连后由 `settleLostTurns` 从 `agent_prompts_running` 的 `userInputs` 补回。权限卡片在输入框上方（runtime 的 `permission`）。
+- **问题卡片**：存入 runtime 的 `elicitations`（仅内存）。卡片嵌在时间线中提问的工具调用之后（拆开所在过程组，process-detail / step 用同样的拆分），找不到工具调用时放在末尾。schema 渲染：`oneOf` / `enum` / boolean 为单选按钮，array 为可切换多选，紧随选择题的 string 字段是其"其他"输入框，其余 string / number 为输入框。选择后统一点提交，跳过为 decline。作答后卡片只显示每道题的问题与答案（跳过、取消时答案为对应状态）；回合结束、取消或会话关闭时未回答的标为已取消；重载后已回答的只读卡片不保留。有问题待答时输入框提示改为"请先回答上方问题"，输入框照常可用（停止按钮在其上）。会话列表的"等待操作"也包括待回答的问题。
+- **下一句建议**：host 的 `agent_prompt_suggestion` 存入 runtime 的 `suggestion`（回合进行中到达的丢弃），新回合开始时清除。composer 输入为空时用它替换 placeholder，可直接发送，长按填入输入框继续编辑（tap-ui 的 `longPress` 指令，暂由 `patches/@mantou__tap-ui@*.patch` 提供，上游发版后删除该部分 patch；iOS 只在手势中弹键盘，所以松开时再聚焦）；只在内存中，不持久化。
 - **斜杠命令**：ACP 的 `available_commands_update` 由 reducer 按 agent 存入 `commandsByAgent`，并与会话配置一起存到 `CONFIG_DEFAULTS_KEY`（`state/config-options.ts`），启动时读回，所以 pending session 也有候选。回合与 load 回放中的随事件流到达，其间的经 `agent_session_update` 通知到达。composer 输入只有 `/词` 时在输入框上方列出匹配命令，点选填入 `/name `，照常作为文本发送。
 - **语音对话**（`elements/voice-chat.ts`）：composer 无内容可发（含下一句建议）时发送按钮变为入口，会话页打开 Sheet；按住录音、松开发送；移出按钮即停止识别并显示弧形刻度尺，沿弧左滑按词（`Intl.Segmenter`）撤销，移回按钮在剩余文字后继续录音（识别出错停止时按钮提示如此续录），超出刻度尺松开取消；Sheet 拖拽手势会抢占指针，所以按住期间在 window 捕获阶段跟踪并拦截 move。回合进行中按下只播报提示。消息带 `voiceChat: true`，daemon 追加 `<agentdeck-voice-chat/>` 标记，`remote_app` 系统提示要求 agent 见到它时在回复末尾写 `<!-- agentdeck-speech … -->` 注释（其他客户端也不渲染）；时间线隐藏这两者（`session/voice-chat.ts`、`lib/markdown.ts`），回合结束后朗读该注释（不读系统提示的非 Claude agent、旧 daemon 或没有注释时，朗读去掉 Markdown 的回复开头）。没说话松开不发送也不提示。权限请求在 Sheet 内显示并朗读；待回答的问题卡片也在 Sheet 内显示，只朗读问题数量，不读选项。Sheet 显示时经 duoyun-ui 的 `DuoyunWakeLockBaseElement` 保持亮屏，锁屏后不可用。
 - **daemon 版本**：host 在 `peer_attach` 返回 `version`（旧版没有，视为过旧），每次启动首次连上时与 `config.ts` 的 `MIN_DAEMON_VERSION` 比较，过旧则 Toast 提示升级。只在需要 App 与 daemon 一起升级时调高该常量。
@@ -40,8 +40,8 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 ## 命名
 
-- `pendingSession` / `pendingCreation`：尚未在远端创建的会话，本地 sessionId 为 `pending-session`，首次发送时由 `promotePendingSession` 转为正式会话；页面先切到正式 ID 再调用 `resetPendingSession` 清理，避免中间一帧找不到会话而重建页面。
-- `pendingSessionIds`：正在执行任务的会话 ID 列表，和 `pendingCreation` 无关。
+- `pendingCreation`：尚未在远端创建的会话（pending session），本地 sessionId 为 `pending-<uuid>`，以 `pendingCreation` 判断而非 ID；首次发送时由 `promotePendingSession` 转为正式会话；页面先切到正式 ID 再调用 `discardPendingSession` 清理，避免中间一帧找不到会话而重建页面。创建中取消或关闭即清掉其 `turn`，创建返回后发现 `turn` 已不是本次的就关闭远端会话。
+- `turn`：runtime 中本设备进行中的回合；pending session 创建期间也有 `turn`，只是没有 `rpcId`。
 - `draft` / `ComposerDraft`：只指未发送的输入文字和附件。
 
 ## 常用命令

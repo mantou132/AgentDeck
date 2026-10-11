@@ -103,17 +103,16 @@ const permissionRequest = (requestId = 'p1') => ({
 test('a question of a running turn is shown once, answered through the host and settled with the turn', async () => {
   const f = await running();
   const prompt = f.requests.find((request) => request.payload.method === 'agent_prompt');
-  const store = f.app.agentdeckStore;
   for (let i = 0; i < 2; i++) f.deliver({ method: 'agent_elicitation_request', peerId: 1, params: askRequest() });
   await tick();
-  assert.equal(store.elicitationsBySession.s1.length, 1);
+  assert.equal(f.app.getRuntime('s1').elicitations.length, 1);
 
-  const answering = f.app.answerElicitation(store.elicitationsBySession.s1[0].request, {
+  const answering = f.app.answerElicitation(f.app.getRuntime('s1').elicitations[0].request, {
     action: 'accept',
     content: { question_0: 'Redis' },
   });
   await tick();
-  assert.equal(store.elicitationsBySession.s1[0].response.action, 'accept');
+  assert.equal(f.app.getRuntime('s1').elicitations[0].response.action, 'accept');
   const respond = f.requests.find((request) => request.payload.method === 'agent_user_input_respond');
   assert.deepEqual(plain(respond.payload.params), {
     agent: 'codex',
@@ -123,26 +122,25 @@ test('a question of a running turn is shown once, answered through the host and 
   });
   f.deliver({ id: respond.payload.id, peerId: 1, error: 'The request is no longer pending' });
   await answering;
-  assert.equal(store.elicitationsBySession.s1[0].response, undefined, 'answerable again when not taken');
+  assert.equal(f.app.getRuntime('s1').elicitations[0].response, undefined, 'answerable again when not taken');
 
   f.reply(prompt, { answer: 'Done' });
   await tick();
-  assert.equal(store.elicitationsBySession.s1[0].response.action, 'cancel');
+  assert.equal(f.app.getRuntime('s1').elicitations[0].response.action, 'cancel');
 });
 
 test('a permission is answered through the host and comes back when the answer is not taken', async () => {
   const f = await running();
-  const store = f.app.agentdeckStore;
   f.deliver({ method: 'agent_permission_request', peerId: 1, params: permissionRequest() });
   await tick();
   const resolving = f.app.resolvePermission('s1', 'allow');
-  assert.equal(store.permissionsBySession.s1, undefined);
+  assert.equal(f.app.getRuntime('s1').permission, undefined);
   await tick();
   const respond = f.requests.find((request) => request.payload.method === 'agent_user_input_respond');
   assert.deepEqual(plain(respond.payload.params.response), { optionId: 'allow' });
   f.deliver({ id: respond.payload.id, peerId: 1, error: 'Not delivered' });
   await resolving;
-  assert.equal(store.permissionsBySession.s1.requestId, 'p1');
+  assert.equal(f.app.getRuntime('s1').permission.requestId, 'p1');
 
   f.app.resolvePermission('s1', null);
   await tick();
@@ -157,13 +155,13 @@ test('requests are ignored once the turn is not running', async () => {
   f.deliver({ method: 'agent_elicitation_request', peerId: 1, params: askRequest() });
   f.deliver({ method: 'agent_permission_request', peerId: 1, params: permissionRequest() });
   await tick();
-  assert.equal(f.app.agentdeckStore.elicitationsBySession.s1, undefined);
-  assert.equal(f.app.agentdeckStore.permissionsBySession.s1, undefined);
+  assert.equal(f.app.getRuntime('s1').elicitations, undefined);
+  assert.equal(f.app.getRuntime('s1').permission, undefined);
 });
 
 for (const [method, params, read] of [
-  ['agent_elicitation_request', askRequest(), (store) => store.elicitationsBySession.s1[0].request],
-  ['agent_permission_request', permissionRequest(), (store) => store.permissionsBySession.s1],
+  ['agent_elicitation_request', askRequest(), (app) => app.getRuntime('s1').elicitations[0].request],
+  ['agent_permission_request', permissionRequest(), (app) => app.getRuntime('s1').permission],
 ]) {
   test(`an unanswered ${method} is shown again after the App reloads`, async () => {
     const fixture = await running();
@@ -174,6 +172,6 @@ for (const [method, params, read] of [
     const query = fresh.requests.find((request) => request.payload.method === 'agent_prompts_running');
     fresh.reply(query, { sessions: [{ agent: 'codex', sessionId: 's1' }], userInputs: [{ method, params }] });
     await fresh.settleHost();
-    assert.equal(read(fresh.app.agentdeckStore).requestId, params.requestId);
+    assert.equal(read(fresh.app).requestId, params.requestId);
   });
 }

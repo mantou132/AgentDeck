@@ -26,22 +26,22 @@ for (const outcome of ['completed', 'failed']) {
       },
     });
     await tick();
-    assert.ok(f.app.agentdeckStore.permissionsBySession.s1);
+    assert.ok(f.app.getRuntime('s1').permission);
     if (outcome === 'failed') f.deliver({ id: prompt.payload.id, peerId: 1, error: 'Agent stopped' });
     else f.reply(prompt, { answer: 'Done' });
     await tick();
-    assert.equal(f.app.agentdeckStore.permissionsBySession.s1, undefined);
+    assert.equal(f.app.getRuntime('s1').permission, undefined);
     // The host settles the request with the turn; nothing is answered.
     assert.equal(
       f.requests.find((request) => request.payload.method === 'agent_user_input_respond'),
       undefined,
     );
-    assert.equal(f.app.agentdeckStore.pendingSessionIds.length, 0);
+    assert.equal(f.app.runningSessionIds().length, 0);
     assert.equal(f.app.sendPrompt('s1', 'Next task'), true);
     await tick();
     f.reply(f.requests.at(-1), { answer: 'Next answer' });
     await tick();
-    assert.equal(f.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'Next answer');
+    assert.equal(f.app.getMessages('s1').at(-1).text, 'Next answer');
   });
 }
 
@@ -61,30 +61,30 @@ test('cancelling an unknown remote task shows the reset recovery path', async ()
   await tick();
   fresh.reply(fresh.requests.at(-1), { answer: 'Recovered' });
   await tick();
-  assert.equal(fresh.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fresh.app.runningSessionIds().length, 0);
 });
 
 test('completed responses stay unread across list refreshes until read or a new prompt starts', async () => {
   const f = await running();
-  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
   f.reply(f.requests.at(-1), { answer: 'Done' });
   await tick();
-  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes('s1'));
+  assert.ok(Boolean(f.app.getRuntime('s1').unread));
 
   const refresh = f.app.refreshSessions();
   await f.settleHost();
   await refresh;
-  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes('s1'));
+  assert.ok(Boolean(f.app.getRuntime('s1').unread));
 
-  f.app.setSessionFlag('unreadSessionIds', 's1', false);
-  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  f.app.updateRuntime('s1', { unread: false });
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
   assert.equal(f.app.sendPrompt('s1', 'Next task'), true);
   await tick();
   f.reply(f.requests.at(-1), { answer: 'Next answer' });
   await tick();
-  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes('s1'));
+  assert.ok(Boolean(f.app.getRuntime('s1').unread));
   assert.equal(f.app.sendPrompt('s1', 'One more task'), true);
-  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
 });
 
 for (const outcome of ['failed', 'cancelled', 'ended']) {
@@ -105,8 +105,8 @@ for (const outcome of ['failed', 'cancelled', 'ended']) {
       f.reply(prompt, { answer: 'Partial response' });
     }
     await tick();
-    assert.equal(f.app.agentdeckStore.pendingSessionIds.length, 0);
-    assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+    assert.equal(f.app.runningSessionIds().length, 0);
+    assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
   });
 }
 
@@ -119,14 +119,14 @@ test('newly created sessions receive completion reminders and resetting clears t
   const session = await creating;
   f.reply(f.requests.at(-1), { answer: 'Done' });
   await tick();
-  assert.ok(f.app.agentdeckStore.unreadSessionIds.includes(session.sessionId));
+  assert.ok(Boolean(f.app.getRuntime(session.sessionId).unread));
   f.app.resetRemoteState();
-  assert.equal(f.app.agentdeckStore.unreadSessionIds.length, 0);
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
 });
 
 test('pending permission requests expose active permission status for session list items', async () => {
   const f = await running();
-  assert.equal(Object.keys(f.app.agentdeckStore.permissionsBySession).length, 0);
+  assert.equal(Object.keys(f.app.sessionsStore.runtimes).filter((id) => f.app.getRuntime(id).permission).length, 0);
   f.deliver({
     method: 'agent_permission_request',
     peerId: 1,
@@ -138,13 +138,16 @@ test('pending permission requests expose active permission status for session li
     },
   });
   await tick();
-  assert.deepEqual(Object.keys(f.app.agentdeckStore.permissionsBySession), ['s1']);
-  assert.equal(f.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.deepEqual(
+    Object.keys(f.app.sessionsStore.runtimes).filter((id) => f.app.getRuntime(id).permission),
+    ['s1'],
+  );
+  assert.equal(f.app.isTurnRunning('s1'), true);
 
   f.app.resolvePermission('s1', 'allow');
   await tick();
-  assert.equal(Object.keys(f.app.agentdeckStore.permissionsBySession).length, 0);
-  assert.equal(f.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(Object.keys(f.app.sessionsStore.runtimes).filter((id) => f.app.getRuntime(id).permission).length, 0);
+  assert.equal(f.app.isTurnRunning('s1'), true);
 });
 
 test('createSession and loadSession pass remote_app panelContext', async () => {
@@ -162,4 +165,47 @@ test('createSession and loadSession pass remote_app panelContext', async () => {
   const createReq = f.requests.find((r) => r.payload.method === 'agent_session_create');
   assert.ok(createReq);
   assert.deepEqual(createReq.payload.params.panelContext, { surface: 'remote_app' });
+});
+
+test('pending sessions are independent, so discarding one keeps the next', async () => {
+  const f = documentFixture();
+  await f.connect();
+  const first = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  const next = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  assert.notEqual(first.sessionId, next.sessionId);
+  f.app.discardPendingSession(first.sessionId);
+  assert.equal(f.app.getSession(first.sessionId), undefined);
+  assert.equal(f.app.getSession(next.sessionId)?.pendingCreation, true);
+});
+
+test('a creation cancelled and sent again keeps only the later turn', async () => {
+  const f = documentFixture();
+  await f.connect();
+  f.heldMethods.add('agent_session_create');
+  const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
+  const cancelled = f.app.promotePendingSession(pendingSession, 'First try');
+  await tick();
+  f.app.cancelTurn(pendingSession.sessionId);
+  const resent = f.app.promotePendingSession(pendingSession, 'Second try');
+  await tick();
+  const [firstCreate, secondCreate] = f.requests.filter((r) => r.payload.method === 'agent_session_create');
+  f.heldMethods.clear();
+
+  f.reply(firstCreate, { sessionId: 'stale', agent: 'codex' });
+  assert.equal(await cancelled, null);
+  await f.settleHost();
+  assert.equal(
+    f.requests.findLast((r) => r.payload.method === 'agent_session_close').payload.params.sessionId,
+    'stale',
+  );
+  assert.equal(f.app.isTurnRunning(pendingSession.sessionId), true);
+
+  f.reply(secondCreate, { sessionId: 'created', agent: 'codex' });
+  assert.equal((await resent).sessionId, 'created');
+  await tick();
+  const prompts = f.requests.filter((r) => r.payload.method === 'agent_prompt');
+  assert.deepEqual(
+    prompts.map((r) => r.payload.params.prompt),
+    ['Second try'],
+  );
 });

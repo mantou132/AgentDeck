@@ -12,13 +12,10 @@ test('closeSession closes the remote session actor and clears local open/pending
 
   // Set up active session state
   f.app.setMessages('s1', [{ id: 'm1', role: 'agent', text: 'Streaming...', streaming: true }]);
-  f.app.setSessionFlag('pendingSessionIds', 's1', true);
-  f.app.setSessionFlag('unreadSessionIds', 's1', true);
-  f.app.setSessionError('s1', 'Temporary error');
+  f.app.updateRuntime('s1', { turn: {}, unread: true, error: 'Temporary error' });
 
   assert.equal(f.app.isSessionOpened('s1'), true);
-  assert.equal(f.app.agentdeckStore.loadedSessionIds.includes('s1'), true);
-  assert.equal(f.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(f.app.isTurnRunning('s1'), true);
 
   const initialCloseCount = closeRequests(f).length;
 
@@ -33,24 +30,21 @@ test('closeSession closes the remote session actor and clears local open/pending
   f.reply(req, { closed: true });
   await closing;
 
-  const store = f.app.agentdeckStore;
   // Session is closed, NOT deleted: still exists in sessions
   assert.ok(f.app.getSession('s1'));
   assert.equal(
-    store.sessions.some((s) => s.sessionId === 's1'),
+    f.app.sessionsStore.sessions.some((s) => s.sessionId === 's1'),
     true,
   );
 
   // Active / open / loaded / pending flags are cleared
-  assert.equal(f.app.isSessionOpened('s1'), false);
-  assert.equal(store.loadedSessionIds.includes('s1'), false);
-  assert.equal(store.loadingSessionIds.includes('s1'), false);
-  assert.equal(store.pendingSessionIds.includes('s1'), false);
-  assert.equal(store.unreadSessionIds.includes('s1'), false);
-  assert.equal(store.errorsBySession.s1, undefined);
+  assert.equal(f.app.getRuntime('s1').load, 'idle');
+  assert.equal(f.app.isTurnRunning('s1'), false);
+  assert.equal(Boolean(f.app.getRuntime('s1').unread), false);
+  assert.equal(f.app.getRuntime('s1').error, '');
 
   // Streaming flag is finished
-  assert.equal(store.messagesBySession.s1[0].streaming, false);
+  assert.equal(f.app.getMessages('s1')[0].streaming, false);
 });
 
 test('closeSession dismisses pending permissions with error', async () => {
@@ -72,13 +66,13 @@ test('closeSession dismisses pending permissions with error', async () => {
     },
   });
   await tick();
-  assert.ok(f.app.agentdeckStore.permissionsBySession.s1);
+  assert.ok(f.app.getRuntime('s1').permission);
 
   const closing = f.app.closeSession('s1');
   await f.settleHost();
   await closing;
 
-  assert.equal(f.app.agentdeckStore.permissionsBySession.s1, undefined);
+  assert.equal(f.app.getRuntime('s1').permission, undefined);
   // The host cancels the request when the session closes; nothing is answered.
   assert.equal(
     f.requests.find((r) => r.payload.method === 'agent_user_input_respond'),
@@ -90,13 +84,12 @@ test('closeSession on a pending session cancels creation and resets pending stat
   const f = documentFixture();
   await f.connect();
 
-  f.app.createPendingSession({ agent: 'codex', cwd: '/workspace' });
-  assert.ok(f.app.getSession('pending-session'));
-  assert.equal(f.app.agentdeckStore.pendingSession?.cwd, '/workspace');
+  const { sessionId } = f.app.createPendingSession({ agent: 'codex', cwd: '/workspace' });
+  assert.equal(f.app.getSession(sessionId)?.cwd, '/workspace');
 
-  await f.app.closeSession('pending-session');
-  assert.equal(f.app.getSession('pending-session'), undefined);
-  assert.equal(f.app.agentdeckStore.pendingSession, null);
+  await f.app.closeSession(sessionId);
+  assert.equal(f.app.getSession(sessionId), undefined);
+  assert.equal(f.app.sessionsStore.runtimes[sessionId], undefined);
 });
 
 test('re-opening a closed session triggers fresh loadSession sequence', async () => {
@@ -109,11 +102,10 @@ test('re-opening a closed session triggers fresh loadSession sequence', async ()
   await closing;
   assert.equal(f.app.isSessionOpened('s1'), false);
 
-  // Open again: since openedSessionIds is false, it executes full load sequence
+  // Open again: the closed session is no longer loaded, so it runs the full load sequence
   const loading = f.app.ensureSessionLoaded('s1');
   await f.settleHost();
   await loading;
 
   assert.equal(f.app.isSessionOpened('s1'), true);
-  assert.equal(f.app.agentdeckStore.loadedSessionIds.includes('s1'), true);
 });

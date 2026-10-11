@@ -10,13 +10,13 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
       old.heldMethods.add('agent_session_load');
       old.app.ensureSessionLoaded('s1');
       await old.settleHost();
-      assert.equal(old.app.agentdeckStore.loadingSessionIds.includes('s1'), true);
+      assert.equal(old.app.getRuntime('s1').load === 'loading', true);
     } else if (operation === 'creating') {
       old.heldMethods.add('agent_session_create');
       const pendingSession = old.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
       old.app.promotePendingSession(pendingSession, 'old pending session');
       await tick();
-      assert.equal(old.app.agentdeckStore.pendingSessionIds.includes('pending-session'), true);
+      assert.equal(old.app.isTurnRunning(pendingSession.sessionId), true);
     } else {
       await old.openSession();
       old.app.sendPrompt('s1', 'old task');
@@ -28,7 +28,7 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
           peerId: 1,
         });
         await tick();
-        assert.ok(old.app.agentdeckStore.permissionsBySession.s1);
+        assert.ok(old.app.getRuntime('s1').permission);
       }
     }
     const staleRequest = old.requests.at(-1);
@@ -53,11 +53,17 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
     assert.equal(fresh.localStorage.getItem(settingsKey), settings);
     assert.equal(fresh.localStorage.getItem('unrelated.preference'), 'keep');
     assert.equal(new URL(fresh.sockets[0].url).searchParams.get('ack_head'), 'true');
-    assert.equal(fresh.app.agentdeckStore.sessionsLoaded, true);
-    assert.equal(fresh.app.agentdeckStore.pendingSessionIds.length, 0);
-    assert.equal(fresh.app.agentdeckStore.loadingSessionIds.length, 0);
-    assert.equal(Object.keys(fresh.app.agentdeckStore.permissionsBySession).length, 0);
-    assert.equal(fresh.app.agentdeckStore.pendingSession, null);
+    assert.equal(fresh.app.sessionsStore.sessionsLoaded, true);
+    assert.equal(fresh.app.runningSessionIds().length, 0);
+    assert.equal(
+      Object.values(fresh.app.sessionsStore.runtimes).filter((runtime) => runtime.load === 'loading').length,
+      0,
+    );
+    assert.equal(
+      Object.keys(fresh.app.sessionsStore.runtimes).filter((id) => fresh.app.getRuntime(id).permission).length,
+      0,
+    );
+    assert.equal(Object.keys(fresh.app.sessionsStore.runtimes).length, 0);
     assert.equal(
       fresh.requests.some((request) => request.message_id === 'stale'),
       false,
@@ -71,8 +77,11 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
       peerId: 1,
     });
     await tick();
-    assert.equal(Object.keys(fresh.app.agentdeckStore.messagesBySession).length, 0);
-    assert.equal(Object.keys(fresh.app.agentdeckStore.permissionsBySession).length, 0);
+    assert.equal(Object.keys(fresh.app.messagesStore.bySession).length, 0);
+    assert.equal(
+      Object.keys(fresh.app.sessionsStore.runtimes).filter((id) => fresh.app.getRuntime(id).permission).length,
+      0,
+    );
 
     await fresh.openSession();
     const methods = fresh.requests.map((request) => request.payload.method);
@@ -83,12 +92,12 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
     assert.notEqual(newPrompt.payload.id, staleRequest.payload.id);
     fresh.reply(staleRequest, { answer: 'another old answer' });
     await tick();
-    assert.equal(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+    assert.equal(fresh.app.isTurnRunning('s1'), true);
     fresh.reply(newPrompt, { answer: 'new answer' });
     await tick();
-    assert.equal(fresh.app.agentdeckStore.pendingSessionIds.length, 0);
-    assert.equal(fresh.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'new answer');
-    assert.equal(fresh.app.agentdeckStore.errorsBySession.s1, '');
+    assert.equal(fresh.app.runningSessionIds().length, 0);
+    assert.equal(fresh.app.getMessages('s1').at(-1).text, 'new answer');
+    assert.equal(fresh.app.getRuntime('s1').error, '');
   });
 }
 
@@ -123,13 +132,13 @@ test('failed cleanup keeps the reset marker and does not replay the old outbox',
   const boot = documentFixture(failed);
   boot.app.startApp();
   assert.equal(boot.sockets.length, 0);
-  assert.match(boot.app.agentdeckStore.sessionsError, /Failed to reset local connection/);
+  assert.match(boot.app.sessionsStore.sessionsError, /Failed to reset local connection/);
   assert.equal(boot.sessionStorage.getItem(resetKey), 'true');
   boot.localStorage.removeItem = remove;
   boot.app.hardResetApp();
   const recovered = documentFixture(boot);
   await recovered.connect();
-  assert.equal(recovered.app.agentdeckStore.sessionsLoaded, true);
+  assert.equal(recovered.app.sessionsStore.sessionsLoaded, true);
   assert.equal(recovered.sessionStorage.getItem(resetKey), null);
 });
 

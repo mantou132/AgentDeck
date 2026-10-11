@@ -24,7 +24,7 @@ test('foreground and online keep a live connection; manual reconnect preserves p
   fixture.transport.reconnectTransport(true);
   await tick();
   assert.equal(new URL(fixture.sockets.at(-1).url).searchParams.has('ack_head'), false);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(fixture.app.isTurnRunning('s1'), true);
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
   fixture.deliver({
@@ -40,8 +40,8 @@ test('foreground and online keep a live connection; manual reconnect preserves p
   });
   fixture.reply(prompt, { answer: 'missed response' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), false);
-  assert.equal(fixture.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'missed response');
+  assert.equal(fixture.app.isTurnRunning('s1'), false);
+  assert.equal(fixture.app.getMessages('s1').at(-1).text, 'missed response');
   assert.equal(fixture.requests.filter((request) => request.payload.method === 'agent_prompt').length, 1);
 });
 
@@ -64,7 +64,7 @@ test('automatic SDK reconnect also keeps the receive cursor and unacknowledged r
   assert.equal(replay.message_id, prompt.message_id);
   fixture.reply(prompt, { answer: 'done' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('Relay ready does not enable App until host attach succeeds; timeout can be retried', async () => {
@@ -85,7 +85,7 @@ test('Relay ready does not enable App until host attach succeeds; timeout can be
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
-  assert.equal(fixture.app.agentdeckStore.sessions.length, 1);
+  assert.equal(fixture.app.sessionsStore.sessions.length, 1);
 });
 
 test('Relay handshake watchdog recovers a socket stuck before ready', async () => {
@@ -106,17 +106,17 @@ test('offline session load error and retry survive a successful reconnection', a
   await fixture.connect();
   fixture.sockets.at(-1).close();
   await fixture.app.ensureSessionLoaded('s1');
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Host is not connected/);
+  assert.match(fixture.app.getRuntime('s1').error, /Host is not connected/);
   fixture.app.retrySessionLoad('s1');
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Host is not connected/);
+  assert.match(fixture.app.getRuntime('s1').error, /Host is not connected/);
   const retry = fixture.app.retrySessionLoad('s1');
   await fixture.settleHost();
   await retry;
   assert.equal(fixture.app.isSessionOpened('s1'), true);
-  assert.equal(fixture.app.agentdeckStore.errorsBySession.s1, '');
+  assert.equal(fixture.app.getRuntime('s1').error, '');
 });
 
 test('a timed-out close does not proceed to load; a timed-out load can be retried', async () => {
@@ -127,7 +127,7 @@ test('a timed-out close does not proceed to load; a timed-out load can be retrie
   await fixture.settleHost();
   await fixture.advance(10_000);
   await first;
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Closing session timed out/);
+  assert.match(fixture.app.getRuntime('s1').error, /Closing session timed out/);
   assert.equal(
     fixture.requests.some((request) => request.payload.method === 'agent_session_load'),
     false,
@@ -139,8 +139,11 @@ test('a timed-out close does not proceed to load; a timed-out load can be retrie
   const oldLoad = fixture.requests.find((request) => request.payload.method === 'agent_session_load');
   await fixture.advance(65_000);
   await second;
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Loading session timed out/);
-  assert.equal(fixture.app.agentdeckStore.loadingSessionIds.length, 0);
+  assert.match(fixture.app.getRuntime('s1').error, /Loading session timed out/);
+  assert.equal(
+    Object.values(fixture.app.sessionsStore.runtimes).filter((runtime) => runtime.load === 'loading').length,
+    0,
+  );
   assert.equal(
     outbox(fixture).some((request) => request.payload.id === oldLoad.payload.id),
     false,
@@ -166,12 +169,12 @@ test('directory and session-list requests end at their deadlines, but prompt has
   await fixture.settleHost();
   await fixture.advance(65_000);
   await list;
-  assert.equal(fixture.app.agentdeckStore.sessionsLoading, false);
-  assert.match(fixture.app.agentdeckStore.sessionsError, /Reading session list timed out/);
+  assert.equal(fixture.app.sessionsStore.sessionsLoading, false);
+  assert.match(fixture.app.sessionsStore.sessionsError, /Reading session list timed out/);
   fixture.app.sendPrompt('s1', 'long task');
   await tick();
   await fixture.advance(120_000);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(fixture.app.isTurnRunning('s1'), true);
 });
 
 test('RPC settles asynchronous send failures and clears timers on completion/rejectAll', async () => {

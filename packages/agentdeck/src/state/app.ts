@@ -17,14 +17,13 @@ import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-
 import {
   applySessionEvent,
   endSession,
-  recordInFlightSession,
   refreshSessions,
   resetRemoteState,
   resumeInFlightTurn,
   settleLostTurns,
   showUserInput,
 } from './sessions';
-import { agentdeckStore, setPromptSuggestion } from './store';
+import { agentdeckStore, isTurnRunning, sessionsStore, updateRuntime } from './store';
 
 /** Older daemon versions that do not report a version are also considered outdated; prerelease suffixes are ignored in comparison */
 const isDaemonOutdated = (version?: string) => {
@@ -95,8 +94,7 @@ const handleTransportMessage = (message: TransportMessage) => {
     }
     case 'prompt_suggestion': {
       // Suggestions arriving after turn completion are not needed by any newly started turn
-      if (!agentdeckStore.pendingSessionIds.includes(message.sessionId))
-        setPromptSuggestion(message.sessionId, message.suggestion);
+      if (!isTurnRunning(message.sessionId)) updateRuntime(message.sessionId, { suggestion: message.suggestion });
       break;
     }
   }
@@ -114,8 +112,8 @@ export const startApp = () => {
       sessionStorage.removeItem(RESET_PENDING_KEY);
     }
   } catch (error) {
-    agentdeckStore({
-      connection: 'disconnected',
+    agentdeckStore({ connection: 'disconnected' });
+    sessionsStore({
       sessionsLoaded: true,
       sessionsError: getStringFromTemplate(
         i18n.get('error.resetLocalFailed', error instanceof Error ? error.message : String(error)),
@@ -126,30 +124,12 @@ export const startApp = () => {
 
   const restoreInFlights = getAllInFlight()
     .then((inFlights) => {
-      if (!inFlights.length) return;
-      const messagesBySession = { ...agentdeckStore.messagesBySession };
-      const optionsBySession = { ...agentdeckStore.optionsBySession };
-      const pendingSessionIds = [...agentdeckStore.pendingSessionIds];
-      const loadedSessionIds = [...agentdeckStore.loadedSessionIds];
-
       for (const item of inFlights) {
-        messagesBySession[item.sessionId] = item.messages;
-        if (item.options) optionsBySession[item.sessionId] = item.options;
-        if (!pendingSessionIds.includes(item.sessionId)) pendingSessionIds.push(item.sessionId);
-        if (!loadedSessionIds.includes(item.sessionId)) loadedSessionIds.push(item.sessionId);
-        const effectiveUpdatedAt =
+        const updatedAt =
           item.session.updatedAt ||
           (item.updatedAt ? new Date(item.updatedAt).toISOString() : new Date().toISOString());
-        recordInFlightSession({ ...item.session, updatedAt: effectiveUpdatedAt });
-        resumeInFlightTurn(item);
+        resumeInFlightTurn({ ...item, session: { ...item.session, updatedAt } });
       }
-
-      agentdeckStore({
-        messagesBySession,
-        optionsBySession,
-        pendingSessionIds,
-        loadedSessionIds,
-      });
     })
     .catch((error) => {
       console.error('Failed to restore in-flight sessions:', error);

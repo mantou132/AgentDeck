@@ -5,7 +5,7 @@ import { type AgentDefaults, CONFIG_DEFAULTS_KEY, readConfigDefaults } from '../
 import { i18n } from '../i18n';
 import { type ConfigSelect, getConfigSelects, withConfigValue, withCurrentMode } from '../session/config-options';
 import type { DeckSession, SessionOptions } from '../session/types';
-import { agentdeckStore, updateSessionOptions } from './store';
+import { agentdeckStore, getRuntime, updateSessionOptions } from './store';
 
 const saveAgentDefaults = (agent: string, patch: AgentDefaults) => {
   const defaults = readConfigDefaults();
@@ -70,16 +70,18 @@ export const applyConfigSelection = async (
   return options;
 };
 
+const sessionOptions = (sessionId: string): SessionOptions => getRuntime(sessionId).options ?? {};
+
 /** Selection takes effect immediately; warns and rolls back to previous value if remote call fails. */
 export const changeSessionConfig = async (session: DeckSession, configId: string, value: string) => {
   const { sessionId } = session;
-  const select = getConfigSelects(agentdeckStore.optionsBySession[sessionId]).find((item) => item.id === configId);
+  const select = getConfigSelects(sessionOptions(sessionId)).find((item) => item.id === configId);
   if (!select) return false;
   if (select.currentValue === value) return true;
   if (!session.pendingCreation) {
-    if (agentdeckStore.connection !== 'connected' || !agentdeckStore.loadedSessionIds.includes(sessionId)) return false;
+    if (agentdeckStore.connection !== 'connected' || getRuntime(sessionId).load !== 'loaded') return false;
   }
-  const next = withConfigValue(agentdeckStore.optionsBySession[sessionId], select, value);
+  const next = withConfigValue(sessionOptions(sessionId), select, value);
   updateSessionOptions(sessionId, next);
   if (session.pendingCreation) {
     saveConfigDefaults(session.agent, next);
@@ -87,11 +89,11 @@ export const changeSessionConfig = async (session: DeckSession, configId: string
   }
   try {
     updateSessionOptions(sessionId, await applyRemoteConfig(session, next, select, value));
-    saveConfigDefaults(session.agent, agentdeckStore.optionsBySession[sessionId]);
+    saveConfigDefaults(session.agent, sessionOptions(sessionId));
     return true;
   } catch (error) {
     Toast.open('error', error instanceof Error ? error.message : i18n.get('error.switchConfigFailed'));
-    const options = agentdeckStore.optionsBySession[sessionId];
+    const options = sessionOptions(sessionId);
     // Keep the new selection if another value was chosen in the meantime
     if (getConfigSelects(options).find((item) => item.id === configId)?.currentValue === value) {
       updateSessionOptions(sessionId, withConfigValue(options, select, select.currentValue));

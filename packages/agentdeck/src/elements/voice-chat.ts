@@ -9,7 +9,8 @@ import { ensureRecognitionPermission, startRecognitionSession } from '../lib/spe
 import { speakText, stopSpeaking } from '../lib/speech-synthesis';
 import { getElicitationQuestions } from '../session/elicitation';
 import { replySpeech } from '../session/voice-chat';
-import { agentdeckStore } from '../state/store';
+import { getSession } from '../state/sessions';
+import { getMessages, getRuntime, isTurnRunning, sessionsStore } from '../state/store';
 import { answerElicitation, resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 import type { ComposerInput } from './composer';
@@ -41,7 +42,7 @@ const splitUnits = (text: string) => {
  * Keeps the screen on while shown, since a locked phone suspends the webview and its Relay connection.
  */
 @customElement('deck-voice-chat')
-@connectStore(agentdeckStore)
+@connectStore(sessionsStore)
 export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
   @property sessionId = '';
   @property submit?: (input: ComposerInput) => boolean | Promise<boolean>;
@@ -78,15 +79,15 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
   #turnStarted = false;
 
   get #pending() {
-    return agentdeckStore.pendingSessionIds.includes(this.sessionId);
+    return isTurnRunning(this.sessionId);
   }
 
   get #permission() {
-    return agentdeckStore.permissionsBySession[this.sessionId];
+    return getRuntime(this.sessionId).permission;
   }
 
   get #elicitation() {
-    return agentdeckStore.elicitationsBySession[this.sessionId]?.find((elicitation) => !elicitation.response);
+    return getRuntime(this.sessionId).elicitations?.find((elicitation) => !elicitation.response);
   }
 
   #say = async (text: string) => {
@@ -256,27 +257,27 @@ export class DeckVoiceChatElement extends DuoyunWakeLockBaseElement {
   };
 
   #readReply = () => {
-    const messages = agentdeckStore.messagesBySession[this.sessionId] ?? [];
+    const messages = getMessages(this.sessionId);
     const turnStart = messages.findLastIndex((message) => 'role' in message && message.role === 'user');
     const reply = messages
       .slice(turnStart + 1)
       .findLast((message) => 'role' in message && message.role === 'agent' && message.text.trim());
     const text =
       (reply && 'role' in reply && replySpeech(reply.text)) ||
-      agentdeckStore.errorsBySession[this.sessionId] ||
+      getRuntime(this.sessionId).error ||
       i18n.get('voiceChat.noReply');
     this.#addEntry('agent', text);
     this.#say(text);
   };
 
-  // A new session first runs as `pending-session` and is then promoted to its real ID while still running,
+  // A new session first runs under its pending ID and is then promoted to its real ID while still running,
   // so only the end of a turn under the final ID counts.
   @effect((i) => [i.sessionId, i.#pending])
   #watchTurn = () => {
     if (!this.#awaiting) return;
     if (this.#pending) {
       this.#turnStarted = true;
-    } else if (this.#turnStarted && this.sessionId !== 'pending-session') {
+    } else if (this.#turnStarted && !getSession(this.sessionId)?.pendingCreation) {
       this.#awaiting = false;
       this.#readReply();
     }

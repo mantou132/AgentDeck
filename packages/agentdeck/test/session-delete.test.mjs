@@ -10,9 +10,9 @@ test('deletion removes the session, empty group, and cached state', async () => 
   await f.connect();
   await f.openSession();
   f.app.setMessages('s1', [{ id: 'message', role: 'agent', text: 'Done' }]);
-  f.app.setSessionFlag('unreadSessionIds', 's1', true);
+  f.app.updateRuntime('s1', { unread: true });
   f.app.updateSessionOptions('s1', { configOptions: [] });
-  f.app.setSessionError('s1', 'Old error');
+  f.app.updateRuntime('s1', { error: 'Old error' });
 
   const deleting = f.app.deleteSession('s1');
   await tick();
@@ -20,16 +20,15 @@ test('deletion removes the session, empty group, and cached state', async () => 
   assert.deepEqual(request.payload.params, { agent: 'codex', sessionId: 's1', timeoutSeconds: 60 });
   f.reply(request, { deleted: true });
   await deleting;
-  const store = f.app.agentdeckStore;
   assert.equal(f.app.getSession('s1'), undefined);
-  assert.equal(store.sessions.length, 0);
-  assert.equal(store.sessionGroups.length, 0);
-  assert.equal(store.messagesBySession.s1, undefined);
-  assert.equal(store.errorsBySession.s1, undefined);
-  assert.equal(store.optionsBySession.s1, undefined);
-  assert.equal(store.loadedSessionIds.length, 0);
-  assert.equal(store.unreadSessionIds.length, 0);
-  assert.equal(store.deletingSessionIds.length, 0);
+  assert.equal(f.app.sessionsStore.sessions.length, 0);
+  assert.equal(f.app.sessionsStore.sessionGroups.length, 0);
+  assert.equal(f.app.messagesStore.bySession.s1, undefined);
+  assert.equal(f.app.getRuntime('s1').error, undefined);
+  assert.equal(f.app.getRuntime('s1').options, undefined);
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.load === 'loaded').length, 0);
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
+  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.deleting).length, 0);
   assert.equal(f.app.isSessionOpened('s1'), false);
 });
 
@@ -46,8 +45,8 @@ for (const outcome of ['failed', 'timed out']) {
     }
     await deleting;
     assert.equal(f.app.getSession('s1'), undefined);
-    assert.equal(f.app.agentdeckStore.sessions.length, 0);
-    assert.equal(f.app.agentdeckStore.deletingSessionIds.length, 0);
+    assert.equal(f.app.sessionsStore.sessions.length, 0);
+    assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.deleting).length, 0);
   });
 }
 
@@ -64,9 +63,9 @@ test('a stale list response cannot bring back a deleted session', async () => {
   await deleting;
   f.reply(list, { sessions: [session] });
   await refreshing;
-  assert.equal(f.app.agentdeckStore.sessionsLoading, false);
-  assert.equal(f.app.agentdeckStore.sessions.length, 0);
-  assert.equal(f.app.agentdeckStore.sessionGroups.length, 0);
+  assert.equal(f.app.sessionsStore.sessionsLoading, false);
+  assert.equal(f.app.sessionsStore.sessions.length, 0);
+  assert.equal(f.app.sessionsStore.sessionGroups.length, 0);
 });
 
 test('offline deletion sends no request and preserves the session', async () => {

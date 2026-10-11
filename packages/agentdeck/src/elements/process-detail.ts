@@ -6,7 +6,7 @@ import { i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { hasActiveStream } from '../lib/stream-text';
 import { getToolStatus, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
-import { agentdeckStore } from '../state/store';
+import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -108,7 +108,8 @@ const style = css`
 @customElement('deck-process-detail')
 @adoptedStyle(blockContainer)
 @adoptedStyle(style)
-@connectStore(agentdeckStore)
+@connectStore(sessionsStore)
+@connectStore(messagesStore)
 export class DeckProcessDetailElement extends GemElement {
   @property sessionId = '';
   @property groupId = '';
@@ -128,15 +129,15 @@ export class DeckProcessDetailElement extends GemElement {
   @memo((i) => [
     i.sessionId,
     i.groupId,
-    agentdeckStore.messagesBySession[i.sessionId],
-    agentdeckStore.pendingSessionIds.includes(i.sessionId),
-    agentdeckStore.elicitationsBySession[i.sessionId],
+    getMessages(i.sessionId),
+    isTurnRunning(i.sessionId),
+    getRuntime(i.sessionId).elicitations,
   ])
   get #group() {
     return groupTimelineMessages(
-      agentdeckStore.messagesBySession[this.sessionId] ?? [],
-      agentdeckStore.pendingSessionIds.includes(this.sessionId),
-      agentdeckStore.elicitationsBySession[this.sessionId],
+      getMessages(this.sessionId),
+      isTurnRunning(this.sessionId),
+      getRuntime(this.sessionId).elicitations,
     ).find(
       (item): item is { type: 'group'; group: ProcessGroup } => item.type === 'group' && item.group.id === this.groupId,
     )?.group;

@@ -5,7 +5,7 @@ import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
-import { agentdeckStore } from '../state/store';
+import { agentdeckStore, type SessionRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -25,6 +25,7 @@ const style = css`
 @customElement('agentdeck-session-list-page')
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
+@connectStore(sessionsStore)
 export class AgentDeckSessionListPageElement extends GemElement {
   #state = createState({
     sheetOpen: false,
@@ -74,16 +75,8 @@ export class AgentDeckSessionListPageElement extends GemElement {
   @template()
   #render = () => {
     const { sheetOpen, newSessionError, selectedCwd, navigatingCwd } = this.#state;
-    const {
-      sessionGroups,
-      connection,
-      connectionError,
-      sessionsLoading,
-      sessionsLoaded,
-      sessionsError,
-      settings,
-      agents,
-    } = agentdeckStore;
+    const { connection, connectionError, settings, agents } = agentdeckStore;
+    const { sessionGroups, sessionsLoading, sessionsLoaded, sessionsError, runtimes } = sessionsStore;
     const selectedAgent = agents.find((agent) => agent.id === settings.agent);
     const errorMessage = connectionError || sessionsError;
     const hasError = Boolean(errorMessage);
@@ -94,15 +87,15 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const isConnected = connection === 'connected';
     const isConnecting = connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching';
 
-    const unreadSessionSet = new Set(agentdeckStore.unreadSessionIds);
-    const pendingSessionSet = new Set(agentdeckStore.pendingSessionIds);
-    const permissionSessionSet = new Set([
-      ...Object.keys(agentdeckStore.permissionsBySession),
-      ...Object.entries(agentdeckStore.elicitationsBySession)
-        .filter(([, elicitations]) => hasPendingElicitation(elicitations))
-        .map(([sessionId]) => sessionId),
-    ]);
-    const deletingSessionSet = new Set(agentdeckStore.deletingSessionIds);
+    const runtimeEntries = Object.entries(runtimes);
+    const sessionSet = (has: (runtime: SessionRuntime) => unknown) =>
+      new Set(runtimeEntries.filter(([, runtime]) => has(runtime)).map(([sessionId]) => sessionId));
+    const unreadSessionSet = sessionSet((runtime) => runtime.unread);
+    const pendingSessionSet = sessionSet((runtime) => runtime.turn);
+    const permissionSessionSet = sessionSet(
+      (runtime) => runtime.permission || hasPendingElicitation(runtime.elicitations),
+    );
+    const deletingSessionSet = sessionSet((runtime) => runtime.deleting);
 
     return html`
       <tap-page

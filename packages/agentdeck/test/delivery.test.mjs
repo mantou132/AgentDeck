@@ -18,8 +18,8 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
   const prompt = fixture.requests.find((request) => request.payload.method === 'agent_prompt');
   const directory = fixture.requests.at(-1);
   await reject(fixture, prompt);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /queue is full/i);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.match(fixture.app.getRuntime('s1').error, /queue is full/i);
   assert.equal(
     outbox(fixture).some((message) => message.messageId === prompt.message_id),
     false,
@@ -36,11 +36,11 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
   const retry = fixture.requests.at(-1);
   assert.notEqual(retry.message_id, prompt.message_id);
   await reject(fixture, prompt);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(fixture.app.isTurnRunning('s1'), true);
   fixture.reply(retry, { answer: 'done' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.equal(fixture.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'done');
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.equal(fixture.app.getMessages('s1').at(-1).text, 'done');
 });
 
 test('rejected handshake can reconnect without waiting for its deadline', async () => {
@@ -67,13 +67,13 @@ test('rejected session list and pending session creation both leave a usable ret
   const list = fixture.requests.findLast((request) => request.payload.method === 'agent_session_list');
   await reject(fixture, list, 'database temporarily unavailable');
   await refresh;
-  assert.equal(fixture.app.agentdeckStore.sessionsLoading, false);
-  assert.match(fixture.app.agentdeckStore.sessionsError, /Relay rejected/i);
+  assert.equal(fixture.app.sessionsStore.sessionsLoading, false);
+  assert.match(fixture.app.sessionsStore.sessionsError, /Relay rejected/i);
   fixture.heldMethods.clear();
   const retry = fixture.app.refreshSessions();
   await fixture.settleHost();
   await retry;
-  assert.equal(fixture.app.agentdeckStore.sessionsError, '');
+  assert.equal(fixture.app.sessionsStore.sessionsError, '');
 
   fixture.heldMethods.add('agent_session_create');
   const pendingSession = fixture.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
@@ -81,18 +81,18 @@ test('rejected session list and pending session creation both leave a usable ret
   await tick();
   await reject(fixture, fixture.requests.at(-1));
   assert.equal(await creation, null);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.ok(fixture.app.agentdeckStore.pendingSession);
-  assert.match(fixture.app.agentdeckStore.errorsBySession['pending-session'], /queue is full/i);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.ok(fixture.app.getSession(pendingSession.sessionId));
+  assert.match(fixture.app.getRuntime(pendingSession.sessionId).error, /queue is full/i);
   fixture.heldMethods.clear();
   const created = fixture.app.promotePendingSession(pendingSession, 'pending session task');
   await fixture.settleHost();
   assert.equal((await created).sessionId, 'created');
-  fixture.app.resetPendingSession();
+  fixture.app.discardPendingSession(pendingSession.sessionId);
   const prompt = fixture.requests.at(-1);
   fixture.reply(prompt, { answer: 'created and sent' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('oversized UTF-8 frames fail before enqueue or send and a smaller prompt works', async () => {
@@ -104,13 +104,13 @@ test('oversized UTF-8 frames fail before enqueue or send and a smaller prompt wo
   await tick();
   assert.equal(fixture.requests.length, requestCount);
   assert.equal(outbox(fixture).length, 0);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /too large/i);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.match(fixture.app.getRuntime('s1').error, /too large/i);
   assert.equal(fixture.app.sendPrompt('s1', 'smaller prompt'), true);
   await tick();
   fixture.reply(fixture.requests.at(-1), { answer: 'done' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('local storage failure does not silently strand a prompt', async () => {
@@ -126,14 +126,14 @@ test('local storage failure does not silently strand a prompt', async () => {
   fixture.app.sendPrompt('s1', 'cannot persist');
   await tick();
   assert.equal(fixture.requests.length, requestCount);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Failed to store pending message/);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.match(fixture.app.getRuntime('s1').error, /Failed to store pending message/);
   fixture.localStorage.setItem = save;
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
   fixture.reply(fixture.requests.at(-1), { answer: 'done' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('WebSocket send failure reaches the prompt and removes its queued message', async () => {
@@ -147,15 +147,15 @@ test('WebSocket send failure reaches the prompt and removes its queued message',
   };
   fixture.app.sendPrompt('s1', 'cannot send');
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /Socket send failed/);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.match(fixture.app.getRuntime('s1').error, /Socket send failed/);
   assert.equal(outbox(fixture).length, 0);
   socket.send = send;
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
   fixture.reply(fixture.requests.at(-1), { answer: 'done' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('rejected permission reply is visible and reset restores the normal session flow', async () => {
@@ -188,7 +188,7 @@ test('rejected permission reply is visible and reset restores the normal session
   await tick();
   fresh.reply(fresh.requests.at(-1), { answer: 'recovered' });
   await tick();
-  assert.equal(fresh.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fresh.app.runningSessionIds().length, 0);
 });
 
 test('late rejection after stored or pairing change cannot fail another call', async () => {
@@ -201,8 +201,8 @@ test('late rejection after stored or pairing change cannot fail another call', a
   fixture.sockets.at(-1).frame({ type: 'stored', message_id: prompt.message_id });
   await tick();
   await reject(fixture, prompt);
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
-  assert.equal(fixture.app.agentdeckStore.errorsBySession.s1, '');
+  assert.equal(fixture.app.isTurnRunning('s1'), true);
+  assert.equal(fixture.app.getRuntime('s1').error, '');
   fixture.reply(prompt, { answer: 'done' });
   await tick();
   const oldSocket = fixture.sockets.at(-1);

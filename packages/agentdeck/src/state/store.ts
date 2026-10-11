@@ -7,6 +7,7 @@ import type { ChatMessage, DeckSession, SessionOptions } from '../session/types'
 
 const initialSettings = readSettings();
 
+/** Settings and connection; changes rarely. */
 export const agentdeckStore = createStore({
   settings: initialSettings,
   pairingHistory: readPairingHistory(),
@@ -15,75 +16,86 @@ export const agentdeckStore = createStore({
   connectionError: '',
   /** Daemon version of the connected host; old hosts omit it. */
   hostVersion: '',
-  pendingSession: null as DeckSession | null,
+  /** Latest slash commands of each agent, also saved with its config defaults. */
+  commandsByAgent: readSavedCommands(),
+});
+
+export type LoadStatus = 'idle' | 'loading' | 'loaded' | 'failed';
+
+/** Everything the App holds about one session besides its messages; removing a session drops the whole entry. */
+export type SessionRuntime = {
+  /** Session held locally: pending creation, created or running here, so it is known before the remote list has it. */
+  session?: DeckSession;
+  /** `loaded` means opened in this App lifecycle: it is never closed and loaded again. */
+  load: LoadStatus;
+  loadToken?: number;
+  /** Running turn of this device; `rpcId` is missing while a pending session is being created. */
+  turn?: { rpcId?: string };
+  unread?: boolean;
+  deleting?: boolean;
+  error?: string;
+  options?: SessionOptions;
+  permission?: PermissionRequest;
+  /** Form elicitations of this device's turns, kept read-only once answered; memory only. */
+  elicitations?: Elicitation[];
+  /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
+  suggestion?: string;
+};
+
+/** Session list and per-session runtime state; changes at turn and load boundaries, not with streamed content. */
+export const sessionsStore = createStore({
   sessions: [] as DeckSession[],
   sessionGroups: [] as SessionGroup[],
   sessionsLoading: false,
   sessionsLoaded: false,
   sessionsError: '',
-  deletingSessionIds: [] as string[],
-  messagesBySession: {} as Record<string, ChatMessage[]>,
-  loadedSessionIds: [] as string[],
-  loadingSessionIds: [] as string[],
-  pendingSessionIds: [] as string[],
-  unreadSessionIds: [] as string[],
-  errorsBySession: {} as Record<string, string>,
-  optionsBySession: {} as Record<string, SessionOptions>,
-  permissionsBySession: {} as Record<string, PermissionRequest>,
-  /** Form elicitations of this device's turns, kept read-only once answered; memory only. */
-  elicitationsBySession: {} as Record<string, Elicitation[]>,
-  /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
-  suggestionsBySession: {} as Record<string, string>,
-  /** Latest slash commands of each agent, also saved with its config defaults. */
-  commandsByAgent: readSavedCommands(),
+  runtimes: {} as Record<string, SessionRuntime>,
+});
+
+/** Messages change with every streamed chunk, so only elements that show them connect to this store. */
+export const messagesStore = createStore({
+  bySession: {} as Record<string, ChatMessage[]>,
 });
 
 /** Home directory of the current host, remembered from its last handshake. */
 export const hostHome = () =>
   agentdeckStore.pairingHistory.find((item) => item.relayId === agentdeckStore.settings.relayId)?.home;
 
-export const setPromptSuggestion = (sessionId: string, suggestion: string) => {
-  const next = { ...agentdeckStore.suggestionsBySession };
-  if (suggestion) next[sessionId] = suggestion;
-  else delete next[sessionId];
-  agentdeckStore({ suggestionsBySession: next });
-};
+const idleRuntime: SessionRuntime = { load: 'idle' };
 
-export const clearSessionError = (sessionId: string) => {
-  const next = { ...agentdeckStore.errorsBySession };
-  delete next[sessionId];
-  agentdeckStore({ errorsBySession: next });
-};
+export const getRuntime = (sessionId: string): SessionRuntime => sessionsStore.runtimes[sessionId] ?? idleRuntime;
 
-export const setSessionFlag = (
-  key: 'loadedSessionIds' | 'loadingSessionIds' | 'pendingSessionIds' | 'unreadSessionIds' | 'deletingSessionIds',
-  sessionId: string,
-  enabled: boolean,
-) => {
-  const next = agentdeckStore[key].filter((id) => id !== sessionId);
-  if (enabled) next.push(sessionId);
-  agentdeckStore({ [key]: next });
-};
+export const updateRuntime = (sessionId: string, patch: Partial<SessionRuntime>) =>
+  sessionsStore({ runtimes: { ...sessionsStore.runtimes, [sessionId]: { ...getRuntime(sessionId), ...patch } } });
+
+export const isTurnRunning = (sessionId: string) => Boolean(getRuntime(sessionId).turn);
+
+export const runningSessionIds = () =>
+  Object.entries(sessionsStore.runtimes)
+    .filter(([, runtime]) => runtime.turn)
+    .map(([sessionId]) => sessionId);
+
+export const getMessages = (sessionId: string): ChatMessage[] => messagesStore.bySession[sessionId] ?? [];
 
 export const setMessages = (sessionId: string, messages: ChatMessage[]) =>
-  agentdeckStore({ messagesBySession: { ...agentdeckStore.messagesBySession, [sessionId]: messages } });
+  messagesStore({ bySession: { ...messagesStore.bySession, [sessionId]: messages } });
 
-export const setSessionError = (sessionId: string, error: string) =>
-  agentdeckStore({ errorsBySession: { ...agentdeckStore.errorsBySession, [sessionId]: error } });
+/** Drops everything the App holds about the session. */
+export const removeRuntime = (sessionId: string) => {
+  const { [sessionId]: _runtime, ...runtimes } = sessionsStore.runtimes;
+  const { [sessionId]: _messages, ...bySession } = messagesStore.bySession;
+  sessionsStore({ runtimes });
+  messagesStore({ bySession });
+};
 
 export const patchSession = (sessionId: string, patch: Partial<DeckSession>) => {
-  const nextSessions = agentdeckStore.sessions.map((session) =>
+  const sessions = sessionsStore.sessions.map((session) =>
     session.sessionId === sessionId ? { ...session, ...patch } : session,
   );
-  agentdeckStore({
-    sessions: nextSessions,
-    sessionGroups: getSortedSessionGroups(nextSessions, agentdeckStore.sessionGroups),
-  });
+  sessionsStore({ sessions, sessionGroups: getSortedSessionGroups(sessions, sessionsStore.sessionGroups) });
+  const local = getRuntime(sessionId).session;
+  if (local) updateRuntime(sessionId, { session: { ...local, ...patch } });
 };
 
-export const updateSessionOptions = (sessionId: string, patch: Partial<SessionOptions>) => {
-  const current = agentdeckStore.optionsBySession[sessionId] ?? {};
-  agentdeckStore({
-    optionsBySession: { ...agentdeckStore.optionsBySession, [sessionId]: { ...current, ...patch } },
-  });
-};
+export const updateSessionOptions = (sessionId: string, patch: Partial<SessionOptions>) =>
+  updateRuntime(sessionId, { options: { ...getRuntime(sessionId).options, ...patch } });

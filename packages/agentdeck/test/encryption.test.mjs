@@ -105,8 +105,8 @@ test('encrypted app handshake, prompt, streaming and retry keep plaintext off th
   });
   fixture.reply(request, { answer: 'secret reply' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.messagesBySession.s1.at(-1).text, 'secret reply');
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(fixture.app.getMessages('s1').at(-1).text, 'secret reply');
+  assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
 test('encrypted request expiry and Relay rejection still correlate with the RPC', async () => {
@@ -127,8 +127,8 @@ test('encrypted request expiry and Relay rejection still correlate with the RPC'
     .at(-1)
     .frame({ type: 'rejected', message_id: fixture.requests.at(-1).message_id, reason: 'queue_full: test' });
   await tick();
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.length, 0);
-  assert.match(fixture.app.agentdeckStore.errorsBySession.s1, /queue is full/i);
+  assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.match(fixture.app.getRuntime('s1').error, /queue is full/i);
 });
 
 test('encrypted attachments, file reads and permission decisions use the same protected transport', async () => {

@@ -20,14 +20,23 @@ import {
   cancelTurn,
   closeSession,
   createPendingSession,
+  discardPendingSession,
   ensureSessionLoaded,
   getSession,
   promotePendingSession,
-  resetPendingSession,
   retrySessionLoad,
   sendPrompt,
 } from '../state/sessions';
-import { agentdeckStore, clearSessionError, hostHome, setSessionError, setSessionFlag } from '../state/store';
+import {
+  agentdeckStore,
+  getMessages,
+  getRuntime,
+  hostHome,
+  isTurnRunning,
+  messagesStore,
+  sessionsStore,
+  updateRuntime,
+} from '../state/store';
 import { resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 
@@ -40,6 +49,8 @@ const style = css`
 @customElement('agentdeck-session-page')
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
+@connectStore(sessionsStore)
+@connectStore(messagesStore)
 @connectStore(history.store)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
@@ -62,13 +73,13 @@ export class AgentDeckSessionPageElement extends GemElement {
       this.isConnected &&
       document.visibilityState === 'visible' &&
       Stack.inCurrentStack(this) &&
-      agentdeckStore.unreadSessionIds.includes(this.sessionId)
+      getRuntime(this.sessionId).unread
     ) {
-      setSessionFlag('unreadSessionIds', this.sessionId, false);
+      updateRuntime(this.sessionId, { unread: false });
     }
   };
 
-  @effect((instance) => [instance.sessionId, agentdeckStore.unreadSessionIds, history.store])
+  @effect((instance) => [instance.sessionId, getRuntime(instance.sessionId).unread, history.store])
   #readCompletedResponse = () => queueMicrotask(this.#markRead);
 
   @effect(() => [])
@@ -85,12 +96,12 @@ export class AgentDeckSessionPageElement extends GemElement {
   #openSession = () => {
     ensureSessionLoaded(this.sessionId);
     // Remote load may return midway through the enter animation; delay timeline rendering until animation finishes. Existing in-memory sessions render immediately
-    this.#state({ deferTimeline: agentdeckStore.loadingSessionIds.includes(this.sessionId) });
+    this.#state({ deferTimeline: getRuntime(this.sessionId).load === 'loading' });
   };
 
   get #loading() {
     const { deferTimeline, entered } = this.#state;
-    return agentdeckStore.loadingSessionIds.includes(this.sessionId) || (deferTimeline && !entered);
+    return getRuntime(this.sessionId).load === 'loading' || (deferTimeline && !entered);
   }
 
   // After history replay finishes, messages render all at once; jump directly to the bottom without smooth catching-up
@@ -108,10 +119,9 @@ export class AgentDeckSessionPageElement extends GemElement {
   };
 
   @effect(() => [])
+  // A pending session being created keeps going after the page closes; `#send` discards it once created.
   #cleanupPendingSession = () => () => {
-    if (this.sessionId === 'pending-session') {
-      resetPendingSession();
-    }
+    if (!isTurnRunning(this.sessionId)) discardPendingSession(this.sessionId);
   };
 
   #restoreFailedInput = async (session: DeckSession, input: ComposerInput) => {
@@ -122,7 +132,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       this.#composerRef.value?.restoreIfEmpty(key, restored);
     } catch {
       this.#composerRef.value?.restoreIfEmpty(key, input);
-      setSessionError(session.sessionId, i18n.get('composer.draftSaveFailed'));
+      updateRuntime(session.sessionId, { error: i18n.get('composer.draftSaveFailed') });
     }
   };
 
@@ -153,7 +163,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           targetSession = liveSession;
           // Switch to the live session before dropping the pending one, so the page never renders without a session.
           this.sessionId = liveSession.sessionId;
-          resetPendingSession();
+          discardPendingSession(session.sessionId);
           accepted = true;
         }
       } else {
@@ -174,12 +184,12 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   // Agent-built widgets (`deck-widget`) send through the same path as the composer, one turn at a time.
   #sendFromWidget = (event: CustomEvent<string>) => {
-    const { connection, pendingSessionIds } = agentdeckStore;
+    const { connection } = agentdeckStore;
     if (connection !== 'connected') {
       Toast.open('warning', getConnectionLabel(connection));
       return;
     }
-    if (pendingSessionIds.includes(this.sessionId)) {
+    if (isTurnRunning(this.sessionId)) {
       Toast.open('warning', i18n.get('widget.busy'));
       return;
     }
@@ -275,14 +285,13 @@ export class AgentDeckSessionPageElement extends GemElement {
         </tap-page>
       `;
     }
-    const messages = agentdeckStore.messagesBySession[session.sessionId] ?? [];
+    const runtime = getRuntime(session.sessionId);
+    const messages = getMessages(session.sessionId);
     const loading = this.#loading;
-    const loaded = agentdeckStore.loadedSessionIds.includes(session.sessionId);
-    const pending = agentdeckStore.pendingSessionIds.includes(session.sessionId);
+    const loaded = runtime.load === 'loaded';
+    const pending = Boolean(runtime.turn);
     const error =
-      agentdeckStore.errorsBySession[session.sessionId] ||
-      agentdeckStore.connectionError ||
-      (!loaded && !loading ? i18n.get('session.notLoaded') : '');
+      runtime.error || agentdeckStore.connectionError || (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
     return html`
       <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
@@ -311,7 +320,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 .sessionKey=${this.sessionId}
                 .cwd=${session.cwd}
                 .messages=${messages}
-                .elicitations=${agentdeckStore.elicitationsBySession[session.sessionId] ?? []}
+                .elicitations=${runtime.elicitations ?? []}
                 ?pending=${pending}
                 @preview=${this.#previewAttachment}
                 @ask=${this.#onAsk}
@@ -368,15 +377,15 @@ export class AgentDeckSessionPageElement extends GemElement {
             <button
               v-else-if=${connected}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
-              @click=${() => clearSessionError(session.sessionId)}
+              @click=${() => updateRuntime(session.sessionId, { error: '' })}
             >
               ${i18n.get('global.close')}
             </button>
           </div>
-          <div v-if=${agentdeckStore.permissionsBySession[session.sessionId]} class="px-2.5 pt-2">
+          <div v-if=${runtime.permission} class="px-2.5 pt-2">
             <deck-permission-request
               class="mx-auto max-w-[760px]"
-              .request=${agentdeckStore.permissionsBySession[session.sessionId]}
+              .request=${runtime.permission}
               @resolve=${(event: CustomEvent<string | null>) => resolvePermission(session.sessionId, event.detail)}
             ></deck-permission-request>
           </div>
@@ -384,10 +393,10 @@ export class AgentDeckSessionPageElement extends GemElement {
             ${this.#composerRef}
             .sessionKey=${this.sessionId}
             .draftKey=${draftKey(session)}
-            config-label=${getConfigLabel(getConfigSelects(agentdeckStore.optionsBySession[session.sessionId]))}
+            config-label=${getConfigLabel(getConfigSelects(runtime.options))}
             @config-open=${() => openSessionConfig(session.sessionId)}
-            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(hasPendingElicitation(agentdeckStore.elicitationsBySession[session.sessionId]) ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
-            .suggestion=${connected && loaded ? (agentdeckStore.suggestionsBySession[session.sessionId] ?? '') : ''}
+            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(hasPendingElicitation(runtime.elicitations) ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
+            .suggestion=${connected && loaded ? (runtime.suggestion ?? '') : ''}
             .commands=${agentdeckStore.commandsByAgent[session.agent] ?? []}
             .submit=${this.#send}
             ?disabled=${!loaded}
@@ -395,7 +404,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             ?pending=${pending}
             @cancel=${() => cancelTurn(this.sessionId)}
             @preview=${this.#previewAttachment}
-            @draft-change=${() => clearSessionError(this.sessionId)}
+            @draft-change=${() => updateRuntime(this.sessionId, { error: '' })}
             @voice-chat=${() => this.#state({ voiceChat: true })}
           ></deck-composer>
         </footer>

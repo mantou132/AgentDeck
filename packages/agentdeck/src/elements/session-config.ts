@@ -7,7 +7,7 @@ import { hapticSelection } from '../lib/haptics';
 import { type ConfigSelect, getConfigSelects, isModelSelect } from '../session/config-options';
 import { changeSessionConfig } from '../state/config-options';
 import { getSession } from '../state/sessions';
-import { agentdeckStore } from '../state/store';
+import { getRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -63,13 +63,13 @@ const style = css`
 @customElement('deck-session-config')
 @adoptedStyle(blockContainer)
 @adoptedStyle(style)
-@connectStore(agentdeckStore)
+@connectStore(sessionsStore)
 export class DeckSessionConfigElement extends GemElement {
   @property sessionId = '';
   @attribute configId: string;
 
   get #selects() {
-    return getConfigSelects(agentdeckStore.optionsBySession[this.sessionId]);
+    return getConfigSelects(getRuntime(this.sessionId).options);
   }
 
   #change = (select: ConfigSelect, value: string) => {

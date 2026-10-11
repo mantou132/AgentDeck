@@ -11,14 +11,6 @@ type TurnHandlers = {
   onDone: (completed: boolean) => void;
 };
 
-let pendingSessionCanceled = false;
-
-export const setPendingSessionCanceled = (canceled: boolean) => {
-  pendingSessionCanceled = canceled;
-};
-
-export const isPendingSessionCanceled = () => pendingSessionCanceled;
-
 export const performTurn = async (
   session: DeckSession,
   { text, attachments = [], voiceChat }: Pick<TextMessage, 'text' | 'attachments' | 'voiceChat'>,

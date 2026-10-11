@@ -42,10 +42,10 @@ test('app restart restores in-flight pending session and seamlessly receives rem
   });
   await tick();
 
-  const currentMessages = fixture.app.agentdeckStore.messagesBySession.s1;
+  const currentMessages = fixture.app.getMessages('s1');
   assert.equal(currentMessages.length, 3);
   assert.equal(currentMessages[2].text, 'Here is the');
-  assert.equal(fixture.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
+  assert.equal(fixture.app.isTurnRunning('s1'), true);
 
   // Simulate App sudden restart / kill (without reset)
   const fresh = documentFixture(fixture);
@@ -55,9 +55,9 @@ test('app restart restores in-flight pending session and seamlessly receives rem
   assert.notEqual(new URL(fresh.sockets[0].url).searchParams.get('ack_head'), 'true');
 
   // 2. Verify state was restored
-  assert.equal(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'), true);
-  assert.equal(fresh.app.agentdeckStore.loadedSessionIds.includes('s1'), true);
-  const restoredMessages = fresh.app.agentdeckStore.messagesBySession.s1;
+  assert.equal(fresh.app.isTurnRunning('s1'), true);
+  assert.equal(fresh.app.isSessionOpened('s1'), true);
+  const restoredMessages = fresh.app.getMessages('s1');
   assert.ok(restoredMessages, 'restored messages exist');
   assert.equal(restoredMessages.length, 3);
   assert.equal(restoredMessages[2].text, 'Here is the');
@@ -82,21 +82,21 @@ test('app restart restores in-flight pending session and seamlessly receives rem
   });
   await tick();
 
-  const streamingMessages = fresh.app.agentdeckStore.messagesBySession.s1;
+  const streamingMessages = fresh.app.getMessages('s1');
   assert.equal(streamingMessages[2].text, 'Here is the script:\nprint("Hello, World!")');
 
   // 5. Turn completes
   fresh.reply(promptRequest, { answer: 'Here is the script:\nprint("Hello, World!")' });
   await tick();
 
-  assert.equal(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'), false);
-  const finalMessages = fresh.app.agentdeckStore.messagesBySession.s1;
+  assert.equal(fresh.app.isTurnRunning('s1'), false);
+  const finalMessages = fresh.app.getMessages('s1');
   assert.equal(finalMessages[2].text, 'Here is the script:\nprint("Hello, World!")');
 
   // 6. Verify in-flight is purged after completion (Zero-bloat)
   const restartAgain = documentFixture(fresh);
   await restartAgain.connect();
-  assert.equal(restartAgain.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(restartAgain.app.runningSessionIds().length, 0);
 });
 
 test('app restart reconciles in-flight session with remote list, keeping the active session group at the top', async () => {
@@ -115,7 +115,7 @@ test('app restart reconciles in-flight session with remote list, keeping the act
   await fresh.connect();
 
   // Before remote session list arrives, sessionsLoaded remains false (skeleton displays cleanly)
-  assert.equal(fresh.app.agentdeckStore.sessionsLoaded, false);
+  assert.equal(fresh.app.sessionsStore.sessionsLoaded, false);
 
   // Deliver remote session list containing multiple older projects
   const listReq = fresh.requests.find((r) => r.payload.method === 'agent_session_list');
@@ -140,8 +140,8 @@ test('app restart reconciles in-flight session with remote list, keeping the act
   });
   await tick();
 
-  assert.equal(fresh.app.agentdeckStore.sessionsLoaded, true);
-  const groups = fresh.app.agentdeckStore.sessionGroups;
+  assert.equal(fresh.app.sessionsStore.sessionsLoaded, true);
+  const groups = fresh.app.sessionsStore.sessionGroups;
   // The in-flight session s1 (cwd: '/tmp') must be reconciled and ordered at the top!
   assert.ok(groups.length >= 2, 'contains both active and remote groups');
   assert.equal(groups[0].cwd, '/tmp', 'active in-flight project group is at the top');
@@ -173,10 +173,9 @@ test('a restored turn the host no longer runs is settled and reloaded from histo
   fresh.reply(query, { sessions: [] });
   await fresh.settleHost();
 
-  const store = fresh.app.agentdeckStore;
-  assert.equal(store.pendingSessionIds.includes('s1'), false);
-  assert.ok(store.unreadSessionIds.includes('s1'));
-  assert.ok(store.loadedSessionIds.includes('s1'));
+  assert.equal(fresh.app.isTurnRunning('s1'), false);
+  assert.ok(Boolean(fresh.app.getRuntime('s1').unread));
+  assert.ok(fresh.app.isSessionOpened('s1'));
   const methods = fresh.requests.slice(requestsBefore).map((r) => r.payload.method);
   assert.deepEqual(
     methods.filter((m) => m === 'agent_session_close' || m === 'agent_session_load'),
@@ -186,21 +185,21 @@ test('a restored turn the host no longer runs is settled and reloaded from histo
   // A reply that was still on its way must not land on the reloaded timeline.
   fresh.reply(promptRequest, { answer: 'Late answer' });
   await tick();
-  assert.equal(store.messagesBySession.s1.length, 0);
+  assert.equal(fresh.app.getMessages('s1').length, 0);
 
   const restartAgain = documentFixture(fresh);
   await restartAgain.connect();
-  assert.equal(restartAgain.app.agentdeckStore.pendingSessionIds.length, 0);
+  assert.equal(restartAgain.app.runningSessionIds().length, 0);
 });
 
 test('a restored turn the host still runs keeps waiting for its reply', async () => {
   const { fresh, promptRequest, query } = await restartWithLostReply();
   fresh.reply(query, { sessions: [{ agent: 'codex', sessionId: 's1' }] });
   await fresh.settleHost();
-  assert.ok(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'));
+  assert.ok(fresh.app.isTurnRunning('s1'));
 
   fresh.reply(promptRequest, { answer: 'Done' });
   await tick();
-  assert.equal(fresh.app.agentdeckStore.pendingSessionIds.includes('s1'), false);
-  assert.ok(fresh.app.agentdeckStore.unreadSessionIds.includes('s1'));
+  assert.equal(fresh.app.isTurnRunning('s1'), false);
+  assert.ok(Boolean(fresh.app.getRuntime('s1').unread));
 });
