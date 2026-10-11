@@ -17,7 +17,10 @@
   "chrome:background": { "service_worker": "background.js" },
   "firefox:background": { "scripts": ["background.js"] },
   "action": {
-    "default_icon": "icon128.png",
+    "default_icon": {
+      "32": "icon32.png",
+      "128": "icon128.png"
+    },
     "default_title": "__MSG_actionTitle__"
   },
   "side_panel": {
@@ -26,11 +29,15 @@
   "firefox:sidebar_action": {
     "default_panel": "pages/agent-panel.html",
     "default_title": "__MSG_actionTitle__",
-    "default_icon": "icon128.png",
+    "default_icon": {
+      "32": "icon32.png",
+      "128": "icon128.png"
+    },
     "open_at_install": false
   },
   "devtools_page": "devtools/devtools.html",
   "icons": {
+    "32": "icon32.png",
     "128": "icon128.png"
   },
   "content_security_policy": {
