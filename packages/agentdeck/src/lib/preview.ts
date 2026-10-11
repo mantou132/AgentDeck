@@ -1,6 +1,7 @@
-import { convertFileSrc, isTauri } from '@tauri-apps/api/core';
+import { isTauri } from '@tauri-apps/api/core';
+import { protocolUrl } from './js-protocol';
 
-const PREVIEW_SCHEME = 'agentdeck-preview';
+export const PREVIEW_SCHEME = 'agentdeck-preview';
 
 /** Only the App registers the `agentdeck-preview` protocol serving host files. */
 export const previewSupported = isTauri();
@@ -24,19 +25,12 @@ export const toPreviewUrl = (file: string, safeArea = false) => {
     hosts.set(key, host);
     sites.set(host, { root, safeArea });
   }
-  const probe = new URL(convertFileSrc('', PREVIEW_SCHEME));
-  // Android / Windows expose custom protocols as `http(s)://<scheme>.<host>`.
-  const origin =
-    probe.protocol === `${PREVIEW_SCHEME}:`
-      ? `${PREVIEW_SCHEME}://${host}`
-      : `${probe.protocol}//${PREVIEW_SCHEME}.${host}`;
-  return `${origin}/${encodeURIComponent(normalized.slice(slash + 1))}`;
+  return protocolUrl(PREVIEW_SCHEME, host, `/${encodeURIComponent(normalized.slice(slash + 1))}`);
 };
 
 /** Host file a preview request asks for; undefined when outside its site root. */
-export const resolvePreviewPath = (url: string) => {
-  const { hostname, pathname } = new URL(url);
-  const site = sites.get(hostname.replace(`${PREVIEW_SCHEME}.`, ''));
+export const resolvePreviewPath = (host: string, pathname: string) => {
+  const site = sites.get(host);
   if (!site) return;
   const path = decodeURIComponent(pathname);
   // Encoded slashes survive URL normalization and could climb out of the root.
