@@ -35,7 +35,6 @@ export class AgentDeckSessionListPageElement extends GemElement {
   });
 
   #openNewSession = () => {
-    if (agentdeckStore.connection !== 'connected') return;
     this.#state({
       sheetOpen: true,
       newSessionError: '',
@@ -243,8 +242,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
         >
           <div class="flex items-center justify-between gap-3">
             <button
-              class="flex h-12 min-w-0 px-4 cursor-pointer items-center justify-center gap-2 rounded-[15px] border-0 bg-primary text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985] disabled:cursor-default disabled:opacity-45"
-              ?disabled=${connection !== 'connected'}
+              class="flex h-12 min-w-0 px-4 cursor-pointer items-center justify-center gap-2 rounded-[15px] border-0 bg-primary text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985]"
               @click=${this.#openNewSession}
             >
               <tap-use class="size-[18px]" .element=${icons.add}></tap-use>

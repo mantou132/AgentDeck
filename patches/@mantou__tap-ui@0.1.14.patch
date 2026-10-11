@@ -1,0 +1,38 @@
+diff --git a/elements/sheet.js b/elements/sheet.js
+index c8ff7f4150cdc884a540ff6883db26c91ef525d6..dd029637684b33f0877ba4074b7905582267e8e0 100644
+--- a/elements/sheet.js
++++ b/elements/sheet.js
+@@ -34,6 +34,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
+ };
+ import { adoptedStyle, attribute, boolattribute, customElement, effect, emitter, memo, part, property, shadow, slot, state, unmounted, } from '@mantou/gem/lib/decorators';
+ import { createRef, createState, css, GemElement, html } from '@mantou/gem/lib/element';
++import { render } from '@mantou/gem/lib/lit-html';
+ import { styleMap } from '@mantou/gem/lib/utils';
+ import { easeOutCubic } from '../lib/easing';
+ import { setBodyInert } from '../lib/element';
+@@ -260,15 +261,19 @@ let TapSheetElement = (() => {
+             const sheet = new this({
+                 ...options,
+                 paddingless: options.paddingless ?? options.hasStack,
+-                body: !options.hasStack
+-                    ? options.body
+-                    : html `
++                body: undefined,
++                open: true,
++            });
++            // Render the body into light DOM and project it through the default slot;
++            // WebKit doesn't apply shadow root `@scope` rules to elements slotted into a nested shadow host:
++            // https://bugs.webkit.org/show_bug.cgi?id=327165
++            render(!options.hasStack
++                ? options.body
++                : html `
+             <tap-stack .autoHeight=${!options.snap} disable-history .maxHeight=${innerHeight * 0.77}>
+               ${options.body}
+             </tap-stack>
+-          `,
+-                open: true,
+-            });
++          `, sheet);
+             const restoreInert = setBodyInert(sheet);
+             document.body.append(sheet);
+             return DyPromise.new((res) => {

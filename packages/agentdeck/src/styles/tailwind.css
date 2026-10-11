@@ -42,6 +42,8 @@
 
 html {
   color-scheme: light dark;
+  /* tap-ui gives body a black background and shrinks it above the keyboard; without this the black canvas shows around the rounded keyboard */
+  background: var(--color-bg);
 }
 
 /* Consistent with page header: height, hairline + distinct boundary color */
