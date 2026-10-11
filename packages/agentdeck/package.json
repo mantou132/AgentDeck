@@ -12,7 +12,8 @@
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "preview": "rsbuild preview",
-    "test": "node --test --test-timeout=30000 test/*.test.mjs"
+    "test": "node --test --test-timeout=30000 test/*.test.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@gem-bind/diff2html": "^0.0.6",
@@ -43,6 +44,7 @@
     "tauri-plugin-webproxy-api": "^0.1.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@rsbuild/core": "^2.1.10",
     "@tailwindcss/postcss": "^4.3.0",
     "postcss": "^8.5.14",

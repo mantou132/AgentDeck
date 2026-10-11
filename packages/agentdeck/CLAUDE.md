@@ -48,4 +48,5 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 - `pnpm run dev` / `pnpm run build`：Rsbuild 开发服务器 / 生产打包。
 - `pnpm run test`：Node 单元测试（`test/*.test.mjs`）。
+- `pnpm run test:e2e`：Playwright 主流程 e2e（`e2e/`），连真实 host，只在本地手动跑；`E2E_PAIRING_ID`（必填，可用审核机的）与 `E2E_CHROME_PATH`（默认系统 Chrome）从环境或 gitignored 的 `.env.local` 读取。Free agent 上删除会话不生效，每次运行会在 host 上留下一个会话。
 - `pnpm run tauri android dev`：Android 联调。
