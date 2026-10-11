@@ -568,6 +568,33 @@ export const promotePendingSession = async (
   return liveSession;
 };
 
+/** Fork `session` up to and including the agent message `messageId` and list the new session; it loads when opened. */
+export const forkSession = async (session: DeckSession, messageId: string): Promise<DeckSession | null> => {
+  if (agentdeckStore.connection !== 'connected') {
+    Toast.open('error', i18n.get('error.remoteNotConnected'));
+    return null;
+  }
+  let sessionId: string;
+  try {
+    ({ sessionId } = await agentApi.forkSession({ ...session, messageId }));
+  } catch (error) {
+    Toast.open('error', error instanceof Error ? error.message : i18n.get('error.forkSessionFailed'));
+    return null;
+  }
+  const forked: DeckSession = {
+    agent: session.agent,
+    sessionId,
+    cwd: session.cwd,
+    // Same title claude-agent-acp derives, so a list refresh keeps it.
+    title: session.title && `${session.title} (fork)`,
+    updatedAt: new Date().toISOString(),
+  };
+  saveSessionMeta(sessionId, { title: forked.title, updatedAt: forked.updatedAt });
+  const sessions = [forked, ...sessionsStore.sessions];
+  sessionsStore({ sessions, sessionGroups: getSortedSessionGroups(sessions, sessionsStore.sessionGroups) });
+  return forked;
+};
+
 export const sendPrompt = (
   sessionId: string,
   prompt: string,

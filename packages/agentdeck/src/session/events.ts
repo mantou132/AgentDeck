@@ -32,13 +32,20 @@ export const finishStreaming = (messages: ChatMessage[]) =>
     'role' in message && message.streaming ? { ...message, streaming: false } : message,
   );
 
-export const appendContent = (messages: ChatMessage[], role: 'user' | 'agent', text: string, streaming: boolean) => {
+export const appendContent = (
+  messages: ChatMessage[],
+  role: 'user' | 'agent',
+  text: string,
+  streaming: boolean,
+  messageId?: string,
+) => {
   const next = messages.slice();
   const last = next.at(-1);
+  const patch = messageId ? { messageId } : {};
   if (last && 'role' in last && last.role === role && last.streaming === streaming) {
-    next[next.length - 1] = { ...last, text: last.text + text };
+    next[next.length - 1] = { ...last, text: last.text + text, ...patch };
   } else {
-    next.push({ id: crypto.randomUUID(), role, text, streaming });
+    next.push({ id: crypto.randomUUID(), role, text, streaming, ...patch });
   }
   return next;
 };
@@ -174,7 +181,8 @@ export const reduceSessionEvent = (
     if (agent === 'claude-acp' && role === 'user' && content.text.trim() === '[Request interrupted by user]') {
       return messages !== current ? { messages } : null;
     }
-    const next = appendContent(messages, role, content.text, streaming);
+    const messageId = role === 'agent' && typeof update.messageId === 'string' ? update.messageId : undefined;
+    const next = appendContent(messages, role, content.text, streaming, messageId);
     return { messages: agent === 'codex-acp' && role === 'agent' ? extractExternalTools(next) : next };
   }
 

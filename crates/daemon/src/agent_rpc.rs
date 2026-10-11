@@ -352,6 +352,27 @@ impl AgentService {
             }
         });
 
+        let fork_sessions = sessions.clone();
+        peer.handle("agent_session_fork", move |params, _ctx| {
+            let sessions = fork_sessions.clone();
+            async move {
+                let (agent, session_id) = required_agent_session(&params, "agent_session_fork")?;
+                let message_id = required_str(&params, "messageId", "agent_session_fork")?;
+                let cwd = message_cwd(&params);
+                let timeout_secs = message_timeout_secs(&params);
+                match tokio::time::timeout(
+                    Duration::from_secs(timeout_secs),
+                    sessions.fork_session(agent, session_id, cwd, message_id),
+                )
+                .await
+                {
+                    Ok(Ok(forked)) => Ok(json!({ "agent": agent, "sessionId": forked })),
+                    Ok(Err(err)) => Err(err.to_string()),
+                    Err(_) => Err("Timeout forking ACP agent session".to_string()),
+                }
+            }
+        });
+
         let close_sessions = sessions.clone();
         peer.handle("agent_session_close", move |params, _ctx| {
             let sessions = close_sessions.clone();

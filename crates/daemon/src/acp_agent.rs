@@ -7,7 +7,7 @@ use agent_client_protocol::{
         v1::{
             AgentCapabilities, CancelNotification, ClientCapabilities as AcpClientCapabilities,
             CloseSessionRequest, ContentBlock, ContentChunk, CreateElicitationRequest,
-            CreateElicitationResponse, DeleteSessionRequest, ElicitationAction,
+            CreateElicitationResponse, DeleteSessionRequest, ElicitationAction, ForkSessionRequest,
             ElicitationCapabilities, ElicitationFormCapabilities, ElicitationScope, ImageContent,
             Implementation, InitializeRequest, ListSessionsRequest, LoadSessionRequest,
             NewSessionRequest, PermissionOptionId, PromptRequest, PromptResponse,
@@ -1015,6 +1015,41 @@ impl AgentSessionManager {
             .await?;
         Ok(())
     }
+
+    /// Fork a persisted session (`session/fork`) up to and including the agent
+    /// message `message_id`. Like list and delete this creates no live actor;
+    /// the client loads the new session afterwards.
+    pub async fn fork_session(
+        &self,
+        agent: &str,
+        session_id: &str,
+        cwd: Option<PathBuf>,
+        message_id: &str,
+    ) -> Result<String> {
+        let AgentConnection {
+            connection,
+            capabilities,
+        } = self.runtime(agent).connection().await?;
+        if capabilities.session_capabilities.fork.is_none() {
+            anyhow::bail!("{agent} does not support forking sessions");
+        }
+        let request =
+            ForkSessionRequest::new(SessionId::from(session_id.to_string()), resolve_cwd(cwd)?)
+                .meta(fork_point_meta(message_id));
+        let response = connection
+            .send_request_to(Agent, request)
+            .block_task()
+            .await?;
+        Ok(response.session_id.to_string())
+    }
+}
+
+/// ACP has no fork point yet; claude-agent-acp reads the one JetBrains AIR sends.
+fn fork_point_meta(message_id: &str) -> serde_json::Map<String, serde_json::Value> {
+    serde_json::Map::from_iter([(
+        "jetbrains".to_string(),
+        serde_json::json!({ "air": { "fork": { "version": 1, "messageId": message_id } } }),
+    )])
 }
 
 /// Start a session with the agent, report ready, then serve its commands and

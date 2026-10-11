@@ -65,16 +65,19 @@ export class DeckElicitationElement extends GemElement {
       >
         <span
           class=${classMap({
-            'mt-0.5 grid size-4 shrink-0 place-items-center text-primary': true,
-            'rounded border border-border-strong': select.kind === 'multi' && !selected,
+            'mt-0.5 grid size-4 shrink-0 place-items-center': true,
+            'border border-border-strong': !selected,
             'rounded bg-primary text-white': select.kind === 'multi' && selected,
+            rounded: select.kind === 'multi',
+            'rounded-full': select.kind !== 'multi',
+            'border-[5px] border-primary': select.kind !== 'multi' && selected,
           })}
         >
-          <tap-use v-if=${selected} class="size-3.5" .element=${icons.check}></tap-use>
+          <tap-use v-if=${select.kind === 'multi' && selected} class="size-3.5" .element=${icons.check}></tap-use>
         </span>
         <span class="min-w-0 flex-1">
           <span class="block font-medium break-words">${choice.title}</span>
-          <span v-if=${!!choice.description} class="mt-0.5 block text-[13px] leading-snug text-describe break-words"
+          <span v-if=${!!choice.description} class="mt-0.5 block text-xs leading-snug text-describe break-words"
             >${choice.description}</span
           >
         </span>
@@ -103,7 +106,7 @@ export class DeckElicitationElement extends GemElement {
     return html`
       <div class="flex flex-col gap-2">
         <span v-if=${!!title} class="text-xs font-semibold text-primary-strong">${title}</span>
-        <p v-if=${!!description} class="m-0 text-sm leading-relaxed text-highlight">${description}</p>
+        <p v-if=${!!description} class="m-0 text-base leading-relaxed text-highlight">${description}</p>
         ${select?.choices.map((choice) => this.#renderChoice(select, choice))}
         ${input ? this.#renderInput(input, !!select) : ''}
       </div>
@@ -133,7 +136,7 @@ export class DeckElicitationElement extends GemElement {
     <section class="flex flex-col gap-3 rounded-2xl border border-border bg-bg-light px-4 py-3">
       ${this.#questions.map(
         (question) => html`
-          <div class="select-text text-sm leading-relaxed break-words">
+          <div class="select-text text-base leading-relaxed break-words">
             <p class="m-0 whitespace-pre-wrap text-describe">${this.#getQuestionText(question)}</p>
             <p class="m-0 mt-0.5 font-medium whitespace-pre-wrap text-highlight">${this.#getAnswerText(question)}</p>
           </div>
@@ -151,7 +154,7 @@ export class DeckElicitationElement extends GemElement {
     return html`
       <section class="overflow-hidden rounded-2xl border border-notice/70 bg-bg-light">
         <div class="flex flex-col gap-4 px-4 pt-3 pb-3.5">
-          <h2 class="select-text m-0 text-sm font-semibold leading-relaxed whitespace-pre-wrap text-highlight">${request.message}</h2>
+          <h2 class="select-text m-0 text-base font-semibold leading-relaxed whitespace-pre-wrap text-highlight">${request.message}</h2>
           ${this.#questions.map(this.#renderQuestion)}
         </div>
         <footer class="flex gap-2 border-t border-border px-3 py-2.5">

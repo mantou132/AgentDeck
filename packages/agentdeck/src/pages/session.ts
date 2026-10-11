@@ -5,14 +5,15 @@ import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { reconnectTransport } from '../agent/transport';
 import type { Attachment } from '../attachment/types';
-import { draftKey, removeDraft, restoreDraft } from '../composer/drafts';
+import { draftKey, removeDraft, restoreDraft, saveDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { openSessionConfig } from '../elements/session-config';
+import type { ForkRequest } from '../elements/session-timeline';
 import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { hapticImpact } from '../lib/haptics';
 import { displayPath } from '../lib/path';
-import { openChanges, openFileViewer, openSettings, replaceSession } from '../navigation';
+import { openChanges, openFileViewer, openSession, openSettings, replaceSession } from '../navigation';
 import { getConfigLabel, getConfigSelects } from '../session/config-options';
 import { hasPendingElicitation } from '../session/elicitation';
 import type { DeckSession } from '../session/types';
@@ -22,6 +23,7 @@ import {
   createPendingSession,
   discardPendingSession,
   ensureSessionLoaded,
+  forkSession,
   getSession,
   promotePendingSession,
   retrySessionLoad,
@@ -90,6 +92,16 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   #onQuote = (evt: CustomEvent<string>) => {
     this.#composerRef.value?.quoteText(evt.detail);
+  };
+
+  // The forked session opens with the user message in its composer, ready to edit and resend.
+  #onFork = async ({ detail: { messageId, text, attachments } }: CustomEvent<ForkRequest>) => {
+    const session = getSession(this.sessionId);
+    if (!session) return;
+    const forked = await forkSession(session, messageId);
+    if (!forked) return;
+    await saveDraft(forked.sessionId, { text, attachments }).catch(console.error);
+    openSession(forked.sessionId);
   };
 
   @effect((instance) => [instance.sessionId])
@@ -322,8 +334,10 @@ export class AgentDeckSessionPageElement extends GemElement {
                 .messages=${messages}
                 .elicitations=${runtime.elicitations ?? []}
                 ?pending=${pending}
+                ?forkable=${session.agent === 'claude-acp'}
                 @preview=${this.#previewAttachment}
                 @quote=${this.#onQuote}
+                @fork=${this.#onFork}
                 @widget-send=${this.#sendFromWidget}
               ></deck-session-timeline>
               <section

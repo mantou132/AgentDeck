@@ -25,6 +25,8 @@ export type TextMessage = {
   id: string;
   role: 'user' | 'agent';
   text: string;
+  /** ACP id of the latest agent message merged into this one; a fork point for the next user message. */
+  messageId?: string;
   attachments?: Attachment[];
   /** Sent from voice chat: the agent is asked for a spoken summary. */
   voiceChat?: boolean;

@@ -53,6 +53,29 @@ tap-browser::part(navbar) {
   border-block-end-color: var(--color-border-strong);
 }
 
+/* Long-press menu as an App card: tap-options defaults to a compact desktop dropdown */
+tap-callout::part(menu) {
+  width: 240px;
+  font-size: var(--text-base);
+  color: var(--color-highlight);
+  background: var(--color-bg-light);
+  border: var(--default-border-width) solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-float);
+  padding-block: 0;
+}
+
+/* iOS rows: hairlines between items; each overlaps the one above, so the first is clipped by the menu */
+tap-callout::part(menu-item) {
+  padding: 10px 16px;
+  margin-block-start: calc(-1 * var(--default-border-width));
+  border-block-start: var(--default-border-width) solid var(--color-border);
+}
+
+tap-callout::part(menu-item):active {
+  background: var(--color-bg-hover);
+}
+
 @layer base {
   button,
   textarea,

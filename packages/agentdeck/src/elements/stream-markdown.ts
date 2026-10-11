@@ -103,7 +103,6 @@ export class DeckStreamMarkdownElement extends GemElement {
   @template()
   #render = () => html`
     <gem-bind-marked
-      class="select-text"
       ?streaming=${this.#isStreaming}
       .mdStyle=${this.mdStyle ?? (this.user ? userMarkdownStyle : markdownStyle)}
       .extensions=${this.extensions ?? (this.user ? userMarkdownExtensions : markdownExtensions)(this.cwd)}

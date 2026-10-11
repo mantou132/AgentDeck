@@ -259,3 +259,25 @@ test('the trailing process group stays pending while the task is still running',
   assert.equal(getProcessSummary(running.group), 'Thinking…');
   assert.equal(groupTimelineMessages(messages, false)[1].group.pending, false);
 });
+
+test('agent messages keep the latest ACP message id as a fork point', () => {
+  let messages = [{ id: 'user', role: 'user', text: 'Hi' }];
+  const apply = (update) => {
+    messages = reduceSessionEvent(
+      messages,
+      { event: 'session_update', update },
+      { agent: 'claude-acp', streaming: false },
+    ).messages;
+  };
+  apply({ sessionUpdate: 'agent_message_chunk', messageId: 'a1', content: { type: 'text', text: 'One ' } });
+  apply({ sessionUpdate: 'agent_message_chunk', messageId: 'a2', content: { type: 'text', text: 'two' } });
+  apply({ sessionUpdate: 'user_message_chunk', messageId: 'u1', content: { type: 'text', text: 'Next' } });
+  assert.deepEqual(
+    plain(messages).map(({ role, text, messageId }) => ({ role, text, messageId })),
+    [
+      { role: 'user', text: 'Hi', messageId: undefined },
+      { role: 'agent', text: 'One two', messageId: 'a2' },
+      { role: 'user', text: 'Next', messageId: undefined },
+    ],
+  );
+});

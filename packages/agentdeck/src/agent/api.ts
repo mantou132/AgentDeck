@@ -16,6 +16,13 @@ type LoadSessionOptions = {
   panelContext?: PanelContext | unknown;
 };
 
+type ForkSessionOptions = {
+  agent: string;
+  sessionId: string;
+  cwd: string;
+  messageId: string;
+};
+
 type ResumePromptHandlers = {
   onEvent?: (event: SessionEvent) => void | Promise<void>;
   resolve?: (value: { answer?: string }) => void;
@@ -412,6 +419,15 @@ export class AgentApi {
       },
       onEvent ? (event) => onEvent(event as SessionEvent) : undefined,
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
+    );
+
+  /** Fork up to and including the agent message `messageId`; the new session is loaded like any other. */
+  forkSession = ({ agent, sessionId, cwd, messageId }: ForkSessionOptions) =>
+    this.#peer.call<{ sessionId: string }>(
+      'agent_session_fork',
+      { agent, sessionId, cwd, messageId, timeoutSeconds: sessionTimeoutSeconds },
+      undefined,
+      { timeoutMs: 65_000, timeoutMessage: i18n.get('error.forkSessionTimeout') },
     );
 
   setSessionMode = (agent: string, sessionId: string, modeId: string, timeoutMs = 15_000) =>
