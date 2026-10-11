@@ -45,13 +45,17 @@ export const popularAgents: { id: string; name: string }[] = [
   { id: 'free', name: 'Free' },
   { id: 'claude-acp', name: 'Claude Code' },
   { id: 'codex-acp', name: 'Codex' },
-  { id: 'cursor', name: 'Cursor' },
-  { id: 'pi-acp', name: 'Pi' },
-  { id: 'antigravity-acp', name: 'Google Antigravity' },
   { id: 'github-copilot-cli', name: 'GitHub Copilot' },
+  { id: 'cursor', name: 'Cursor' },
+  { id: 'antigravity-acp', name: 'Google Antigravity' },
   { id: 'opencode', name: 'OpenCode' },
   { id: 'qwen-code', name: 'Qwen Code' },
   { id: 'kimi', name: 'Kimi CLI' },
+  { id: 'junie', name: 'Junie' },
+  { id: 'grok-build', name: 'Grok Build' },
+  { id: 'codebuddy-code', name: 'CodeBuddy Code' },
+  { id: 'qoder', name: 'Qoder CLI' },
+  { id: 'pi-acp', name: 'Pi' },
 ];
 
 export const isRelayUrl = (value: string) => {
