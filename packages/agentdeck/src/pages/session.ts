@@ -336,11 +336,12 @@ export class AgentDeckSessionPageElement extends GemElement {
           <button
             v-if=${!this.#state.followMessages}
             type="button"
-            class="absolute bottom-3 left-1/2 flex min-h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-bg-light px-3.5 text-sm font-semibold whitespace-nowrap text-primary-strong shadow-float active:bg-primary-soft"
+            class="absolute bottom-3 left-1/2 grid size-10 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-primary/20 bg-bg-light text-primary-strong shadow-float active:bg-primary-soft"
+            aria-label=${i18n.get('session.scrollToLatest')}
+            title=${i18n.get('session.scrollToLatest')}
             @click=${() => this.#following?.resume()}
           >
-            <tap-use class="size-4" .element=${icons.arrowDown}></tap-use>
-            ${i18n.get('session.scrollToLatest')}
+            <tap-use class="size-5" .element=${icons.arrowDown}></tap-use>
           </button>
         </div>
 
