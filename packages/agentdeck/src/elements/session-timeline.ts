@@ -28,7 +28,7 @@ export class DeckSessionTimelineElement extends GemElement {
   @property elicitations: Elicitation[] = [];
   @boolattribute pending: boolean;
   @emitter preview: Emitter<Attachment>;
-  @emitter ask: Emitter<string>;
+  @emitter quote: Emitter<string>;
 
   #renderMarkdown = (text: string, streamKey = '', streaming = false, user = false) => html`
     <deck-stream-markdown
@@ -163,7 +163,7 @@ export class DeckSessionTimelineElement extends GemElement {
     // Only replies: user messages render with `user`, process details live in sheets outside the timeline.
     const markdown = closestElement(ele, DeckStreamMarkdownElement);
     if (!markdown || markdown.user || !this.contains(markdown)) return;
-    setSelectionMenuItems({ items: [{ label: 'Ask', onClick: ({ text }) => this.ask(text) }] });
+    setSelectionMenuItems({ items: [{ label: i18n.get('timeline.quote'), onClick: ({ text }) => this.quote(text) }] });
   };
 
   @mounted()

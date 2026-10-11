@@ -88,7 +88,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     return () => document.removeEventListener('visibilitychange', this.#markRead);
   };
 
-  #onAsk = (evt: CustomEvent<string>) => {
+  #onQuote = (evt: CustomEvent<string>) => {
     this.#composerRef.value?.quoteText(evt.detail);
   };
 
@@ -323,7 +323,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 .elicitations=${runtime.elicitations ?? []}
                 ?pending=${pending}
                 @preview=${this.#previewAttachment}
-                @ask=${this.#onAsk}
+                @quote=${this.#onQuote}
                 @widget-send=${this.#sendFromWidget}
               ></deck-session-timeline>
               <section
