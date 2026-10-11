@@ -57,6 +57,8 @@ jobs:
         with:
           toolchain: 1.94.1
           targets: aarch64-apple-ios
+          # swift-rs 在 Xcode 27 上需要 llvm-objcopy 导出插件的 @_cdecl 符号
+          components: llvm-tools
 
       - name: Configure App Store Connect API key
         env:
