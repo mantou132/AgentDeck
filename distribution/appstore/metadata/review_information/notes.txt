@@ -1,8 +1,19 @@
-AgentDeck is a remote client for coding agents (ACP) running on the user's own computer, connected through the open-source agentdeckd daemon.
+PURPOSE AND AUDIENCE
+AgentDeck is a remote client for AI coding agents (Claude Code, Codex, Cursor, OpenCode and other ACP agents) that run on the user's own computer, connected through our open-source agentdeckd daemon. It is for software developers who want to start, monitor and approve agent tasks from their phone while away from the keyboard. Agents and code stay on the user's computer; the app only displays and controls them.
 
-We keep a demo computer online for review:
+HOW TO TEST
+No account or login is required. We keep a demo computer online for review:
 1. Open AgentDeck and go to Settings → Connect to Remote.
 2. Paste this Pairing ID and tap "Save & Connect": {{PAIRING_ID}}
 3. Choose the "Free" agent, open the "workspace/trip-planner" folder and send a prompt such as "Add Paris to the city list".
+Push notifications are sent when an agent finishes a task. Real users install agentdeckd on their computer (npm, Homebrew or Scoop), run "agentdeckd start" and scan the QR code it prints.
 
-Push notifications are sent when an agent finishes a task. No account or login is required.
+EXTERNAL SERVICES
+- AgentDeck relay (agent-deck.xianqiao.wang): forwards end-to-end encrypted messages between the app and the user's computer; users can self-host it.
+- Apple Push Notification service: task-complete notifications.
+- AI agents: run on the user's computer under the user's own accounts with their providers; the built-in "Free" agent uses OpenCode's free models.
+- Apple's system speech recognition and text-to-speech for voice chat.
+No analytics, authentication service or payment processor.
+
+OTHER
+The app has no account creation, no user-generated content shared between users and no paid content. It works the same in all regions. It does not operate in a regulated industry or include protected third-party material.
