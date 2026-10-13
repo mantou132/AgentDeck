@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_data::{self, AppPaths};
 
-pub(crate) const DEFAULT_RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
+pub(crate) const DEFAULT_RELAY_URL: &str = "wss://agentdeck.xianqiao.wang/ws";
+/// Earlier `reset` saved the default relay explicitly; treat it as unset so it follows `DEFAULT_RELAY_URL`.
+const LEGACY_DEFAULT_RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
 
 #[derive(Default)]
 pub(crate) struct RelayOptions {
@@ -55,7 +57,10 @@ impl DaemonConfig {
     }
 
     pub fn relay_url(&self) -> &str {
-        self.relay_url.as_deref().unwrap_or(DEFAULT_RELAY_URL)
+        self.relay_url
+            .as_deref()
+            .filter(|url| *url != LEGACY_DEFAULT_RELAY_URL)
+            .unwrap_or(DEFAULT_RELAY_URL)
     }
 
     /// Normal starts reuse saved values unless explicitly overridden.
@@ -95,12 +100,7 @@ impl DaemonConfig {
                     .filter(|id| !id.trim().is_empty())
                     .unwrap_or_else(generate_pairing_id),
             ),
-            relay_url: Some(
-                options
-                    .relay_url
-                    .clone()
-                    .unwrap_or_else(|| DEFAULT_RELAY_URL.to_owned()),
-            ),
+            relay_url: options.relay_url.clone(),
         };
         config.save(paths)?;
         Ok(config)
@@ -272,5 +272,14 @@ mod tests {
         assert_eq!(config.awake, crate::awake::Mode::Never);
         assert_eq!(config.relay_url(), DEFAULT_RELAY_URL);
         assert_eq!(config.relay_id.as_deref(), Some("existing-id"));
+    }
+
+    #[test]
+    fn legacy_default_relay_follows_current_default() {
+        let config: DaemonConfig = serde_json::from_str(&format!(
+            r#"{{"relay_id":"existing-id","relay_url":"{LEGACY_DEFAULT_RELAY_URL}"}}"#
+        ))
+        .unwrap();
+        assert_eq!(config.relay_url(), DEFAULT_RELAY_URL);
     }
 }

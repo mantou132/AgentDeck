@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-pub const PUSH_URL: &str = "https://agent-deck.xianqiao.wang/push";
+pub const PUSH_URL: &str = "https://agentdeck.xianqiao.wang/push";
 
 /// The body is localized by the app (`notification_response_complete` in the
 /// Android strings and the iOS `Localizable.strings`).

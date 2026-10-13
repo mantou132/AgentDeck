@@ -28,7 +28,7 @@ export const DATABASES = {
   drafts: { name: 'agentdeck-drafts', version: 1, storeName: 'drafts' },
 } as const;
 
-export const RELAY_URL = 'wss://agent-deck.xianqiao.wang/ws';
+export const RELAY_URL = 'wss://agentdeck.xianqiao.wang/ws';
 export const FEEDBACK_URL = 'https://github.com/mantou132/AgentDeck/issues/new';
 
 /** Raise when the app needs a newer agentdeckd; older hosts get an upgrade toast once per launch. */

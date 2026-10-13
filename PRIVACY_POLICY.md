@@ -15,7 +15,7 @@ AgentDeck contains no analytics, advertising, or tracking SDKs. We do not sell d
 
 ## 3. Relay
 
-The app, the extension, and the daemon communicate through a WebSocket relay: the default relay at `wss://agent-deck.xianqiao.wang/ws`, or a relay you host yourself.
+The app, the extension, and the daemon communicate through a WebSocket relay: the default relay at `wss://agentdeck.xianqiao.wang/ws`, or a relay you host yourself.
 
 - With `adk1_` Pairing IDs, messages are end-to-end encrypted. The relay only receives ciphertext, a routing ID derived from the Pairing ID, device IDs, and connection metadata (IP addresses, timestamps, message sizes). It cannot read prompts, replies, or files.
 - The relay stores undelivered encrypted messages temporarily and deletes them after delivery or when they expire.
@@ -23,7 +23,7 @@ The app, the extension, and the daemon communicate through a WebSocket relay: th
 
 ## 4. Push Notifications
 
-To tell you when a task is complete, the app registers with Firebase Cloud Messaging (FCM), a Google service, and sends its FCM token to your daemon. On iOS, FCM delivers notifications through Apple Push Notification service (APNs). When a task completes, the daemon sends the token, the agent ID, and the session ID to our notification forwarder (`agent-deck.xianqiao.wang/push`), which passes them to FCM. Notifications never contain prompts or replies. FCM processes the token under [Google's privacy policy](https://policies.google.com/privacy).
+To tell you when a task is complete, the app registers with Firebase Cloud Messaging (FCM), a Google service, and sends its FCM token to your daemon. On iOS, FCM delivers notifications through Apple Push Notification service (APNs). When a task completes, the daemon sends the token, the agent ID, and the session ID to our notification forwarder (`agentdeck.xianqiao.wang/push`), which passes them to FCM. Notifications never contain prompts or replies. FCM processes the token under [Google's privacy policy](https://policies.google.com/privacy).
 
 ## 5. Permissions
 
