@@ -15,7 +15,7 @@
 - `src/peer.rs`：JSON RPC 对端。`handle_with_bytes` 注册的处理函数可在结果旁返回原始字节（如 `file_read` 的图片与 raw 读取），由传输层携带，对端在 `result.data` 收到；结果本身不放 `data`，也不做 base64。
 - `src/relay_codec.rs`：RPC 消息与 Relay 帧互转（加密、帧大小限制与超限错误回复）。带字节的回复总是拼成二进制帧（`[u32 头长度][回复 JSON][原始字节]`，加密为 `[nonce][密文]`，AAD 带 `binary` 标签），Relay 按 ephemeral 投递。不涉及 peer 与设备。
 - `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密原语。
-- `src/push.rs`：prompt 成功完成时，向发起该 prompt 的设备推送 FCM 通知。
+- `src/push.rs`：prompt 成功完成时，向发起该 prompt 的设备推送 FCM 通知；正文用 `notification_response_complete` 由 App 本地化（Android strings、iOS `Localizable.strings`）。
 - `src/screen_capture.rs`：`screen_capture` RPC，按 target 截一帧（`ios:` 用 `simctl` 的 alpha 遮罩得到屏幕形状；`android:` 用 adb，形状取自 `dumpsys display`；`browser:` 用 rmcp 连 browser4agent 本地 MCP 服务 `127.0.0.1:39271/mcp`，并以页面脚本判断标签页是否在模拟手机），缩放后以 JPEG 字节回复，不保存状态。
 - `src/render_skills.rs`：渲染能力对应的 skill（`src/render_skills/<能力>/SKILL.md`），首次使用时写入 `AppPaths::skills_dir()`；mermaid / LaTeX 不单独声明能力，写在 chart skill 里。
 - `src/logger.rs`：`tracing` 日志（含依赖库事件）按天写入 `logs/agentdeckd.YYYY-MM-DD.log`，保留 7 个文件；默认 `info`，`RUST_LOG` 可覆盖；只在 `run` 中初始化，不输出到终端。

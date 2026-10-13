@@ -20,6 +20,7 @@
 		B5D97BD73DBCF1438DE42274 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */; };
 		C9FAEEA58679281628E33BD4 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 78CB78DE555762C0467FFC5B /* UIKit.framework */; };
 		DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */; };
+		791A0E1E30601A81001CBED7 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 791A0E1D30601A81001CBED7 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,8 @@
 		DAB9945DE9E9EFB52CC302D4 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		F82D63050BFA082B2F66F7A8 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		791A0E1F30601A81001CBED7 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		791A0E2030601A81001CBED7 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +120,7 @@
 				791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */,
 				19EC4957519500559466C137 /* agentdeck_iOS.entitlements */,
 				14FEFCCE8C4E76330EF845D8 /* Info.plist */,
+				791A0E1D30601A81001CBED7 /* Localizable.strings */,
 			);
 			path = agentdeck_iOS;
 			sourceTree = "<group>";
@@ -191,6 +195,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = AA675ADF24F9B8A4034F70D7;
 			minimizedProjectReferenceProxies = 1;
@@ -213,6 +218,7 @@
 				791A0E1C30601A81001CBED7 /* GoogleService-Info.plist in Resources */,
 				DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */,
 				A3AA947601E86B0B7A41EF10 /* assets in Resources */,
+				791A0E1E30601A81001CBED7 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,6 +258,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		791A0E1D30601A81001CBED7 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				791A0E1F30601A81001CBED7 /* en */,
+				791A0E2030601A81001CBED7 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		2A82DC17B19623D9EDAAA59B /* debug */ = {
