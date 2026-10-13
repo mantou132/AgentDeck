@@ -2,6 +2,7 @@ name: Release iOS
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
@@ -9,8 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-ios
-  cancel-in-progress: false
+  # main 上连续推送只保留最新一次 TestFlight 构建；tag 发版不被取消
+  group: release-ios-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
   release:
@@ -33,6 +35,13 @@ jobs:
           version=$(jq -r '.version' "$tauri_conf")
           if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" == v* ]]; then
             version="${GITHUB_REF_NAME#v}"
+          elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            # 已发布版本的 train 会关闭，TestFlight 构建使用最新 tag 的下一个 patch 版本
+            latest=$(git ls-remote --tags --refs --sort=-v:refname origin 'v*' | head -1 | sed 's|.*refs/tags/v||')
+            IFS=. read -r major minor patch <<< "$latest"
+            version="$major.$minor.$((patch + 1))"
+          fi
+          if [[ "$version" != "$(jq -r '.version' "$tauri_conf")" ]]; then
             echo "Syncing tauri.conf.json version to $version"
             jq --arg v "$version" '.version = $v' "$tauri_conf" > "${tauri_conf}.tmp" && mv "${tauri_conf}.tmp" "$tauri_conf"
           fi
@@ -111,6 +120,18 @@ jobs:
           name: AgentDeck-ios-${{ steps.version.outputs.version }}
           path: release/
           if-no-files-found: error
+
+      - name: Upload to TestFlight
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IPA: ${{ steps.ipa.outputs.path }}
+        run: |
+          command -v fastlane > /dev/null || gem install fastlane --no-document
+          fastlane pilot upload \
+            --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
+            --app_identifier "$APP_IDENTIFIER" \
+            --ipa "$IPA" \
+            --skip_waiting_for_build_processing true
 
       - name: Prepare App Store metadata
         if: github.event_name == 'push' && github.ref_type == 'tag'

@@ -18,7 +18,7 @@
   - `ci.yml`：push 到 main 与 PR 时运行全局检查（Biome、tsc、前端与扩展测试和构建、`cargo check` 与 Daemon 测试）；Tauri crate 编译需要前端构建产物与系统 WebView，所以 Rust 检查跑在 macOS。
   - `release.yml`：Daemon 多平台构建、npm OIDC 分发、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）；npm 实现见 `crates/daemon/CLAUDE.md`。
   - `release-android.yml`：Android 签名构建与 Google Play 发布。
-  - `release-ios.yml`：iOS 签名构建与 App Store 发布；商店资料与首次上架清单见 `distribution/appstore/`。
+  - `release-ios.yml`：iOS 签名构建；push 到 main 上传 TestFlight（版本号为最新 tag 的下一个 patch），tag 提交 App Store 发布；商店资料与首次上架清单见 `distribution/appstore/`。
   - `bump-packages.yml`：版本自动递增与包依赖管理。
 - `biome.json`：代码风格格式化与 Lint 配置。
 
