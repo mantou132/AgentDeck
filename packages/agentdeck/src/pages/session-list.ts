@@ -34,6 +34,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
     navigatingCwd: false,
   });
 
+  /** The picked directory belongs to the previous host. */
+  @effect(() => [agentdeckStore.settings.relayId])
+  #resetNewSession = () => {
+    if (this.#state.selectedCwd) this.#state({ selectedCwd: '', navigatingCwd: false });
+  };
+
   #openNewSession = () => {
     this.#state({
       sheetOpen: true,
@@ -266,12 +272,18 @@ export class AgentDeckSessionListPageElement extends GemElement {
         @close=${this.#closeNewSession}
         .content=${html`
           <div class="flex h-full flex-col">
-            <deck-file-browser
-              directories-only
-              .emptyText=${i18n.get('cwdPicker.emptyDir')}
-              @navstart=${this.#onCwdNavStart}
-              @change=${this.#onCwdChange}
-            ></deck-file-browser>
+            ${repeat(
+              [settings.relayId],
+              (relayId) => relayId,
+              () => html`
+                <deck-file-browser
+                  directories-only
+                  .emptyText=${i18n.get('cwdPicker.emptyDir')}
+                  @navstart=${this.#onCwdNavStart}
+                  @change=${this.#onCwdChange}
+                ></deck-file-browser>
+              `,
+            )}
 
             <div
               v-if=${newSessionError}
