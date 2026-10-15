@@ -49,6 +49,10 @@ const SKILLS: &[RenderSkill] = &[
         capability: "screen",
         skill_md: include_str!("render_skills/screen/SKILL.md"),
     },
+    RenderSkill {
+        capability: "session",
+        skill_md: include_str!("render_skills/session/SKILL.md"),
+    },
 ];
 
 /// Skill locations agents scan in additional directories: Codex reads

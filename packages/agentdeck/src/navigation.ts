@@ -182,12 +182,17 @@ export const openSettings = () => {
   });
 };
 
-export const openSession = (sessionId: string, options?: { replace?: boolean }) => {
+/** `prompt` is sent once the page opens, e.g. a new session started from an `agentdeck-session` card. */
+export const openSession = (sessionId: string, options?: { replace?: boolean; prompt?: string }) => {
   const method = options?.replace ? Stack.replace : Stack.push;
   method({
     animated: true,
     content: html`
-      <agentdeck-session-page class="block h-full" .sessionId=${sessionId}></agentdeck-session-page>
+      <agentdeck-session-page
+        class="block h-full"
+        .sessionId=${sessionId}
+        .initialPrompt=${options?.prompt}
+      ></agentdeck-session-page>
     `,
     gesture: true,
   });

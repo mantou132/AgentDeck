@@ -56,6 +56,8 @@ const style = css`
 @connectStore(history.store)
 export class AgentDeckSessionPageElement extends GemElement {
   @property sessionId = '';
+  /** Sent as soon as the page opens. */
+  @property initialPrompt?: string;
 
   #state = createState({ followMessages: true, deferTimeline: false, entered: false, voiceChat: false });
   #messagesRef = createRef<HTMLElement>();
@@ -208,6 +210,23 @@ export class AgentDeckSessionPageElement extends GemElement {
     this.#send({ text: event.detail, attachments: [] });
   };
 
+  @mounted()
+  #sendInitialPrompt = () => {
+    if (this.initialPrompt) this.#send({ text: this.initialPrompt, attachments: [] });
+  };
+
+  // An `agentdeck-session` card starts a session with the same agent and directory and sends its prompt right away.
+  #startNewSession = ({ detail: prompt }: CustomEvent<string>) => {
+    const session = getSession(this.sessionId);
+    if (!session) return;
+    const { connection } = agentdeckStore;
+    if (connection !== 'connected') {
+      Toast.open('warning', getConnectionLabel(connection));
+      return;
+    }
+    openSession(createPendingSession({ agent: session.agent, cwd: session.cwd }).sessionId, { prompt });
+  };
+
   #previewAttachment = (event: CustomEvent<Attachment>) => {
     const attachment = event.detail;
     if (attachment.kind === 'file' && 'uri' in attachment) {
@@ -339,6 +358,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 @quote=${this.#onQuote}
                 @fork=${this.#onFork}
                 @widget-send=${this.#sendFromWidget}
+                @new-session=${this.#startNewSession}
               ></deck-session-timeline>
               <section
                 v-if=${!loading && loaded && !messages.length}

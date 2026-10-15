@@ -5,6 +5,7 @@ import { isSmallTextFile } from './file-preview';
 import { parseMessageLink } from './links';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
 
+import '../elements/new-session';
 import '../elements/preview';
 import '../elements/screen';
 
@@ -117,6 +118,8 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
         }
         if (closed && language === 'agentdeck-map') return `<deck-map source="${source}"></deck-map>`;
         if (closed && language === 'agentdeck-screen') return `<deck-screen target="${source}"></deck-screen>`;
+        if (closed && language === 'agentdeck-session')
+          return `<deck-new-session source="${source}"></deck-new-session>`;
         if (closed && diffLanguages.includes(language)) {
           return `<gem-bind-diff2html color-scheme="${diffColorScheme}" compact-line-numbers tabindex="0">${source}</gem-bind-diff2html>`;
         }
@@ -208,7 +211,8 @@ const baseMarkdownStyle = `
   deck-chart,
   deck-map,
   deck-preview,
-  deck-screen {
+  deck-screen,
+  deck-new-session {
     border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
     border-radius: ${agentDeckTheme.normalRound};
     background: ${agentDeckTheme.lightBackgroundColor};
@@ -277,7 +281,8 @@ userMarkdownStyle.replaceSync(`
   deck-chart,
   deck-map,
   deck-preview,
-  deck-screen {
+  deck-screen,
+  deck-new-session {
     max-width: 100%;
     margin: .6rem 0;
     border: ${agentDeckTheme.borderWidth} solid ${agentDeckTheme.borderColor};
