@@ -504,6 +504,9 @@ class AgentTransport {
       } catch {}
     }
     if (!this.hostSession.isPayloadAllowed(message as Record<string, unknown>)) return;
+    // After a reconnect the Relay replays the host's backlog first and the attach reply comes after it.
+    const { attachId } = this.hostSession;
+    if (attachId !== undefined && message.id !== attachId) this.agentApi.touch(attachId);
     await this.agentApi.dispatch(message);
   }
 

@@ -88,6 +88,19 @@ test('Relay ready does not enable App until host attach succeeds; timeout can be
   assert.equal(fixture.app.sessionsStore.sessions.length, 1);
 });
 
+test('host frames arriving ahead of the attach reply keep the attach alive', async () => {
+  const fixture = documentFixture();
+  fixture.heldMethods.add('peer_attach');
+  await fixture.connect();
+  await fixture.advance(8000);
+  fixture.deliver({ id: 'earlier-prompt', event: {}, peerId: 1 });
+  await tick();
+  await fixture.advance(8000);
+  assert.equal(fixture.app.agentdeckStore.connection, 'attaching');
+  await fixture.advance(2000);
+  assert.equal(fixture.app.agentdeckStore.connection, 'unavailable');
+});
+
 test('Relay handshake watchdog recovers a socket stuck before ready', async () => {
   const fixture = documentFixture();
   fixture.app.startApp();
@@ -199,6 +212,31 @@ test('RPC settles asynchronous send failures and clears timers on completion/rej
   peer.rejectAll(new Error('reset'));
   await rejected;
   assert.equal(fixture.timers.size, 0);
+});
+
+test('RPC timeout restarts on each streamed event', async () => {
+  const fixture = documentFixture();
+  const { RpcPeer } = fixture.rpc;
+  const sent = [];
+  const peer = new RpcPeer((message) => {
+    sent.push(message);
+  });
+  const events = [];
+  const done = peer.call('test', {}, (event) => events.push(event), { timeoutMs: 100, timeoutMessage: 'timeout' });
+  await fixture.advance(80);
+  peer.dispatch({ id: sent[0].id, event: 1 });
+  await fixture.advance(80);
+  peer.dispatch({ id: sent[0].id, event: 2 });
+  await fixture.advance(80);
+  peer.dispatch({ id: sent[0].id, result: true });
+  assert.equal(await done, true);
+  assert.deepEqual(events, [1, 2]);
+  assert.equal(fixture.timers.size, 0);
+  const stalled = peer.call('test', {}, () => {}, { timeoutMs: 100, timeoutMessage: 'timeout' });
+  const rejected = assert.rejects(stalled, /timeout/);
+  peer.dispatch({ id: sent[1].id, event: 1 });
+  await fixture.advance(100);
+  await rejected;
 });
 
 test('new attach may update peer ID and late replies cannot overwrite it', async () => {

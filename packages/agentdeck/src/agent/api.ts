@@ -238,6 +238,8 @@ export class AgentApi {
 
   rejectAll = (error: Error) => this.#peer.rejectAll(error);
 
+  touch = (id: RpcId) => this.#peer.touch(id);
+
   /** Requests waiting for the user arrive as notifications; answers go through `respondUserInput`. */
   setUserInputHandler = (handler?: ((input: UserInput) => void) | null) => {
     for (const method of ['agent_permission_request', 'agent_elicitation_request'] as const) {

@@ -168,7 +168,7 @@ export class DeckChangesPageElement extends GemElement {
                   title=${file.path}
                   @click=${() => this.#onFileClick(file.path)}
                 >
-                  <div class="flex min-w-0 items-center gap-2.5">
+                  <div class="flex min-w-0 flex-1 items-center gap-2.5">
                     <span
                       class=${classMap({
                         'inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-xs font-mono font-bold': true,

@@ -29,6 +29,7 @@ type PendingCall = {
   reject: (error: Error) => void;
   onEvent?: (event: unknown) => void | Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
+  startTimer?: () => void;
 };
 
 type Handler = (params: unknown) => unknown | Promise<unknown>;
@@ -58,13 +59,18 @@ export class RpcPeer {
       const pending: PendingCall = { resolve: resolve as (value: unknown) => void, reject, onEvent };
       this.#pending.set(id, pending);
       if (options) {
-        pending.timer = setTimeout(() => {
-          if (!this.#takePending(id)) return;
-          reject(new Error(options.timeoutMessage));
-          Promise.resolve()
-            .then(() => this.#onTimeout?.(id))
-            .catch(console.error);
-        }, options.timeoutMs);
+        // Counted from the last frame: a long event stream (e.g. a load replay) keeps the call alive.
+        pending.startTimer = () => {
+          clearTimeout(pending.timer);
+          pending.timer = setTimeout(() => {
+            if (!this.#takePending(id)) return;
+            reject(new Error(options.timeoutMessage));
+            Promise.resolve()
+              .then(() => this.#onTimeout?.(id))
+              .catch(console.error);
+          }, options.timeoutMs);
+        };
+        pending.startTimer();
       }
       const failed = (error: unknown) => {
         this.#takePending(id)?.reject(error instanceof Error ? error : new Error(String(error)));
@@ -84,6 +90,9 @@ export class RpcPeer {
       onEvent: handlers.onEvent,
     });
   };
+
+  /** Restart a pending call's timeout, e.g. while frames queued ahead of its reply are still arriving. */
+  touch = (id: RpcId) => this.#pending.get(id)?.startTimer?.();
 
   /** Drop a pending call without settling it; a late reply is then ignored. */
   forget = (id: RpcId) => {
@@ -121,6 +130,7 @@ export class RpcPeer {
       const pending = this.#pending.get(id);
       if (!pending) return;
       if ('event' in message) {
+        pending.startTimer?.();
         try {
           return pending.onEvent?.(message.event);
         } catch (error) {
