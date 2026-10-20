@@ -41,6 +41,8 @@ pub(super) enum AgentLaunch {
         args: Vec<String>,
         env: HashMap<String, String>,
     },
+    /// A custom agent's own command, resolved from `PATH` unless it is a path.
+    Command { command: String, args: Vec<String> },
 }
 
 /// A supported agent, its user CLI, and how to launch or provision ACP.
@@ -108,6 +110,40 @@ pub(super) struct RegistryUvxTarget {
     pub(super) args: Vec<String>,
     #[serde(default)]
     pub(super) env: HashMap<String, String>,
+}
+
+/// An agent from `custom_agents.json`. With a `command` it runs that command,
+/// replacing a registry agent with the same id; with only an `id` it is the
+/// registry agent of that id.
+#[derive(Debug, Clone, Deserialize)]
+struct CustomAgent {
+    id: String,
+    name: Option<String>,
+    command: Option<String>,
+    #[serde(default)]
+    args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CustomAgents {
+    agents: Vec<CustomAgent>,
+}
+
+/// Read on every use so edits apply without restarting the daemon.
+fn custom_agents() -> Vec<CustomAgent> {
+    let Ok(path) = AppPaths::discover().map(|paths| paths.custom_agents_file()) else {
+        return Vec::new();
+    };
+    let Ok(bytes) = fs::read(&path) else {
+        return Vec::new();
+    };
+    match serde_json::from_slice::<CustomAgents>(&bytes) {
+        Ok(custom) => custom.agents,
+        Err(err) => {
+            tracing::warn!("Ignoring invalid {}: {err}", path.display());
+            Vec::new()
+        }
+    }
 }
 
 /// The registry in use; only replaced by a newer fetch, never by an older copy.
@@ -299,6 +335,20 @@ pub(super) fn managed_binary_agent(id: &str) -> &str {
 }
 
 pub(super) fn agent_candidate(id: &str) -> Result<AgentCandidate> {
+    if let Some(CustomAgent {
+        id,
+        name,
+        command: Some(command),
+        args,
+    }) = custom_agents().into_iter().find(|custom| custom.id == id)
+    {
+        return Ok(AgentCandidate {
+            name: name.unwrap_or_else(|| id.clone()),
+            id,
+            cli: None,
+            launch: AgentLaunch::Command { command, args },
+        });
+    }
     let mut candidate =
         candidates_for_platform((*current_registry()).clone(), &registry_platform())
             .into_iter()
@@ -307,6 +357,7 @@ pub(super) fn agent_candidate(id: &str) -> Result<AgentCandidate> {
     let env = match &mut candidate.launch {
         AgentLaunch::Binary { target, .. } => &mut target.env,
         AgentLaunch::Npx { env, .. } | AgentLaunch::Uvx { env, .. } => env,
+        AgentLaunch::Command { .. } => unreachable!("custom agents return early"),
     };
     env.extend(agentdeck_env(id)?);
     Ok(candidate)
@@ -319,13 +370,24 @@ pub struct AvailableAgent {
     pub name: String,
 }
 
-/// Agents with a usable distribution for this host (binary, then npx/uvx).
-pub fn available_agents() -> Vec<AvailableAgent> {
-    candidates_for_platform((*current_registry()).clone(), &registry_platform())
+/// Custom agents, which clients list below `free`; unnamed ones take the
+/// registry name.
+pub fn custom_agent_list() -> Vec<AvailableAgent> {
+    let registry = current_registry();
+    custom_agents()
         .into_iter()
-        .map(|candidate| AvailableAgent {
-            id: candidate.id,
-            name: candidate.name,
+        .map(|custom| AvailableAgent {
+            name: custom
+                .name
+                .or_else(|| {
+                    registry
+                        .agents
+                        .iter()
+                        .find(|agent| agent.id == custom.id)
+                        .map(|agent| agent.name.clone())
+                })
+                .unwrap_or_else(|| custom.id.clone()),
+            id: custom.id,
         })
         .collect()
 }
@@ -333,8 +395,20 @@ pub fn available_agents() -> Vec<AvailableAgent> {
 #[cfg(test)]
 mod tests {
     use super::{
-        AgentLaunch, agentdeck_env, bundled_registry, candidates_for_platform, managed_binary_agent,
+        AgentLaunch, CustomAgents, agentdeck_env, bundled_registry, candidates_for_platform,
+        managed_binary_agent,
     };
+
+    #[test]
+    fn parses_custom_agents() {
+        let custom: CustomAgents = serde_json::from_str(
+            r#"{ "agents": [{ "id": "omp", "name": "Oh My Pi", "command": "omp", "args": ["acp"] }, { "id": "amp-acp" }] }"#,
+        )
+        .unwrap();
+        assert_eq!(custom.agents[0].command.as_deref(), Some("omp"));
+        assert_eq!(custom.agents[0].args, ["acp"]);
+        assert!(custom.agents[1].command.is_none() && custom.agents[1].name.is_none());
+    }
 
     #[test]
     fn parses_bundled_registry() {

@@ -5,7 +5,7 @@ import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
-import { agentdeckStore, type SessionRuntime, sessionsStore } from '../state/store';
+import { agentdeckStore, hostAgents, type SessionRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -80,9 +80,9 @@ export class AgentDeckSessionListPageElement extends GemElement {
   @template()
   #render = () => {
     const { sheetOpen, newSessionError, selectedCwd, navigatingCwd } = this.#state;
-    const { connection, connectionError, settings, agents } = agentdeckStore;
+    const { connection, connectionError, settings } = agentdeckStore;
     const { sessionGroups, sessionsLoading, sessionsLoaded, sessionsError, runtimes } = sessionsStore;
-    const selectedAgent = agents.find((agent) => agent.id === settings.agent);
+    const selectedAgent = hostAgents().find((agent) => agent.id === settings.agent);
     const errorMessage = connectionError || sessionsError;
     const hasError = Boolean(errorMessage);
     const hasGroups = Boolean(sessionGroups.length);

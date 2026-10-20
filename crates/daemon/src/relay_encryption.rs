@@ -199,7 +199,7 @@ mod tests {
         let codec =
             RelayEncryption::new(&format!("adk1_{}", URL_SAFE_NO_PAD.encode([42; 32]))).unwrap();
         assert!(codec.open(v["appFrame"].clone()).is_err());
-        assert!(codec.open(json!({"method": "agent_list"})).is_err());
+        assert!(codec.open(json!({"method": "agent_prompts_running"})).is_err());
         assert!(codec.open(v["hostFrame"].clone()).is_err());
         for id in ["adk2_bad", "adk1_bad", "adk1_", "secret"] {
             assert!(RelayEncryption::new(id).is_err());

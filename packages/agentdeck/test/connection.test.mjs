@@ -73,7 +73,7 @@ test('Relay ready does not enable App until host attach succeeds; timeout can be
   await fixture.connect();
   assert.equal(fixture.app.agentdeckStore.connection, 'attaching');
   assert.equal(
-    fixture.requests.some((request) => request.payload.method === 'agent_list'),
+    fixture.requests.some((request) => request.payload.method === 'agent_session_list'),
     false,
   );
   await fixture.advance(10_000);

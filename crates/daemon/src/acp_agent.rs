@@ -32,7 +32,7 @@ mod provision;
 #[cfg(test)]
 mod lifecycle_tests;
 
-pub use catalog::available_agents;
+pub use catalog::custom_agent_list;
 use provision::prepare_agent_command;
 
 fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {

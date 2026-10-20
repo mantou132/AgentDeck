@@ -268,8 +268,7 @@ export function documentFixture(previous, options = {}) {
         const { method } = request.payload;
         if (!method || processed.has(request.message_id) || heldMethods.has(method)) continue;
         const results = {
-          peer_attach: { peerId: 1 },
-          agent_list: { agents: [{ id: 'codex', name: 'Codex' }] },
+          peer_attach: { peerId: 1, customAgents: [] },
           agent_session_list: { sessions: [remoteSession] },
           agent_session_close: { closed: true },
           agent_session_load: { sessionId: 's1', agent: 'codex' },

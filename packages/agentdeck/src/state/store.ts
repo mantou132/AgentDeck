@@ -1,6 +1,6 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
-import { popularAgents, readPairingHistory, readSavedCommands, readSettings } from '../config';
+import { defaultAgents, readPairingHistory, readSavedCommands, readSettings } from '../config';
 import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
 import type { ChatMessage, DeckSession, SessionOptions } from '../session/types';
@@ -11,7 +11,6 @@ const initialSettings = readSettings();
 export const agentdeckStore = createStore({
   settings: initialSettings,
   pairingHistory: readPairingHistory(),
-  agents: popularAgents,
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
   /** Daemon version of the connected host; old hosts omit it. */
@@ -57,9 +56,17 @@ export const messagesStore = createStore({
   bySession: {} as Record<string, ChatMessage[]>,
 });
 
+const getPairing = (relayId: string) => agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
+
 /** Home directory of the current host, remembered from its last handshake. */
-export const hostHome = () =>
-  agentdeckStore.pairingHistory.find((item) => item.relayId === agentdeckStore.settings.relayId)?.home;
+export const hostHome = () => getPairing(agentdeckStore.settings.relayId)?.home;
+
+/** `free`, the host's custom agents remembered from its last handshake, then the other built-in agents. */
+export const hostAgents = (relayId = agentdeckStore.settings.relayId) => {
+  const custom = getPairing(relayId)?.customAgents ?? [];
+  const [free, ...popular] = defaultAgents;
+  return [free, ...custom, ...popular.filter((agent) => !custom.some(({ id }) => id === agent.id))];
+};
 
 const idleRuntime: SessionRuntime = { load: 'idle' };
 

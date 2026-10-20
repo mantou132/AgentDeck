@@ -290,16 +290,18 @@ impl RemotePeerManager {
         let hostname = gethostname::gethostname().to_string_lossy().into_owned();
         // Clients shorten paths under it to `~`.
         let home = dirs::home_dir().map(|home| home.to_string_lossy().into_owned());
+        // Clients list them below `free` in their agent picker.
+        let custom_agents = crate::acp_agent::custom_agent_list();
         let response = match id {
             Some(req_id) => json!({
                 "peerId": peer_id,
                 "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home }
+                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents }
             }),
             None => json!({
                 "peerId": peer_id,
                 "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home }
+                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents }
             }),
         };
         let target = if device_id.is_empty() {
@@ -534,11 +536,10 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(result["id"], "list-1");
-        assert!(result["result"]["agents"].is_array());
         assert_eq!(target.as_deref(), Some("test-phone"));
         handler.on_payload(vector["wrongPeerFrame"].clone());
         handler.on_payload(vector["wrongDeviceFrame"].clone());
-        handler.on_payload(json!({"id":"plain", "method":"agent_list", "peerId":1}));
+        handler.on_payload(json!({"id":"plain", "method":"agent_prompts_running", "peerId":1}));
         tokio::task::yield_now().await;
         assert!(outbound_rx.try_recv().is_err());
     }
@@ -548,7 +549,7 @@ mod tests {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let manager = RemotePeerManager::with_devices(AgentService::new(), tx, HashMap::new());
 
-        let request = json!({ "peerId": 1, "id": "e", "method": "agent_list", "params": {}, "ephemeral": true });
+        let request = json!({ "peerId": 1, "id": "e", "method": "agent_prompts_running", "params": {}, "ephemeral": true });
         manager.dispatch(request).await;
         let reply = rx.recv().await.unwrap();
         assert!(reply.ephemeral);
@@ -556,7 +557,7 @@ mod tests {
         assert!(manager.ephemeral_calls.lock().unwrap().is_empty());
 
         manager
-            .dispatch(json!({ "peerId": 1, "id": "d", "method": "agent_list", "params": {} }))
+            .dispatch(json!({ "peerId": 1, "id": "d", "method": "agent_prompts_running", "params": {} }))
             .await;
         assert!(!rx.recv().await.unwrap().ephemeral);
 
@@ -654,24 +655,24 @@ mod tests {
             Some(2)
         );
 
-        // Phone A calls agent_list with peerId 1
+        // Phone A calls agent_prompts_running with peerId 1
         manager
             .dispatch(json!({
                 "peerId": 1,
                 "id": "req-a2",
-                "method": "agent_list",
+                "method": "agent_prompts_running",
                 "params": {}
             }))
             .await;
 
         let Outbound {
-            message: res_agents,
-            target_device_id: target_agents,
+            message: res_running,
+            target_device_id: target_running,
             ..
-        } = outbound_rx.recv().await.expect("Phone A agent_list");
-        assert_eq!(target_agents, Some("device-phone-a".to_string()));
-        assert_eq!(res_agents.get("peerId").and_then(Value::as_u64), Some(1));
-        assert_eq!(res_agents.get("id").and_then(Value::as_str), Some("req-a2"));
-        assert!(res_agents.get("result").is_some());
+        } = outbound_rx.recv().await.expect("Phone A agent_prompts_running");
+        assert_eq!(target_running, Some("device-phone-a".to_string()));
+        assert_eq!(res_running.get("peerId").and_then(Value::as_u64), Some(1));
+        assert_eq!(res_running.get("id").and_then(Value::as_str), Some("req-a2"));
+        assert!(res_running.get("result").is_some());
     }
 }

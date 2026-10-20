@@ -32,7 +32,7 @@ export const RELAY_URL = 'wss://agentdeck.xianqiao.wang/ws';
 export const FEEDBACK_URL = 'https://github.com/mantou132/AgentDeck/issues/new';
 
 /** Raise when the app needs a newer agentdeckd; older hosts get an upgrade toast once per launch. */
-export const MIN_DAEMON_VERSION = '0.4.0';
+export const MIN_DAEMON_VERSION = '0.8.0';
 
 /** Markdown blocks this client renders; the host teaches agents to write them (e.g. `agentdeck-chart`). */
 export const RENDER_CAPABILITIES: ClientCapabilities = {
@@ -41,9 +41,11 @@ export const RENDER_CAPABILITIES: ClientCapabilities = {
     : ['widget', 'chart', 'map', 'screen', 'session'],
 };
 
+export type AgentInfo = { id: string; name: string };
+
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
-// `free` is the daemon's built-in agent (OpenCode free models), first so it is the default.
-export const popularAgents: { id: string; name: string }[] = [
+// `free` is the daemon's built-in agent (OpenCode free models), first so it is the default; hosts' custom agents follow it.
+export const defaultAgents: AgentInfo[] = [
   { id: 'free', name: 'Free' },
   { id: 'claude-acp', name: 'Claude Code' },
   { id: 'codex-acp', name: 'Codex' },
@@ -86,7 +88,16 @@ export const readSavedCommands = () =>
   ) as Record<string, AvailableCommand[]>;
 
 /** A pairing whose host handshake succeeded; `hostname` is missing for old daemons. */
-export type PairingRecord = { relayId: string; relayUrl?: string; hostname?: string; home?: string };
+export type PairingRecord = {
+  relayId: string;
+  relayUrl?: string;
+  hostname?: string;
+  home?: string;
+  /** From `custom_agents.json` on the host. */
+  customAgents?: AgentInfo[];
+  /** Agent last chosen for this host. */
+  agent?: string;
+};
 
 /** Most recently connected first. */
 export const readPairingHistory = (): PairingRecord[] => {
@@ -106,10 +117,10 @@ export const readSettings = (): AppSettings => {
     const relayId = typeof value?.relayId === 'string' && isPairingId(value.relayId) ? value.relayId : '';
     return {
       relayId,
-      agent: typeof value?.agent === 'string' && value.agent ? value.agent : popularAgents[0].id,
+      agent: typeof value?.agent === 'string' && value.agent ? value.agent : defaultAgents[0].id,
       relayUrl: typeof value?.relayUrl === 'string' && isRelayUrl(value.relayUrl) ? value.relayUrl : '',
     };
   } catch {
-    return { relayId: '', agent: popularAgents[0].id, relayUrl: '' };
+    return { relayId: '', agent: defaultAgents[0].id, relayUrl: '' };
   }
 };

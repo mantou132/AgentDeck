@@ -1,3 +1,4 @@
+import type { AgentInfo } from '../config';
 import { i18n } from '../i18n';
 import type { RpcId, RpcMessage } from './rpc';
 import { RpcPeer } from './rpc';
@@ -227,6 +228,14 @@ type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 // Allow ACP startup/history work more time than the lightweight host handshake.
 const sessionTimeoutSeconds = 60;
 
+type PeerAttachResult = {
+  peerId: number;
+  version?: string;
+  hostname?: string;
+  home?: string;
+  customAgents: AgentInfo[];
+};
+
 export class AgentApi {
   #peer: RpcPeer;
 
@@ -266,15 +275,10 @@ export class AgentApi {
     this.#peer.onNotify('host_reconnected', () => handler?.());
 
   attachPeer = async (deviceId: string, fcmToken?: string | null, capabilities?: ClientCapabilities) => {
-    return this.#peer.call<{ peerId: number; version?: string; hostname?: string; home?: string }>(
-      'peer_attach',
-      { deviceId, fcmToken, capabilities },
-      undefined,
-      {
-        timeoutMs: 10_000,
-        timeoutMessage: i18n.get('error.connectHostTimeout'),
-      },
-    );
+    return this.#peer.call<PeerAttachResult>('peer_attach', { deviceId, fcmToken, capabilities }, undefined, {
+      timeoutMs: 10_000,
+      timeoutMessage: i18n.get('error.connectHostTimeout'),
+    });
   };
 
   /** One JPEG frame of an app on the host (`ios:` / `android:` / `browser:` target), at most `maxWidth` wide. */

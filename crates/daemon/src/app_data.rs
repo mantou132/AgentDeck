@@ -57,6 +57,11 @@ impl AppPaths {
         self.root.join("registry.json")
     }
 
+    /// User-defined agents launched by a local command; kept by reset.
+    pub fn custom_agents_file(&self) -> PathBuf {
+        self.root.join("custom_agents.json")
+    }
+
     fn agents_dir(&self) -> PathBuf {
         self.root.join("agents")
     }

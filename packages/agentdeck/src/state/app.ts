@@ -44,12 +44,17 @@ const savePairingHistory = (pairingHistory: PairingRecord[]) => {
   agentdeckStore({ pairingHistory });
 };
 
+type HostInfo = Pick<PairingRecord, 'hostname' | 'home' | 'customAgents'>;
+
 /** Moves the connected pairing to the front; keeps the known hostname when an old daemon omits it. */
-const recordPairing = (hostname?: string, home?: string) => {
-  const { relayId, relayUrl } = agentdeckStore.settings;
+const recordPairing = ({ hostname, home, customAgents }: HostInfo) => {
+  const { relayId, relayUrl, agent } = agentdeckStore.settings;
   const previous = agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
   const rest = agentdeckStore.pairingHistory.filter((item) => item !== previous);
-  savePairingHistory([{ relayId, relayUrl, hostname: hostname || previous?.hostname, home }, ...rest]);
+  savePairingHistory([
+    { relayId, relayUrl, hostname: hostname || previous?.hostname, home, customAgents, agent },
+    ...rest,
+  ]);
 };
 
 export const removePairing = (relayId: string) =>
@@ -66,14 +71,14 @@ const handleTransportMessage = (message: TransportMessage) => {
       break;
     }
     case 'connection': {
-      const { connection, error, hostVersion, hostname, home } = message;
+      const { connection, error, hostVersion, hostname, home, customAgents } = message;
       agentdeckStore({
         connection,
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
       });
       if (connection === 'connected') {
         agentdeckStore({ hostVersion: hostVersion || '' });
-        recordPairing(hostname, home);
+        recordPairing({ hostname, home, customAgents });
         refreshSessions();
         // Older daemon has no reconciliation endpoint; stay waiting if it fails
         settleLostTurns().catch(console.error);
@@ -157,6 +162,13 @@ export const saveSettings = (settings: AppSettings) => {
   const notConnected = agentdeckStore.connection !== 'connected';
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   agentdeckStore({ settings: next, connectionError: '' });
+  if (agentChanged) {
+    savePairingHistory(
+      agentdeckStore.pairingHistory.map((item) =>
+        item.relayId === next.relayId ? { ...item, agent: next.agent } : item,
+      ),
+    );
+  }
   if (relayChanged || agentChanged) {
     resetRemoteState();
   }

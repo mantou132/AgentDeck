@@ -116,11 +116,6 @@ impl AgentService {
             }));
 
         let sessions = self.sessions.clone();
-        peer.handle("agent_list", move |_params, _ctx| async move {
-            let agents = acp_agent::available_agents();
-            Ok(json!({ "agents": agents }))
-        });
-
         peer.handle("agent_cwd_complete", move |params, _ctx| async move {
             let input = params
                 .get("input")

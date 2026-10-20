@@ -86,6 +86,21 @@ agentdeckd reset --pairing-id <NEW_PAIRING_ID>
 
 When you use a custom relay, the QR code carries both the Pairing ID and the relay URL. If you type the Pairing ID in manually, the app uses the default relay (`wss://agentdeck.xianqiao.wang/ws`).
 
+## Custom agents
+
+To add agents that aren't in the list, put them in `custom_agents.json` in the daemon data directory (see [Troubleshooting](#troubleshooting)):
+
+```json
+{
+  "agents": [
+    { "id": "amp-acp" },
+    { "id": "omp", "name": "Oh My Pi", "command": "omp", "args": ["acp"] }
+  ]
+}
+```
+
+An entry with only an `id` adds that agent from the [ACP registry](https://agentclientprotocol.com/registry). An entry with a `command` runs that command instead; the command is looked up on `PATH` unless it is a path, and it replaces any registry agent with the same `id`. `name` is optional. The daemon reads the file each time it's used, so you don't need to restart it. The app picks up the new list the next time it connects.
+
 ## Troubleshooting
 
 - **Cannot connect:** check `agentdeckd status` and make sure the app uses the same Pairing ID and relay. Then try `agentdeckd restart`, and confirm that your network allows WebSocket connections to the relay.

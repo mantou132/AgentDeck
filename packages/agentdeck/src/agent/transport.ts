@@ -6,7 +6,7 @@ import {
   type RelayConnectionState,
   type RelayStore,
 } from 'relay-client-ts';
-import { DEVICE_ID_KEY, RELAY_URL } from '../config';
+import { type AgentInfo, DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
 import { AgentApi, type ClientCapabilities, type SessionEvent, type UserInput } from './api';
 import { isPairingId } from './encryption';
@@ -38,7 +38,7 @@ export const connectionLabels = new Proxy({} as Record<ConnectionState, string>,
 });
 
 export type TransportMessage =
-  /** `hostVersion`, `hostname` and `home` come with `connected`; old hosts omit the first two. */
+  /** `hostVersion`, `hostname`, `home` and `customAgents` come with `connected`; old hosts omit the first two. */
   | {
       type: 'connection';
       connection: ConnectionState;
@@ -46,6 +46,7 @@ export type TransportMessage =
       hostVersion?: string;
       hostname?: string;
       home?: string;
+      customAgents?: AgentInfo[];
     }
   | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
@@ -152,6 +153,7 @@ class HostSessionManager {
   #hostVersion: string | undefined;
   #hostname: string | undefined;
   #home: string | undefined;
+  #customAgents: AgentInfo[] | undefined;
   #attachId: RpcId | undefined;
   #attaching: Promise<void> | undefined;
   #fcmToken: string | null | undefined;
@@ -176,6 +178,10 @@ class HostSessionManager {
 
   get home() {
     return this.#home;
+  }
+
+  get customAgents() {
+    return this.#customAgents;
   }
 
   get attachId() {
@@ -233,6 +239,7 @@ class HostSessionManager {
         this.#hostVersion = result.version;
         this.#hostname = result.hostname;
         this.#home = result.home;
+        this.#customAgents = result.customAgents;
         this.#syncedFcmToken = sentToken;
         if (!silent || peerChanged) options.onStateChange('connected');
       })
@@ -366,6 +373,7 @@ class AgentTransport {
       hostVersion: host?.hostVersion,
       hostname: host?.hostname,
       home: host?.home,
+      customAgents: host?.customAgents,
     });
   }
 

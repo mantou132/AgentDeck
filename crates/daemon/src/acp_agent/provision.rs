@@ -496,6 +496,33 @@ fn prepare_uvx_command(
     Ok(command)
 }
 
+fn prepare_custom_command(
+    candidate: &AgentCandidate,
+    program: &str,
+    args: &[String],
+) -> Result<Vec<String>> {
+    let executable = if Path::new(program).components().count() > 1 {
+        PathBuf::from(program)
+    } else {
+        executable_candidates(program)
+            .into_iter()
+            .find(|executable| executable.is_file())
+            .with_context(|| {
+                format!(
+                    "{program} was not found; install it to run {} ({})",
+                    candidate.name, candidate.id
+                )
+            })?
+    };
+    let path_entries = user_path_entries();
+    let mut command = vec![format!(
+        "PATH={}",
+        joined_path(&path_entries)?.to_string_lossy()
+    )];
+    append_program(&mut command, &executable, args);
+    Ok(command)
+}
+
 pub(super) fn prepare_agent_command(candidate: AgentCandidate) -> Result<Vec<String>> {
     let user_cli = candidate.cli.as_deref().and_then(find_working_command);
     match &candidate.launch {
@@ -508,6 +535,7 @@ pub(super) fn prepare_agent_command(candidate: AgentCandidate) -> Result<Vec<Str
         AgentLaunch::Uvx { package, args, env } => {
             prepare_uvx_command(&candidate, package, args, env)
         }
+        AgentLaunch::Command { command, args } => prepare_custom_command(&candidate, command, args),
     }
 }
 

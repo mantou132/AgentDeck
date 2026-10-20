@@ -4,11 +4,11 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { FEEDBACK_URL, isRelayUrl, RELAY_GUIDE_SEEN_KEY } from '../config';
+import { FEEDBACK_URL, isRelayUrl, type PairingRecord, RELAY_GUIDE_SEEN_KEY } from '../config';
 import type { DeckQrScannerError } from '../elements/qr-scanner';
 import { i18n } from '../i18n';
 import { hardResetApp, removePairing, saveSettings } from '../state/app';
-import { agentdeckStore } from '../state/store';
+import { agentdeckStore, hostAgents } from '../state/store';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -89,14 +89,25 @@ export class AgentDeckSettingsPageElement extends GemElement {
     );
   };
 
-  #fillPairing = (relayId: string, relayUrl = '') => {
-    this.#state({ relayId, relayUrl });
+  /** Agents of the host being edited. */
+  get #agents() {
+    return hostAgents(this.#state.relayId.trim());
+  }
+
+  /** The picked agent, else the host's first one when it does not have it. */
+  get #agent() {
+    const agents = this.#agents;
+    return agents.some((agent) => agent.id === this.#state.agent) ? this.#state.agent : agents[0].id;
+  }
+
+  #fillPairing = ({ relayId, relayUrl = '', agent = '' }: PairingRecord) => {
+    this.#state({ relayId, relayUrl, agent });
     Toast.open('success', i18n.get('settings.relayIdUpdated'));
   };
 
   #save = () => {
     try {
-      saveSettings({ relayId: this.#state.relayId, agent: this.#state.agent, relayUrl: this.#state.relayUrl });
+      saveSettings({ relayId: this.#state.relayId, agent: this.#agent, relayUrl: this.#state.relayUrl });
       if (this.canGoBack) {
         Stack.pop();
       }
@@ -138,7 +149,8 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { agents } = agentdeckStore;
+    const agents = this.#agents;
+    const agent = this.#agent;
     const pairings = agentdeckStore.pairingHistory.filter((item) => item.relayId !== this.#state.relayId.trim());
     return html`
       <tap-page class="bg-bg text-text" @hide=${() => this.#state({ showRelayId: false })}>
@@ -219,23 +231,23 @@ export class AgentDeckSettingsPageElement extends GemElement {
               <p class="mt-0 mb-2 text-xs font-medium text-describe">${i18n.get('settings.recentPairings')}</p>
               <div class="flex flex-col gap-2">
                 ${pairings.map(
-                  ({ relayId, relayUrl, hostname }) => html`
+                  (pairing) => html`
                     <div class="flex h-12 items-center rounded-xl border border-border bg-bg">
                       <button
                         type="button"
                         class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent pl-3.5 text-left active:opacity-70"
-                        @click=${() => this.#fillPairing(relayId, relayUrl)}
+                        @click=${() => this.#fillPairing(pairing)}
                       >
                         <span class="truncate text-sm font-medium text-highlight">
-                          ${hostname || i18n.get('settings.unknownHost')}
+                          ${pairing.hostname || i18n.get('settings.unknownHost')}
                         </span>
-                        <span class="shrink-0 font-mono text-xs text-describe">…${relayId.slice(-4)}</span>
+                        <span class="shrink-0 font-mono text-xs text-describe">…${pairing.relayId.slice(-4)}</span>
                       </button>
                       <button
                         type="button"
                         class="grid h-12 w-11 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-describe transition-colors hover:text-highlight active:opacity-70"
                         aria-label=${i18n.get('settings.removePairingAria')}
-                        @click=${() => removePairing(relayId)}
+                        @click=${() => removePairing(pairing.relayId)}
                       >
                         <tap-use class="size-4" .element=${icons.close}></tap-use>
                       </button>
@@ -257,13 +269,10 @@ export class AgentDeckSettingsPageElement extends GemElement {
               <span class="relative block">
                 <select
                   class="box-border h-12 w-full appearance-none rounded-xl border border-border-strong bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
-                  .value=${this.#state.agent}
+                  .value=${agent}
                   @change=${(event: Event) => this.#state({ agent: (event.target as HTMLSelectElement).value })}
                 >
-                  ${agents.map(
-                    (agent) =>
-                      html`<option value=${agent.id} ?selected=${agent.id === this.#state.agent}>${agent.name}</option>`,
-                  )}
+                  ${agents.map(({ id, name }) => html`<option value=${id} ?selected=${id === agent}>${name}</option>`)}
                 </select>
                 <tap-use class="pointer-events-none absolute top-4 right-3.5 size-4 text-describe" .element=${icons.expand}></tap-use>
               </span>
