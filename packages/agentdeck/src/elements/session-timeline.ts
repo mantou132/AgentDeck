@@ -206,8 +206,10 @@ export class DeckSessionTimelineElement extends GemElement {
 
   #setSelectionMenu = () => {
     const selection = window.getSelection();
-    const ele = selection?.anchorNode?.parentElement;
-    if (!ele || !selection.toString().trim()) return;
+    const anchor = selection?.anchorNode;
+    // Android WebView retargets the anchor out of the markdown shadow root to `deck-stream-markdown` itself.
+    const ele = anchor instanceof Element ? anchor : anchor?.parentElement;
+    if (!ele || !selection?.toString().trim()) return;
     // Only replies: user messages render with `user`, process details live in sheets outside the timeline.
     const markdown = closestElement(ele, DeckStreamMarkdownElement);
     if (!markdown || markdown.user || !this.contains(markdown)) return;
