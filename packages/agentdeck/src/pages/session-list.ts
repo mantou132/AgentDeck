@@ -242,12 +242,13 @@ export class AgentDeckSessionListPageElement extends GemElement {
         </main>
 
         <footer
-          v-if=${!showErrorState && !showSkeleton}
+          v-if=${!showErrorState}
           slot="footer"
           class="menu-footer bg-bg/90 px-4 pt-2 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div class="flex items-center justify-between gap-3">
             <button
+              v-if=${!showSkeleton}
               class="flex h-12 min-w-0 px-4 cursor-pointer items-center justify-center gap-2 rounded-[15px] border-0 bg-primary text-sm font-bold text-white shadow-primary transition-transform active:scale-[0.985]"
               @click=${this.#openNewSession}
             >
@@ -255,7 +256,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
               ${i18n.get('sessionList.newSession')}
             </button>
             <button
-              class="grid size-12 shrink-0 cursor-pointer place-items-center rounded-[15px] border border-border bg-bg-light text-highlight shadow-card transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-bg-hover"
+              class="ml-auto grid size-12 shrink-0 cursor-pointer place-items-center rounded-[15px] border border-border bg-bg-light text-highlight shadow-card transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-bg-hover"
               aria-label=${i18n.get('sessionList.openSettingsAria')}
               @click=${openSettings}
             >
