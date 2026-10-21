@@ -199,5 +199,6 @@ class DuoyunTestElement extends GemElement {
 # 发布
 
 - 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核；iOS 以 run number 为 build 号构建 IPA，经 fastlane 同步 `distribution/appstore/metadata` 后提交 App Store 审核，通过后自动发布。
+- macOS Daemon 用 `MACOS_CERT_P12_BASE64` / `MACOS_CERT_PASSWORD`（Developer ID Application 证书）签名，identifier 为 `com.agentdeck.daemon`，使隐私授权在升级后保留；secret 缺失或证书失效时保留 ad-hoc 签名继续发布。
 - 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 与 App Store 更新说明。
 - 所需 Secrets 以各 workflow 文件中的引用为准。

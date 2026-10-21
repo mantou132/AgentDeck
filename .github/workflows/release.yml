@@ -47,6 +47,42 @@ jobs:
       - name: Build agentdeckd binary
         run: cargo build --release --target ${{ matrix.target }} -p agentdeck-daemon
 
+      # A stable Developer ID identity keeps macOS privacy grants across upgrades.
+      # Missing secrets or an expired certificate fall back to the linker's ad-hoc signature.
+      - name: Sign agentdeckd with Developer ID
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERT_P12_BASE64" ]; then
+            echo "::notice::MACOS_CERT_P12_BASE64 is not set; keeping ad-hoc signature"
+            exit 0
+          fi
+          bin="target/${{ matrix.target }}/release/agentdeckd"
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          cert="$RUNNER_TEMP/cert.p12"
+          password="$(uuidgen)"
+          sign() {
+            echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$cert" &&
+            security create-keychain -p "$password" "$keychain" &&
+            security set-keychain-settings -lut 21600 "$keychain" &&
+            security unlock-keychain -p "$password" "$keychain" &&
+            security import "$cert" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign &&
+            security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null &&
+            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"') &&
+            identity="$(security find-identity -v -p codesigning "$keychain" | awk '/Developer ID Application/ { print $2; exit }')" &&
+            [ -n "$identity" ] &&
+            codesign --force --sign "$identity" --identifier com.agentdeck.daemon --timestamp "$bin" &&
+            codesign --verify --strict "$bin"
+          }
+          if ! sign; then
+            echo "::warning::Developer ID signing failed; keeping ad-hoc signature"
+          fi
+          rm -f "$cert"
+          codesign -dv "$bin" 2>&1 | grep -E '^(Identifier|TeamIdentifier|Signature)'
+
       - name: Package archive (tar.gz)
         if: matrix.archive == 'tar.gz'
         shell: bash
