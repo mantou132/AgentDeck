@@ -111,6 +111,7 @@ dependencies = [
  "hkdf",
  "image",
  "keepawake",
+ "libc",
  "planif",
  "qr2term",
  "relay-client",

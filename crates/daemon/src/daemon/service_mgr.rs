@@ -23,6 +23,18 @@ pub fn install_daemon() -> Result<()> {
     let manager = get_manager()?;
     let program = std::env::current_exe().context("failed to get current executable path")?;
 
+    // Rewriting the LaunchAgent makes macOS show a new "Background Items Added" notification.
+    #[cfg(target_os = "macos")]
+    let contents = {
+        let plist = launchd::plist(&program);
+        if launchd::is_current(&plist) {
+            return Ok(());
+        }
+        Some(plist)
+    };
+    #[cfg(not(target_os = "macos"))]
+    let contents = None;
+
     manager
         .install(ServiceInstallCtx {
             label: SERVICE_LABEL
@@ -30,7 +42,7 @@ pub fn install_daemon() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("invalid service label: {e}"))?,
             program,
             args: vec![OsString::from("run")],
-            contents: None,
+            contents,
             username: None,
             working_directory: None,
             environment: None,
@@ -78,6 +90,21 @@ pub fn start_daemon() -> Result<()> {
     Ok(())
 }
 
+/// Restart through launchd when the installed service is unchanged; otherwise reinstall it.
+pub fn restart_daemon() -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let program = std::env::current_exe().context("failed to get current executable path")?;
+        if launchd::is_current(&launchd::plist(&program)) {
+            return launchd::kickstart();
+        }
+    }
+
+    let _ = stop_daemon();
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    start_daemon()
+}
+
 /// Unregister autostart service and try to terminate the running daemon process.
 pub fn stop_daemon() -> Result<()> {
     let _ = uninstall_daemon();
@@ -104,5 +131,57 @@ pub fn daemon_status() -> Result<Status> {
     match manager.status(ServiceStatusCtx { label }) {
         Ok(s) => Ok(s.into()),
         Err(_) => Ok(Status::NotInstalled),
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod launchd {
+    use std::{path::Path, process::Command};
+
+    use anyhow::{Result, bail};
+
+    use super::SERVICE_LABEL;
+
+    /// `launchd.plist` keeps the layout launchd leaves after `start`, so existing installs compare equal.
+    pub fn plist(program: &Path) -> String {
+        let program = program
+            .to_string_lossy()
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
+        include_str!("launchd.plist")
+            .trim_end()
+            .replace("{label}", SERVICE_LABEL)
+            .replace("{program}", &program)
+    }
+
+    fn target() -> String {
+        format!("gui/{}/{SERVICE_LABEL}", unsafe { libc::getuid() })
+    }
+
+    /// The plist on disk matches and launchd has it loaded.
+    pub fn is_current(expected: &str) -> bool {
+        let Some(home) = dirs::home_dir() else {
+            return false;
+        };
+        let path = home.join(format!("Library/LaunchAgents/{SERVICE_LABEL}.plist"));
+        std::fs::read_to_string(path).is_ok_and(|current| current == expected)
+            && Command::new("launchctl")
+                .args(["print", &target()])
+                .output()
+                .is_ok_and(|output| output.status.success())
+    }
+
+    pub fn kickstart() -> Result<()> {
+        let output = Command::new("launchctl")
+            .args(["kickstart", "-k", &target()])
+            .output()?;
+        if !output.status.success() {
+            bail!(
+                "launchctl kickstart failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+        }
+        Ok(())
     }
 }

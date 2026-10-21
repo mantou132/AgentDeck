@@ -93,6 +93,12 @@ pub fn stop_daemon() -> Result<()> {
     Ok(())
 }
 
+pub fn restart_daemon() -> Result<()> {
+    let _ = stop_daemon();
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    start_daemon()
+}
+
 pub fn daemon_status() -> Result<Status> {
     if let Ok(Some(_)) = InstanceLock::check_running() {
         return Ok(Status::Running);

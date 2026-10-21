@@ -22,4 +22,6 @@ mod fallback;
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 use fallback as platform;
 
-pub use platform::{daemon_status, install_daemon, start_daemon, stop_daemon, uninstall_daemon};
+pub use platform::{
+    daemon_status, install_daemon, restart_daemon, start_daemon, stop_daemon, uninstall_daemon,
+};

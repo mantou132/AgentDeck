@@ -253,9 +253,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Restart) => {
             let config = DaemonConfig::load_or_init(&paths, &options)?;
-            let _ = daemon::stop_daemon();
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            daemon::start_daemon()?;
+            daemon::restart_daemon()?;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             print_daemon_info(&config, None);
         }

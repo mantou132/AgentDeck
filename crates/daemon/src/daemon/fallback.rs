@@ -18,6 +18,10 @@ pub fn stop_daemon() -> Result<()> {
     bail!("stopping daemon service is not supported on this platform");
 }
 
+pub fn restart_daemon() -> Result<()> {
+    bail!("restarting daemon service is not supported on this platform");
+}
+
 pub fn daemon_status() -> Result<Status> {
     Ok(Status::NotInstalled)
 }
