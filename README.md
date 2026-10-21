@@ -106,6 +106,7 @@ An entry with only an `id` adds that agent from the [ACP registry](https://agent
 - **Cannot connect:** check `agentdeckd status` and make sure the app uses the same Pairing ID and relay. Then try `agentdeckd restart`, and confirm that your network allows WebSocket connections to the relay.
 - **Still stuck:** run `agentdeckd reset`, then tap **Reset App** in the app's Settings and scan the code again.
 - **Connection preempted:** close any other client that shares the same device identity.
+- **Session keeps loading, then times out:** the agent may still be installing or updating on the computer, which can take a while the first time it is used or after a new release. Wait a moment and retry.
 - **Connected, but an agent fails:** check that the agent's CLI works locally, and look at the daemon logs.
 
 | OS | Daemon data directory |
