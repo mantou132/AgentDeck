@@ -4,25 +4,21 @@
     "noImplicitThis": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "stripInternal": true,
-    "declaration": true,
-    "declarationMap": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "sourceMap": true,
-    "allowJs": true,
-    "module": "es2022",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "downlevelIteration": true,
     "target": "ES2022",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["chrome"],
+    "noEmit": true,
     "baseUrl": ".",
-    "outDir": "./dist"
+    "paths": { "agentdeck/*": ["../agentdeck/src/*"] }
   },
   "include": ["./"],
-  "exclude": ["dist"]
+  "exclude": ["dist", "node_modules", "public"]
 }

@@ -1,21 +1,25 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
 import { displayPath } from 'agentdeck/lib/path';
 import { icons } from 'agentdeck/styles/icons';
-import { t } from '../../shared/i18n.js';
+import type { SessionRecord } from '../../shared/agent-session-store';
+import { t } from '../../shared/i18n';
 
 @customElement('agent-session-list')
-class AgentSessionListElement extends GemElement {
-  @boolattribute compact;
-  @property sessions; // persisted sessions plus at most one in-memory draft
-  @property sessionKey;
-  @property home;
-  @property loadingIds;
-  @property deleting; // local session key being deleted, or null
+export class AgentSessionListElement extends GemElement {
+  @boolattribute compact: boolean;
+  /** Persisted sessions plus at most one in-memory draft. */
+  @property sessions: SessionRecord[] = [];
+  @property sessionKey: string | null = null;
+  @property home = '';
+  @property loadingIds: string[] = [];
+  /** Local session key being deleted. */
+  @property deleting: string | null = null;
 
-  @emitter select; // detail: local session key
-  @emitter create;
-  @emitter remove; // detail: local session key
-
-  #isActive = (session) => Boolean(session) && session.key === this.sessionKey;
+  /** Detail: local session key. */
+  @emitter select: Emitter<string>;
+  @emitter create: Emitter;
+  /** Detail: local session key. */
+  @emitter remove: Emitter<string>;
 
   @template()
   #content = () => {
@@ -23,7 +27,7 @@ class AgentSessionListElement extends GemElement {
     const sessionOptions = sessions.length
       ? sessions.map((session) => {
           const title = session.title || t('devtoolsPanelNewSession');
-          const cwd = displayPath(session.cwd, home);
+          const cwd = displayPath(session.cwd || '', home);
           return {
             label: html`
               <agent-session-option-label
@@ -59,7 +63,7 @@ class AgentSessionListElement extends GemElement {
               .options=${sessionOptions}
               .value=${sessionKey}
               placeholder=${t('devtoolsPanelNoSessions')}
-              @change=${(e) => this.select(e.detail)}
+              @change=${(e: CustomEvent<string>) => this.select(e.detail)}
               aria-label=${t('devtoolsPanelSessions')}
             ></dy-picker>
             <span v-else class="font-semibold text-highlight">${t('devtoolsPanelSessions')}</span>
@@ -71,9 +75,9 @@ class AgentSessionListElement extends GemElement {
                 color="cancel"
                 .icon=${icons.delete}
                 title=${t('devtoolsPanelDelete')}
-                @click=${() => this.remove(sessionKey)}
+                @click=${() => sessionKey && this.remove(sessionKey)}
               ></dy-button>
-              <dy-button small .icon=${icons.add} @click=${() => this.create(null)}>
+              <dy-button small .icon=${icons.add} @click=${() => this.create()}>
                 ${t('devtoolsPanelNew')}
               </dy-button>
             </div>
@@ -88,7 +92,7 @@ class AgentSessionListElement extends GemElement {
               <agent-session-item
                 .session=${session}
                 .home=${home}
-                ?active=${this.#isActive(session)}
+                ?active=${session.key === sessionKey}
                 ?loading=${loadingIds.includes(session.key)}
                 ?deleting=${deleting === session.key}
                 @select=${() => this.select(session.key)}

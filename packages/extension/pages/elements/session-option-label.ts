@@ -22,9 +22,9 @@ const style = css`
 @customElement('agent-session-option-label')
 @adoptedStyle(style)
 @shadow()
-class AgentSessionOptionLabelElement extends GemElement {
-  @property sessionAgent;
-  @property sessionTitle;
+export class AgentSessionOptionLabelElement extends GemElement {
+  @property sessionAgent = '';
+  @property sessionTitle = '';
 
   @template()
   #content = () => html`

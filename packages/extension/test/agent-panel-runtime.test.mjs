@@ -1,17 +1,5 @@
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
 import { beforeEach, describe, it } from 'node:test';
-
-// Shared app modules are TypeScript without extensions; Node strips the types.
-registerHooks({
-  resolve: (specifier, context, nextResolve) =>
-    specifier.startsWith('agentdeck/')
-      ? {
-          url: new URL(`../../agentdeck/src/${specifier.slice('agentdeck/'.length)}.ts`, import.meta.url).href,
-          shortCircuit: true,
-        }
-      : nextResolve(specifier, context),
-});
 
 let storage = {};
 globalThis.chrome = {
@@ -29,10 +17,10 @@ globalThis.chrome = {
   },
 };
 
-const { AGENT_PANEL_STATE_KEY, agentSessionKey } = await import('../shared/agent-session-store.js');
-const { createSessionController } = await import('../pages/agent-panel/session-controller.js');
-const { createSessionRuntime, reduceSessionEvent } = await import('../pages/agent-panel/session-runtime.js');
-const { createTurnController } = await import('../pages/agent-panel/turn-controller.js');
+const { AGENT_PANEL_STATE_KEY, agentSessionKey } = await import('../shared/agent-session-store');
+const { createSessionController } = await import('../pages/agent-panel/session-controller');
+const { createSessionRuntime, reduceSessionEvent } = await import('../pages/agent-panel/session-runtime');
+const { createTurnController } = await import('../pages/agent-panel/turn-controller');
 
 function createPanelState(patch = {}) {
   const state = (next) => Object.assign(state, next);

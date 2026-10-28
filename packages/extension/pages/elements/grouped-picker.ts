@@ -1,5 +1,6 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
 import { addListener } from '@mantou/gem/lib/utils';
-import { ContextMenu } from 'duoyun-ui/elements/contextmenu';
+import { ContextMenu, type ContextMenuItem } from 'duoyun-ui/elements/contextmenu';
 import { pickerStyle } from 'duoyun-ui/elements/picker';
 import { commonHandle } from 'duoyun-ui/lib/hotkeys';
 import { icons } from 'duoyun-ui/lib/icons';
@@ -26,6 +27,19 @@ const style = css`
   }
 `;
 
+type PickerOption = { label: string; description?: string; value?: string };
+type PickerGroup = PickerOption & { children?: PickerOption[] };
+
+const tagStyle = {
+  display: 'block',
+  maxWidth: '8em',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+export type GroupedPickerChange = { group: string; value: string };
+
 /**
  * A dy-picker-shaped control for multiple independent single-select groups.
  *
@@ -41,36 +55,38 @@ const style = css`
 @connectStore(icons)
 @shadow()
 @aria({ focusable: true, role: 'combobox' })
-class AgentGroupedPickerElement extends GemElement {
-  @attribute placeholder;
-  @boolattribute disabled;
-  @boolattribute borderless;
-  @boolattribute fit;
+export class AgentGroupedPickerElement extends GemElement {
+  @attribute placeholder: string;
+  @boolattribute disabled: boolean;
+  @boolattribute borderless: boolean;
+  @boolattribute fit: boolean;
 
-  @state active;
+  @state active: boolean;
 
-  @property options;
-  @property value;
-  @property renderValue;
+  @property options?: PickerGroup[];
+  @property value?: Record<string, string>;
+  @property renderValue?: (value?: Record<string, string>) => string | undefined;
 
-  @globalemitter change;
+  @globalemitter change: Emitter<GroupedPickerChange>;
 
-  #optionValue = (option) => option.value ?? option.label;
+  #optionValue = (option: PickerOption) => option.value ?? option.label;
 
-  #current = (group) => {
+  #current = (group: PickerGroup) => {
     const groupValue = this.#optionValue(group);
     const currentValue = this.value?.[groupValue];
     return group.children?.find((option) => this.#optionValue(option) === currentValue);
   };
 
-  #genMenu = (group) => {
+  #genMenu = (group: PickerGroup): ContextMenuItem => {
     const groupValue = this.#optionValue(group);
     const currentValue = this.value?.[groupValue];
     const current = this.#current(group);
     return {
       text: group.label,
       description: group.description,
-      tag: current?.label,
+      // The menu's tag never shrinks; cap it so a long value (e.g. a model name) cannot squeeze out the group label.
+      // Menu items render in tap-options' Shadow DOM, so only inline styles reach them.
+      tag: current && html`<span title=${current.label} style=${styleMap(tagStyle)}>${current.label}</span>`,
       menu: group.children?.map((option) => {
         const value = this.#optionValue(option);
         return {
@@ -90,7 +106,7 @@ class AgentGroupedPickerElement extends GemElement {
     if (this.disabled || !options?.length) return;
     await ContextMenu.open(options.map(this.#genMenu), {
       activeElement: this,
-      width: this.fit ? `${this.getBoundingClientRect().width}px` : undefined,
+      width: this.fit ? `${this.getBoundingClientRect().width}px` : '18em',
     });
   };
 

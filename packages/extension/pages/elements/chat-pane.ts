@@ -1,33 +1,41 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { PermissionRequest, SessionConfigOption } from 'agentdeck/agent/api';
 import { followBottom } from 'agentdeck/lib/follow-bottom';
-import { t } from '../../shared/i18n.js';
+import { t } from '../../shared/i18n';
+import type { PanelMessage, PromptPayload, QueueItem } from '../agent-panel/types';
+import type { AgentComposerElement, ConfigChange } from './composer';
 
 @customElement('agent-chat-pane')
-class AgentChatPaneElement extends GemElement {
-  @boolattribute compact;
-  @boolattribute loadingSession;
-  @property sessionKey;
-  @property title;
-  @property cwd;
-  @property messages;
-  @property permissionRequest;
-  @property bannerError;
-  @property configOptions;
-  @boolattribute turnPending;
-  @property queue; // prompts staged while a turn is in flight
+export class AgentChatPaneElement extends GemElement {
+  @boolattribute compact: boolean;
+  @boolattribute loadingSession: boolean;
+  @boolattribute turnPending: boolean;
+  @property sessionKey: string | null = null;
+  @property title = '';
+  @property cwd = '';
+  @property messages: PanelMessage[] = [];
+  @property permissionRequest?: PermissionRequest;
+  @property bannerError = '';
+  @property configOptions: SessionConfigOption[] = [];
+  /** Prompts staged while a turn is in flight. */
+  @property queue: QueueItem[] = [];
 
-  @emitter send;
-  @emitter cancel;
-  @emitter configchange;
-  @emitter decision; // detail: permission optionId (null declines)
-  @emitter attacherror;
-  @emitter queuesend; // detail: queued item id
-  @emitter queueupdate; // detail: { id, prompt, attachments }
-  @emitter queueremove; // detail: queued item id
+  @emitter send: Emitter<PromptPayload>;
+  @emitter cancel: Emitter;
+  @emitter configchange: Emitter<ConfigChange>;
+  /** Detail: permission optionId (`null` declines). */
+  @emitter decision: Emitter<string | null>;
+  @emitter attacherror: Emitter<string>;
+  /** Detail: queued item id. */
+  @emitter queuesend: Emitter<string>;
+  @emitter queueupdate: Emitter<QueueItem>;
+  /** Detail: queued item id. */
+  @emitter queueremove: Emitter<string>;
 
-  #messagesRef = createRef();
-  #messagesContentRef = createRef();
-  #composerRef = createRef();
-  #following;
+  #messagesRef = createRef<HTMLElement>();
+  #messagesContentRef = createRef<HTMLElement>();
+  #composerRef = createRef<AgentComposerElement>();
+  #following?: ReturnType<typeof followBottom>;
 
   /** The prompt gets focus once a session view becomes chattable. */
   @effect((i) => [i.sessionKey, i.loadingSession])
@@ -98,19 +106,19 @@ class AgentChatPaneElement extends GemElement {
                   <agent-message-bubble
                     .message=${msg}
                     .streamKey=${sessionKey}
-                    ?streaming=${turnPending && (msg.role === 'agent' || (msg.type === 'thought' && msg.pending))}
+                    ?streaming=${turnPending && (msg.type === 'thought' ? msg.pending : msg.type === undefined && msg.role === 'agent')}
                   ></agent-message-bubble>
               `,
             )}
             <agent-permission-request
-              v-if=${permissionRequest}
+              v-if=${!!permissionRequest}
               class="mb-1 mt-2 block"
               .request=${permissionRequest}
-              @decision=${(e) => this.decision(e.detail)}
+              @decision=${(e: CustomEvent<string | null>) => this.decision(e.detail)}
             ></agent-permission-request>
           </div>
         </div>
-        <div v-if=${bannerError} class="border-t border-negative/30 bg-negative/5 px-4 py-2 text-xs text-negative">
+        <div v-if=${!!bannerError} class="border-t border-negative/30 bg-negative/5 px-4 py-2 text-xs text-negative">
           ${bannerError}
         </div>
         <footer v-if=${!loadingSession && canChat} class="bg-bg px-4 pb-4 pt-2">
@@ -121,13 +129,13 @@ class AgentChatPaneElement extends GemElement {
             .configOptions=${configOptions}
             .sessionKey=${sessionKey}
             .queue=${queue}
-            @send=${(e) => this.send(e.detail)}
-            @cancel=${() => this.cancel(null)}
-            @configchange=${(e) => this.configchange(e.detail)}
-            @attacherror=${(e) => this.attacherror(e.detail)}
-            @queuesend=${(e) => this.queuesend(e.detail)}
-            @queueupdate=${(e) => this.queueupdate(e.detail)}
-            @queueremove=${(e) => this.queueremove(e.detail)}
+            @send=${(e: CustomEvent<PromptPayload>) => this.send(e.detail)}
+            @cancel=${() => this.cancel()}
+            @configchange=${(e: CustomEvent<ConfigChange>) => this.configchange(e.detail)}
+            @attacherror=${(e: CustomEvent<string>) => this.attacherror(e.detail)}
+            @queuesend=${(e: CustomEvent<string>) => this.queuesend(e.detail)}
+            @queueupdate=${(e: CustomEvent<QueueItem>) => this.queueupdate(e.detail)}
+            @queueremove=${(e: CustomEvent<string>) => this.queueremove(e.detail)}
           ></agent-composer>
         </footer>
       </section>

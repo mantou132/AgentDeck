@@ -67,7 +67,7 @@ export default {
     config.plugins ??= [];
     config.plugins.push(
       unpluginGem({
-        include: /^(?!.*[\\/]node_modules[\\/]).*\.js$/,
+        include: /^(?!.*[\\/]node_modules[\\/]).*\.ts$/,
         styleMinify: true,
         selectorCompatible: true,
         autoImport: {

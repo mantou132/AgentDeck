@@ -13,4 +13,4 @@ const style = css`
 
 @customElement('agent-modal')
 @adoptedStyle(style)
-class AgentModalElement extends DuoyunModalElement {}
+export class AgentModalElement extends DuoyunModalElement {}

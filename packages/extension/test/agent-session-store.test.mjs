@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 const { agentSessionKey, readAgentPanelState, updateAgentPanelState, upsertStoredSession } = await import(
-  '../shared/agent-session-store.js'
+  '../shared/agent-session-store'
 );
 
 describe('agent session storage', () => {

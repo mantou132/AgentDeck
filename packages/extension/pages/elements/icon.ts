@@ -1,5 +1,5 @@
 import { createDecoratorTheme } from '@mantou/gem/helper/theme';
-import { getAgentIconUrl } from '../../shared/agents.js';
+import { getAgentIconUrl } from '../../shared/agents';
 
 const elementTheme = createDecoratorTheme({ icon: '' });
 
@@ -20,13 +20,11 @@ const style = css`
 @customElement('agent-icon')
 @adoptedStyle(style)
 @shadow()
-class AgentIconElement extends GemElement {
-  @property src;
-  @property agent;
+export class AgentIconElement extends GemElement {
+  @property agent = '';
 
   @elementTheme()
   #theme = () => {
-    const url = this.src || getAgentIconUrl(this.agent);
-    return { icon: url ? `url("${url}")` : '' };
+    return { icon: this.agent ? `url("${getAgentIconUrl(this.agent)}")` : '' };
   };
 }

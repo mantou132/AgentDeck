@@ -14,8 +14,8 @@
   "description": "__MSG_appDescription__",
   "permissions": ["sidePanel", "storage"],
   "host_permissions": ["<all_urls>"],
-  "chrome:background": { "service_worker": "background.js" },
-  "firefox:background": { "scripts": ["background.js"] },
+  "chrome:background": { "service_worker": "background.ts" },
+  "firefox:background": { "scripts": ["background.ts"] },
   "action": {
     "default_icon": {
       "32": "icon32.png",

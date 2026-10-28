@@ -1,30 +1,36 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { AgentInfo } from 'agentdeck/config';
 import { displayPath } from 'agentdeck/lib/path';
 import { hotkeys } from 'duoyun-ui/lib/hotkeys';
-import { t } from '../../shared/i18n.js';
+import { t } from '../../shared/i18n';
+
+export type NewSessionChoice = { agent: string; cwd: string };
+
+type CwdCompletion = { directories: string[]; value?: string; isDirectory?: boolean };
 
 @customElement('agent-new-session-picker')
-class AgentNewSessionPickerElement extends GemElement {
-  @property complete;
-  @property initialValue;
-  @property home;
-  @property agents;
-  @property initialAgent;
+export class AgentNewSessionPickerElement extends GemElement {
+  @property complete?: (value: string) => Promise<CwdCompletion>;
+  @property initialValue = '';
+  @property home = '';
+  @property agents: AgentInfo[] = [];
+  @property initialAgent = '';
 
-  @emitter confirm; // detail: { agent, cwd }
+  @emitter confirm: Emitter<NewSessionChoice>;
 
   #s = createState({
     value: '',
-    directories: [],
+    directories: [] as string[],
     loading: true,
     error: '',
     activeIndex: 0,
     agent: '',
   });
-  #activeDirectoryRef = createRef();
+  #activeDirectoryRef = createRef<HTMLButtonElement>();
 
   @willMount()
   #init = () => {
-    const agents = this.agents || [];
+    const { agents } = this;
     const agent = agents.some((item) => item.id === this.initialAgent) ? this.initialAgent : agents[0]?.id || '';
     this.#s({ agent });
     this.#update(this.#directoryInput(this.initialValue));
@@ -35,7 +41,7 @@ class AgentNewSessionPickerElement extends GemElement {
     this.#activeDirectoryRef.value?.scrollIntoView({ block: 'nearest' });
   };
 
-  #update = async (value) => {
+  #update = async (value: string) => {
     this.#s({
       value,
       directories: [],
@@ -46,7 +52,7 @@ class AgentNewSessionPickerElement extends GemElement {
     try {
       const result = await this.complete?.(value);
       const directories = [...(result?.directories || [])];
-      if (result?.isDirectory && result?.value) {
+      if (result?.isDirectory && result.value) {
         directories.unshift(result.value);
       }
       this.#s({
@@ -59,17 +65,17 @@ class AgentNewSessionPickerElement extends GemElement {
     }
   };
 
-  #directoryInput = (value) => {
+  #directoryInput = (value = '') => {
     const display = displayPath(value, this.home);
     if (!display || display === '/') return display;
     return `${display.replace(/[\\/]+$/, '')}/`;
   };
 
-  #select = (value) => {
+  #select = (value: string) => {
     this.#update(this.#directoryInput(value));
   };
 
-  #confirm = (cwd) => {
+  #confirm = (cwd: string) => {
     if (this.#s.agent) this.confirm({ agent: this.#s.agent, cwd });
   };
 
@@ -98,14 +104,9 @@ class AgentNewSessionPickerElement extends GemElement {
   @template()
   #content = () => {
     const { value, directories, loading, error, activeIndex, agent } = this.#s;
-    const agents = this.agents || [];
-    const agentOptions = agents.map((item) => ({
+    const agentOptions = this.agents.map((item) => ({
       label: html`
-        <agent-option-label
-          .agent=${item.id}
-          .name=${item.name}
-          .icon=${item.icon}
-        ></agent-option-label>
+        <agent-option-label .agent=${item.id} .name=${item.name}></agent-option-label>
       `,
       value: item.id,
     }));
@@ -125,7 +126,7 @@ class AgentNewSessionPickerElement extends GemElement {
               class="w-full"
               .value=${agent}
               .options=${agentOptions}
-              @change=${(event) => this.#s({ agent: event.detail })}
+              @change=${(e: CustomEvent<string>) => this.#s({ agent: e.detail })}
             ></dy-select>
           </div>
           <label class="mb-1.5 block text-xs font-medium text-describe" for="agent-new-session-cwd-input">
@@ -137,7 +138,7 @@ class AgentNewSessionPickerElement extends GemElement {
             class="w-full font-mono"
             placeholder=${t('devtoolsCwdPlaceholder')}
             .value=${value}
-            @change=${(event) => this.#update(event.detail)}
+            @change=${(e: CustomEvent<string>) => this.#update(e.detail)}
             @keydown=${this.#onKeydown}
           ></dy-input>
           <div class="mt-2 h-52 overflow-auto rounded border border-border bg-bg-light/40">

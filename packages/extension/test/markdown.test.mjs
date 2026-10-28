@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createMarkdownExtensions } from '../shared/markdown.js';
+import { createMarkdownExtensions } from '../shared/markdown';
 
 const defaultMarkdownRenderer = {
   table() {

@@ -1,8 +1,10 @@
-@customElement('agent-relay-settings')
-class AgentRelaySettingsElement extends GemElement {
-  @property value;
+import type { Emitter } from '@mantou/gem/lib/decorators';
 
-  @emitter confirm;
+@customElement('agent-relay-settings')
+export class AgentRelaySettingsElement extends GemElement {
+  @property value = '';
+
+  @emitter confirm: Emitter<string>;
 
   #s = createState({
     value: '',
@@ -10,7 +12,7 @@ class AgentRelaySettingsElement extends GemElement {
 
   @willMount()
   #init = () => {
-    this.#s({ value: this.value || '' });
+    this.#s({ value: this.value });
   };
 
   #onConfirm = () => {
@@ -35,8 +37,8 @@ class AgentRelaySettingsElement extends GemElement {
             class="w-full font-mono"
             placeholder="adk1_..."
             .value=${value}
-            @change=${(e) => this.#s({ value: e.detail })}
-            @keydown=${(e) => {
+            @change=${(e: CustomEvent<string>) => this.#s({ value: e.detail })}
+            @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') {
                 this.#onConfirm();
               }

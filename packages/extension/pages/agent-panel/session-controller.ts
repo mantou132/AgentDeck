@@ -1,34 +1,63 @@
-import { agentSessionKey, sessionTitleFromPrompt, upsertStoredSession } from '../../shared/agent-session-store.js';
-import { t } from '../../shared/i18n.js';
-import { completeThought, DRAFT_SESSION_KEY, withAgentConfigOptions, withConfigValue } from './session-runtime.js';
+import type { AgentApi, PanelContext, SessionConfigOption } from 'agentdeck/agent/api';
+import {
+  agentSessionKey,
+  type SessionRecord,
+  sessionTitleFromPrompt,
+  upsertStoredSession,
+} from '../../shared/agent-session-store';
+import { t } from '../../shared/i18n';
+import {
+  completeThought,
+  DRAFT_SESSION_KEY,
+  type SessionRuntime,
+  withAgentConfigOptions,
+  withConfigValue,
+} from './session-runtime';
+import type { TurnController } from './turn-controller';
+import type { Pane, PanelStore, PromptPayload } from './types';
+
+type SessionControllerOptions = {
+  state: PanelStore;
+  runtime: SessionRuntime;
+  turns: TurnController;
+  api: AgentApi;
+};
+
+type SessionTarget = { agent: string; sessionId: string };
+
+export type SessionController = ReturnType<typeof createSessionController>;
 
 // The host only adds browser instructions when its browser4agent sees this tab, i.e. same browser.
-async function getPanelContext() {
-  const inspectedWindow = globalThis.chrome?.devtools?.inspectedWindow;
+async function getPanelContext(): Promise<PanelContext> {
+  const inspectedWindow = chrome.devtools?.inspectedWindow;
   if (inspectedWindow) {
-    const url = await new Promise((resolve) => inspectedWindow.eval('location.href', resolve));
+    const url = await new Promise<string>((resolve) => inspectedWindow.eval<string>('location.href', resolve));
     return { surface: 'devtools', tabId: inspectedWindow.tabId, url };
   }
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return { surface: 'side_panel', tabId: tab?.id, url: tab?.url };
 }
 
-export function createSessionController({ state, runtime, turns, api }) {
+export function createSessionController({ state, runtime, turns, api }: SessionControllerOptions) {
   // A cleared record makes a settling load inert after deletion/reconnect.
-  const pendingLoads = new Map();
+  const pendingLoads = new Map<string, { alive: boolean }>();
 
   const openNewSession = () => {
     if (state.loadingIds.includes(DRAFT_SESSION_KEY)) return;
     state({ newSessionOpen: true, error: '' });
   };
 
-  const applyComposerConfig = async (target, configOptions, composerConfigOptions) => {
+  const applyComposerConfig = async (
+    target: SessionTarget,
+    configOptions: SessionConfigOption[],
+    composerConfigOptions: SessionConfigOption[],
+  ) => {
     let current = configOptions;
     for (const selected of composerConfigOptions) {
       const option = current.find((item) => item.id === selected.id);
       const value = selected.currentValue;
-      const supported = option?.options?.some((item) => item.value === value);
-      if (!value || !supported || option.currentValue === value) continue;
+      if (option?.type !== 'select' || typeof value !== 'string' || option.currentValue === value) continue;
+      if (!option.options.some((item) => 'value' in item && item.value === value)) continue;
       const result = await api.setSessionConfigOption(target.agent, target.sessionId, option.id, value);
       current = Array.isArray(result.configOptions) ? result.configOptions : withConfigValue(current, option.id, value);
     }
@@ -36,19 +65,20 @@ export function createSessionController({ state, runtime, turns, api }) {
   };
 
   /** Turn the single local draft into an ACP session, then deliver its first prompt. */
-  const startDraftTurn = async (sessionKey, payload) => {
+  const startDraftTurn = async (sessionKey: string, payload: PromptPayload) => {
     const draft = runtime.record(sessionKey);
     const draftState = runtime.getPane(sessionKey);
     if (!draft?.draft || !draftState) return;
-    let createdTarget;
+    let createdTarget: SessionTarget | null = null;
     turns.stage(sessionKey, payload);
     runtime.setLoading(sessionKey, true);
     try {
       const created = await api.createSession({
         agent: draft.agent,
-        cwd: draft.cwd,
+        cwd: draft.cwd || '',
         panelContext: await getPanelContext(),
       });
+      if (!created.sessionId) throw new Error('Missing session id');
       createdTarget = { agent: draft.agent, sessionId: created.sessionId };
       const composerConfigOptions = runtime.getPane(sessionKey)?.configOptions ?? draftState.configOptions;
       const configOptions = await applyComposerConfig(
@@ -58,7 +88,7 @@ export function createSessionController({ state, runtime, turns, api }) {
       );
       const liveSessionKey = agentSessionKey(draft.agent, created.sessionId);
       const now = new Date().toISOString();
-      const session = {
+      const session: SessionRecord = {
         key: liveSessionKey,
         agent: draft.agent,
         sessionId: created.sessionId,
@@ -68,10 +98,10 @@ export function createSessionController({ state, runtime, turns, api }) {
         updatedAt: created.updatedAt || now,
       };
       const stagedPane = runtime.getPane(sessionKey) ?? draftState;
-      const pane = {
+      const pane: Pane = {
         messages: stagedPane.messages,
         configOptions,
-        cwd: draft.cwd,
+        cwd: draft.cwd || '',
         queue: stagedPane.queue,
       };
       const isCurrent = state.sessionKey === sessionKey;
@@ -88,7 +118,7 @@ export function createSessionController({ state, runtime, turns, api }) {
         upsertStoredSession(withAgentConfigOptions(storedState, draft.agent, configOptions), session),
       );
       createdTarget = null;
-      turns.run(liveSessionKey, payload, { staged: true });
+      turns.run(liveSessionKey, payload, true);
       await persistence;
     } catch (e) {
       if (createdTarget) api.closeSession(createdTarget.agent, createdTarget.sessionId).catch(() => {});
@@ -99,10 +129,10 @@ export function createSessionController({ state, runtime, turns, api }) {
   };
 
   /** Replace the existing empty draft, if any, with the newly selected settings. */
-  const confirmNewSession = ({ agent, cwd }) => {
+  const confirmNewSession = ({ agent, cwd }: { agent: string; cwd: string }) => {
     runtime.snapshotCurrent();
     const now = new Date().toISOString();
-    const draftSession = {
+    const draftSession: SessionRecord = {
       key: DRAFT_SESSION_KEY,
       agent,
       title: '',
@@ -112,7 +142,7 @@ export function createSessionController({ state, runtime, turns, api }) {
       draft: true,
     };
     const configOptions = state.defaults.configOptionsByAgent[agent] || [];
-    const pane = { messages: [], configOptions, cwd, queue: [] };
+    const pane: Pane = { messages: [], configOptions, cwd, queue: [] };
     runtime.setCachedPane(DRAFT_SESSION_KEY, pane);
     state({
       draftSession,
@@ -124,8 +154,7 @@ export function createSessionController({ state, runtime, turns, api }) {
     runtime.persistAgentDefault(agent);
   };
 
-  const openSession = async (sessionKey) => {
-    if (!sessionKey) return;
+  const openSession = async (sessionKey: string) => {
     const isCurrent = sessionKey === state.sessionKey;
     if (isCurrent && (runtime.hasCachedPane(sessionKey) || pendingLoads.has(sessionKey))) return;
     if (!isCurrent) runtime.snapshotCurrent();
@@ -139,10 +168,14 @@ export function createSessionController({ state, runtime, turns, api }) {
       return;
     }
 
+    const target = runtime.target(sessionKey);
+    if (!target) return;
+    const cwd = selected.cwd || '';
+
     runtime.clearError(sessionKey);
     state({
       sessionKey,
-      cwd: selected.cwd || '',
+      cwd,
       messages: [],
       configOptions: [],
       queue: [],
@@ -151,11 +184,10 @@ export function createSessionController({ state, runtime, turns, api }) {
     const record = { alive: true };
     pendingLoads.set(sessionKey, record);
     try {
-      await api.closeSession(selected.agent, selected.sessionId).catch(() => {});
+      await api.closeSession(target.agent, target.sessionId).catch(() => {});
       const { configOptions, title, updatedAt } = await api.loadSession({
-        agent: selected.agent,
-        sessionId: selected.sessionId,
-        cwd: selected.cwd,
+        ...target,
+        cwd,
         onEvent: (event) => runtime.applyEvent(sessionKey, event),
         panelContext: await getPanelContext(),
       });
@@ -165,7 +197,7 @@ export function createSessionController({ state, runtime, turns, api }) {
       // Agents reset mode / model on load; re-apply the agent's saved selection
       if (defaults?.length) {
         try {
-          loadedOptions = await applyComposerConfig(selected, loadedOptions, defaults);
+          loadedOptions = await applyComposerConfig(target, loadedOptions, defaults);
         } catch (e) {
           runtime.setError(sessionKey, e.message);
         }
@@ -182,7 +214,7 @@ export function createSessionController({ state, runtime, turns, api }) {
         });
       }
       if (state.sessionKey === sessionKey) {
-        const pane = {
+        const pane: Pane = {
           messages: state.messages,
           configOptions: loadedOptions,
           cwd: state.cwd,
@@ -190,13 +222,14 @@ export function createSessionController({ state, runtime, turns, api }) {
         };
         runtime.setCachedPane(sessionKey, pane);
         state({ configOptions: pane.configOptions });
-      } else if (runtime.hasCachedPane(sessionKey)) {
+      } else {
         const pane = runtime.getCachedPane(sessionKey);
-        runtime.setCachedPane(sessionKey, {
-          ...pane,
-          messages: completeThought(pane.messages),
-          configOptions: loadedOptions,
-        });
+        if (pane)
+          runtime.setCachedPane(sessionKey, {
+            ...pane,
+            messages: completeThought(pane.messages),
+            configOptions: loadedOptions,
+          });
       }
     } catch (e) {
       if (!record.alive) return;
@@ -210,7 +243,7 @@ export function createSessionController({ state, runtime, turns, api }) {
     }
   };
 
-  const deleteSession = async (sessionKey) => {
+  const deleteSession = async (sessionKey: string) => {
     if (state.deleting) return;
     let selected = runtime.record(sessionKey);
     if (!selected) return;
@@ -234,15 +267,15 @@ export function createSessionController({ state, runtime, turns, api }) {
     const previousDraft = state.draftSession;
     state({ deleting: sessionKey });
     try {
-      if (!isDraft && (isCurrent || loadRecord || runtime.hasCachedPane(sessionKey))) {
-        await api.closeSession(selected.agent, selected.sessionId).catch(() => {});
-      }
-      if (!isDraft) {
-        await api.deleteSession(selected.agent, selected.sessionId).catch(() => {});
-        await runtime.removeRecord(sessionKey);
-      }
-      if (isDraft) {
+      const target = runtime.target(sessionKey);
+      if (isDraft || !target) {
         state({ draftSession: null });
+      } else {
+        if (isCurrent || loadRecord || runtime.hasCachedPane(sessionKey)) {
+          await api.closeSession(target.agent, target.sessionId).catch(() => {});
+        }
+        await api.deleteSession(target.agent, target.sessionId).catch(() => {});
+        await runtime.removeRecord(sessionKey);
       }
       runtime.deletePane(sessionKey);
       runtime.clearError(sessionKey);
@@ -268,7 +301,7 @@ export function createSessionController({ state, runtime, turns, api }) {
     }
   };
 
-  const changeConfig = async (configId, value) => {
+  const changeConfig = async (configId: string, value: string) => {
     const sessionKey = state.sessionKey;
     if (!sessionKey) return;
     const session = runtime.record(sessionKey);
@@ -296,7 +329,7 @@ export function createSessionController({ state, runtime, turns, api }) {
     }
   };
 
-  const handleSessionEnded = ({ agent, sessionId }) => {
+  const handleSessionEnded = ({ agent, sessionId }: SessionTarget) => {
     const sessionKey = agentSessionKey(agent, sessionId);
     const record = pendingLoads.get(sessionKey);
     if (record) {

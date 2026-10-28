@@ -1,4 +1,7 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { ConfigChoice, SessionConfigOption } from 'agentdeck/agent/api';
 import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from 'agentdeck/attachment/read';
+import type { Attachment } from 'agentdeck/attachment/types';
 import {
   createPasteReference,
   expandReferenceRange,
@@ -6,7 +9,23 @@ import {
   syncPasteReferences,
 } from 'agentdeck/composer/references';
 import { icons } from 'agentdeck/styles/icons';
-import { t } from '../../shared/i18n.js';
+import { t } from '../../shared/i18n';
+import type { PromptPayload, QueueItem } from '../agent-panel/types';
+import type { GroupedPickerChange } from './grouped-picker';
+
+export type ConfigChange = { configId: string; value: string };
+
+export type SelectOption = Extract<SessionConfigOption, { type: 'select' }>;
+
+/** Grouped choices are flattened, as in the App. */
+const choicesOf = (option: SelectOption): ConfigChoice[] =>
+  option.options.flatMap((item) => ('options' in item ? item.options : [item]));
+
+const toPickerOption = (item: ConfigChoice) => ({
+  label: item.name,
+  description: item.description || undefined,
+  value: item.value,
+});
 
 // ACP categories merged into one picker; trigger shows model + effort, e.g. Codex and Claude Agent
 const MODEL_CONFIG_CATEGORIES = ['model', 'thought_level', 'model_config'];
@@ -21,30 +40,36 @@ const stopButtonClass =
   'ml-1 grid size-8 shrink-0 cursor-pointer place-items-center rounded-full border border-border bg-transparent text-describe transition-[background-color,color] duration-150 hover:bg-bg-light hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 
 @customElement('agent-composer')
-class AgentComposerElement extends GemElement {
-  @boolattribute turnPending;
-  @property configOptions;
-  @property sessionKey;
-  @property queue; // staged prompts while one is in flight
+export class AgentComposerElement extends GemElement {
+  @boolattribute turnPending: boolean;
+  /** Selectable options only. */
+  @property configOptions: SelectOption[] = [];
+  @property sessionKey: string | null = null;
+  /** Staged prompts while one is in flight. */
+  @property queue: QueueItem[] = [];
 
-  @emitter send;
-  @emitter cancel;
-  @emitter configchange;
-  @emitter attacherror;
-  @emitter queuesend; // detail: queued item id
-  @emitter queueupdate; // detail: { id, prompt, attachments }
-  @emitter queueremove; // detail: queued item id
+  @emitter send: Emitter<PromptPayload>;
+  @emitter cancel: Emitter;
+  @emitter configchange: Emitter<ConfigChange>;
+  @emitter attacherror: Emitter<string>;
+  /** Detail: queued item id. */
+  @emitter queuesend: Emitter<string>;
+  @emitter queueupdate: Emitter<QueueItem>;
+  /** Detail: queued item id. */
+  @emitter queueremove: Emitter<string>;
 
   #s = createState({
     input: '',
-    attachments: [], // staged prompt attachments: { id, kind: 'image'|'text'|'file', name, … }
-    editingId: null, // Queued item currently being edited: sending will update it in place instead of posting a new one
+    /** Staged prompt attachments. */
+    attachments: [] as Attachment[],
+    /** Queued item currently being edited: sending will update it in place instead of posting a new one. */
+    editingId: null as string | null,
   });
 
-  #fileInputRef = createRef();
-  #textareaRef = createRef();
+  #fileInputRef = createRef<HTMLInputElement>();
+  #textareaRef = createRef<HTMLTextAreaElement>();
   #nextPasteReference = 1;
-  #pastedAttachments = new Map();
+  #pastedAttachments = new Map<string, Attachment>();
 
   focus = () => {
     this.#textareaRef.value?.focus();
@@ -53,7 +78,7 @@ class AgentComposerElement extends GemElement {
   /** The DOM value is reset imperatively too: template property bindings only
    * rewrite when the bound value differs from their last commit, which can
    * desync once the user edited the field directly. */
-  #setInput = (value) => {
+  #setInput = (value: string) => {
     this.#s({ input: value });
     if (this.#textareaRef.value) this.#textareaRef.value.value = value;
   };
@@ -87,7 +112,7 @@ class AgentComposerElement extends GemElement {
     else this.send({ prompt, attachments });
   };
 
-  #onKeydown = (e) => {
+  #onKeydown = (e: KeyboardEvent) => {
     // Enter during IME composition confirms character selection and must not trigger send
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -100,12 +125,13 @@ class AgentComposerElement extends GemElement {
     this.#fileInputRef.value?.click();
   };
 
-  #onFileInputChange = (e) => {
-    this.#addFiles(e.target.files);
-    e.target.value = '';
+  #onFileInputChange = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files) this.#addFiles(input.files);
+    input.value = '';
   };
 
-  #readFile = async (file) => {
+  #readFile = async (file: File): Promise<{ attachment?: Attachment; reason?: string }> => {
     try {
       return { attachment: await readAttachment(file) };
     } catch (error) {
@@ -114,7 +140,7 @@ class AgentComposerElement extends GemElement {
     }
   };
 
-  #readFiles = async (fileList) => {
+  #readFiles = async (fileList: Iterable<File>) => {
     // dy-drop-area wraps plain-text drags as { name: 'temp', type: '*' } —
     // ignore them; pasting covers that case.
     const room = MAX_ATTACHMENTS - this.#s.attachments.length;
@@ -127,16 +153,16 @@ class AgentComposerElement extends GemElement {
     return added;
   };
 
-  #addFiles = async (fileList) => {
+  #addFiles = async (fileList: Iterable<File>) => {
     const added = await this.#readFiles(fileList);
     if (added.length) this.#s({ attachments: [...this.#s.attachments, ...added] });
   };
 
-  #syncInput = (input) => {
+  #syncInput = (input: string) => {
     this.#s({ input, attachments: syncPasteReferences(input, this.#s.attachments, this.#pastedAttachments.values()) });
   };
 
-  #replaceInputRange = (start, end, replacement, addedAttachments = []) => {
+  #replaceInputRange = (start: number, end: number, replacement: string, addedAttachments: Attachment[] = []) => {
     const input = this.#s.input;
     start = Math.max(0, Math.min(start, input.length));
     end = Math.max(start, Math.min(end, input.length));
@@ -160,7 +186,7 @@ class AgentComposerElement extends GemElement {
     textarea.setSelectionRange(caret, caret);
   };
 
-  #insertPastedAttachments = (attachments, selection) => {
+  #insertPastedAttachments = (attachments: Attachment[], selection: { input: string; start: number; end: number }) => {
     if (!attachments.length) return;
     const textarea = this.#textareaRef.value;
     const currentSelection =
@@ -181,18 +207,18 @@ class AgentComposerElement extends GemElement {
     this.#replaceInputRange(range.start, range.end, references.map((item) => item.marker).join(' '), references);
   };
 
-  #removeAttachment = (id) => {
-    const attachment = this.#s.attachments.find((item) => item.id === id);
-    const markerStart = attachment?.marker ? this.#s.input.indexOf(attachment.marker) : -1;
-    if (markerStart >= 0) {
-      this.#replaceInputRange(markerStart, markerStart + attachment.marker.length, '');
+  #removeAttachment = (id: string) => {
+    const marker = this.#s.attachments.find((item) => item.id === id)?.marker;
+    const markerStart = marker ? this.#s.input.indexOf(marker) : -1;
+    if (marker && markerStart >= 0) {
+      this.#replaceInputRange(markerStart, markerStart + marker.length, '');
       return;
     }
     this.#s({ attachments: this.#s.attachments.filter((item) => item.id !== id) });
   };
 
-  #onBeforeInput = (e) => {
-    const textarea = e.target;
+  #onBeforeInput = (e: InputEvent) => {
+    const textarea = e.target as HTMLTextAreaElement;
     let start = textarea.selectionStart ?? 0;
     let end = textarea.selectionEnd ?? start;
     if (e.inputType.startsWith('insert')) {
@@ -211,15 +237,16 @@ class AgentComposerElement extends GemElement {
     textarea.setSelectionRange(range.start, range.end);
   };
 
-  #onInput = (e) => {
-    this.#syncInput(e.target.value);
+  #onInput = (e: Event) => {
+    this.#syncInput((e.target as HTMLTextAreaElement).value);
   };
 
-  #onPaste = async (e) => {
+  #onPaste = async (e: ClipboardEvent) => {
+    const textarea = e.target as HTMLTextAreaElement;
     const selection = {
       input: this.#s.input,
-      start: e.target.selectionStart ?? this.#s.input.length,
-      end: e.target.selectionEnd ?? this.#s.input.length,
+      start: textarea.selectionStart ?? this.#s.input.length,
+      end: textarea.selectionEnd ?? this.#s.input.length,
     };
     const images = [...(e.clipboardData?.files || [])].filter((file) => file.type.startsWith('image/'));
     if (images.length) {
@@ -242,16 +269,16 @@ class AgentComposerElement extends GemElement {
 
   /** Put a queued prompt back into the draft; sending then updates that
    * entry in place. Clicking its row button again cancels editing. */
-  #editQueued = (id) => {
+  #editQueued = (id: string) => {
     if (this.#s.editingId === id) {
       this.#s({ editingId: null });
       return;
     }
-    const item = (this.queue || []).find((entry) => entry.id === id);
+    const item = this.queue.find((entry) => entry.id === id);
     if (!item) return;
     this.#s({ editingId: id });
     this.#setInput(item.prompt);
-    const attachments = item.attachments || [];
+    const { attachments } = item;
     this.#s({ attachments });
     this.#pastedAttachments.clear();
     for (const attachment of attachments) {
@@ -261,10 +288,10 @@ class AgentComposerElement extends GemElement {
     this.focus();
   };
 
-  #renderModelConfigValue = (value) =>
+  #renderModelConfigValue = (value: Record<string, string>) =>
     ['model', 'thought_level']
-      .map((category) => this.configOptions?.find((option) => option.category === category))
-      .map((option) => option?.options.find((item) => item.value === value?.[option.id])?.name)
+      .map((category) => this.configOptions.find((option) => option.category === category))
+      .map((option) => option && choicesOf(option).find((item) => item.value === value[option.id])?.name)
       .filter(Boolean)
       .join(' ');
 
@@ -272,24 +299,22 @@ class AgentComposerElement extends GemElement {
   #content = () => {
     const { input, attachments, editingId } = this.#s;
     const pending = this.turnPending;
-    const configOptions = this.configOptions || [];
-    const modelConfigOptions = configOptions.filter((option) => MODEL_CONFIG_CATEGORIES.includes(option.category));
+    const { configOptions } = this;
+    const modelConfigOptions = configOptions.filter((option) =>
+      MODEL_CONFIG_CATEGORIES.includes(option.category || ''),
+    );
     const standaloneConfigOptions = configOptions.filter((option) => !modelConfigOptions.includes(option));
     const modelPickerOptions = modelConfigOptions.map((option) => ({
       label: option.name,
-      description: option.description,
+      description: option.description || undefined,
       value: option.id,
-      children: option.options.map((item) => ({
-        label: item.name,
-        description: item.description,
-        value: item.value,
-      })),
+      children: choicesOf(option).map(toPickerOption),
     }));
     const modelPickerValue = Object.fromEntries(modelConfigOptions.map((option) => [option.id, option.currentValue]));
     const modelConfigSummary = modelConfigOptions
       .map(
         (option) =>
-          `${option.name}: ${option.options.find((item) => item.value === option.currentValue)?.name || option.currentValue}`,
+          `${option.name}: ${choicesOf(option).find((item) => item.value === option.currentValue)?.name || option.currentValue}`,
       )
       .join('; ');
     const canSend = this.#canSend;
@@ -301,10 +326,10 @@ class AgentComposerElement extends GemElement {
         : t('devtoolsPanelCancel')
       : t('devtoolsPanelSend');
     return html`
-      <div v-if=${!!this.queue?.length} class="mb-2">
+      <div v-if=${!!this.queue.length} class="mb-2">
         <div class="px-1 pb-1 text-xs text-describe">${t('devtoolsPanelQueuedPrompts')}</div>
         <div class="flex flex-col gap-1.5">
-          ${this.queue?.map(
+          ${this.queue.map(
             (item) => html`
               <div
                 class=${`group flex items-center gap-2 rounded-lg border bg-bg px-3 py-1.5 ${
@@ -313,7 +338,7 @@ class AgentComposerElement extends GemElement {
               >
                 <div class="min-w-0 flex-1 self-stretch flex flex-col justify-center">
                   <div class="truncate text-sm text-text" title=${item.prompt}>${item.prompt}</div>
-                  <div v-if=${item.attachments.length} class="truncate text-xs text-describe">
+                  <div v-if=${!!item.attachments.length} class="truncate text-xs text-describe">
                     ${item.attachments.map((attachment) => attachment.name).join(' · ')}
                   </div>
                 </div>
@@ -365,7 +390,7 @@ class AgentComposerElement extends GemElement {
         @change=${
           // The emitter is global: native `change` events (e.g. input blur)
           // bubble here too and carry no detail — only react to file lists.
-          (e) => {
+          (e: CustomEvent<File[] | undefined>) => {
             if (Array.isArray(e.detail)) this.#addFiles(e.detail);
           }
         }
@@ -373,13 +398,13 @@ class AgentComposerElement extends GemElement {
         <div
           class="w-full rounded-lg border border-border bg-bg transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/15"
         >
-          <div v-if=${attachments.length} class="flex flex-wrap gap-1.5 px-3 pt-2">
+          <div v-if=${!!attachments.length} class="flex flex-wrap gap-1.5 px-3 pt-2">
             ${attachments.map(
               (item) => html`
                 <agent-attachment
                   .attachment=${item}
                   removable
-                  @request-remove=${(e) => this.#removeAttachment(e.detail)}
+                  @request-remove=${(e: CustomEvent<string>) => this.#removeAttachment(e.detail)}
                 ></agent-attachment>
               `,
             )}
@@ -407,7 +432,7 @@ class AgentComposerElement extends GemElement {
             </button>
             <div class="ml-auto flex min-w-0 items-center">
               <div
-                v-if=${standaloneConfigOptions.length || modelConfigOptions.length}
+                v-if=${!!(standaloneConfigOptions.length || modelConfigOptions.length)}
                 class="flex min-w-0 flex-wrap items-center gap-1"
               >
                 ${standaloneConfigOptions.map(
@@ -416,20 +441,16 @@ class AgentComposerElement extends GemElement {
                       borderless
                       class="max-w-40"
                       placeholder=${option.name}
-                      .options=${option.options.map((item) => ({
-                        label: item.name,
-                        description: item.description,
-                        value: item.value,
-                      }))}
+                      .options=${choicesOf(option).map(toPickerOption)}
                       .value=${option.currentValue}
                       aria-label=${option.name}
                       title=${option.description || option.name}
-                      @change=${(e) => this.configchange({ configId: option.id, value: e.detail })}
+                      @change=${(e: CustomEvent<string>) => this.configchange({ configId: option.id, value: e.detail })}
                     ></dy-picker>
                   `,
                 )}
                 <agent-grouped-picker
-                  v-if=${modelConfigOptions.length}
+                  v-if=${!!modelConfigOptions.length}
                   borderless
                   class="max-w-40"
                   placeholder=${modelConfigOptions[0]?.name}
@@ -438,7 +459,7 @@ class AgentComposerElement extends GemElement {
                   .renderValue=${this.#renderModelConfigValue}
                   aria-label=${modelConfigSummary}
                   title=${modelConfigSummary}
-                  @change=${(event) => this.configchange({ configId: event.detail.group, value: event.detail.value })}
+                  @change=${(e: CustomEvent<GroupedPickerChange>) => this.configchange({ configId: e.detail.group, value: e.detail.value })}
                 ></agent-grouped-picker>
               </div>
               <button

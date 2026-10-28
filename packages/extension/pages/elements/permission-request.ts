@@ -1,12 +1,15 @@
-import { t } from '../../shared/i18n.js';
+import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { PermissionRequest } from 'agentdeck/agent/api';
+import { t } from '../../shared/i18n';
 
 @customElement('agent-permission-request')
-class AgentPermissionRequestElement extends GemElement {
-  @property request;
+export class AgentPermissionRequestElement extends GemElement {
+  @property request?: PermissionRequest;
 
-  @emitter decision;
+  /** `null` cancels the tool call. */
+  @emitter decision: Emitter<string | null>;
 
-  #choose = (optionId) => this.decision(optionId);
+  #choose = (optionId: string | null) => this.decision(optionId);
 
   @template()
   #content = () => {

@@ -1,30 +1,28 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
 import { displayPath } from 'agentdeck/lib/path';
 import { icons } from 'agentdeck/styles/icons';
-import { getAgentName } from '../../shared/agents.js';
-import { t } from '../../shared/i18n.js';
+import type { SessionRecord } from '../../shared/agent-session-store';
+import { getAgentName } from '../../shared/agents';
+import { t } from '../../shared/i18n';
 
 @customElement('agent-session-item')
-class AgentSessionItemElement extends GemElement {
-  @property session;
-  @property home;
-  @boolattribute active;
-  @boolattribute loading;
-  @boolattribute deleting;
+export class AgentSessionItemElement extends GemElement {
+  @property session?: SessionRecord;
+  @property home = '';
+  @boolattribute active: boolean;
+  @boolattribute loading: boolean;
+  @boolattribute deleting: boolean;
 
-  @emitter select;
-  @emitter delete;
+  @emitter select: Emitter;
+  @emitter delete: Emitter;
 
   #onSelect = () => {
-    if (!this.deleting) {
-      this.select(this.session?.key);
-    }
+    if (!this.deleting) this.select();
   };
 
-  #onDelete = (e) => {
+  #onDelete = (e: Event) => {
     e.stopPropagation();
-    if (!this.deleting && !this.loading) {
-      this.delete(this.session?.key);
-    }
+    if (!this.deleting && !this.loading) this.delete();
   };
 
   @template()
@@ -44,7 +42,7 @@ class AgentSessionItemElement extends GemElement {
           'bg-bg-hover': active,
           'opacity-60 cursor-not-allowed': deleting,
         })}
-        title=${`${agentName || ''} · ${session.sessionId || ''}`}
+        title=${`${agentName} · ${session.sessionId || ''}`}
         @click=${this.#onSelect}
       >
         <span class="min-w-0 flex-1">
@@ -52,14 +50,14 @@ class AgentSessionItemElement extends GemElement {
             <agent-icon
               class="size-3.5 shrink-0"
               .agent=${session.agent}
-              title=${agentName || session.agent}
+              title=${agentName}
             ></agent-icon>
             <span class="min-w-0 truncate">${title}</span>
           </span>
-          <span v-if=${session.cwd} class="mt-0.5 block truncate font-mono text-xs text-describe" title=${session.cwd}>
-            ${displayPath(session.cwd, this.home)}
+          <span v-if=${!!session.cwd} class="mt-0.5 block truncate font-mono text-xs text-describe" title=${session.cwd}>
+            ${displayPath(session.cwd || '', this.home)}
           </span>
-          <span v-if=${updatedAt} class="block truncate text-xs text-describe mt-0.5">${updatedAt}</span>
+          <span v-if=${!!updatedAt} class="block truncate text-xs text-describe mt-0.5">${updatedAt}</span>
         </span>
         <dy-use
           v-if=${loading && !deleting}

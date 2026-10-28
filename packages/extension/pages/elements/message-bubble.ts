@@ -1,18 +1,26 @@
 import { GemBindDiff2htmlElement } from '@gem-bind/diff2html';
 import { GemBindMarkedElement, Renderer } from '@gem-bind/marked';
+import type { Metadata, Sheet } from '@mantou/gem/lib/reactive';
 import { extractMessageAttachments } from 'agentdeck/attachment/message';
 import { toolCallDiffs } from 'agentdeck/lib/diff';
 import { nextStreamingText, STREAM_REVEAL_INTERVAL } from 'agentdeck/lib/stream-text';
 import { theme } from 'duoyun-ui/lib/theme';
-import { t } from '../../shared/i18n.js';
-import { createMarkdownExtensions } from '../../shared/markdown.js';
+import { t } from '../../shared/i18n';
+import { createMarkdownExtensions } from '../../shared/markdown';
+import type { PanelMessage } from '../agent-panel/types';
 
 import '@gem-bind/diff2html';
 import '@gem-bind/latex';
 import '@gem-bind/mermaid';
 import 'duoyun-ui/elements/code-block';
 
-GemBindMarkedElement[Symbol.metadata].adoptedStyleSheets.push(css`
+/** Extra styles for third-party elements; they come after the element's own sheets. */
+const adoptStyle = (element: typeof GemElement, sheet: Sheet<unknown>) =>
+  (element[Symbol.metadata] as Metadata).adoptedStyleSheets?.push(sheet);
+
+adoptStyle(
+  GemBindMarkedElement,
+  css`
   :host {
     display: block;
     line-height: 1.6;
@@ -147,15 +155,18 @@ GemBindMarkedElement[Symbol.metadata].adoptedStyleSheets.push(css`
       color: inherit;
     }
   }
-`);
+`,
+);
 
 const defaultMarkdownRenderer = new Renderer();
 const markdownExtensions = createMarkdownExtensions(defaultMarkdownRenderer);
-const diffColorScheme = globalThis.chrome?.devtools?.panels?.themeName === 'dark' ? 'dark' : 'light';
+const diffColorScheme = chrome.devtools?.panels?.themeName === 'dark' ? 'dark' : 'light';
 
 // Tool title already includes file path, hide d2h file header;
 // The element places its own stylesheet after external ones, so specificity must exceed upstream .d2h-file-header to override
-GemBindDiff2htmlElement[Symbol.metadata].adoptedStyleSheets.push(css`
+adoptStyle(
+  GemBindDiff2htmlElement,
+  css`
   div.d2h-wrapper {
     .d2h-file-header {
       display: none;
@@ -168,21 +179,26 @@ GemBindDiff2htmlElement[Symbol.metadata].adoptedStyleSheets.push(css`
       border-left: none;
     }
   }
-`);
+`,
+);
 
 @customElement('agent-message-bubble')
-class AgentMessageBubbleElement extends GemElement {
-  @property message;
-  @property streamKey;
-  @boolattribute streaming;
+export class AgentMessageBubbleElement extends GemElement {
+  @property message?: PanelMessage;
+  @property streamKey: string | null = null;
+  @boolattribute streaming: boolean;
 
-  #streamText = createState({ key: undefined, text: '' });
-  #streamTimer = 0;
+  #streamText = createState({ key: undefined as string | null | undefined, text: '' });
+  #streamTimer: ReturnType<typeof setTimeout> | undefined;
 
-  @memo((i) => [i.streamKey, i.streaming, i.message?.text])
+  get #targetText() {
+    return this.message && 'text' in this.message ? this.message.text : '';
+  }
+
+  @memo((i) => [i.streamKey, i.streaming, i.#targetText])
   #updateStreamingText = () => {
     clearTimeout(this.#streamTimer);
-    const targetText = this.message?.text || '';
+    const targetText = this.#targetText;
     if (!this.streaming) {
       this.#streamText({ key: this.streamKey, text: targetText });
       return;
@@ -195,7 +211,7 @@ class AgentMessageBubbleElement extends GemElement {
     }
 
     const reveal = () => {
-      const target = this.message?.text || '';
+      const target = this.#targetText;
       const text = nextStreamingText(this.#streamText.text, target);
       if (text === this.#streamText.text) return;
       this.#streamText({ text });
@@ -206,7 +222,7 @@ class AgentMessageBubbleElement extends GemElement {
   };
 
   get #messageText() {
-    const targetText = this.message?.text || '';
+    const targetText = this.#targetText;
     return this.streaming && this.#streamText.key === this.streamKey ? this.#streamText.text : targetText;
   }
 
@@ -232,8 +248,8 @@ class AgentMessageBubbleElement extends GemElement {
     }
 
     if (msg.type === 'tool') {
-      const { title, kind, status, rawInput } = msg.data || {};
-      const diffs = toolCallDiffs(msg.data?.content || msg.data);
+      const { title, kind, status, rawInput } = msg.data;
+      const diffs = toolCallDiffs(msg.data.content);
       const toolTitle = title || t('devtoolsToolCall');
       const toolMeta = [kind, status].filter(Boolean).join(' / ');
       return html`
@@ -241,7 +257,7 @@ class AgentMessageBubbleElement extends GemElement {
           <summary class="min-w-0 cursor-pointer select-none px-2.5 py-2 hover:text-text">
             <span class="inline-flex w-[calc(100%-1rem)] min-w-0 items-center gap-2 align-middle">
               <span class="min-w-0 flex-1 truncate font-medium text-text" title=${toolTitle}>${toolTitle}</span>
-              <span v-if=${toolMeta} class="max-w-[45%] shrink-0 truncate font-mono" title=${toolMeta}
+              <span v-if=${!!toolMeta} class="max-w-[45%] shrink-0 truncate font-mono" title=${toolMeta}
                 >${toolMeta}</span
               >
             </span>
@@ -269,7 +285,7 @@ class AgentMessageBubbleElement extends GemElement {
     }
 
     if (msg.type === 'event') {
-      const updateName = msg.data?.sessionUpdate || 'event';
+      const updateName = msg.data.sessionUpdate || 'event';
       return html`
         <details class="my-2 rounded border border-border bg-bg-light/60 text-xs text-describe">
           <summary class="cursor-pointer select-none px-2.5 py-1.5 hover:text-text font-mono">
@@ -295,7 +311,7 @@ class AgentMessageBubbleElement extends GemElement {
             'w-full bg-bg-light text-text border border-border rounded-bl-xs': !isUser,
           })}
         >
-          <div v-if=${attachments.length} class=${`mb-1.5 flex flex-wrap gap-1 ${isUser ? 'justify-end' : ''}`}>
+          <div v-if=${!!attachments.length} class=${`mb-1.5 flex flex-wrap gap-1 ${isUser ? 'justify-end' : ''}`}>
             ${attachments.map(
               (item) => html`
                 <agent-attachment ?inverted=${isUser} small .attachment=${item}></agent-attachment>

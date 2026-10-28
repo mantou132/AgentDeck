@@ -1,29 +1,42 @@
+import type { AgentApi, UserInput } from 'agentdeck/agent/api';
 import { toPromptAttachment } from 'agentdeck/attachment/prompt';
-import { agentSessionKey, sessionTitleFromPrompt } from '../../shared/agent-session-store.js';
+import { agentSessionKey, sessionTitleFromPrompt } from '../../shared/agent-session-store';
+import type { SessionRuntime } from './session-runtime';
+import type { PanelStore, PromptPayload, QueueItem } from './types';
 
-export function createTurnController({ state, runtime, api, scrollToLatest, startDraftTurn }) {
-  const runningTurns = new Map();
-  const canceledSessions = new Set();
+type TurnControllerOptions = {
+  state: PanelStore;
+  runtime: SessionRuntime;
+  api: AgentApi;
+  scrollToLatest: () => void;
+  startDraftTurn: (sessionKey: string, payload: PromptPayload) => Promise<void>;
+};
+
+export type TurnController = ReturnType<typeof createTurnController>;
+
+export function createTurnController({ state, runtime, api, scrollToLatest, startDraftTurn }: TurnControllerOptions) {
+  const runningTurns = new Map<string, Promise<void>>();
+  const canceledSessions = new Set<string>();
 
   /** Show a permission request of the host (a notification); keyed by session so
    * requests survive switching and are answered when their session shows. The panel
    * has no question card, so form elicitations are skipped (declined) at once. */
-  const handleUserInput = ({ method, params }) => {
-    if (method === 'agent_elicitation_request') {
-      api.respondUserInput(params, { action: 'decline' }).catch(console.error);
+  const handleUserInput = (input: UserInput) => {
+    if (input.method === 'agent_elicitation_request') {
+      api.respondUserInput(input.params, { action: 'decline' }).catch(console.error);
       return;
     }
+    const { params } = input;
     const { agent, sessionId } = params;
     // The host waits for one request per session; a newer one replaces the card.
     state({ permissions: { ...state.permissions, [agentSessionKey(agent, sessionId)]: params } });
   };
 
   /** Answer the permission of one session through the host; `null` cancels the tool call. */
-  const decidePermission = (sessionKey, optionId) => {
+  const decidePermission = (sessionKey: string | null, optionId: string | null) => {
     const request = sessionKey && state.permissions[sessionKey];
     if (!request) return;
-    const permissions = { ...state.permissions };
-    delete permissions[sessionKey];
+    const { [sessionKey]: _, ...permissions } = state.permissions;
     state({ permissions });
     api.respondUserInput(request, optionId ? { optionId } : {}).catch(console.error);
   };
@@ -33,8 +46,8 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   /** Show a submitted prompt immediately, before the host starts answering. */
-  const stage = (sessionKey, { prompt, attachments }) => {
-    if (sessionKey === state.sessionKey) scrollToLatest?.();
+  const stage = (sessionKey: string, { prompt, attachments }: PromptPayload) => {
+    if (sessionKey === state.sessionKey) scrollToLatest();
     runtime.clearError(sessionKey);
     runtime.setPending(sessionKey, true);
     runtime.setPane(sessionKey, {
@@ -50,11 +63,11 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
 
   /** Run one turn against the host; events keep following their session when
    * the user switches away. A newly materialized draft is already staged. */
-  const performTurn = async (sessionKey, { prompt, attachments }, { staged = false } = {}) => {
+  const performTurn = async (sessionKey: string, { prompt, attachments }: PromptPayload, staged: boolean) => {
     const target = runtime.target(sessionKey);
     if (!target) return;
     if (staged) {
-      if (sessionKey === state.sessionKey) scrollToLatest?.();
+      if (sessionKey === state.sessionKey) scrollToLatest();
       runtime.clearError(sessionKey);
       runtime.setPending(sessionKey, true);
     } else {
@@ -69,10 +82,12 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
         (event) => runtime.applyEvent(sessionKey, event),
         attachments.map(toPromptAttachment),
       );
-      const answer = result?.answer || '';
+      const answer = result.answer || '';
       runtime.finishThought(sessionKey);
       const messages = runtime.getPane(sessionKey)?.messages ?? [];
-      const receivedAgentText = messages.slice(turnStart).some((message) => message.role === 'agent' && message.text);
+      const receivedAgentText = messages
+        .slice(turnStart)
+        .some((message) => message.type === undefined && message.role === 'agent' && message.text);
       if (answer && !receivedAgentText) {
         runtime.setPane(sessionKey, { messages: [...messages, { role: 'agent', text: answer }] });
       }
@@ -89,8 +104,8 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   /** Track the settling promise so cancel-and-replace can await it. */
-  const run = (sessionKey, payload, options) => {
-    const turn = performTurn(sessionKey, payload, options)
+  const run = (sessionKey: string, payload: PromptPayload, staged = false) => {
+    const turn = performTurn(sessionKey, payload, staged)
       .catch(() => {})
       .finally(() => {
         if (runningTurns.get(sessionKey) === turn) runningTurns.delete(sessionKey);
@@ -99,7 +114,7 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   /** After a successful turn, auto-send the next queued prompt in order. */
-  const drainQueue = (sessionKey) => {
+  const drainQueue = (sessionKey: string) => {
     if (state.pendingIds.includes(sessionKey)) return;
     const [next, ...rest] = runtime.getPane(sessionKey)?.queue ?? [];
     if (!next) return;
@@ -108,7 +123,7 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   /** Abort one in-flight turn and decline any permission it is awaiting. */
-  const abort = async (sessionKey) => {
+  const abort = async (sessionKey: string) => {
     decidePermission(sessionKey, null);
     const turn = runningTurns.get(sessionKey);
     if (!turn) return;
@@ -124,9 +139,9 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   /** Accept a composer send: deliver it when idle, queue it during a turn. */
-  const send = ({ prompt, attachments }) => {
+  const send = ({ prompt, attachments }: PromptPayload) => {
     const sessionKey = state.sessionKey;
-    if ((!prompt && !attachments?.length) || !sessionKey) return;
+    if ((!prompt && !attachments.length) || !sessionKey) return;
     if (state.pendingIds.includes(sessionKey)) {
       runtime.setPane(sessionKey, {
         queue: [...(runtime.getPane(sessionKey)?.queue ?? []), { id: crypto.randomUUID(), prompt, attachments }],
@@ -141,7 +156,7 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
   };
 
   /** Send one queued prompt now, canceling the current turn first if needed. */
-  const flushQueued = async (sessionKey, itemId) => {
+  const flushQueued = async (sessionKey: string, itemId: string) => {
     const item = (runtime.getPane(sessionKey)?.queue ?? []).find((entry) => entry.id === itemId);
     if (!item) return;
     if (!state.pendingIds.includes(sessionKey)) {
@@ -159,13 +174,13 @@ export function createTurnController({ state, runtime, api, scrollToLatest, star
     run(sessionKey, item);
   };
 
-  const removeQueued = (sessionKey, itemId) => {
+  const removeQueued = (sessionKey: string, itemId: string) => {
     runtime.setPane(sessionKey, {
       queue: (runtime.getPane(sessionKey)?.queue ?? []).filter((entry) => entry.id !== itemId),
     });
   };
 
-  const updateQueued = (sessionKey, { id, prompt, attachments }) => {
+  const updateQueued = (sessionKey: string, { id, prompt, attachments }: QueueItem) => {
     const queue = runtime.getPane(sessionKey)?.queue ?? [];
     const next = queue.some((entry) => entry.id === id)
       ? queue.map((entry) => (entry.id === id ? { id, prompt, attachments } : entry))

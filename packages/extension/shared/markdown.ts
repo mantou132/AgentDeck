@@ -1,4 +1,6 @@
-const escapeHtml = (value) =>
+import type { MarkedExtension, Renderer, Tokens } from '@gem-bind/marked';
+
+const escapeHtml = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 // Agent code reference fence info; codelang should extract the file extension:
@@ -7,13 +9,13 @@ const escapeHtml = (value) =>
 const CODE_REFERENCE_RE = /^(\d+):(\d+):(.+)$/;
 const PATH_LOCATION_RE = /^(?!\d+:\d+:)(.+):(\d+):(\d+)$/;
 
-const langFromFilepath = (filepath) => {
+const langFromFilepath = (filepath: string) => {
   const dot = filepath.lastIndexOf('.');
   return dot > 0 ? filepath.slice(dot + 1).toLowerCase() : '';
 };
 
-const resolveCodeLang = (lang) => {
-  const token = (lang || '').trim().split(/\s+/)[0];
+const resolveCodeLang = (lang = '') => {
+  const token = lang.trim().split(/\s+/)[0];
   const ref = CODE_REFERENCE_RE.exec(token);
   if (ref) return langFromFilepath(ref[3]);
   const location = PATH_LOCATION_RE.exec(token);
@@ -21,12 +23,12 @@ const resolveCodeLang = (lang) => {
   return token.toLowerCase();
 };
 
-const firstIndex = (...values) => {
+const firstIndex = (...values: number[]) => {
   const indexes = values.filter((value) => value >= 0);
   return indexes.length ? Math.min(...indexes) : undefined;
 };
 
-const hasClosingFence = (raw) => {
+const hasClosingFence = (raw?: string) => {
   if (!raw) return true;
   const [openingLine, ...lines] = raw.split(/\r?\n/);
   const fence = /^ {0,3}(`{3,}|~{3,})/.exec(openingLine)?.[1];
@@ -37,20 +39,20 @@ const hasClosingFence = (raw) => {
 
 const blockLatex = {
   name: 'latexBlock',
-  level: 'block',
-  start(source) {
+  level: 'block' as const,
+  start(source: string) {
     const match = /(?:^|\n)(?:\$\$|\\\[)/.exec(source);
     if (!match) return;
     return match.index + (match[0].startsWith('\n') ? 1 : 0);
   },
-  tokenizer(source) {
+  tokenizer(source: string) {
     const dollar = /^\$\$[ \t]*\n?([\s\S]*?)\n?[ \t]*\$\$(?:[ \t]*(?:\n|$))/.exec(source);
     const bracket = /^\\\[[ \t]*\n?([\s\S]*?)\n?[ \t]*\\\](?:[ \t]*(?:\n|$))/.exec(source);
     const match = dollar || bracket;
     if (match) return { type: 'latexBlock', raw: match[0], text: match[1].trim() };
     if (/^(?:\$\$|\\\[)/.test(source)) return { type: 'latexBlock', raw: source, text: '', pending: true };
   },
-  renderer({ text, pending }) {
+  renderer({ text, pending }: { text: string; pending?: boolean }) {
     if (pending) return '';
     return `<gem-bind-latex block tabindex="0">${escapeHtml(text)}</gem-bind-latex>\n`;
   },
@@ -58,21 +60,21 @@ const blockLatex = {
 
 const inlineLatex = {
   name: 'latexInline',
-  level: 'inline',
-  start: (source) => firstIndex(source.indexOf('$'), source.indexOf('\\(')),
-  tokenizer(source) {
+  level: 'inline' as const,
+  start: (source: string) => firstIndex(source.indexOf('$'), source.indexOf('\\(')),
+  tokenizer(source: string) {
     const dollar = /^\$(?!\$|\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\$)/.exec(source);
     const parenthesis = /^\\\((?!\s)([^\n]*?)(?<!\s)\\\)/.exec(source);
     const match = dollar || parenthesis;
     if (!match?.[1]) return;
     return { type: 'latexInline', raw: match[0], text: match[1] };
   },
-  renderer({ text }) {
+  renderer({ text }: { text: string }) {
     return `<gem-bind-latex>${escapeHtml(text)}</gem-bind-latex>`;
   },
 };
 
-export const createMarkdownExtensions = (defaultMarkdownRenderer) => [
+export const createMarkdownExtensions = (defaultMarkdownRenderer: Pick<Renderer, 'table'>): MarkedExtension[] => [
   {
     gfm: true,
     breaks: true,
@@ -93,7 +95,7 @@ export const createMarkdownExtensions = (defaultMarkdownRenderer) => [
         }
         return `<dy-code-block ${language ? `codelang="${escapeHtml(language)}"` : ''}>${source}</dy-code-block>`;
       },
-      table(token) {
+      table(token: Tokens.Table) {
         const table = defaultMarkdownRenderer.table.call(this, token);
         return `<div class="table-scroll" tabindex="0">${table}</div>`;
       },

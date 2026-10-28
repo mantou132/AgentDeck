@@ -1,19 +1,20 @@
+import type { Emitter } from '@mantou/gem/lib/decorators';
+import type { Attachment } from 'agentdeck/attachment/types';
 import { icons } from 'agentdeck/styles/icons';
-import { t } from '../../shared/i18n.js';
+import { t } from '../../shared/i18n';
 
 /** The emitter must not be named `remove`: that would shadow
  * `Element.prototype.remove()` and break lit-html's node removal. */
 @customElement('agent-attachment')
-class AgentAttachmentElement extends GemElement {
-  @property attachment;
-  @boolattribute inverted;
-  @boolattribute small;
-  @boolattribute removable;
+export class AgentAttachmentElement extends GemElement {
+  @property attachment?: Attachment;
+  @boolattribute inverted: boolean;
+  @boolattribute small: boolean;
+  @boolattribute removable: boolean;
 
-  @emitter requestRemove;
+  @emitter requestRemove: Emitter<string>;
 
-  #preview = () => {
-    const { previewUrl, name } = this.attachment || {};
+  #preview = ({ previewUrl, name }: Attachment & { kind: 'image' }) => {
     return html`
       <div class="flex flex-col items-center">
         <img class="max-h-80 max-w-xs object-contain" src=${previewUrl} alt="" />
@@ -26,7 +27,6 @@ class AgentAttachmentElement extends GemElement {
   #content = () => {
     const item = this.attachment;
     if (!item) return html``;
-    const previewable = item.kind === 'image' && item.previewUrl;
     const chip = html`
       <span
         class=${classMap({
@@ -38,7 +38,7 @@ class AgentAttachmentElement extends GemElement {
         <img
           v-if=${item.kind === 'image'}
           class=${classMap({ 'object-cover rounded-xs': true, 'size-7': !this.small, 'size-4': this.small })}
-          src=${item.previewUrl}
+          src=${item.kind === 'image' ? item.previewUrl : ''}
           alt=""
         />
         <dy-use
@@ -59,7 +59,7 @@ class AgentAttachmentElement extends GemElement {
         </button>
       </span>
     `;
-    if (!previewable) return chip;
-    return html`<dy-popover position="auto" .content=${this.#preview()}>${chip}</dy-popover>`;
+    if (item.kind !== 'image' || !item.previewUrl) return chip;
+    return html`<dy-popover position="auto" .content=${this.#preview(item)}>${chip}</dy-popover>`;
   };
 }
