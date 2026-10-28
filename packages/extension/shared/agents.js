@@ -1,4 +1,4 @@
-import { popularAgents } from 'agentdeck/config';
+import { defaultAgents } from 'agentdeck/config';
 
 // Aligned with AgentDeck and ACP Registry:
 // https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
@@ -6,7 +6,7 @@ import { popularAgents } from 'agentdeck/config';
 const registryIcon = (id) =>
   `https://cdn.agentclientprotocol.com/registry/v1/latest/${id === 'free' ? 'opencode' : id}.svg`;
 
-export const POPULAR_AGENTS = popularAgents.map(({ id, name }) => ({
+export const POPULAR_AGENTS = defaultAgents.map(({ id, name }) => ({
   id,
   name,
   icon: registryIcon(id),
