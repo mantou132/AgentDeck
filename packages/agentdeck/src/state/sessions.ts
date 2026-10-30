@@ -23,6 +23,7 @@ import {
   agentdeckStore,
   getMessages,
   getRuntime,
+  isConnecting,
   isTurnRunning,
   messagesStore,
   patchSession,
@@ -138,9 +139,12 @@ export const isPlaceholderTitle = (title?: string) => {
   return false;
 };
 
+/** Manual retry: restarts a stalled connection, but only hurries an automatic reconnect instead of restarting it. */
+const reconnect = () => reconnectTransport(!isConnecting());
+
 export const refreshSessions = async () => {
   if (agentdeckStore.connection !== 'connected') {
-    reconnectTransport(true);
+    reconnect();
     return;
   }
   const request = ++sessionsRequest;
@@ -291,10 +295,8 @@ export const ensureSessionLoaded = async (sessionId: string) => {
   }
   const session = getSession(sessionId);
   if (!session) return;
-  if (agentdeckStore.connection !== 'connected') {
-    updateRuntime(sessionId, { load: 'failed', error: i18n.get('error.remoteNotConnected') });
-    return;
-  }
+  // Stays idle; the session page loads it once connected
+  if (agentdeckStore.connection !== 'connected') return;
 
   const token = ++loadRequest;
   const isCurrent = () => getRuntime(sessionId).loadToken === token;
@@ -347,7 +349,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
 
 export const retrySessionLoad = (sessionId: string) => {
   if (agentdeckStore.connection !== 'connected') {
-    reconnectTransport(true);
+    reconnect();
     return;
   }
   updateRuntime(sessionId, { load: 'idle', error: '' });

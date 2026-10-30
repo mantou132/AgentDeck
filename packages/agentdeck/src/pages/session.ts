@@ -3,7 +3,6 @@ import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { reconnectTransport } from '../agent/transport';
 import type { Attachment } from '../attachment/types';
 import { draftKey, removeDraft, restoreDraft, saveDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
@@ -107,7 +106,8 @@ export class AgentDeckSessionPageElement extends GemElement {
     openSession(forked.sessionId);
   };
 
-  @effect((instance) => [instance.sessionId])
+  // Also runs once connected: a session opened while reconnecting loads then
+  @effect((instance) => [instance.sessionId, agentdeckStore.connection === 'connected'])
   #openSession = () => {
     ensureSessionLoaded(this.sessionId);
     // Remote load may return midway through the enter animation; delay timeline rendering until animation finishes. Existing in-memory sessions render immediately
@@ -116,7 +116,8 @@ export class AgentDeckSessionPageElement extends GemElement {
 
   get #loading() {
     const { deferTimeline, entered } = this.#state;
-    return getRuntime(this.sessionId).load === 'loading' || (deferTimeline && !entered);
+    const { load } = getRuntime(this.sessionId);
+    return load === 'loading' || (load === 'idle' && isConnecting()) || (deferTimeline && !entered);
   }
 
   // After history replay finishes, messages render all at once; jump directly to the bottom without smooth catching-up
@@ -400,7 +401,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             <button
               v-if=${!connected || (!loaded && !loading)}
               class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"
-              @click=${() => (connected ? this.#retryLoad() : reconnectTransport(true))}
+              @click=${this.#retryLoad}
             >
               ${connected ? i18n.get('global.retryLoad') : i18n.get('global.reconnect')}
             </button>

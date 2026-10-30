@@ -114,22 +114,51 @@ test('Relay handshake watchdog recovers a socket stuck before ready', async () =
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 });
 
-test('offline session load error and retry survive a successful reconnection', async () => {
+test('a session opened while reconnecting stays idle without an error and loads once connected', async () => {
   const fixture = documentFixture();
   await fixture.connect();
   fixture.sockets.at(-1).close();
   await fixture.app.ensureSessionLoaded('s1');
-  assert.match(fixture.app.getRuntime('s1').error, /Host is not connected/);
-  fixture.app.retrySessionLoad('s1');
+  assert.equal(fixture.app.getRuntime('s1').load, 'idle');
+  assert.equal(fixture.app.getRuntime('s1').error ?? '', '');
+  await fixture.advance(1000);
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
-  assert.match(fixture.app.getRuntime('s1').error, /Host is not connected/);
-  const retry = fixture.app.retrySessionLoad('s1');
+  // The session page calls this again once connected
+  const loading = fixture.app.ensureSessionLoaded('s1');
   await fixture.settleHost();
-  await retry;
+  await loading;
   assert.equal(fixture.app.isSessionOpened('s1'), true);
-  assert.equal(fixture.app.getRuntime('s1').error, '');
+});
+
+test('manual retry does not restart a connection in progress, but skips the backoff wait', async () => {
+  const fixture = documentFixture();
+  fixture.heldMethods.add('peer_attach');
+  await fixture.connect();
+  assert.equal(fixture.app.agentdeckStore.connection, 'attaching');
+  await fixture.app.refreshSessions();
+  fixture.app.retrySessionLoad('s1');
+  await tick();
+  assert.equal(fixture.sockets.length, 1);
+  assert.equal(fixture.sockets[0].readyState, fixture.sockets[0].constructor.OPEN);
+
+  fixture.heldMethods.clear();
+  await fixture.settleHost();
+  fixture.sockets.at(-1).close();
+  await fixture.advance(1000);
+  fixture.sockets.at(-1).close();
+  await tick();
+  assert.equal(fixture.app.agentdeckStore.connection, 'reconnecting');
+  await fixture.app.refreshSessions();
+  await tick();
+  assert.equal(fixture.sockets.length, 3, 'connects without waiting for the backoff timer');
+  await fixture.app.refreshSessions();
+  await tick();
+  assert.equal(fixture.sockets.length, 3);
+  fixture.sockets.at(-1).open();
+  await fixture.settleHost();
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 });
 
 test('a timed-out close does not proceed to load; a timed-out load can be retried', async () => {
