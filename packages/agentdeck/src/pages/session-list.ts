@@ -5,7 +5,7 @@ import { getConnectionLabel, i18n } from '../i18n';
 import { openSession, openSettings } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
-import { agentdeckStore, hostAgents, type SessionRuntime, sessionsStore } from '../state/store';
+import { agentdeckStore, hostAgents, isConnecting, type SessionRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -83,14 +83,14 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const { connection, connectionError, settings } = agentdeckStore;
     const { sessionGroups, sessionsLoading, sessionsLoaded, sessionsError, runtimes } = sessionsStore;
     const selectedAgent = hostAgents().find((agent) => agent.id === settings.agent);
-    const errorMessage = connectionError || sessionsError;
+    const isConnected = connection === 'connected';
+    const reconnecting = isConnecting();
+    // Errors raised while reconnecting (e.g. timers firing on resume) are not actionable
+    const errorMessage = reconnecting ? '' : connectionError || sessionsError;
     const hasError = Boolean(errorMessage);
     const hasGroups = Boolean(sessionGroups.length);
-    const showSkeleton = !hasGroups && (sessionsLoading || !sessionsLoaded) && !hasError;
+    const showSkeleton = !hasGroups && (sessionsLoading || !sessionsLoaded || reconnecting) && !hasError;
     const showErrorState = !showSkeleton && !hasGroups && hasError;
-
-    const isConnected = connection === 'connected';
-    const isConnecting = connection === 'connecting' || connection === 'reconnecting' || connection === 'attaching';
 
     const runtimeEntries = Object.entries(runtimes);
     const sessionSet = (has: (runtime: SessionRuntime) => unknown) =>
@@ -125,7 +125,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                     'size-[7px] shrink-0 rounded-full bg-disabled': true,
                     'bg-positive ring-4 ring-positive/10': isConnected,
                     'bg-negative ring-4 ring-negative/10': connection === 'preempted',
-                    'animate-pulse bg-informative': isConnecting,
+                    'animate-pulse bg-informative': reconnecting,
                   })}
                 ></span>
                 <span class="truncate">${getConnectionLabel(connection)} · ${selectedAgent?.name || settings.agent}</span>

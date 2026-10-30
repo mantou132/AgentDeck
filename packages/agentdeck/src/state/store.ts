@@ -59,6 +59,9 @@ export const messagesStore = createStore({
 const getPairing = (relayId: string) => agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
 
 /** Home directory of the current host, remembered from its last handshake. */
+/** Automatic reconnection in progress; errors raised meanwhile are cleared once connected. */
+export const isConnecting = () => ['connecting', 'reconnecting', 'attaching'].includes(agentdeckStore.connection);
+
 export const hostHome = () => getPairing(agentdeckStore.settings.relayId)?.home;
 
 /** `free`, the host's custom agents remembered from its last handshake, then the other built-in agents. */

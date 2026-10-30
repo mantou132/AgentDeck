@@ -34,6 +34,7 @@ import {
   getMessages,
   getRuntime,
   hostHome,
+  isConnecting,
   isTurnRunning,
   messagesStore,
   sessionsStore,
@@ -322,7 +323,9 @@ export class AgentDeckSessionPageElement extends GemElement {
     const loaded = runtime.load === 'loaded';
     const pending = Boolean(runtime.turn);
     const error =
-      runtime.error || agentdeckStore.connectionError || (!loaded && !loading ? i18n.get('session.notLoaded') : '');
+      runtime.error ||
+      (isConnecting() ? '' : agentdeckStore.connectionError) ||
+      (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
     return html`
       <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
