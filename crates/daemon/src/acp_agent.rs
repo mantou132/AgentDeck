@@ -619,7 +619,7 @@ struct PromptTurn {
     /// The prompting device, which gets the session's notifications from now on.
     notifier: Option<Notifier>,
     idle_timeout: std::time::Duration,
-    reply: oneshot::Sender<Result<String, String>>,
+    reply: oneshot::Sender<Result<String>>,
 }
 
 enum SessionCommand {
@@ -826,8 +826,7 @@ impl AgentSessionManager {
         )
         .await?;
         match reply_rx.await {
-            Ok(Ok(answer)) => Ok(answer),
-            Ok(Err(err)) => anyhow::bail!(err),
+            Ok(result) => result,
             Err(_) => anyhow::bail!("ACP agent session closed before responding"),
         }
     }
@@ -1164,7 +1163,7 @@ struct Turn {
     deadline: tokio::time::Instant,
     /// Taken when the turn times out: the caller gets the timeout right away
     /// while the turn runs until the agent confirms the cancellation.
-    reply: Option<oneshot::Sender<Result<String, String>>>,
+    reply: Option<oneshot::Sender<Result<String>>>,
     cancelled: bool,
 }
 
@@ -1233,7 +1232,7 @@ impl SessionActor {
                     self.cancel_turn(session);
                     let turn = self.turn.as_mut().expect("deadline of a running turn");
                     if let Some(reply) = turn.reply.take() {
-                        let _ = reply.send(Err(format!(
+                        let _ = reply.send(Err(anyhow::anyhow!(
                             "Timeout waiting for ACP agent: no activity for {}s",
                             turn.idle_timeout.as_secs()
                         )));
@@ -1301,9 +1300,9 @@ impl SessionActor {
 
     fn begin_turn(&mut self, session: &ActiveSession<'_, Agent>, turn: PromptTurn) {
         if self.turn.is_some() {
-            let _ = turn.reply.send(Err(
-                "ACP agent session already has a prompt in progress".to_string()
-            ));
+            let _ = turn.reply.send(Err(anyhow::anyhow!(
+                "ACP agent session already has a prompt in progress"
+            )));
             return;
         }
         if turn.notifier.is_some() {
@@ -1376,7 +1375,7 @@ impl SessionActor {
                 });
                 turn.answer
             })
-            .map_err(|err| err.to_string());
+            .map_err(anyhow::Error::from);
         if let Some(reply) = turn.reply {
             let _ = reply.send(result);
         }

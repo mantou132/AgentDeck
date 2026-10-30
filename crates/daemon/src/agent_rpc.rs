@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
-    peer::{CallCtx, Peer},
+    peer::{CallCtx, Peer, RpcError},
     render_skills::ClientCapabilities,
     screen_capture,
 };
@@ -426,7 +426,7 @@ impl AgentService {
         });
 
         let prompt_sessions = sessions.clone();
-        peer.handle("agent_prompt", move |params, ctx| {
+        peer.handle_rpc("agent_prompt", move |params, ctx| {
             let on_complete = on_complete.clone();
             let sessions = prompt_sessions.clone();
             let notifier = notifier.clone();
@@ -441,9 +441,9 @@ impl AgentService {
                 let timeout_secs = message_timeout_secs(&params);
                 let mut attachments = message_attachments(&params)?;
                 if prompt.is_empty() && attachments.is_empty() {
-                    return Err(
-                        "agent_prompt requires a non-empty prompt or attachments".to_string()
-                    );
+                    return Err("agent_prompt requires a non-empty prompt or attachments"
+                        .to_string()
+                        .into());
                 }
                 let session_id = required_session_id(&params, "agent_prompt")?;
                 if message_voice_chat(&params) {
@@ -481,7 +481,7 @@ impl AgentService {
 
                 result
                 .map(|answer| json!({ "answer": answer, "agent": agent, "sessionId": session_id }))
-                .map_err(|err| err.to_string())
+                .map_err(agent_error)
             }
         });
 
@@ -1101,6 +1101,19 @@ fn non_empty_str<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
 
 fn required_str<'a>(params: &'a Value, field: &str, method: &str) -> Result<&'a str, String> {
     non_empty_str(params, field).ok_or_else(|| format!("{method} requires a string {field}"))
+}
+
+/// An agent failure for the app. ACP `AuthRequired` gets the `auth_required`
+/// code, so the app can tell the user to sign in to the agent on this computer.
+pub(crate) fn agent_error(err: anyhow::Error) -> RpcError {
+    let auth_required = err
+        .chain()
+        .filter_map(|cause| cause.downcast_ref::<agent_client_protocol::Error>())
+        .any(|cause| cause.code == agent_client_protocol::ErrorCode::AuthRequired);
+    RpcError {
+        message: err.to_string(),
+        code: auth_required.then_some("auth_required"),
+    }
 }
 
 fn required_agent<'a>(params: &'a Value, method: &str) -> Result<&'a str, String> {

@@ -209,3 +209,19 @@ test('a creation cancelled and sent again keeps only the later turn', async () =
     ['Second try'],
   );
 });
+
+test('an expired agent login shows a sign-in hint instead of the agent error', async () => {
+  const f = await running();
+  f.deliver({ id: f.requests.at(-1).payload.id, peerId: 1, error: 'Authentication required', code: 'auth_required' });
+  await tick();
+  assert.equal(
+    f.app.getRuntime('s1').error,
+    'The agent needs you to sign in on your computer. Sign in with its CLI, then send again.',
+  );
+
+  assert.equal(f.app.sendPrompt('s1', 'Retry'), true);
+  await tick();
+  f.deliver({ id: f.requests.at(-1).payload.id, peerId: 1, error: 'Agent stopped' });
+  await tick();
+  assert.equal(f.app.getRuntime('s1').error, 'Agent stopped');
+});

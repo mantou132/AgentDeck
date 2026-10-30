@@ -7,7 +7,7 @@ import type { DeckSession, TextMessage } from './types';
 type TurnHandlers = {
   onEvent: (event: SessionEvent) => void | Promise<void>;
   onAnswer: (answer: string) => void;
-  onError: (error: string) => void;
+  onError: (error: unknown) => void;
   onDone: (completed: boolean) => void;
 };
 
@@ -37,7 +37,7 @@ export const performTurn = async (
     }
     completed = !cancelled;
   } catch (error) {
-    handlers.onError(error instanceof Error ? error.message : i18n.get('error.sendMessageFailed'));
+    handlers.onError(error);
   } finally {
     handlers.onDone(completed);
   }

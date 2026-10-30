@@ -1,6 +1,7 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent, type UserInput } from '../agent/api';
+import { RpcError } from '../agent/rpc';
 import { agentApi, reconnectTransport } from '../agent/transport';
 import type { Attachment } from '../attachment/types';
 import { draftKey, removeDraft } from '../composer/drafts';
@@ -35,6 +36,12 @@ import {
   updateSessionOptions,
 } from './store';
 import { settleUserInput, showElicitation, showPermission } from './user-input';
+
+/** Banner text for a failed prompt; an agent whose login expired gets a sign-in hint. */
+const promptErrorMessage = (error: unknown) => {
+  if (error instanceof RpcError && error.code === 'auth_required') return i18n.get('error.agentAuthRequired');
+  return error instanceof Error ? error.message : i18n.get('error.sendMessageFailed');
+};
 
 let sessionsRequest = 0;
 let loadRequest = 0;
@@ -402,7 +409,7 @@ const runPromptTurn = (
       },
       onError: (error) => {
         removeInFlight(sessionId);
-        updateRuntime(sessionId, { error });
+        updateRuntime(sessionId, { error: promptErrorMessage(error) });
         setMessages(
           sessionId,
           getMessages(sessionId).map((message) => (message.id === prompt.id ? { ...message, failed: true } : message)),
@@ -438,7 +445,7 @@ export const resumeInFlightTurn = ({ sessionId, rpcId, session, messages, option
     },
     reject: (error) => {
       removeInFlight(sessionId);
-      updateRuntime(sessionId, { error: error.message, turn: undefined });
+      updateRuntime(sessionId, { error: promptErrorMessage(error), turn: undefined });
       setMessages(sessionId, finishStreaming(getMessages(sessionId)));
     },
   });

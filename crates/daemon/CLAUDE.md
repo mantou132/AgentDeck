@@ -12,7 +12,7 @@
 - `src/agent_rpc.rs`：远端 RPC 入口（会话、文件、Git）。
 - `src/relay_client.rs`：`RemotePeerManager` 在一条 Relay 连接上复用多台设备，维护 deviceId → peerId 映射（`remote_peers_v1.json`）。请求带 `ephemeral: true` 时，记录 `(peerId, id)`，该请求的 event 与最终回复也以 ephemeral 发出。
   `peer_attach` 回复带 `version`（`CARGO_PKG_VERSION`，发布时由 `release.yml` 按 tag 写入 `Cargo.toml`），App 据此提示升级；还带 `customAgents`（`custom_agent_list()`），App 把它们列在 `free` 之后。
-- `src/peer.rs`：JSON RPC 对端。`handle_with_bytes` 注册的处理函数可在结果旁返回原始字节（如 `file_read` 的图片与 raw 读取），由传输层携带，对端在 `result.data` 收到；结果本身不放 `data`，也不做 base64。
+- `src/peer.rs`：JSON RPC 对端。`handle_with_bytes` 注册的处理函数可在结果旁返回原始字节（如 `file_read` 的图片与 raw 读取），由传输层携带，对端在 `result.data` 收到；结果本身不放 `data`，也不做 base64。失败回复为 `{ id, error, code? }`：`handle_rpc` 的处理函数可附 `code`，目前只有 `agent_prompt` 在 Agent 返回 ACP `AuthRequired` 时带 `auth_required`，App 据此提示用户在电脑上登录该 Agent（SDK 的 `start_session` 会把 `session/new` 的错误变成 internal error，所以创建与加载会话拿不到这个码）。
 - `src/relay_codec.rs`：RPC 消息与 Relay 帧互转（加密、帧大小限制与超限错误回复）。带字节的回复总是拼成二进制帧（`[u32 头长度][回复 JSON][原始字节]`，加密为 `[nonce][密文]`，AAD 带 `binary` 标签），Relay 按 ephemeral 投递。不涉及 peer 与设备。
 - `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密原语。
 - `src/push.rs`：prompt 成功完成时，向发起该 prompt 的设备推送 FCM 通知；正文用 `notification_response_complete` 由 App 本地化（Android strings、iOS `Localizable.strings`）。

@@ -19,6 +19,8 @@ export type RpcMessage = {
   params?: unknown;
   result?: unknown;
   error?: string;
+  /** Set next to `error` for failures the host classified, e.g. `auth_required`. */
+  code?: string;
   event?: unknown;
   /** Skip Relay storage; the host answers this request the same way. */
   ephemeral?: boolean;
@@ -33,6 +35,16 @@ type PendingCall = {
 };
 
 type Handler = (params: unknown) => unknown | Promise<unknown>;
+
+/** A failed call; `code` comes from the host's reply. */
+export class RpcError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 export class RpcPeer {
   #send: (message: RpcMessage) => void | Promise<void>;
@@ -140,7 +152,7 @@ export class RpcPeer {
         return;
       }
       this.#takePending(id);
-      if (typeof message.error === 'string') pending.reject(new Error(message.error));
+      if (typeof message.error === 'string') pending.reject(new RpcError(message.error, message.code));
       else pending.resolve(message.result);
       return;
     }

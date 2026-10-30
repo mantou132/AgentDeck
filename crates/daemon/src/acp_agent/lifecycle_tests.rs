@@ -111,6 +111,15 @@ impl MockAcp {
             .unwrap();
     }
 
+    fn respond_error(&self, request: &Value, error: Value) {
+        self.peer
+            .tx
+            .unbounded_send(frame(json!({
+                "jsonrpc": "2.0", "id": request["id"], "error": error,
+            })))
+            .unwrap();
+    }
+
     async fn create(&mut self, id: &str) {
         let manager = self.manager.clone();
         let call = tokio::spawn(async move {
@@ -209,6 +218,30 @@ async fn running_prompts_lists_only_sessions_with_an_unfinished_prompt() {
     mock.respond(&request, json!({"stopReason": "end_turn"}));
     assert!(prompt.await.unwrap().is_ok());
     assert!(mock.manager.running_prompts().await.is_empty());
+}
+
+/// Claude reports an expired login as `AuthRequired` on the prompt. (The SDK's
+/// `start_session` turns a failed `session/new` into an internal error.)
+#[tokio::test]
+async fn auth_required_keeps_its_code_for_the_app() {
+    let auth_required = || json!({"code": -32000, "message": "Authentication required"});
+    let is_auth_required =
+        |err: anyhow::Error| crate::agent_rpc::agent_error(err).code == Some("auth_required");
+    let mut mock = MockAcp::new().await;
+
+    mock.create("session").await;
+    let prompt = mock.prompt("session");
+    let request = mock.next("session/prompt").await;
+    mock.respond_error(&request, auth_required());
+    assert!(is_auth_required(prompt.await.unwrap().unwrap_err()));
+
+    let prompt = mock.prompt("session");
+    let request = mock.next("session/prompt").await;
+    mock.respond_error(
+        &request,
+        json!({"code": -32603, "message": "Internal error"}),
+    );
+    assert!(!is_auth_required(prompt.await.unwrap().unwrap_err()));
 }
 
 #[tokio::test]

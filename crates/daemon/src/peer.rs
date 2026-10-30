@@ -27,7 +27,24 @@ impl CallCtx {
 /// A handler's result, with optional raw bytes for the transport to attach.
 type Reply = (Value, Option<Vec<u8>>);
 type Handler =
-    Arc<dyn Fn(Value, CallCtx) -> BoxFuture<'static, Result<Reply, String>> + Send + Sync>;
+    Arc<dyn Fn(Value, CallCtx) -> BoxFuture<'static, Result<Reply, RpcError>> + Send + Sync>;
+
+/// A failed request, sent as `{ id, error, code? }`. Every client shows
+/// `error`; `code` lets a client explain known failures in its own words.
+#[derive(Debug)]
+pub struct RpcError {
+    pub message: String,
+    pub code: Option<&'static str>,
+}
+
+impl From<String> for RpcError {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            code: None,
+        }
+    }
+}
 /// Writes one outgoing message; the bytes only accompany a reply from
 /// [`Peer::handle_with_bytes`].
 type Writer = Arc<dyn Fn(Value, Option<Vec<u8>>) + Send + Sync>;
@@ -134,6 +151,19 @@ impl Peer {
         F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Value, String>> + Send + 'static,
     {
+        self.handle_rpc(method, move |params, ctx| {
+            let reply = f(params, ctx);
+            async move { reply.await.map_err(RpcError::from) }
+        });
+    }
+
+    /// Like [`Peer::handle`], but the handler may fail with an [`RpcError`]
+    /// that carries a `code`.
+    pub fn handle_rpc<F, Fut>(&self, method: &str, f: F)
+    where
+        F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Value, RpcError>> + Send + 'static,
+    {
         self.insert_handler(method, move |params, ctx| {
             let reply = f(params, ctx);
             async move { reply.await.map(|result| (result, None)) }
@@ -148,13 +178,16 @@ impl Peer {
         F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Reply, String>> + Send + 'static,
     {
-        self.insert_handler(method, f);
+        self.insert_handler(method, move |params, ctx| {
+            let reply = f(params, ctx);
+            async move { reply.await.map_err(RpcError::from) }
+        });
     }
 
     fn insert_handler<F, Fut>(&self, method: &str, f: F)
     where
         F: Fn(Value, CallCtx) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Reply, String>> + Send + 'static,
+        Fut: Future<Output = Result<Reply, RpcError>> + Send + 'static,
     {
         let handler: Handler = Arc::new(move |params, ctx| Box::pin(f(params, ctx)));
         self.handlers
@@ -233,7 +266,13 @@ impl Peer {
                 Ok((result, bytes)) => {
                     reply_peer.write_with_bytes(json!({ "id": id, "result": result }), bytes)
                 }
-                Err(err) => reply_peer.write(json!({ "id": id, "error": err })),
+                Err(RpcError { message, code }) => {
+                    let mut reply = json!({ "id": id, "error": message });
+                    if let Some(code) = code {
+                        reply["code"] = json!(code);
+                    }
+                    reply_peer.write(reply)
+                }
             }
         });
     }

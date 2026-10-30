@@ -202,6 +202,7 @@
   "error.remoteSessionEnded": "远端会话已结束",
   "error.userInputTimeout": "提交超时",
   "error.sendMessageFailed": "发送消息失败",
+  "error.agentAuthRequired": "Agent 需要在电脑上登录。用它的 CLI 登录后，再重新发送。",
   "error.cannotStopTask": "远端已无法停止这个任务，请在设置中重置 App 后重新加载会话。",
   "error.relayNotConfigured": "Relay 尚未配置",
   "error.remoteNotConnectedRetry": "远端尚未连接，请重新连接后重试",

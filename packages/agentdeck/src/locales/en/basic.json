@@ -202,6 +202,7 @@
   "error.remoteSessionEnded": "Host session ended",
   "error.userInputTimeout": "Submitting timed out",
   "error.sendMessageFailed": "Failed to send message",
+  "error.agentAuthRequired": "The agent needs you to sign in on your computer. Sign in with its CLI, then send again.",
   "error.cannotStopTask": "Host can no longer stop this task. Reset the app in settings and reload the session.",
   "error.relayNotConfigured": "Relay is not configured",
   "error.remoteNotConnectedRetry": "Host is not connected. Please reconnect and retry.",
