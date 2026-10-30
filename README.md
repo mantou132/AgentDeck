@@ -108,6 +108,7 @@ An entry with only an `id` adds that agent from the [ACP registry](https://agent
 - **Connection preempted:** close any other client that shares the same device identity.
 - **Session keeps loading, then times out:** the agent may still be installing or updating on the computer, which can take a while the first time it is used or after a new release. Wait a moment and retry.
 - **Connected, but an agent fails:** check that the agent's CLI works locally, and look at the daemon logs.
+- **Agent says its login expired** (for example Claude Code's `OAuth session expired and could not be refreshed`): agents use their own CLI's sign-in on the computer. Being signed in to a vendor's desktop app doesn't always mean the CLI is signed in too. Sign in again in a terminal (for Claude Code: `claude auth login`, then check with `claude auth status`) and start a new session in the app.
 
 | OS | Daemon data directory |
 | --- | --- |
