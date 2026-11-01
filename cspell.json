@@ -15,6 +15,7 @@
     "rsbuild",
     "Swipeout",
     "tauri",
-    "webproxy"
+    "webproxy",
+    "xianqiao"
   ]
 }
