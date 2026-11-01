@@ -51,6 +51,12 @@ AgentDeck app  ⇄  Relay (ciphertext only)  ⇄  agentdeckd (your computer)  �
 
 **Keep the Pairing ID secret.** Anyone who has it can use your agents. Don't include it in screenshots or issue reports. If it leaks, run `agentdeckd reset` to rotate it.
 
+## Browser extension
+
+The AgentDeck extension for Chrome, Edge and Firefox opens an agent chat in the browser's side panel or DevTools, so you can work on a web page without switching to the app. A new session carries the current tab, and when the daemon runs on the same computer as the browser, the agent can look at and debug that page directly.
+
+The extension is in maintenance mode: it gets bug fixes, but new features land in the app first.
+
 ---
 
 ## More install options

@@ -2,6 +2,8 @@
 
 基于 Extension.js 与 Manifest V3 构建的浏览器扩展（支持 Chrome Side Panel 与 Firefox Sidebar），源码为 TypeScript（manifest 与 HTML 直接引用 `.ts` 入口）。
 
+处于维护模式：只修 bug、跟随 App 共享代码的改动，新功能优先做在 App。
+
 ## 架构与核心文件
 
 - `pages/agent-panel.html` & `pages/agent-panel.ts`：核心交互面板，Side Panel 与 DevTools 共同复用；状态与消息类型在 `pages/agent-panel/types.ts`。
