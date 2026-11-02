@@ -1,10 +1,12 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
+import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack, type TapStackElement } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { sleep } from '@mantou/tap-ui/lib/timer';
 import { share } from '@vnidrop/tauri-plugin-share';
 import { onWebProxyState, toWebproxyUrl } from 'tauri-plugin-webproxy-api';
 import { agentApi } from './agent/transport';
+import type { Attachment } from './attachment/types';
 import { i18n } from './i18n';
 import { parseMessageLink } from './lib/links';
 import { toPreviewUrl } from './lib/preview';
@@ -114,6 +116,19 @@ export const openFileViewer = (path: string, cwd: string, line?: number, stack?:
   });
 };
 
+/** A host file attachment opens in the file viewer; others preview in a sheet. */
+export const openAttachment = (attachment: Attachment, cwd: string) => {
+  if (attachment.kind === 'file' && 'uri' in attachment) {
+    // Matches how the daemon builds the uri and the agent reads it.
+    openFileViewer(attachment.uri.slice('file://'.length), cwd);
+    return;
+  }
+  Sheet.open({
+    maskClosable: true,
+    body: html`<deck-attachment-preview .attachment=${attachment}></deck-attachment-preview>`,
+  });
+};
+
 /** Shows workspace changes when commit is omitted */
 export const openChanges = (cwd: string, commit?: string) => {
   Stack.push({
@@ -200,4 +215,17 @@ export const openSession = (sessionId: string, options?: { replace?: boolean; pr
 
 export const replaceSession = (sessionId: string) => {
   openSession(sessionId, { replace: true });
+};
+
+/** Read-only view of subagent `subagentId` of session `sessionId`: it can only be watched and, when allowed, stopped. */
+export const openSubagent = (sessionId: string, subagentId: string) => {
+  Stack.push({
+    animated: true,
+    content: html`<agentdeck-subagent-page
+      class="block h-full"
+      .sessionId=${sessionId}
+      .subagentId=${subagentId}
+    ></agentdeck-subagent-page>`,
+    gesture: true,
+  });
 };

@@ -82,6 +82,8 @@ export function reduceSessionEvent(
   { agent }: { agent?: string } = {},
 ): SessionEventReduction {
   const messages = state?.messages ?? [];
+  // Subagent sessions are shown only in the App.
+  if (event.event === 'session_update' && event.childSessionId) return null;
   if (event.event !== 'session_update') {
     if (event.event !== 'stop') return null;
     const completed = completeThought(messages);

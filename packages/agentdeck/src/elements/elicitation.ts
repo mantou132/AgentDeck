@@ -14,6 +14,7 @@ import {
   getElicitationQuestions,
 } from '../session/elicitation';
 import { icons } from '../styles/icons';
+import { getUserInputSource } from './subagent-card';
 
 const button =
   'min-h-11 min-w-0 flex-1 cursor-pointer truncate rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98] disabled:cursor-default disabled:opacity-45 disabled:active:scale-100';
@@ -154,6 +155,7 @@ export class DeckElicitationElement extends GemElement {
     return html`
       <section class="overflow-hidden rounded-2xl border border-notice/70 bg-bg-light">
         <div class="flex flex-col gap-4 px-4 pt-3 pb-3.5">
+          <p v-if=${!!request.childSessionId} class="m-0 -mb-3 text-xs text-describe">${getUserInputSource(request)}</p>
           <h2 class="select-text m-0 text-base font-semibold leading-relaxed whitespace-pre-wrap text-highlight">${request.message}</h2>
           ${this.#questions.map(this.#renderQuestion)}
         </div>

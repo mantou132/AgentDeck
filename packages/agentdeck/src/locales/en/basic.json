@@ -274,5 +274,17 @@
   "voiceChat.noReply": "Done, no reply",
   "voiceChat.permission": "Permission needed: $1",
   "voiceChat.question": "$1 question(s) need your answer",
-  "voiceChat.speakFailed": "Speech playback failed"
+  "voiceChat.speakFailed": "Speech playback failed",
+  "subagent.untitled": "Subagent",
+  "subagent.running": "Running",
+  "subagent.requiresAction": "Waiting for you",
+  "subagent.finished": "Finished",
+  "subagent.cancelled": "Cancelled",
+  "subagent.failed": "Failed",
+  "subagent.idle": "Idle",
+  "subagent.unknown": "Status unknown",
+  "subagent.stop": "Stop",
+  "subagent.fromParent": "From the main agent",
+  "subagent.empty": "No activity yet",
+  "subagent.from": "From subagent: $1"
 }

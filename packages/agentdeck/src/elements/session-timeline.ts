@@ -28,6 +28,8 @@ export type ForkRequest = { messageId: string; text: string; attachments: Attach
 @adoptedStyle(blockContainer)
 export class DeckSessionTimelineElement extends GemElement {
   @property sessionKey = '';
+  /** The root session of a subagent's timeline; its subagents (nested ones too) are kept there. */
+  @property rootSessionKey = '';
   @property cwd = '';
   @property messages: ChatMessage[] = [];
   @property elicitations: Elicitation[] = [];
@@ -149,6 +151,9 @@ export class DeckSessionTimelineElement extends GemElement {
             .menu=${menu}
           >
             <div class="flex flex-col items-end">
+              <span v-if=${!!message.sessionMessageId} class="mb-1 text-xs text-describe">
+                ${i18n.get('subagent.fromParent')}
+              </span>
               <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
                 ${attachments.map(
                   (attachment) => html`
@@ -244,7 +249,12 @@ export class DeckSessionTimelineElement extends GemElement {
             ? this.#renderProcessGroup(item.group)
             : item.type === 'elicitation'
               ? this.#renderElicitation(item.elicitation)
-              : this.#renderTextMessage(item.message),
+              : item.type === 'subagent'
+                ? html`<deck-subagent-card
+                    .sessionId=${this.rootSessionKey || this.sessionKey}
+                    .subagentId=${item.message.sessionId}
+                  ></deck-subagent-card>`
+                : this.#renderTextMessage(item.message),
       )}
       <div
         v-if=${this.pending && last?.type === 'message' && last.message.role === 'user'}

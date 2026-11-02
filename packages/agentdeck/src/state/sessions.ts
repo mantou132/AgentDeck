@@ -10,7 +10,7 @@ import { getConfigSelects, getConfigValues } from '../session/config-options';
 import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
 import { getSortedSessionGroups } from '../session/groups';
 import { cancelTurnPrompt, performTurn } from '../session/turn';
-import type { DeckSession, SessionOptions, TextMessage } from '../session/types';
+import type { DeckSession, SessionOptions, Subagent, TextMessage } from '../session/types';
 import { applyConfigSelection, getConfigDefaults, saveConfigDefaults, setAgentCommands } from './config-options';
 import {
   clearAllInFlight,
@@ -48,21 +48,51 @@ let loadRequest = 0;
 
 export const isSessionOpened = (sessionId: string) => getRuntime(sessionId).load === 'loaded';
 
+/** Subagent `childSessionId` of `sessionId` was announced, or what is known about it changed. */
+const applySubagentUpdate = (sessionId: string, childSessionId: string, patch: Partial<Subagent>) => {
+  const { subagents } = getRuntime(sessionId);
+  updateRuntime(sessionId, {
+    subagents: { ...subagents, [childSessionId]: { ...subagents?.[childSessionId], ...patch } },
+  });
+  // The host has cancelled its requests.
+  if (patch.state?.state === 'idle' && patch.state.stopReason === 'cancelled')
+    settleUserInput(sessionId, childSessionId);
+};
+
+/**
+ * Updates of subagents (`childSessionId`, nested ones too) are kept under their own session id and belong to
+ * the root session `sessionId`: its turn drives them, and they never change its session, options or commands.
+ */
 export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
+  const subagentId = event.event === 'session_update' ? event.childSessionId : undefined;
+  const target = subagentId || sessionId;
   const { turn, options } = getRuntime(sessionId);
   const streaming = Boolean(turn);
   const agent = getSession(sessionId)?.agent ?? agentdeckStore.settings.agent;
-  const reduction = reduceSessionEvent(getMessages(sessionId), event, { agent, streaming, options });
+  const reduction = reduceSessionEvent(getMessages(target), event, { agent, streaming, options, subagentId });
   if (!reduction) return;
   if (reduction.messages) {
-    setMessages(sessionId, reduction.messages);
-    if (streaming) {
+    setMessages(target, reduction.messages);
+    if (streaming && !subagentId) {
       updateInFlightMessages(sessionId, reduction.messages);
     }
   }
+  if (reduction.subagent) applySubagentUpdate(sessionId, reduction.subagent.sessionId, reduction.subagent.patch);
+  if (subagentId) return;
   if (reduction.sessionPatch) patchSession(sessionId, reduction.sessionPatch);
   if (reduction.optionsPatch) updateSessionOptions(sessionId, reduction.optionsPatch);
   if (reduction.commands) setAgentCommands(agent, reduction.commands);
+};
+
+/** Cancel subagent `childSessionId`'s current work; the agent reports it `idle` / `cancelled` when it stopped. */
+export const cancelSubagent = async (sessionId: string, childSessionId: string) => {
+  const session = getSession(sessionId);
+  if (!session) return;
+  try {
+    await cancelTurnPrompt(session, childSessionId);
+  } catch (error) {
+    Toast.open('error', error instanceof Error ? error.message : i18n.get('error.cancelTaskFailed'));
+  }
 };
 
 /** Permission requests and questions are shown only for the running turn of the device that started it. */
@@ -307,8 +337,10 @@ export const ensureSessionLoaded = async (sessionId: string) => {
 
   const token = ++loadRequest;
   const isCurrent = () => getRuntime(sessionId).loadToken === token;
-  updateRuntime(sessionId, { load: 'loading', loadToken: token, error: '' });
-  setMessages(sessionId, []);
+  // The load replays the subagents.
+  const subagentIds = Object.keys(getRuntime(sessionId).subagents ?? {});
+  updateRuntime(sessionId, { load: 'loading', loadToken: token, error: '', subagents: undefined });
+  for (const id of [sessionId, ...subagentIds]) setMessages(id, []);
 
   try {
     // First time entering session after restart: run close + load session
@@ -367,7 +399,9 @@ export const retrySessionLoad = (sessionId: string) => {
 const endTurn = (sessionId: string, completed: boolean) => {
   removeInFlight(sessionId);
   settleUserInput(sessionId);
-  setMessages(sessionId, finishStreaming(getMessages(sessionId)));
+  for (const id of [sessionId, ...Object.keys(getRuntime(sessionId).subagents ?? {})]) {
+    setMessages(id, finishStreaming(getMessages(id)));
+  }
   updateRuntime(sessionId, { turn: undefined, ...(completed && isTurnRunning(sessionId) ? { unread: true } : {}) });
 };
 

@@ -118,8 +118,9 @@ export type RemoteSession = {
 /** ACP slash command; the prompt `/name args` runs it. */
 export type AvailableCommand = { name: string; description: string; input?: { hint: string } | null };
 
+/** `childSessionId` marks an update of a subagent session (ACP Subagent Sessions RFD) of the session. */
 export type SessionEvent =
-  | { event: 'session_update'; update: Record<string, unknown> }
+  | { event: 'session_update'; update: Record<string, unknown>; childSessionId?: string }
   | { event: 'stop'; stop_reason?: string };
 
 export type SessionModes = {
@@ -154,6 +155,8 @@ export type LoadedSession = {
 export type PermissionRequest = {
   agent: string;
   sessionId: string;
+  /** The subagent session asking; `sessionId` is its root session. */
+  childSessionId?: string;
   requestId: string;
   toolCall?: { title?: string; kind?: string; rawInput?: unknown };
   options?: { optionId: string; name: string; kind?: string }[];
@@ -175,6 +178,8 @@ export type ElicitationProperty = {
 export type ElicitationRequest = {
   agent: string;
   sessionId: string;
+  /** The subagent session asking; `sessionId` is its root session. */
+  childSessionId?: string;
   requestId: string;
   toolCallId?: string;
   message: string;
@@ -221,6 +226,13 @@ export type ScreenFrame =
 
 export type ScreenCapture = { width: number; height: number; frame: ScreenFrame };
 
+export type SessionUpdateNotification = {
+  agent: string;
+  sessionId: string;
+  childSessionId?: string;
+  update: Record<string, unknown>;
+};
+
 export type PromptSuggestion = { agent: string; sessionId: string; suggestion: string };
 
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
@@ -264,12 +276,8 @@ export class AgentApi {
     this.#peer.onNotify('agent_prompt_suggestion', (params) => handler?.(params as PromptSuggestion));
 
   /** Session updates the agent sends between turns (e.g. available commands), to the device that created or loaded it. */
-  setSessionUpdateHandler = (
-    handler?: ((params: { agent: string; sessionId: string; update: Record<string, unknown> }) => void) | null,
-  ) =>
-    this.#peer.onNotify('agent_session_update', (params) =>
-      handler?.(params as { agent: string; sessionId: string; update: Record<string, unknown> }),
-    );
+  setSessionUpdateHandler = (handler?: ((params: SessionUpdateNotification) => void) | null) =>
+    this.#peer.onNotify('agent_session_update', (params) => handler?.(params as SessionUpdateNotification));
 
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());
@@ -496,8 +504,9 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.userInputTimeout'),
     });
 
-  cancelPrompt = (sessionId: string, agent: string) =>
-    this.#peer.call<{ cancelled?: boolean }>('agent_prompt_cancel', { agent, sessionId }, undefined, {
+  /** With `childSessionId`, cancels only that subagent's current work. */
+  cancelPrompt = (sessionId: string, agent: string, childSessionId?: string) =>
+    this.#peer.call<{ cancelled?: boolean }>('agent_prompt_cancel', { agent, sessionId, childSessionId }, undefined, {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.cancelTaskTimeout'),
     });

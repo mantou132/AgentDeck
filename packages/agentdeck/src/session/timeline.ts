@@ -1,14 +1,15 @@
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { i18n } from '../i18n';
 import type { Elicitation } from './elicitation';
-import type { ChatMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
+import type { ChatMessage, SubagentMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
 
 export type ProcessGroup = { id: string; items: (ThoughtMessage | ToolMessage)[]; pending: boolean };
 
 type TimelineItem =
   | { type: 'message'; message: TextMessage }
   | { type: 'group'; group: ProcessGroup }
-  | { type: 'elicitation'; elicitation: Elicitation };
+  | { type: 'elicitation'; elicitation: Elicitation }
+  | { type: 'subagent'; message: SubagentMessage };
 
 export type ToolStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'ended';
 
@@ -131,6 +132,9 @@ export const groupTimelineMessages = (
           currentGroup = null;
         }
       }
+    } else if ('type' in msg && msg.type === 'subagent') {
+      currentGroup = null;
+      result.push({ type: 'subagent', message: msg });
     } else {
       const textMsg = msg as TextMessage;
       if (textMsg.role === 'agent' && !textMsg.text?.trim() && !textMsg.attachments?.length) {

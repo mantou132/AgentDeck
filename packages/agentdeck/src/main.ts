@@ -8,6 +8,7 @@ import './styles/theme';
 import './app';
 import './pages/session-list';
 import './pages/session';
+import './pages/subagent';
 import './pages/settings';
 
 initApp({

@@ -1,6 +1,5 @@
 import { history } from '@mantou/gem/lib/history';
 import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
-import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import type { Attachment } from '../attachment/types';
@@ -12,7 +11,7 @@ import { getConnectionLabel, i18n } from '../i18n';
 import { followBottom } from '../lib/follow-bottom';
 import { hapticImpact } from '../lib/haptics';
 import { displayPath } from '../lib/path';
-import { openChanges, openFileViewer, openSession, openSettings, replaceSession } from '../navigation';
+import { openAttachment, openChanges, openSession, openSettings, replaceSession } from '../navigation';
 import { getConfigLabel, getConfigSelects } from '../session/config-options';
 import { hasPendingElicitation } from '../session/elicitation';
 import type { DeckSession } from '../session/types';
@@ -42,7 +41,8 @@ import {
 import { resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 
-const style = css`
+/** Also used by the subagent page. */
+export const style = css`
   .session-header {
     padding-top: max(6px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
@@ -229,18 +229,8 @@ export class AgentDeckSessionPageElement extends GemElement {
     openSession(createPendingSession({ agent: session.agent, cwd: session.cwd }).sessionId, { prompt });
   };
 
-  #previewAttachment = (event: CustomEvent<Attachment>) => {
-    const attachment = event.detail;
-    if (attachment.kind === 'file' && 'uri' in attachment) {
-      // Matches how the daemon builds the uri and the agent reads it.
-      openFileViewer(attachment.uri.slice('file://'.length), getSession(this.sessionId)?.cwd ?? '');
-      return;
-    }
-    Sheet.open({
-      maskClosable: true,
-      body: html`<deck-attachment-preview .attachment=${attachment}></deck-attachment-preview>`,
-    });
-  };
+  #previewAttachment = (event: CustomEvent<Attachment>) =>
+    openAttachment(event.detail, getSession(this.sessionId)?.cwd ?? '');
 
   #retryLoad = () => {
     retrySessionLoad(this.sessionId);

@@ -43,8 +43,9 @@ export const performTurn = async (
   }
 };
 
-export const cancelTurnPrompt = async (session: DeckSession) => {
-  const result = await agentApi.cancelPrompt(session.sessionId, session.agent);
+/** With `childSessionId`, cancels only that subagent's current work. */
+export const cancelTurnPrompt = async (session: DeckSession, childSessionId?: string) => {
+  const result = await agentApi.cancelPrompt(session.sessionId, session.agent, childSessionId);
   if (result.cancelled === false) {
     throw new Error(i18n.get('error.cannotStopTask'));
   }

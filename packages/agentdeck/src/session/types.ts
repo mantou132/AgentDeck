@@ -30,6 +30,8 @@ export type TextMessage = {
   attachments?: Attachment[];
   /** Sent from voice chat: the agent is asked for a spoken summary. */
   voiceChat?: boolean;
+  /** ACP `session_message` id: a message from the parent session to this subagent session. */
+  sessionMessageId?: string;
   streaming?: boolean;
   failed?: boolean;
 };
@@ -47,6 +49,28 @@ export type ToolMessage = {
   data: ToolCallData;
 };
 
-export type ChatMessage = TextMessage | ThoughtMessage | ToolMessage;
+/** Where subagent `sessionId` was first announced; the timeline shows its card here. */
+export type SubagentMessage = {
+  id: string;
+  type: 'subagent';
+  sessionId: string;
+};
+
+export type ChatMessage = TextMessage | ThoughtMessage | ToolMessage | SubagentMessage;
+
+/** Current work of a subagent (ACP Subagent Sessions RFD); unknown until the agent reports it. */
+export type SubagentState = {
+  state: 'running' | 'requires_action' | 'idle' | 'unknown' | (string & {});
+  stopReason?: string | null;
+};
+
+/** A subagent session as `subagent_update` announced it; nested ones are kept under the root session too. */
+export type Subagent = {
+  title?: string;
+  description?: string;
+  state?: SubagentState;
+  /** The agent allows cancelling its current work. */
+  cancellable?: boolean;
+};
 
 export type SessionOptions = Pick<LoadedSession, 'modes' | 'configOptions'>;

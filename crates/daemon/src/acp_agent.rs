@@ -1,20 +1,22 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use agent_client_protocol::{
-    AcpAgent, ActiveSession, Agent, Client, ConnectionTo, JsonRpcNotification, SessionMessage,
+    AcpAgent, ActiveSession, Agent, Client, ConnectionTo, Handled, JsonRpcNotification,
+    SessionMessage,
     schema::{
-        ProtocolVersion,
+        MaybeUndefined, ProtocolVersion,
         v1::{
             AgentCapabilities, CancelNotification, ClientCapabilities as AcpClientCapabilities,
             CloseSessionRequest, ContentBlock, ContentChunk, CreateElicitationRequest,
             CreateElicitationResponse, DeleteSessionRequest, ElicitationAction, ForkSessionRequest,
-            ElicitationCapabilities, ElicitationFormCapabilities, ElicitationScope, ImageContent,
-            Implementation, InitializeRequest, ListSessionsRequest, LoadSessionRequest,
+            ElicitationCapabilities, ElicitationFormCapabilities, ElicitationScope, IdleStopReason,
+            ImageContent, Implementation, InitializeRequest, ListSessionsRequest, LoadSessionRequest,
             NewSessionRequest, PermissionOptionId, PromptRequest, PromptResponse,
             RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
             ResourceLink, SelectedPermissionOutcome, SessionConfigId, SessionConfigValueId,
             SessionId, SessionModeId, SessionNotification, SessionUpdate,
-            SetSessionConfigOptionRequest, SetSessionModeRequest, TextContent,
+            SetSessionConfigOptionRequest, SetSessionModeRequest, StateUpdate,
+            SubagentCapabilities, SubagentUpdate, TextContent,
         },
     },
     util::MatchDispatch,
@@ -145,6 +147,10 @@ struct AcpRuntime {
     state: Arc<Mutex<RuntimeState>>,
     /// The manager's live sessions, to route agent requests to their actor.
     sessions: SessionMap,
+    /// Subagent session → the root session whose actor owns it, nested
+    /// subagents included. Filled on the connection's dispatch loop before
+    /// any child traffic is routed.
+    children: Arc<std::sync::Mutex<HashMap<String, String>>>,
     disconnects: watch::Sender<u64>,
 }
 
@@ -160,6 +166,7 @@ impl AcpRuntime {
                 waiters: Vec::new(),
             })),
             sessions,
+            children: Arc::default(),
             disconnects,
         }
     }
@@ -227,6 +234,7 @@ impl AcpRuntime {
         let permission_runtime = self.clone();
         let elicitation_runtime = self.clone();
         let suggestion_runtime = self.clone();
+        let child_runtime = self.clone();
         let runtime = self.clone();
 
         Client
@@ -304,11 +312,29 @@ impl AcpRuntime {
                 },
                 agent_client_protocol::on_receive_notification!(),
             )
+            // Registered before session routing: subagent sessions have no
+            // `ActiveSession`, so their updates go to the root session's actor.
+            .on_receive_notification(
+                async move |notification: SessionNotification, connection| {
+                    Ok(match child_runtime.route_child(notification).await {
+                        None => Handled::Yes,
+                        Some(notification) => Handled::No {
+                            message: (notification, connection),
+                            retry: false,
+                        },
+                    })
+                },
+                agent_client_protocol::on_receive_notification!(),
+            )
             .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
-                // Form elicitation lets Claude ask the user (`AskUserQuestion`).
-                let capabilities = AcpClientCapabilities::new().elicitation(
-                    ElicitationCapabilities::new().form(ElicitationFormCapabilities::new()),
-                );
+                // Form elicitation lets Claude ask the user (`AskUserQuestion`);
+                // `subagents` asks for child sessions in the ACP Subagent
+                // Sessions RFD form.
+                let capabilities = AcpClientCapabilities::new()
+                    .elicitation(
+                        ElicitationCapabilities::new().form(ElicitationFormCapabilities::new()),
+                    )
+                    .subagents(SubagentCapabilities::new());
                 let request = InitializeRequest::new(ProtocolVersion::V1)
                     .client_capabilities(capabilities)
                     .client_info(
@@ -448,21 +474,77 @@ impl AcpRuntime {
         })
     }
 
-    async fn session_tx(&self, session_id: &str) -> Option<mpsc::Sender<SessionCommand>> {
+    async fn session(&self, session_id: &str) -> Option<AgentSession> {
         let key = AgentSessionKey::new(&self.agent, session_id);
-        Some(self.sessions.lock().await.get(&key)?.tx.clone())
+        self.sessions.lock().await.get(&key).cloned()
+    }
+
+    async fn session_tx(&self, session_id: &str) -> Option<mpsc::Sender<SessionCommand>> {
+        Some(self.session(session_id).await?.tx)
+    }
+
+    /// The root session owning a subagent session; `None` for other sessions.
+    fn root_of(&self, session_id: &str) -> Option<String> {
+        let children = self.children.lock().expect("children lock poisoned");
+        children.get(session_id).cloned()
+    }
+
+    /// Record the child a `subagent_update` announces, then hand a subagent
+    /// session's notification to its root actor. Returns the notification when
+    /// it belongs to a root session, for its `ActiveSession`.
+    async fn route_child(&self, notification: SessionNotification) -> Option<SessionNotification> {
+        let session_id = notification.session_id.to_string();
+        let root = {
+            let mut children = self.children.lock().expect("children lock poisoned");
+            let root = children.get(&session_id).cloned();
+            if let SessionUpdate::SubagentUpdate(update) = &notification.update {
+                let owner = root.clone().unwrap_or_else(|| session_id.clone());
+                children
+                    .entry(update.session_id.to_string())
+                    .or_insert(owner);
+            }
+            root
+        };
+        let Some(root) = root else {
+            return Some(notification);
+        };
+        // Unbounded and never awaited: this runs on the dispatch loop, which
+        // the actor may be waiting on.
+        if let Some(session) = self.session(&root).await {
+            let _ = session.child_tx.send(ChildUpdate {
+                session_id,
+                update: notification.update,
+            });
+        }
+        None
+    }
+
+    /// Drop the subagents of a session whose actor stopped.
+    fn forget_children(&self, root: &str) {
+        let mut children = self.children.lock().expect("children lock poisoned");
+        children.retain(|_, owner| owner != root);
     }
 
     /// Show a request on the session's device and wait until a device answers
     /// it through `answer_user_input`; delivery is not the answer, so a device
-    /// that reloaded can still answer. `None` when it is cancelled: no turn
-    /// runs, the turn is cancelled or ends, or the session closes.
+    /// that reloaded can still answer. A subagent's request is shown with its
+    /// root session and `childSessionId`. `None` when it is cancelled: no turn
+    /// runs, the turn is cancelled or ends, the subagent is cancelled, or the
+    /// session closes.
     async fn wait_user_input(
         &self,
         session_id: &str,
-        input: UserInput,
+        mut input: UserInput,
     ) -> Option<serde_json::Value> {
-        let tx = self.session_tx(session_id).await?;
+        let root = self.root_of(session_id);
+        let params = input.params_mut();
+        if let Some(root) = &root {
+            params["sessionId"] = root.clone().into();
+            params["childSessionId"] = session_id.into();
+        } else {
+            params["sessionId"] = session_id.into();
+        }
+        let tx = self.session_tx(root.as_deref().unwrap_or(session_id)).await?;
         let (answer, answer_rx) = oneshot::channel();
         tx.send(SessionCommand::UserInput { input, answer })
             .await
@@ -548,12 +630,34 @@ impl Attachment {
 }
 
 /// Stream events forwarded to the extension. `update` is the raw ACP session
-/// update payload (text chunks included); `stop` terminates the prompt.
+/// update payload (text chunks included), with `childSessionId` when it is a
+/// subagent's; `stop` terminates the prompt.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum AgentEvent {
-    SessionUpdate { update: serde_json::Value },
-    Stop { stop_reason: serde_json::Value },
+    SessionUpdate {
+        update: serde_json::Value,
+        #[serde(rename = "childSessionId", skip_serializing_if = "Option::is_none")]
+        child_session_id: Option<String>,
+    },
+    Stop {
+        stop_reason: serde_json::Value,
+    },
+}
+
+impl AgentEvent {
+    fn update(update: SessionUpdate, child_session_id: Option<String>) -> Self {
+        Self::SessionUpdate {
+            update: update_to_json(update),
+            child_session_id,
+        }
+    }
+}
+
+/// A session update of a subagent session, routed to its root session.
+struct ChildUpdate {
+    session_id: String,
+    update: SessionUpdate,
 }
 
 pub type SessionEndCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
@@ -572,6 +676,7 @@ pub struct AgentSessionManager {
 #[derive(Clone)]
 struct AgentSession {
     tx: mpsc::Sender<SessionCommand>,
+    child_tx: mpsc::UnboundedSender<ChildUpdate>,
     status: watch::Receiver<SessionStatus>,
     closing: CancellationToken,
     stopped: watch::Receiver<bool>,
@@ -589,9 +694,9 @@ impl AgentSession {
 struct SessionStatus {
     /// A prompt turn runs, until the agent ends it.
     busy: bool,
-    /// The unanswered request, kept so a reloaded or reconnected device can
-    /// show it again.
-    pending_input: Option<UserInput>,
+    /// Unanswered requests, kept so a reloaded or reconnected device can show
+    /// them again.
+    pending_inputs: Vec<UserInput>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -643,6 +748,11 @@ enum SessionCommand {
     AnswerUserInput {
         request_id: String,
         response: serde_json::Value,
+        reply: oneshot::Sender<bool>,
+    },
+    /// Cancel a subagent's current work; `false` when it doesn't allow it.
+    CancelChild {
+        session_id: String,
         reply: oneshot::Sender<bool>,
     },
     Suggestion(String),
@@ -700,10 +810,12 @@ impl AgentSessionManager {
     ) -> Result<SessionReady> {
         let cwd = resolve_cwd(cwd)?;
         let (tx, rx) = mpsc::channel(8);
+        let (child_tx, child_rx) = mpsc::unbounded_channel();
         let (status_tx, status) = watch::channel(SessionStatus::default());
         let (stopped_tx, stopped) = watch::channel(false);
         let handle = AgentSession {
             tx,
+            child_tx,
             status,
             closing: CancellationToken::new(),
             stopped,
@@ -722,12 +834,14 @@ impl AgentSessionManager {
         }
 
         let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = self.runtime(agent);
         let actor = run_session_actor(
             cwd,
             load,
             context,
-            self.runtime(agent),
+            runtime.clone(),
             rx,
+            child_rx,
             status_tx,
             ready_tx,
             handle.closing.clone(),
@@ -744,6 +858,7 @@ impl AgentSessionManager {
                 .map(|(key, _)| key.clone());
             if let Some(key) = key {
                 sessions.remove(&key);
+                runtime.forget_children(&key.session_id);
                 // Explicit close already has a reply. Do not emit a late ended
                 // notification that could invalidate a reloaded session.
                 if was_ready && !actor_handle.closing.is_cancelled() {
@@ -849,7 +964,7 @@ impl AgentSessionManager {
             .lock()
             .await
             .values()
-            .filter_map(|session| session.status.borrow().pending_input.clone())
+            .flat_map(|session| session.status.borrow().pending_inputs.clone())
             .collect()
     }
 
@@ -882,6 +997,18 @@ impl AgentSessionManager {
             return false;
         };
         session.tx.send(SessionCommand::Cancel).await.is_ok()
+    }
+
+    /// Cancel a subagent's current work (`session/cancel` on the child), when
+    /// it advertises `cancel`; its pending requests settle cancelled.
+    pub async fn cancel_child(&self, agent: &str, session_id: &str, child_session_id: &str) -> bool {
+        let (reply, reply_rx) = oneshot::channel();
+        let command = SessionCommand::CancelChild {
+            session_id: child_session_id.to_string(),
+            reply,
+        };
+        self.send_command(agent, session_id, command).await.is_ok()
+            && reply_rx.await.unwrap_or(false)
     }
 
     /// Switch the session mode (`session/set_mode`), e.g. plan mode.
@@ -1061,6 +1188,7 @@ async fn run_session_actor(
     context: SessionContext,
     runtime: AcpRuntime,
     mut rx: mpsc::Receiver<SessionCommand>,
+    mut child_rx: mpsc::UnboundedReceiver<ChildUpdate>,
     status: watch::Sender<SessionStatus>,
     ready_tx: oneshot::Sender<Result<SessionReady, String>>,
     closing: CancellationToken,
@@ -1091,7 +1219,8 @@ async fn run_session_actor(
         notifier,
         status,
         turn: None,
-        pending_input: None,
+        pending_inputs: Vec::new(),
+        children: HashMap::new(),
     };
     let mut was_ready = false;
     let run = async {
@@ -1099,12 +1228,15 @@ async fn run_session_actor(
         // response; forward it before reporting ready so the client sees the
         // events before the load call resolves.
         if let Some(replay_tx) = &replay_tx {
-            let metadata = drain_replay(&mut session, replay_tx).await?;
+            let metadata = drain_replay(&mut session, &mut child_rx, replay_tx, |update| {
+                actor.on_subagent_update(update)
+            })
+            .await?;
             ready.title = metadata.title.or(ready.title);
             ready.updated_at = metadata.updated_at.or(ready.updated_at);
         }
         was_ready = ready_tx.send(Ok(ready)).is_ok();
-        actor.serve(&mut session, &mut rx).await
+        actor.serve(&mut session, &mut rx, &mut child_rx).await
     };
     let result: Result<(), agent_client_protocol::Error> = tokio::select! {
         result = run => result,
@@ -1146,8 +1278,11 @@ struct SessionActor {
     notifier: Option<Notifier>,
     status: watch::Sender<SessionStatus>,
     turn: Option<Turn>,
-    /// The agent waits for one request at a time.
-    pending_input: Option<PendingUserInput>,
+    /// One at a time per session, but subagents ask alongside their parent.
+    pending_inputs: Vec<PendingUserInput>,
+    /// Subagent sessions announced since the session started, and whether
+    /// each currently allows `session/cancel`. Replayed grants don't count.
+    children: HashMap<String, bool>,
 }
 
 struct Turn {
@@ -1180,9 +1315,11 @@ impl SessionActor {
         &mut self,
         session: &mut ActiveSession<'_, Agent>,
         rx: &mut mpsc::Receiver<SessionCommand>,
+        child_rx: &mut mpsc::UnboundedReceiver<ChildUpdate>,
     ) -> Result<(), agent_client_protocol::Error> {
         enum Input {
             Update(SessionMessage),
+            Child(ChildUpdate),
             Stop(Result<PromptResponse, agent_client_protocol::Error>),
             Command(SessionCommand),
             Idle,
@@ -1196,10 +1333,12 @@ impl SessionActor {
             let turn = &mut self.turn;
             // `biased` drains updates the agent sent before its prompt response;
             // a random pick could take Stop first and leave the final chunks
-            // queued until the next turn.
+            // queued until the next turn. The parent's queue goes first, so a
+            // subagent's announcement precedes its own updates.
             let input = tokio::select! {
                 biased;
                 update = session.read_update() => Input::Update(update?),
+                Some(update) = child_rx.recv() => Input::Child(update),
                 response = async {
                     match turn {
                         Some(turn) => turn.stop.as_mut().await,
@@ -1217,13 +1356,16 @@ impl SessionActor {
                 Input::Update(SessionMessage::SessionMessage(dispatch)) => {
                     MatchDispatch::new(dispatch)
                         .if_notification(async |notif: SessionNotification| {
-                            self.on_update(notif.update);
+                            self.on_update(notif.update, None);
                             Ok(())
                         })
                         .await
                         .otherwise_ignore()?;
                 }
                 Input::Update(_) => {}
+                Input::Child(ChildUpdate { session_id, update }) => {
+                    self.on_update(update, Some(session_id));
+                }
                 Input::Stop(response) => self.end_turn(response),
                 Input::Idle => {
                     // Callers keep at most one prompt in flight per session, so a
@@ -1272,7 +1414,7 @@ impl SessionActor {
                     .to_string();
                 input.params_mut()["requestId"] = request_id.into();
                 notifier(input.method(), input.params().clone());
-                self.pending_input = Some(PendingUserInput { input, answer });
+                self.pending_inputs.push(PendingUserInput { input, answer });
                 self.publish();
             }
             SessionCommand::AnswerUserInput {
@@ -1281,11 +1423,24 @@ impl SessionActor {
                 reply,
             } => {
                 let pending = self
-                    .pending_input
-                    .take_if(|pending| pending.input.params()["requestId"] == request_id);
+                    .pending_inputs
+                    .iter()
+                    .position(|pending| pending.input.params()["requestId"] == request_id)
+                    .map(|index| self.pending_inputs.remove(index));
                 let answered = pending.is_some_and(|pending| pending.answer.send(response).is_ok());
                 self.publish();
                 let _ = reply.send(answered);
+            }
+            SessionCommand::CancelChild { session_id, reply } => {
+                let cancellable = self.children.get(&session_id).copied().unwrap_or(false);
+                if cancellable {
+                    let notification = CancelNotification::new(SessionId::from(session_id.clone()));
+                    if let Err(err) = session.connection().send_notification(notification) {
+                        tracing::warn!("Failed to cancel ACP subagent session: {err}");
+                    }
+                    self.drop_child_inputs(&session_id);
+                }
+                let _ = reply.send(cancellable);
             }
             SessionCommand::Suggestion(suggestion) => {
                 let params = serde_json::json!({
@@ -1340,30 +1495,64 @@ impl SessionActor {
         self.publish();
     }
 
-    fn on_update(&mut self, update: SessionUpdate) {
+    /// `child` is the subagent session the update addresses, if any.
+    fn on_update(&mut self, update: SessionUpdate, child: Option<String>) {
+        if let SessionUpdate::SubagentUpdate(subagent) = &update {
+            self.on_subagent_update(subagent);
+        }
         let Some(turn) = &mut self.turn else {
             // Between turns, forward what the agent sends right away (e.g. the
             // available commands after `session/new`) instead of leaving it
             // queued until the next prompt.
-            let params = serde_json::json!({
+            let mut params = serde_json::json!({
                 "agent": self.agent,
                 "sessionId": self.session_id,
                 "update": update_to_json(update),
             });
+            if let Some(child) = child {
+                params["childSessionId"] = child.into();
+            }
             self.notify("agent_session_update", params);
             return;
         };
+        // A subagent working while the parent waits keeps the turn alive.
         turn.deadline = tokio::time::Instant::now() + turn.idle_timeout;
-        if let SessionUpdate::AgentMessageChunk(ContentChunk {
-            content: ContentBlock::Text(text),
-            ..
-        }) = &update
+        if child.is_none()
+            && let SessionUpdate::AgentMessageChunk(ContentChunk {
+                content: ContentBlock::Text(text),
+                ..
+            }) = &update
         {
             turn.answer.push_str(&text.text);
         }
-        let _ = turn.event_tx.send(AgentEvent::SessionUpdate {
-            update: update_to_json(update),
-        });
+        let _ = turn.event_tx.send(AgentEvent::update(update, child));
+    }
+
+    /// Track which subagents allow cancel; a subagent cancelled by the agent
+    /// (e.g. with its parent's turn) settles its pending requests.
+    fn on_subagent_update(&mut self, update: &SubagentUpdate) {
+        let session_id = update.session_id.to_string();
+        let cancellable = self.children.entry(session_id.clone()).or_default();
+        match &update.capabilities {
+            MaybeUndefined::Undefined => {}
+            MaybeUndefined::Null => *cancellable = false,
+            MaybeUndefined::Value(capabilities) => *cancellable = capabilities.cancel.is_some(),
+        }
+        if let MaybeUndefined::Value(StateUpdate::Idle(idle)) = &update.state
+            && matches!(idle.stop_reason, Some(IdleStopReason::Cancelled))
+        {
+            self.drop_child_inputs(&session_id);
+        }
+    }
+
+    /// Settle a subagent's pending requests as cancelled.
+    fn drop_child_inputs(&mut self, session_id: &str) {
+        let before = self.pending_inputs.len();
+        self.pending_inputs
+            .retain(|pending| pending.input.params()["childSessionId"] != session_id);
+        if self.pending_inputs.len() != before {
+            self.publish();
+        }
     }
 
     fn end_turn(&mut self, response: Result<PromptResponse, agent_client_protocol::Error>) {
@@ -1379,7 +1568,7 @@ impl SessionActor {
         if let Some(reply) = turn.reply {
             let _ = reply.send(result);
         }
-        self.pending_input = None;
+        self.pending_inputs.clear();
         self.publish();
     }
 
@@ -1390,7 +1579,7 @@ impl SessionActor {
         };
         turn.cancelled = true;
         send_cancel(session);
-        self.pending_input = None;
+        self.pending_inputs.clear();
         self.publish();
     }
 
@@ -1403,10 +1592,11 @@ impl SessionActor {
     fn publish(&self) {
         self.status.send_replace(SessionStatus {
             busy: self.turn.is_some(),
-            pending_input: self
-                .pending_input
-                .as_ref()
-                .map(|pending| pending.input.clone()),
+            pending_inputs: self
+                .pending_inputs
+                .iter()
+                .map(|pending| pending.input.clone())
+                .collect(),
         });
     }
 }
@@ -1474,27 +1664,52 @@ impl SessionReplayMetadata {
     }
 }
 
+/// Subagents replay their history to their own sessions, routed to
+/// `child_rx`; their announcements on the parent come first (see `serve`).
+/// Their current state follows the load response, within the drain, so
+/// `on_subagent` sees it; replayed announcements carry no `cancel` grant.
 async fn drain_replay(
     session: &mut ActiveSession<'_, Agent>,
+    child_rx: &mut mpsc::UnboundedReceiver<ChildUpdate>,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    mut on_subagent: impl FnMut(&SubagentUpdate),
 ) -> Result<SessionReplayMetadata, agent_client_protocol::Error> {
     const REPLAY_IDLE: std::time::Duration = std::time::Duration::from_millis(200);
     let mut metadata = SessionReplayMetadata::default();
     loop {
-        match tokio::time::timeout(REPLAY_IDLE, session.read_update()).await {
-            Ok(Ok(SessionMessage::SessionMessage(dispatch))) => {
+        let input = tokio::time::timeout(REPLAY_IDLE, async {
+            tokio::select! {
+                biased;
+                update = session.read_update() => Ok(update),
+                Some(update) = child_rx.recv() => Err(update),
+            }
+        });
+        match input.await {
+            Ok(Ok(Ok(SessionMessage::SessionMessage(dispatch)))) => {
                 MatchDispatch::new(dispatch)
                     .if_notification(async |notif: SessionNotification| {
+                        if let SessionUpdate::SubagentUpdate(subagent) = &notif.update {
+                            on_subagent(subagent);
+                        }
                         let update = update_to_json(notif.update);
                         metadata.apply(&update);
-                        let _ = event_tx.send(AgentEvent::SessionUpdate { update });
+                        let _ = event_tx.send(AgentEvent::SessionUpdate {
+                            update,
+                            child_session_id: None,
+                        });
                         Ok(())
                     })
                     .await
                     .otherwise_ignore()?;
             }
-            Ok(Ok(_)) => {}
-            Ok(Err(err)) => return Err(err),
+            Ok(Ok(Ok(_))) => {}
+            Ok(Ok(Err(err))) => return Err(err),
+            Ok(Err(ChildUpdate { session_id, update })) => {
+                if let SessionUpdate::SubagentUpdate(subagent) = &update {
+                    on_subagent(subagent);
+                }
+                let _ = event_tx.send(AgentEvent::update(update, Some(session_id)));
+            }
             Err(_) => break,
         }
     }

@@ -62,13 +62,20 @@ export const answerElicitation = async (request: ElicitationRequest, response: E
   }
 };
 
-/** The turn stopped and the host has cancelled what was unanswered: the permission card closes, questions show cancelled. */
-export const settleUserInput = (sessionId: string) => {
+/**
+ * The host has cancelled what was unanswered: the permission card closes, questions show cancelled.
+ * That is everything when the turn stopped, and only its requests when subagent `childSessionId` was cancelled.
+ */
+export const settleUserInput = (sessionId: string, childSessionId?: string) => {
+  const settled = (request: PermissionRequest | ElicitationRequest) =>
+    !childSessionId || request.childSessionId === childSessionId;
   const { permission, elicitations: current } = getRuntime(sessionId);
-  if (permission) setPermission(sessionId);
-  if (!current?.some((item) => !item.response)) return;
+  if (permission && settled(permission)) setPermission(sessionId);
+  if (!current?.some((item) => !item.response && settled(item.request))) return;
   setElicitations(
     sessionId,
-    current.map((item) => (item.response ? item : { request: item.request, response: { action: 'cancel' } })),
+    current.map((item) =>
+      item.response || !settled(item.request) ? item : { request: item.request, response: { action: 'cancel' } },
+    ),
   );
 };

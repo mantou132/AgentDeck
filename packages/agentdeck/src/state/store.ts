@@ -3,7 +3,7 @@ import type { ConnectionState } from '../agent/transport';
 import { defaultAgents, readPairingHistory, readSavedCommands, readSettings } from '../config';
 import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
-import type { ChatMessage, DeckSession, SessionOptions } from '../session/types';
+import type { ChatMessage, DeckSession, SessionOptions, Subagent } from '../session/types';
 
 const initialSettings = readSettings();
 
@@ -39,6 +39,8 @@ export type SessionRuntime = {
   elicitations?: Elicitation[];
   /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
   suggestion?: string;
+  /** Subagent sessions (nested ones too) by session id; their messages are kept under those ids. */
+  subagents?: Record<string, Subagent>;
 };
 
 /** Session list and per-session runtime state; changes at turn and load boundaries, not with streamed content. */
@@ -90,10 +92,11 @@ export const getMessages = (sessionId: string): ChatMessage[] => messagesStore.b
 export const setMessages = (sessionId: string, messages: ChatMessage[]) =>
   messagesStore({ bySession: { ...messagesStore.bySession, [sessionId]: messages } });
 
-/** Drops everything the App holds about the session. */
+/** Drops everything the App holds about the session, its subagents' messages included. */
 export const removeRuntime = (sessionId: string) => {
-  const { [sessionId]: _runtime, ...runtimes } = sessionsStore.runtimes;
-  const { [sessionId]: _messages, ...bySession } = messagesStore.bySession;
+  const { [sessionId]: runtime, ...runtimes } = sessionsStore.runtimes;
+  const bySession = { ...messagesStore.bySession };
+  for (const id of [sessionId, ...Object.keys(runtime?.subagents ?? {})]) delete bySession[id];
   sessionsStore({ runtimes });
   messagesStore({ bySession });
 };

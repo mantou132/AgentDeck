@@ -6,6 +6,8 @@ import type {
   ChatMessage,
   DeckSession,
   SessionOptions,
+  Subagent,
+  SubagentState,
   TextMessage,
   ToolCallContent,
   ToolCallData,
@@ -17,6 +19,8 @@ type SessionEventContext = {
   agent: string;
   streaming: boolean;
   options?: SessionOptions;
+  /** Set when these are the messages of subagent session `subagentId`. */
+  subagentId?: string;
 };
 
 export const completeThought = (messages: ChatMessage[]) => {
@@ -149,7 +153,35 @@ export type EventReduction = {
   sessionPatch?: Partial<DeckSession>;
   optionsPatch?: Partial<SessionOptions>;
   commands?: AvailableCommand[];
+  /** A `subagent_update` announcing or patching a subagent session. */
+  subagent?: { sessionId: string; patch: Partial<Subagent> };
 };
+
+const getSubagentState = (value: unknown): SubagentState | undefined => {
+  if (!value || typeof value !== 'object' || !('state' in value) || typeof value.state !== 'string') return;
+  const stopReason = 'stopReason' in value && typeof value.stopReason === 'string' ? value.stopReason : undefined;
+  return { state: value.state, stopReason };
+};
+
+/** Optional fields are nullable patches: missing keeps the value, `null` clears it. */
+const getSubagentPatch = (update: Record<string, unknown>): Partial<Subagent> => {
+  const patch: Partial<Subagent> = {};
+  if ('title' in update) patch.title = typeof update.title === 'string' ? update.title : undefined;
+  if ('description' in update) {
+    patch.description = typeof update.description === 'string' ? update.description : undefined;
+  }
+  if ('state' in update) patch.state = getSubagentState(update.state);
+  if ('capabilities' in update) {
+    const capabilities = update.capabilities as { cancel?: unknown } | null;
+    patch.cancellable = Boolean(capabilities?.cancel);
+  }
+  return patch;
+};
+
+const getContentText = (content: unknown) =>
+  (Array.isArray(content) ? content : [content])
+    .map((block) => (block && typeof block === 'object' && 'text' in block ? String(block.text) : ''))
+    .join('');
 
 const getToolContent = (update: Record<string, unknown>) => {
   if (!Array.isArray(update.content)) return {};
@@ -248,6 +280,52 @@ export const reduceSessionEvent = (
     return { messages: next };
   }
 
+  if (sessionUpdate === 'subagent_update' && typeof update.sessionId === 'string') {
+    const { sessionId } = update;
+    // The card stays where the subagent was first announced.
+    const known = messages.some(
+      (message) => 'type' in message && message.type === 'subagent' && message.sessionId === sessionId,
+    );
+    const next: ChatMessage[] = known
+      ? messages
+      : [...messages, { id: crypto.randomUUID(), type: 'subagent', sessionId }];
+    return {
+      ...(next !== current ? { messages: next } : {}),
+      subagent: { sessionId, patch: getSubagentPatch(update) },
+    };
+  }
+
+  // A subagent shows the instructions it received; a parent reads a subagent's reply in its card.
+  if (sessionUpdate === 'session_message' && typeof update.messageId === 'string') {
+    const recipient = typeof update.recipientSessionId === 'string' ? update.recipientSessionId : undefined;
+    if (!context.subagentId || (recipient && recipient !== context.subagentId)) {
+      return messages !== current ? { messages } : null;
+    }
+    const next = messages.slice();
+    const index = next.findIndex((message) => 'role' in message && message.sessionMessageId === update.messageId);
+    if (index >= 0) {
+      if (!('content' in update)) return messages !== current ? { messages } : null;
+      next[index] = { ...(next[index] as TextMessage), text: getContentText(update.content) };
+    } else {
+      next.push({
+        id: crypto.randomUUID(),
+        role: 'user',
+        text: getContentText(update.content),
+        sessionMessageId: update.messageId,
+      });
+    }
+    return { messages: next };
+  }
+
+  if (sessionUpdate === 'session_message_chunk' && typeof update.messageId === 'string') {
+    const index = messages.findIndex((message) => 'role' in message && message.sessionMessageId === update.messageId);
+    if (index < 0) return messages !== current ? { messages } : null;
+    const next = messages.slice();
+    const message = next[index] as TextMessage;
+    next[index] = { ...message, text: message.text + getContentText(update.content) };
+    return { messages: next };
+  }
+
   if (sessionUpdate === 'session_info_update') {
     const sessionPatch: Partial<DeckSession> = {
       ...(typeof update.title === 'string' && update.title ? { title: update.title } : {}),
@@ -264,7 +342,8 @@ export const reduceSessionEvent = (
     return { optionsPatch: { configOptions: update.configOptions as SessionConfigOption[] } };
   }
 
-  if (sessionUpdate === 'available_commands_update' && Array.isArray(update.availableCommands)) {
+  // A subagent cannot be prompted, so its commands are never offered.
+  if (sessionUpdate === 'available_commands_update' && Array.isArray(update.availableCommands) && !context.subagentId) {
     return { commands: update.availableCommands as AvailableCommand[] };
   }
 

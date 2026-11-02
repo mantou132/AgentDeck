@@ -2,6 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { PermissionRequest } from '../agent/api';
 import { i18n } from '../i18n';
+import { getUserInputSource } from './subagent-card';
 
 const button =
   'min-h-11 min-w-0 max-w-full flex-auto cursor-pointer truncate rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98]';
@@ -31,6 +32,9 @@ export class DeckPermissionRequestElement extends GemElement {
     return html`
       <section class="flex max-h-[45dvh] flex-col overflow-hidden rounded-2xl border border-notice/70 bg-bg-light">
         <div class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-3 pb-3">
+          <p v-if=${!!this.request.childSessionId} class="m-0 mb-1 text-xs text-describe">
+            ${getUserInputSource(this.request)}
+          </p>
           <h2 class="m-0 text-sm font-semibold text-highlight">${i18n.get('permission.title')}</h2>
           <pre
             class="select-text mt-2 mb-0 whitespace-pre-wrap break-words rounded-lg bg-bg px-3 py-2 font-mono text-[13px] leading-relaxed text-text"

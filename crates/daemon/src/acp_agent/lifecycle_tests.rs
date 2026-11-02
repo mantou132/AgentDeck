@@ -69,6 +69,10 @@ impl MockAcp {
             request["params"]["clientCapabilities"]["elicitation"],
             json!({"form": {}})
         );
+        assert_eq!(
+            request["params"]["clientCapabilities"]["subagents"],
+            json!({})
+        );
         peer.tx
             .unbounded_send(frame(json!({
                 "jsonrpc": "2.0", "id": request["id"], "result": {
@@ -853,4 +857,130 @@ async fn a_session_being_loaded_cannot_be_loaded_again() {
     mock.respond(&request, json!({}));
     first.await.unwrap().unwrap();
     assert!(mock.manager.session("codex-acp", "session").await.is_ok());
+}
+
+#[tokio::test]
+async fn subagent_traffic_reaches_the_parent_turn_and_child_requests_settle() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel();
+    let notifier: Notifier =
+        Arc::new(move |method, params| request_tx.send((method.to_string(), params)).unwrap());
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                30,
+                event_tx,
+                Some(notifier),
+            )
+            .await
+    });
+    let prompt_request = mock.next("session/prompt").await;
+    let update = |session_id: &str, update: Value| {
+        frame(json!({
+            "jsonrpc": "2.0", "method": "session/update",
+            "params": {"sessionId": session_id, "update": update}
+        }))
+    };
+    let chunk = |text: &str| {
+        json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}})
+    };
+    let send = |frame| mock.peer.tx.unbounded_send(frame).unwrap();
+    send(update(
+        "session",
+        json!({
+            "sessionUpdate": "subagent_update", "sessionId": "child", "title": "scout",
+            "capabilities": {"cancel": {}}, "state": {"state": "running"}
+        }),
+    ));
+    send(update("child", chunk("child says")));
+    send(update("session", chunk("parent says")));
+    let mut events = Vec::new();
+    for _ in 0..3 {
+        let AgentEvent::SessionUpdate {
+            update,
+            child_session_id,
+        } = event_rx.recv().await.unwrap()
+        else {
+            panic!("expected a session update");
+        };
+        events.push((update["sessionUpdate"].clone(), child_session_id));
+    }
+    // The announcement precedes the child's traffic; other parent updates may
+    // come before or after it.
+    assert_eq!(events[0], (json!("subagent_update"), None));
+    assert!(events.contains(&(json!("agent_message_chunk"), Some("child".to_string()))));
+    assert!(events.contains(&(json!("agent_message_chunk"), None)));
+
+    let permission = |id: &str, session_id: &str| {
+        frame(json!({
+            "jsonrpc": "2.0", "id": id, "method": "session/request_permission",
+            "params": {
+                "sessionId": session_id,
+                "toolCall": {"toolCallId": id, "title": "Test permission", "status": "pending"},
+                "options": [{"optionId": "allow", "name": "Allow once", "kind": "allow_once"}]
+            }
+        }))
+    };
+    send(permission("child-permission", "child"));
+    let (_, child_request) = request_rx.recv().await.unwrap();
+    assert_eq!(child_request["sessionId"], "session");
+    assert_eq!(child_request["childSessionId"], "child");
+    send(permission("parent-permission", "session"));
+    let (_, parent_request) = request_rx.recv().await.unwrap();
+    assert!(parent_request.get("childSessionId").is_none());
+    assert_eq!(mock.manager.pending_user_inputs().await.len(), 2);
+
+    assert!(
+        !mock
+            .manager
+            .cancel_child("codex-acp", "session", "unknown")
+            .await
+    );
+    assert!(
+        mock.manager
+            .cancel_child("codex-acp", "session", "child")
+            .await
+    );
+    tokio::time::timeout(Duration::from_secs(1), async {
+        let (mut cancelled, mut settled) = (false, false);
+        while !(cancelled && settled) {
+            let message = frame_json(mock.peer.rx.next().await.unwrap());
+            match message["method"].as_str() {
+                Some("session/cancel") => {
+                    assert_eq!(message["params"]["sessionId"], "child");
+                    cancelled = true;
+                }
+                None if message["id"] == "child-permission" => {
+                    assert_eq!(message["result"]["outcome"]["outcome"], "cancelled");
+                    settled = true;
+                }
+                _ => panic!("Unexpected ACP message: {message}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+    // Only the parent's request is still waiting, and it is answered as usual.
+    let pending = serde_json::to_value(mock.manager.pending_user_inputs().await).unwrap();
+    assert_eq!(pending[0]["params"]["requestId"], parent_request["requestId"]);
+    assert_eq!(pending.as_array().unwrap().len(), 1);
+    let request_id = parent_request["requestId"].as_str().unwrap();
+    assert!(
+        mock.manager
+            .answer_user_input("codex-acp", "session", request_id, json!({"optionId": "allow"}))
+            .await
+    );
+    let answer = frame_json(mock.peer.rx.next().await.unwrap());
+    assert_eq!(answer["id"], "parent-permission");
+
+    mock.respond(&prompt_request, json!({"stopReason": "end_turn"}));
+    // A subagent's text is not part of the parent's answer.
+    assert_eq!(prompt.await.unwrap().unwrap(), "parent says");
 }

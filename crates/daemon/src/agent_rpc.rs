@@ -383,7 +383,11 @@ impl AgentService {
             let sessions = cancel_sessions.clone();
             async move {
                 let (agent, session_id) = required_agent_session(&params, "agent_prompt_cancel")?;
-                let cancelled = sessions.cancel(agent, session_id).await;
+                // With `childSessionId`, only that subagent's current work.
+                let cancelled = match params.get("childSessionId").and_then(Value::as_str) {
+                    Some(child) => sessions.cancel_child(agent, session_id, child).await,
+                    None => sessions.cancel(agent, session_id).await,
+                };
                 Ok(json!({ "agent": agent, "sessionId": session_id, "cancelled": cancelled }))
             }
         });
