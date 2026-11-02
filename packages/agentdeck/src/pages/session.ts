@@ -383,32 +383,33 @@ export class AgentDeckSessionPageElement extends GemElement {
         </div>
 
         <footer slot="footer">
-          <div
-            v-if=${error}
-            class="mx-3 mb-2 flex items-center gap-2 rounded-[11px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2 text-sm leading-relaxed text-negative"
-          >
-            <span class="select-text min-w-0 flex-1">${error}</span>
-            <button
-              v-if=${!connected || (!loaded && !loading)}
-              class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"
-              @click=${this.#retryLoad}
+          <div v-if=${error} class="px-2.5 pb-2">
+            <div
+              class="mx-auto flex max-w-[760px] items-center gap-2 rounded-[11px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2 text-sm leading-relaxed text-negative"
             >
-              ${connected ? i18n.get('global.retryLoad') : i18n.get('global.reconnect')}
-            </button>
-            <button
-              v-else-if=${agentdeckStore.connectionError || pending}
-              class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
-              @click=${openSettings}
-            >
-              ${i18n.get('global.openSettings')}
-            </button>
-            <button
-              v-else-if=${connected}
-              class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
-              @click=${() => updateRuntime(session.sessionId, { error: '' })}
-            >
-              ${i18n.get('global.close')}
-            </button>
+              <span class="select-text min-w-0 flex-1">${error}</span>
+              <button
+                v-if=${!connected || (!loaded && !loading)}
+                class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"
+                @click=${this.#retryLoad}
+              >
+                ${connected ? i18n.get('global.retryLoad') : i18n.get('global.reconnect')}
+              </button>
+              <button
+                v-else-if=${agentdeckStore.connectionError || pending}
+                class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
+                @click=${openSettings}
+              >
+                ${i18n.get('global.openSettings')}
+              </button>
+              <button
+                v-else-if=${connected}
+                class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative"
+                @click=${() => updateRuntime(session.sessionId, { error: '' })}
+              >
+                ${i18n.get('global.close')}
+              </button>
+            </div>
           </div>
           <div v-if=${runtime.permission} class="px-2.5 pt-2">
             <deck-permission-request

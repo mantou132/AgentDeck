@@ -22,6 +22,7 @@
   "connection.disconnected": "Disconnected",
   "connection.preempted": "Connection preempted",
   "sessionList.loading": "Loading sessions",
+  "sessionList.thisComputer": "This computer",
   "sessionList.emptyTitle": "No sessions for this agent yet",
   "sessionList.emptyDesc": "Sessions are managed by the remote ACP agent and will appear here grouped by working directory.",
   "sessionList.errorTitle": "Unable to load sessions",

@@ -22,7 +22,10 @@ pub fn run() {
             Ok(())
         })
         .manage(js_protocol::JsProtocol::default())
-        .register_asynchronous_uri_scheme_protocol(PREVIEW_SCHEME, js_protocol::handler(PREVIEW_SCHEME))
+        .register_asynchronous_uri_scheme_protocol(
+            PREVIEW_SCHEME,
+            js_protocol::handler(PREVIEW_SCHEME),
+        )
         .invoke_handler(tauri::generate_handler![
             js_protocol::js_protocol_register,
             js_protocol::js_protocol_respond

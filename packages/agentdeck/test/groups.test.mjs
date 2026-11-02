@@ -105,3 +105,36 @@ test('getSortedSessionGroups: deleted groups are removed while preserving remain
     ['/project-b', '/project-a'],
   );
 });
+
+test('getSortedSessionGroups: worktree sessions join their main checkout group', () => {
+  const sessions = [
+    { sessionId: '1', cwd: '/repo', updatedAt: '2026-01-01T10:00:00.000Z' },
+    {
+      sessionId: '2',
+      cwd: '/repo/.claude/worktrees/feat',
+      worktree: { mainCwd: '/repo', name: 'feat' },
+      updatedAt: '2026-01-01T12:00:00.000Z',
+    },
+  ];
+
+  const groups = getSortedSessionGroups(sessions);
+  assert.deepEqual(
+    groups.map((g) => [g.cwd, g.sessions.map((s) => s.sessionId)]),
+    [['/repo', ['2', '1']]],
+  );
+});
+
+test('getSortedSessionGroups: Claude desktop scratch workspaces share one group', () => {
+  const root = '/Users/me/Library/Application Support/Claude/scratch-workspaces';
+  const sessions = [
+    { sessionId: '1', cwd: `${root}/acc/org/scratch-2026-10-27-aaa`, updatedAt: '2026-01-01T10:00:00.000Z' },
+    { sessionId: '2', cwd: `${root}/acc/org/scratch-2026-10-28-bbb`, updatedAt: '2026-01-01T12:00:00.000Z' },
+  ];
+
+  const groups = getSortedSessionGroups(sessions);
+  assert.deepEqual(
+    groups.map((g) => [g.cwd, g.sessions.map((s) => s.sessionId)]),
+    [[root, ['2', '1']]],
+  );
+  assert.equal(exports.scratchWorkspacesRoot('/Users/me/Claude/projects'), undefined);
+});

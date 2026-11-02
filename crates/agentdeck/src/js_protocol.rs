@@ -97,10 +97,17 @@ fn guess_content_type(path: &str) -> String {
 /// Handler for `register_asynchronous_uri_scheme_protocol(scheme, handler(scheme))`.
 pub fn handler<R: Runtime>(
     scheme: &'static str,
-) -> impl Fn(UriSchemeContext<'_, R>, Request<Vec<u8>>, UriSchemeResponder) + Send + Sync + 'static {
+) -> impl Fn(UriSchemeContext<'_, R>, Request<Vec<u8>>, UriSchemeResponder) + Send + Sync + 'static
+{
     move |ctx, request, responder| {
         let state = ctx.app_handle().state::<JsProtocol>();
-        let Some(channel) = state.handlers.lock().expect("lock poisoned").get(scheme).cloned() else {
+        let Some(channel) = state
+            .handlers
+            .lock()
+            .expect("lock poisoned")
+            .get(scheme)
+            .cloned()
+        else {
             return responder.respond(status(StatusCode::SERVICE_UNAVAILABLE));
         };
         let id = state.next_id.fetch_add(1, Ordering::Relaxed);
@@ -125,15 +132,25 @@ pub fn handler<R: Runtime>(
         if channel.send(event).is_err()
             && let Some(pending) = state.take(id)
         {
-            pending.responder.respond(status(StatusCode::INTERNAL_SERVER_ERROR));
+            pending
+                .responder
+                .respond(status(StatusCode::INTERNAL_SERVER_ERROR));
         }
     }
 }
 
 /// Routes the scheme's requests to `channel`, replacing an earlier handler.
 #[tauri::command]
-pub fn js_protocol_register(state: State<'_, JsProtocol>, scheme: String, channel: Channel<ProtocolRequest>) {
-    state.handlers.lock().expect("lock poisoned").insert(scheme, channel);
+pub fn js_protocol_register(
+    state: State<'_, JsProtocol>,
+    scheme: String,
+    channel: Channel<ProtocolRequest>,
+) {
+    state
+        .handlers
+        .lock()
+        .expect("lock poisoned")
+        .insert(scheme, channel);
 }
 
 /// Answers a pending request with `body` as base64. `size` is the whole
@@ -147,14 +164,22 @@ pub fn js_protocol_respond(
     size: Option<u64>,
     content_type: Option<String>,
 ) {
-    let Some(Pending { responder, path, offset }) = state.take(id) else {
+    let Some(Pending {
+        responder,
+        path,
+        offset,
+    }) = state.take(id)
+    else {
         return;
     };
     let Ok(body) = STANDARD.decode(body) else {
         return responder.respond(self::status(StatusCode::INTERNAL_SERVER_ERROR));
     };
     let mut response = Response::builder()
-        .header(CONTENT_TYPE, content_type.unwrap_or_else(|| guess_content_type(&path)))
+        .header(
+            CONTENT_TYPE,
+            content_type.unwrap_or_else(|| guess_content_type(&path)),
+        )
         .header(ACCEPT_RANGES, "bytes");
     response = match (offset, size) {
         (Some(offset), Some(size)) if status == 200 && offset >= size => {
@@ -166,10 +191,12 @@ pub fn js_protocol_respond(
                     .unwrap(),
             );
         }
-        (Some(offset), Some(size)) if status == 200 => response.status(StatusCode::PARTIAL_CONTENT).header(
-            CONTENT_RANGE,
-            format!("bytes {offset}-{}/{size}", offset + body.len() as u64 - 1),
-        ),
+        (Some(offset), Some(size)) if status == 200 => {
+            response.status(StatusCode::PARTIAL_CONTENT).header(
+                CONTENT_RANGE,
+                format!("bytes {offset}-{}/{size}", offset + body.len() as u64 - 1),
+            )
+        }
         _ => response.status(status),
     };
     responder.respond(response.body(body).unwrap());

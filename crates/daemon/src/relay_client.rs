@@ -557,7 +557,9 @@ mod tests {
         assert!(manager.ephemeral_calls.lock().unwrap().is_empty());
 
         manager
-            .dispatch(json!({ "peerId": 1, "id": "d", "method": "agent_prompts_running", "params": {} }))
+            .dispatch(
+                json!({ "peerId": 1, "id": "d", "method": "agent_prompts_running", "params": {} }),
+            )
             .await;
         assert!(!rx.recv().await.unwrap().ephemeral);
 
@@ -669,10 +671,16 @@ mod tests {
             message: res_running,
             target_device_id: target_running,
             ..
-        } = outbound_rx.recv().await.expect("Phone A agent_prompts_running");
+        } = outbound_rx
+            .recv()
+            .await
+            .expect("Phone A agent_prompts_running");
         assert_eq!(target_running, Some("device-phone-a".to_string()));
         assert_eq!(res_running.get("peerId").and_then(Value::as_u64), Some(1));
-        assert_eq!(res_running.get("id").and_then(Value::as_str), Some("req-a2"));
+        assert_eq!(
+            res_running.get("id").and_then(Value::as_str),
+            Some("req-a2")
+        );
         assert!(res_running.get("result").is_some());
     }
 }

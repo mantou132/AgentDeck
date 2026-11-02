@@ -888,9 +888,7 @@ async fn subagent_traffic_reaches_the_parent_turn_and_child_requests_settle() {
             "params": {"sessionId": session_id, "update": update}
         }))
     };
-    let chunk = |text: &str| {
-        json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}})
-    };
+    let chunk = |text: &str| json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}});
     let send = |frame| mock.peer.tx.unbounded_send(frame).unwrap();
     send(update(
         "session",
@@ -969,12 +967,20 @@ async fn subagent_traffic_reaches_the_parent_turn_and_child_requests_settle() {
     .unwrap();
     // Only the parent's request is still waiting, and it is answered as usual.
     let pending = serde_json::to_value(mock.manager.pending_user_inputs().await).unwrap();
-    assert_eq!(pending[0]["params"]["requestId"], parent_request["requestId"]);
+    assert_eq!(
+        pending[0]["params"]["requestId"],
+        parent_request["requestId"]
+    );
     assert_eq!(pending.as_array().unwrap().len(), 1);
     let request_id = parent_request["requestId"].as_str().unwrap();
     assert!(
         mock.manager
-            .answer_user_input("codex-acp", "session", request_id, json!({"optionId": "allow"}))
+            .answer_user_input(
+                "codex-acp",
+                "session",
+                request_id,
+                json!({"optionId": "allow"})
+            )
             .await
     );
     let answer = frame_json(mock.peer.rx.next().await.unwrap());

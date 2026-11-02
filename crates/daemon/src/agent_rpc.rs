@@ -319,7 +319,9 @@ impl AgentService {
                 )
                 .await
                 {
-                    Ok(Ok(list)) => Ok(list),
+                    Ok(Ok(list)) => tokio::task::spawn_blocking(move || annotate_worktrees(list))
+                        .await
+                        .map_err(|err| err.to_string()),
                     Ok(Err(err)) => Err(err.to_string()),
                     Err(_) => Err("Timeout listing ACP agent sessions".to_string()),
                 }
@@ -752,6 +754,72 @@ fn mime_from_extension(path: &Path) -> Option<&'static str> {
         "ico" => Some("image/x-icon"),
         _ => None,
     }
+}
+
+/// Tag listed sessions whose cwd lies in a linked worktree with `worktree: { mainCwd, name }`,
+/// so the App lists them with the main checkout.
+fn annotate_worktrees(mut list: Value) -> Value {
+    let mut resolved = std::collections::HashMap::<String, Option<Value>>::new();
+    let Some(sessions) = list.get_mut("sessions").and_then(Value::as_array_mut) else {
+        return list;
+    };
+    for session in sessions {
+        let Some(cwd) = session
+            .get("cwd")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let worktree = resolved
+            .entry(cwd)
+            .or_insert_with_key(|cwd| {
+                session_worktree(Path::new(cwd)).map(|(main_cwd, name)| {
+                    json!({ "mainCwd": main_cwd.to_string_lossy(), "name": name })
+                })
+            })
+            .clone();
+        if let (Some(worktree), Some(session)) = (worktree, session.as_object_mut()) {
+            session.insert("worktree".to_string(), worktree);
+        }
+    }
+    list
+}
+
+/// Main checkout path (keeping the cwd's subpath) and name of the linked worktree holding `cwd`.
+/// Removed worktrees fall back to Claude Code's `<repo>/.claude/worktrees/<name>` layout.
+fn session_worktree(cwd: &Path) -> Option<(PathBuf, String)> {
+    git_worktree(cwd).or_else(|| claude_worktree(cwd))
+}
+
+fn git_worktree(cwd: &Path) -> Option<(PathBuf, String)> {
+    let repo = git2::Repository::discover(cwd).ok()?;
+    if !repo.is_worktree() {
+        return None;
+    }
+    let root = repo.workdir()?;
+    let main = git2::Repository::open(repo.commondir()).ok()?;
+    let sub = cwd.strip_prefix(root).ok()?;
+    let main_cwd = main
+        .workdir()?
+        .components()
+        .chain(sub.components())
+        .collect();
+    Some((main_cwd, root.file_name()?.to_string_lossy().into_owned()))
+}
+
+fn claude_worktree(cwd: &Path) -> Option<(PathBuf, String)> {
+    let parts: Vec<_> = cwd.components().collect();
+    let index = parts
+        .windows(2)
+        .position(|pair| pair[0].as_os_str() == ".claude" && pair[1].as_os_str() == "worktrees")?;
+    let name = parts
+        .get(index + 2)?
+        .as_os_str()
+        .to_string_lossy()
+        .into_owned();
+    let main_cwd = parts[..index].iter().chain(&parts[index + 3..]).collect();
+    Some((main_cwd, name))
 }
 
 fn open_repo(cwd: Option<&Path>) -> Result<git2::Repository, String> {
@@ -1346,10 +1414,56 @@ mod tests {
     };
 
     use super::{
-        VOICE_CHAT_MARKER, browse_files, browser_panel_system_prompt, complete_directories,
-        message_panel_system_prompt, message_voice_chat, read_raw_file, read_remote_file,
-        resolve_directory_path, save_file_attachment,
+        VOICE_CHAT_MARKER, annotate_worktrees, browse_files, browser_panel_system_prompt,
+        complete_directories, message_panel_system_prompt, message_voice_chat, read_raw_file,
+        read_remote_file, resolve_directory_path, save_file_attachment, session_worktree,
     };
+
+    #[test]
+    fn worktree_sessions_resolve_to_the_main_checkout() {
+        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "agentdeck-worktree-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let main = root.join("repo");
+        let repo = git2::Repository::init(&main).unwrap();
+        let tree = repo
+            .find_tree(repo.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        let sig = git2::Signature::now("test", "test@example.com").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "init", &tree, &[])
+            .unwrap();
+        let worktree = root.join("feature");
+        repo.worktree("feature", &worktree, None).unwrap();
+        std::fs::create_dir(worktree.join("pkg")).unwrap();
+
+        assert_eq!(
+            session_worktree(&worktree.join("pkg")),
+            Some((main.join("pkg"), "feature".to_string()))
+        );
+        assert_eq!(session_worktree(&main), None);
+        // Removed worktrees are recognized by Claude Code's layout.
+        assert_eq!(
+            session_worktree(&main.join(".claude/worktrees/gone/pkg")),
+            Some((main.join("pkg"), "gone".to_string()))
+        );
+
+        let list = annotate_worktrees(serde_json::json!({
+            "sessions": [
+                { "sessionId": "a", "cwd": worktree.to_string_lossy() },
+                { "sessionId": "b", "cwd": main.to_string_lossy() },
+            ]
+        }));
+        assert_eq!(
+            list["sessions"][0]["worktree"],
+            serde_json::json!({ "mainCwd": main.to_string_lossy(), "name": "feature" })
+        );
+        assert!(list["sessions"][1].get("worktree").is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn file_attachments_are_saved_under_a_link_safe_name() {

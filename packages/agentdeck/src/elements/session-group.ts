@@ -4,6 +4,7 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { Time } from '@mantou/tap-ui/lib/time';
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
+import { scratchWorkspacesRoot } from '../session/groups';
 import type { DeckSession } from '../session/types';
 import { hostHome } from '../state/store';
 import { icons } from '../styles/icons';
@@ -40,7 +41,7 @@ export class DeckSessionGroupElement extends GemElement {
             <tap-use class="size-4" .element=${icons.folder}></tap-use>
           </span>
           <span class="min-w-0 flex-1 truncate font-mono text-sm font-medium text-highlight" title=${cwd}>
-            ${displayPath(cwd, hostHome())}
+            ${scratchWorkspacesRoot(cwd) === cwd ? i18n.get('sessionList.thisComputer') : displayPath(cwd, hostHome())}
           </span>
           <span class="rounded-lg bg-bg px-2 py-1 font-mono text-xs font-bold text-describe">${sessions.length}</span>
         </header>
@@ -100,8 +101,16 @@ export class DeckSessionGroupElement extends GemElement {
                           ${i18n.get('session.completed')}
                         </span>
                       </span>
-                      <span class="mt-1.5 block truncate font-mono text-xs text-describe">
-                        ${session.sessionId}
+                      <span class="mt-1.5 flex min-w-0 items-center gap-2 font-mono text-xs text-describe">
+                        <span
+                          v-if=${!!session.worktree}
+                          class="inline-flex max-w-[50%] shrink-0 items-center gap-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-primary-strong"
+                          title=${session.cwd}
+                        >
+                          <tap-use class="size-3 shrink-0" .element=${icons.gitBranch}></tap-use>
+                          <span class="truncate">${session.worktree?.name}</span>
+                        </span>
+                        <span class="truncate">${session.sessionId}</span>
                       </span>
                     </span>
                     <span class="flex shrink-0 items-center gap-1.5 text-xs text-describe">

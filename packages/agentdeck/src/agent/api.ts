@@ -113,6 +113,8 @@ export type RemoteSession = {
   title?: string;
   updatedAt?: string;
   additionalDirectories?: string[];
+  /** Set by the host when `cwd` lies in a linked git worktree; the session is listed with `mainCwd`. */
+  worktree?: { mainCwd: string; name: string };
 };
 
 /** ACP slash command; the prompt `/name args` runs it. */

@@ -15,6 +15,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 ## 行为约束
 
 - **会话**：新会话先建本地 pending session，首次发送才向远端 create；打开已有会话保留 close → load，手机端不能依赖页面卸载时 close。
+- **会话列表**：按 cwd 分组；host 标了 `worktree` 的会话归入其 `mainCwd` 分组，行内显示 worktree 名；Claude 桌面版无项目对话的 `…/Claude/scratch-workspaces/…` 合为一组，显示为"这台电脑"；打开与新建会话仍用会话自己的 cwd。
 - **会话配置**（`state/config-options.ts`）：所有 select 类型的 `configOptions`（mode / model / effort…）均可选，旧版 `modes` 作为 mode 一项。composer 只展示当前模型，点击打开带 Stack 的 Sheet（`elements/session-config.ts`）：根页为模型单选，其余配置点击后 push 单选页（均用 `tap-cell-group`）。选择立即生效，远端失败时 toast 并回退。用户修改后按 agent 存整组选项到 `CONFIG_DEFAULTS_KEY`（未存过时以首个加载的会话为准），新会话直接沿用；create 后逐项应用，远端不支持的项或值跳过。settings 重置保留。
 - **进行中回合**：回合存入 in-flight，重启后恢复等待回复。Relay 会丢弃过期未 ack 的消息，所以每次连上 host 都调 `agent_prompts_running` 对账（`settleLostTurns`）：daemon 已不在运行的回合就地结束、标未读，并 close → load 历史；旧 daemon 无此接口时保持等待。
 - **等待用户输入**：host 以通知发来 `agent_permission_request` / `agent_elicitation_request`，只在本设备的回合进行中显示（按 `requestId` 去重），用 `agent_user_input_respond` 作答；作答后卡片立即关闭或只读，失败时 Toast 并恢复可答。回合结束、取消或会话关闭时由 host 取消，App 只清理本地状态，不发送作答。重载或重连后由 `settleLostTurns` 从 `agent_prompts_running` 的 `userInputs` 补回。权限卡片在输入框上方（runtime 的 `permission`）。

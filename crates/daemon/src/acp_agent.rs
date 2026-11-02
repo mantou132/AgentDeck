@@ -8,13 +8,13 @@ use agent_client_protocol::{
         v1::{
             AgentCapabilities, CancelNotification, ClientCapabilities as AcpClientCapabilities,
             CloseSessionRequest, ContentBlock, ContentChunk, CreateElicitationRequest,
-            CreateElicitationResponse, DeleteSessionRequest, ElicitationAction, ForkSessionRequest,
-            ElicitationCapabilities, ElicitationFormCapabilities, ElicitationScope, IdleStopReason,
-            ImageContent, Implementation, InitializeRequest, ListSessionsRequest, LoadSessionRequest,
-            NewSessionRequest, PermissionOptionId, PromptRequest, PromptResponse,
-            RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
-            ResourceLink, SelectedPermissionOutcome, SessionConfigId, SessionConfigValueId,
-            SessionId, SessionModeId, SessionNotification, SessionUpdate,
+            CreateElicitationResponse, DeleteSessionRequest, ElicitationAction,
+            ElicitationCapabilities, ElicitationFormCapabilities, ElicitationScope,
+            ForkSessionRequest, IdleStopReason, ImageContent, Implementation, InitializeRequest,
+            ListSessionsRequest, LoadSessionRequest, NewSessionRequest, PermissionOptionId,
+            PromptRequest, PromptResponse, RequestPermissionOutcome, RequestPermissionRequest,
+            RequestPermissionResponse, ResourceLink, SelectedPermissionOutcome, SessionConfigId,
+            SessionConfigValueId, SessionId, SessionModeId, SessionNotification, SessionUpdate,
             SetSessionConfigOptionRequest, SetSessionModeRequest, StateUpdate,
             SubagentCapabilities, SubagentUpdate, TextContent,
         },
@@ -544,7 +544,9 @@ impl AcpRuntime {
         } else {
             params["sessionId"] = session_id.into();
         }
-        let tx = self.session_tx(root.as_deref().unwrap_or(session_id)).await?;
+        let tx = self
+            .session_tx(root.as_deref().unwrap_or(session_id))
+            .await?;
         let (answer, answer_rx) = oneshot::channel();
         tx.send(SessionCommand::UserInput { input, answer })
             .await
@@ -1001,7 +1003,12 @@ impl AgentSessionManager {
 
     /// Cancel a subagent's current work (`session/cancel` on the child), when
     /// it advertises `cancel`; its pending requests settle cancelled.
-    pub async fn cancel_child(&self, agent: &str, session_id: &str, child_session_id: &str) -> bool {
+    pub async fn cancel_child(
+        &self,
+        agent: &str,
+        session_id: &str,
+        child_session_id: &str,
+    ) -> bool {
         let (reply, reply_rx) = oneshot::channel();
         let command = SessionCommand::CancelChild {
             session_id: child_session_id.to_string(),

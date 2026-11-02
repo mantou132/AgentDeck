@@ -6,11 +6,17 @@ export type SessionGroup = {
   sessions: DeckSession[];
 };
 
+/** Claude desktop runs project-less chats in their own `…/Claude/scratch-workspaces/…` directory; they share one group. */
+export const scratchWorkspacesRoot = (cwd: string) => /^.*[\\/]Claude[\\/]scratch-workspaces(?=[\\/]|$)/.exec(cwd)?.[0];
+
 export const getSortedSessionGroups = (
   sessions: DeckSession[],
   prevGroups: readonly SessionGroup[] = [],
 ): SessionGroup[] => {
-  const groupsMap = Map.groupBy(sessions, (session) => session.cwd);
+  const groupsMap = Map.groupBy(
+    sessions,
+    (session) => session.worktree?.mainCwd ?? scratchWorkspacesRoot(session.cwd) ?? session.cwd,
+  );
   const groups: SessionGroup[] = [];
   for (const [cwd, items] of groupsMap) {
     const sortedItems = [...items].sort(
