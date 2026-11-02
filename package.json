@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "scripts": {
     "lint": "biome check --write && lerna exec -- tsc --noEmit",
-    "test": "lerna exec -- npm test",
+    "test": "lerna run test",
     "tauri": "tauri",
     "release": "lerna version",
-    "prepare": "husky install"
+    "prepare": "husky install && pnpm -C packages/website build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",

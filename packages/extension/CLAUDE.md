@@ -25,4 +25,4 @@
 
 - `pnpm run dev`：启动 Chrome 扩展调试环境。
 - `pnpm run build`：构建 Chromium 与 Firefox 扩展（`dist/chrome`、`dist/firefox`）。
-- `pnpm run test`：运行单元测试；`test/register.mjs` 为无扩展名导入补 `.ts` 并把 `agentdeck/*` 指向 App 源码，由 Node 直接剥离类型运行。
+- `pnpm run test`：运行单元测试；`test/register.mjs` 为源码的无扩展名导入补 `.ts`（`node_modules` 中的补 `.js`）并把 `agentdeck/*` 指向 App 源码，由 Node 直接剥离类型运行。

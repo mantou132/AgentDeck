@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, registerHooks } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
+
+// Gem's published JS imports relative modules without extensions, which only bundlers resolve.
+registerHooks({
+  resolve: (specifier, context, nextResolve) =>
+    specifier.startsWith('.') && !path.extname(specifier) && context.parentURL?.includes('/node_modules/')
+      ? nextResolve(`${specifier}.js`, context)
+      : nextResolve(specifier, context),
+});
 
 import * as chacha from '@noble/ciphers/chacha.js';
 import * as hkdf from '@noble/hashes/hkdf.js';

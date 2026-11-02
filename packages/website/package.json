@@ -1,0 +1,17 @@
+{
+  "name": "agentdeck-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build",
+    "start": "gemkit start"
+  },
+  "dependencies": {
+    "@mantou/gem": "^2.3.1",
+    "@mantou/gemkit": "^0.2.0"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "^2.3.0"
+  }
+}

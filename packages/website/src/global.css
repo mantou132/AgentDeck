@@ -1,0 +1,34 @@
+:root {
+  --bg: #0e1133;
+  --bg-2: #141844;
+  --card: rgb(255 255 255 / 0.04);
+  --line: rgb(255 255 255 / 0.09);
+  --text: #eef0ff;
+  --muted: #a3a8d1;
+  --indigo: #5568ef;
+  --cyan: #62d3df;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px / 1.6 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Inter,
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+}
