@@ -153,7 +153,7 @@ export class DeckFileViewerElement extends GemElement {
           </div>
           <gem-bind-marked
             v-else-if=${markdown && !source}
-            class="select-text mx-auto block w-full max-w-[760px] p-5"
+            class="select-text mx-auto box-border block w-full max-w-[760px] p-5"
             .mdStyle=${fileViewerMarkdownStyle}
             .extensions=${this.#markdownExtensions}
             @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
