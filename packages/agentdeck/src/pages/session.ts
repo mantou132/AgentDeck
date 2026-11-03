@@ -1,4 +1,5 @@
 import { history } from '@mantou/gem/lib/history';
+import { addListener } from '@mantou/gem/lib/utils';
 import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
 import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
@@ -88,10 +89,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   #readCompletedResponse = () => queueMicrotask(this.#markRead);
 
   @effect(() => [])
-  #watchVisibility = () => {
-    document.addEventListener('visibilitychange', this.#markRead);
-    return () => document.removeEventListener('visibilitychange', this.#markRead);
-  };
+  #watchVisibility = () => addListener(document, 'visibilitychange', this.#markRead);
 
   #onQuote = (evt: CustomEvent<string>) => {
     this.#composerRef.value?.quoteText(evt.detail);

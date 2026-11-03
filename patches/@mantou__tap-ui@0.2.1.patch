@@ -1,3 +1,86 @@
+diff --git a/elements/base/resize.d.ts b/elements/base/resize.d.ts
+index 303ced138f9409acdf5b94c7de2e6b1b31ba7edf..3e25ec86840493594abb3a33dfcc2378492d8e07 100644
+--- a/elements/base/resize.d.ts
++++ b/elements/base/resize.d.ts
+@@ -9,6 +9,8 @@ export declare class TapResizeBaseElement extends GemElement {
+     #private;
+     resize: Emitter<ResizeDetail>;
+     resizeThrottle?: boolean;
++    /**Box that triggers resize, `content-box` by default */
++    resizeBox?: ResizeObserverBoxOptions;
+     borderBoxSize: {
+         blockSize: number;
+         inlineSize: number;
+diff --git a/elements/base/resize.js b/elements/base/resize.js
+index 6b4054ed8fb1bdf20965c83fb6d4c5e0ca291d79..db74517fe0a587a83b074a5ee770b12456bdc356 100644
+--- a/elements/base/resize.js
++++ b/elements/base/resize.js
+@@ -36,7 +36,7 @@ import { effect, emitter, property } from '@mantou/gem/lib/decorators';
+ import { GemElement } from '@mantou/gem/lib/element';
+ import { throttle } from '../../lib/timer';
+ export function resizeObserver(ele) {
+-    const { resizeThrottle = true } = ele;
++    const { resizeThrottle = true, resizeBox } = ele;
+     const callback = (entryList) => {
+         entryList.forEach((entry) => {
+             const oldDetail = { contentRect: ele.contentRect, borderBoxSize: ele.borderBoxSize };
+@@ -52,7 +52,7 @@ export function resizeObserver(ele) {
+     };
+     const throttleCallback = resizeThrottle ? throttle(callback, 300, { leading: true }) : callback;
+     const ro = new ResizeObserver(throttleCallback);
+-    ro.observe(ele, {});
++    ro.observe(ele, { box: resizeBox });
+     return () => ro.disconnect();
+ }
+ let TapResizeBaseElement = (() => {
+@@ -63,6 +63,9 @@ let TapResizeBaseElement = (() => {
+     let _resizeThrottle_decorators;
+     let _resizeThrottle_initializers = [];
+     let _resizeThrottle_extraInitializers = [];
++    let _resizeBox_decorators;
++    let _resizeBox_initializers = [];
++    let _resizeBox_extraInitializers = [];
+     let _private_observer_decorators;
+     let _private_observer_initializers = [];
+     let _private_observer_extraInitializers = [];
+@@ -71,15 +74,19 @@ let TapResizeBaseElement = (() => {
+             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+             _resize_decorators = [emitter];
+             _resizeThrottle_decorators = [property];
+-            _private_observer_decorators = [effect((i) => [i.resizeThrottle])];
++            _resizeBox_decorators = [property];
++            _private_observer_decorators = [effect((i) => [i.resizeThrottle, i.resizeBox])];
+             __esDecorate(null, null, _resize_decorators, { kind: "field", name: "resize", static: false, private: false, access: { has: obj => "resize" in obj, get: obj => obj.resize, set: (obj, value) => { obj.resize = value; } }, metadata: _metadata }, _resize_initializers, _resize_extraInitializers);
+             __esDecorate(null, null, _resizeThrottle_decorators, { kind: "field", name: "resizeThrottle", static: false, private: false, access: { has: obj => "resizeThrottle" in obj, get: obj => obj.resizeThrottle, set: (obj, value) => { obj.resizeThrottle = value; } }, metadata: _metadata }, _resizeThrottle_initializers, _resizeThrottle_extraInitializers);
++            __esDecorate(null, null, _resizeBox_decorators, { kind: "field", name: "resizeBox", static: false, private: false, access: { has: obj => "resizeBox" in obj, get: obj => obj.resizeBox, set: (obj, value) => { obj.resizeBox = value; } }, metadata: _metadata }, _resizeBox_initializers, _resizeBox_extraInitializers);
+             __esDecorate(null, null, _private_observer_decorators, { kind: "field", name: "#observer", static: false, private: true, access: { has: obj => #observer in obj, get: obj => obj.#observer, set: (obj, value) => { obj.#observer = value; } }, metadata: _metadata }, _private_observer_initializers, _private_observer_extraInitializers);
+             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+         }
+         resize = __runInitializers(this, _resize_initializers, void 0);
+         resizeThrottle = (__runInitializers(this, _resize_extraInitializers), __runInitializers(this, _resizeThrottle_initializers, void 0));
+-        #observer = (__runInitializers(this, _resizeThrottle_extraInitializers), __runInitializers(this, _private_observer_initializers, () => resizeObserver(this)));
++        /**Box that triggers resize, `content-box` by default */
++        resizeBox = (__runInitializers(this, _resizeThrottle_extraInitializers), __runInitializers(this, _resizeBox_initializers, void 0));
++        #observer = (__runInitializers(this, _resizeBox_extraInitializers), __runInitializers(this, _private_observer_initializers, () => resizeObserver(this)));
+         borderBoxSize = (__runInitializers(this, _private_observer_extraInitializers), {
+             blockSize: 0,
+             inlineSize: 0,
+diff --git a/elements/browser.js b/elements/browser.js
+index f4cb1120ef6acd0d809560c8343c96dd4e532a4f..7917a29257018f41a7bb18b65e3ffa2a680bde4e 100644
+--- a/elements/browser.js
++++ b/elements/browser.js
+@@ -49,9 +49,9 @@ const style = css `
+     inset: 0;
+     display: block;
+   }
++  /* In flow, so the page insets keep it between the bars; block avoids the inline baseline gap that would scroll */
+   .frame {
+-    position: absolute;
+-    inset: 0;
++    display: block;
+     width: 100%;
+     height: 100%;
+     border: 0;
 diff --git a/elements/navbar.js b/elements/navbar.js
 index fc74594b25daf087b854029d8c78497c6f678b67..d37beabaaf4de1994a3d38b08f8f7567883a3620 100644
 --- a/elements/navbar.js
@@ -44,7 +127,7 @@ index 0e160e559dec5126710e6d06c2e6000fbe7f9282..f80f488e588859617d0e4718485dc8ea
  //# sourceMappingURL=page.d.ts.map
 \ No newline at end of file
 diff --git a/elements/page.js b/elements/page.js
-index 1776e626cfc5d1f923b776d656ace4e1420ac8ed..07602beeae528dee47a41042fbf7371f495c3b4d 100644
+index 1776e626cfc5d1f923b776d656ace4e1420ac8ed..855ceecf35b6042d394a75a490117b08e0cbf939 100644
 --- a/elements/page.js
 +++ b/elements/page.js
 @@ -32,7 +32,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
@@ -412,7 +495,7 @@ index 1776e626cfc5d1f923b776d656ace4e1420ac8ed..07602beeae528dee47a41042fbf7371f
              if (!this.floatheader) {
                  this.#state({ scrolled: false });
                  return;
-@@ -465,36 +511,40 @@ let TapPageElement = (() => {
+@@ -465,36 +511,41 @@ let TapPageElement = (() => {
              return () => clearTimeout(timer);
          }));
          #content = (__runInitializers(this, _private_watchLoading_extraInitializers), __runInitializers(this, _private_content_initializers, () => {
@@ -442,6 +525,7 @@ index 1776e626cfc5d1f923b776d656ace4e1420ac8ed..07602beeae528dee47a41042fbf7371f
 +                '--footer-height': `${footerHeight}px`,
 +            })}
 +        disable-scroll-mask
++        .resizeBox=${'border-box'}
          ?disable-gesture=${!this.refreshable || refreshing || pageStore.shouldDim}
          @pull=${this.#onPull}
          @pull-end=${this.#onPullEnd}
