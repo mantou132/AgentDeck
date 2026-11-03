@@ -128,6 +128,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload to TestFlight
+        # 等构建处理完后分发给公开链接所在的外部测试组；新版本号的首个构建需过 Beta App Review
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           IPA: ${{ steps.ipa.outputs.path }}
@@ -137,7 +138,9 @@ jobs:
             --api_key_path "$RUNNER_TEMP/asc-api-key.json" \
             --app_identifier "$APP_IDENTIFIER" \
             --ipa "$IPA" \
-            --skip_waiting_for_build_processing true
+            --distribute_external true \
+            --groups "朋友" \
+            --changelog "$(git log -1 --format=%s)"
 
       - name: Prepare App Store metadata
         if: github.event_name == 'push' && github.ref_type == 'tag'
