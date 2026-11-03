@@ -1,5 +1,6 @@
 import { history } from '@mantou/gem/lib/history';
 import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
+import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import type { Attachment } from '../attachment/types';
@@ -60,7 +61,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   @property initialPrompt?: string;
 
   #state = createState({ followMessages: true, deferTimeline: false, entered: false, voiceChat: false });
-  #messagesRef = createRef<HTMLElement>();
+  #pageRef = createRef<TapPageElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
   #following?: ReturnType<typeof followBottom>;
@@ -126,9 +127,9 @@ export class AgentDeckSessionPageElement extends GemElement {
     if (!this.#loading) this.#following?.resume();
   };
 
-  @effect((i) => [i.sessionId, i.#messagesRef.value, i.#messagesContentRef.value])
+  @effect((i) => [i.sessionId, i.#pageRef.value, i.#messagesContentRef.value])
   #followMessages = () => {
-    this.#following = followBottom(this.#messagesRef.value, this.#messagesContentRef.value, {
+    this.#following = followBottom(this.#pageRef.value?.scrollElement, this.#messagesContentRef.value, {
       onFollowingChange: (followMessages) => this.#state({ followMessages }),
     });
     return this.#following?.disconnect;
@@ -241,7 +242,7 @@ export class AgentDeckSessionPageElement extends GemElement {
     return html`
       <header
         slot="header"
-        class="session-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong px-3 pb-1.5"
+        class="session-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong bg-bg/75 px-3 pb-1.5 backdrop-blur-lg"
       >
         <tap-gesture
           role="button"
@@ -319,20 +320,14 @@ export class AgentDeckSessionPageElement extends GemElement {
       (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
     return html`
-      <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
+      <tap-page ${this.#pageRef} class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         ${this.#renderHeader(session.title || (session.pendingCreation ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd)}
 
-        <div class="relative h-full">
-          <main
-            ${this.#messagesRef}
-            class="no-scrollbar h-full overflow-x-hidden overflow-y-auto overscroll-y-contain"
-            tabindex="0"
-            aria-label=${i18n.get('session.messagesAria')}
-          >
-            <div
-              ${this.#messagesContentRef}
-              class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-4 pb-5 sm:px-6"
-            >
+        <main
+          ${this.#messagesContentRef}
+          class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-4 pb-5 sm:px-6"
+          aria-label=${i18n.get('session.messagesAria')}
+        >
               <section v-if=${loading} class="grid flex-1 place-items-center content-center px-6 py-12 text-center">
                 <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
                   <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
@@ -368,21 +363,19 @@ export class AgentDeckSessionPageElement extends GemElement {
                   ${session.pendingCreation ? i18n.get('session.newSessionHint') : i18n.get('session.emptyHistoryHint')}
                 </p>
               </section>
-            </div>
-          </main>
+        </main>
+
+        <footer slot="footer" class="relative bg-bg/75 backdrop-blur-lg">
           <button
             v-if=${!this.#state.followMessages}
             type="button"
-            class="absolute bottom-3 left-1/2 grid size-10 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-primary/20 bg-bg-light text-primary-strong shadow-float active:bg-primary-soft"
+            class="absolute bottom-full mb-3 left-1/2 grid size-10 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-primary/20 bg-bg-light text-primary-strong shadow-float active:bg-primary-soft"
             aria-label=${i18n.get('session.scrollToLatest')}
             title=${i18n.get('session.scrollToLatest')}
             @click=${() => this.#following?.resume()}
           >
             <tap-use class="size-5" .element=${icons.arrowDown}></tap-use>
           </button>
-        </div>
-
-        <footer slot="footer">
           <div v-if=${error} class="px-2.5 pb-2">
             <div
               class="mx-auto flex max-w-[760px] items-center gap-2 rounded-[11px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2 text-sm leading-relaxed text-negative"

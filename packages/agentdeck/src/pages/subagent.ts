@@ -1,3 +1,4 @@
+import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import type { Attachment } from '../attachment/types';
 import { getSubagentStatus, getSubagentTitle, isSubagentActive } from '../elements/subagent-card';
@@ -23,11 +24,11 @@ export class AgentDeckSubagentPageElement extends GemElement {
   @property sessionId = '';
   @property subagentId = '';
 
-  #messagesRef = createRef<HTMLElement>();
+  #pageRef = createRef<TapPageElement>();
   #messagesContentRef = createRef<HTMLElement>();
 
-  @effect((i) => [i.subagentId, i.#messagesRef.value, i.#messagesContentRef.value])
-  #followMessages = () => followBottom(this.#messagesRef.value, this.#messagesContentRef.value)?.disconnect;
+  @effect((i) => [i.subagentId, i.#pageRef.value, i.#messagesContentRef.value])
+  #followMessages = () => followBottom(this.#pageRef.value?.scrollElement, this.#messagesContentRef.value)?.disconnect;
 
   #previewAttachment = ({ detail: attachment }: CustomEvent<Attachment>) =>
     openAttachment(attachment, getSession(this.sessionId)?.cwd ?? '');
@@ -41,10 +42,10 @@ export class AgentDeckSubagentPageElement extends GemElement {
     const active = isSubagentActive(subagent);
     const ownPermission = permission?.childSessionId === this.subagentId ? permission : undefined;
     return html`
-      <tap-page class="bg-bg text-text">
+      <tap-page ${this.#pageRef} class="bg-bg text-text">
         <header
           slot="header"
-          class="session-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong px-3 pb-1.5"
+          class="session-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong bg-bg/75 px-3 pb-1.5 backdrop-blur-lg"
         >
           <button
             type="button"
@@ -63,15 +64,10 @@ export class AgentDeckSubagentPageElement extends GemElement {
           <span></span>
         </header>
         <main
-          ${this.#messagesRef}
-          class="no-scrollbar h-full overflow-x-hidden overflow-y-auto overscroll-y-contain"
-          tabindex="0"
+          ${this.#messagesContentRef}
+          class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-4 pb-5 sm:px-6"
           aria-label=${i18n.get('session.messagesAria')}
         >
-          <div
-            ${this.#messagesContentRef}
-            class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-4 pb-5 sm:px-6"
-          >
             <p v-if=${!messages.length} class="m-auto text-sm text-describe">${i18n.get('subagent.empty')}</p>
             <deck-session-timeline
               v-else
@@ -83,9 +79,8 @@ export class AgentDeckSubagentPageElement extends GemElement {
               ?pending=${active}
               @preview=${this.#previewAttachment}
             ></deck-session-timeline>
-          </div>
         </main>
-        <footer slot="footer" class="px-2.5 pb-[max(10px,env(safe-area-inset-bottom,0px))]">
+        <footer slot="footer" class="bg-bg/75 px-2.5 backdrop-blur-lg pb-[max(10px,env(safe-area-inset-bottom,0px))]">
           <deck-permission-request
             v-if=${!!ownPermission}
             class="mx-auto mt-2 max-w-[760px]"

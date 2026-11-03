@@ -1,5 +1,492 @@
+diff --git a/elements/navbar.js b/elements/navbar.js
+index fc74594b25daf087b854029d8c78497c6f678b67..d37beabaaf4de1994a3d38b08f8f7567883a3620 100644
+--- a/elements/navbar.js
++++ b/elements/navbar.js
+@@ -52,7 +52,8 @@ const style = css `
+     padding-block: 0.5em;
+     padding-block-start: calc(0.5em + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+     box-sizing: border-box;
+-    background: ${theme.backgroundColor};
++    background: color-mix(in srgb, ${theme.backgroundColor} 75%, transparent);
++    backdrop-filter: blur(16px);
+     border-block-end: 1px solid ${theme.borderColor};
+     color: ${theme.highlightColor};
+     transition:
+@@ -61,6 +62,7 @@ const style = css `
+   }
+   :host([transparent]) {
+     background: transparent;
++    backdrop-filter: none;
+     border-block-end-color: transparent;
+   }
+   .left {
+diff --git a/elements/page.d.ts b/elements/page.d.ts
+index 0e160e559dec5126710e6d06c2e6000fbe7f9282..f80f488e588859617d0e4718485dc8ea457de8a3 100644
+--- a/elements/page.d.ts
++++ b/elements/page.d.ts
+@@ -37,7 +37,6 @@ export declare class TapPageElement extends TapVisibleBaseElement {
+     refreshable: boolean;
+     loading: boolean;
+     disableNavigation: boolean;
+-    scrollMask: boolean;
+     trackVisibility: boolean;
+     pullThreshold: number;
+     /**
+@@ -52,6 +51,9 @@ export declare class TapPageElement extends TapVisibleBaseElement {
+     }>;
+     dim: boolean;
+     fullscreen: boolean;
++    /**The scroll container of the page content, e.g. to keep a chat scrolled to the bottom */
++    get scrollElement(): HTMLElement | undefined;
++    /**Measures the bars directly, the main insets are only set after the first resize observation */
+     get contentHeight(): number;
+ }
+ //# sourceMappingURL=page.d.ts.map
+\ No newline at end of file
+diff --git a/elements/page.js b/elements/page.js
+index 1776e626cfc5d1f923b776d656ace4e1420ac8ed..07602beeae528dee47a41042fbf7371f495c3b4d 100644
+--- a/elements/page.js
++++ b/elements/page.js
+@@ -32,7 +32,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
+     }
+     return useValue ? value : void 0;
+ };
+-import { adoptedStyle, boolattribute, connectStore, customElement, effect, emitter, numattribute, part, shadow, slot, state, template, } from '@mantou/gem/lib/decorators';
++import { adoptedStyle, boolattribute, connectStore, customElement, effect, emitter, mounted, numattribute, part, shadow, slot, state, template, } from '@mantou/gem/lib/decorators';
+ import { createRef, createState, css, html } from '@mantou/gem/lib/element';
+ import { createStore } from '@mantou/gem/lib/store';
+ import { addListener, classMap, styleMap } from '@mantou/gem/lib/utils';
+@@ -55,20 +55,22 @@ const PULL_HOLD = 44;
+ const PULL_MAX = 96;
+ const style = css `
+   :host(:where(:not([hidden]))) {
+-    display: flex;
+-    flex-direction: column;
+     position: absolute;
+     inset: 0;
+     overflow: hidden;
+-    box-sizing: border-box;
+     background: ${theme.backgroundColor};
+     color: ${theme.textColor};
+   }
++  /* Insets from an ancestor page, e.g. the tabbar of a root page */
++  :host {
++    --outer-inset-top: var(--page-inset-top, 0px);
++    --outer-inset-bottom: var(--page-inset-bottom, 0px);
++  }
++  /* In the header so it stays below it while content scrolls and leaves with it */
+   .progress {
+     position: absolute;
+-    inset-block-start: 0;
++    inset-block-start: 100%;
+     inset-inline: 0;
+-    z-index: 1;
+     height: 2px;
+     background: ${theme.primaryColor};
+     transform-origin: left;
+@@ -86,61 +88,69 @@ const style = css `
+   }
+   .header,
+   .footer {
+-    overflow: hidden;
+-    /* Safari lacks calc-size(); auto keeps natural height for flex items */
+-    height: auto;
+-    height: calc-size(auto, size);
+-    position: relative;
+-    flex-shrink: 0;
+-    z-index: 2;
+-    will-change: opacity, transform;
+-    transition: all 350ms ${theme.timingFunction};
+-  }
+-  :host([floatheader]) .header {
+     position: absolute;
+     inset-inline: 0;
+-    inset-block-start: 0;
++    z-index: 2;
++    /* will-change: opacity would make it a backdrop root, so the bars could not blur the content below */
++    will-change: transform;
++    transition:
++      transform 350ms ${theme.timingFunction},
++      inset-block 350ms ${theme.timingFunction};
++  }
++  .header {
++    inset-block-start: var(--outer-inset-top);
+   }
++  .footer {
++    inset-block-end: var(--outer-inset-bottom);
++  }
++  /* Scrolls under the header and footer, the insets keep content clear of them like iOS */
++  /* No z-index: content stays below the bars, while an expanded card can still cover them */
+   .main {
+-    position: relative;
+-    z-index: 0;
+-    flex: 1;
+-    min-height: 0;
++    --page-inset-top: calc(var(--outer-inset-top) + var(--header-height));
++    --page-inset-bottom: calc(var(--outer-inset-bottom) + var(--footer-height));
++    position: absolute;
++    inset: 0;
++    padding-block: var(--page-inset-top) var(--page-inset-bottom);
++    scroll-padding-block: var(--page-inset-top) var(--page-inset-bottom);
++  }
++  :host([floatheader]) .main {
++    --page-inset-top: var(--outer-inset-top);
++  }
++  /* Enabled once fullscreen toggles, so the first measurement does not slide the content */
++  .main.animate-insets {
++    transition: padding-block 350ms ${theme.timingFunction};
+   }
+-  /* Flat :host descendants — nested rules under :host fail on Safari */
+-  :host(:state(dim)) .header,
+-  :host(:state(dim)) .footer {
+-    opacity: 0;
++  /* Content already runs under the bars, so moving them away is enough */
++  :host(:is(:state(dim), :state(fullscreen))) .header {
++    transform: translateY(-100%);
+     pointer-events: none;
+   }
+-  :host(:state(dim)) {
+-    .header {
+-      transform: translateY(-100%);
+-    }
+-    .footer {
+-      transform: translateY(100%);
+-    }
+-    .main {
+-      z-index: 3;
+-      /* Safari clips position:fixed inside overflow:auto + z-index ancestors */
+-      @supports (font:-apple-system-body) {
+-        overflow: visible;
+-      }
+-    }
++  :host(:is(:state(dim), :state(fullscreen))) .footer {
++    transform: translateY(100%);
++    pointer-events: none;
+   }
+-  :host(:state(fullscreen)) {
+-    .header,
+-    .footer {
+-      height: 0;
+-    }
++  /* Content at the top, e.g. a focused searchbar, covers the safe area itself */
++  :host(:state(fullscreen)) .main {
++    --page-inset-top: var(--outer-inset-top);
++    --page-inset-bottom: var(--outer-inset-bottom);
+   }
+   /* Pull moves the slotted content itself, so the main layout stays untouched */
+-  .main ::slotted(*) {
++  /* Only while pulled, otherwise it would override the transitions of the content */
++  .pulled ::slotted(*) {
+     translate: 0 var(--pull);
+     transition: translate 200ms ${theme.timingFunction};
+   }
+-  /* Sits in the gap above the content; .main clips it, centered once the gap fits */
++  /* The gap above the content, clips the indicator so it never shows through the header */
+   .refresh {
++    position: absolute;
++    inset-block-start: var(--page-inset-top);
++    inset-inline: 0;
++    height: var(--pull, 0px);
++    overflow: hidden;
++    transition: height 200ms ${theme.timingFunction};
++  }
++  /* Centered once the gap fits */
++  .refresh-icon {
+     position: absolute;
+     inset-block-start: 0;
+     left: 50%;
+@@ -151,7 +161,7 @@ const style = css `
+     transition: translate 200ms ${theme.timingFunction};
+   }
+   .dragging ::slotted(*),
+-  .dragging .refresh {
++  .dragging :is(.refresh, .refresh-icon) {
+     transition: none;
+   }
+   .gesture {
+@@ -193,9 +203,6 @@ let TapPageElement = (() => {
+     let _disableNavigation_decorators;
+     let _disableNavigation_initializers = [];
+     let _disableNavigation_extraInitializers = [];
+-    let _scrollMask_decorators;
+-    let _scrollMask_initializers = [];
+-    let _scrollMask_extraInitializers = [];
+     let _trackVisibility_decorators;
+     let _trackVisibility_initializers = [];
+     let _trackVisibility_extraInitializers = [];
+@@ -217,6 +224,9 @@ let TapPageElement = (() => {
+     let _private_spinIcon_decorators;
+     let _private_spinIcon_initializers = [];
+     let _private_spinIcon_extraInitializers = [];
++    let _private_settle_decorators;
++    let _private_settle_initializers = [];
++    let _private_settle_extraInitializers = [];
+     let _private_watchPull_decorators;
+     let _private_watchPull_initializers = [];
+     let _private_watchPull_extraInitializers = [];
+@@ -229,6 +239,9 @@ let TapPageElement = (() => {
+     let _private_watchMainFullscreen_decorators;
+     let _private_watchMainFullscreen_initializers = [];
+     let _private_watchMainFullscreen_extraInitializers = [];
++    let _private_observeBars_decorators;
++    let _private_observeBars_initializers = [];
++    let _private_observeBars_extraInitializers = [];
+     let _private_watchScroll_decorators;
+     let _private_watchScroll_initializers = [];
+     let _private_watchScroll_extraInitializers = [];
+@@ -250,7 +263,6 @@ let TapPageElement = (() => {
+             _refreshable_decorators = [boolattribute];
+             _loading_decorators = [boolattribute];
+             _disableNavigation_decorators = [boolattribute];
+-            _scrollMask_decorators = [boolattribute];
+             _trackVisibility_decorators = [boolattribute];
+             _pullThreshold_decorators = [numattribute];
+             _refresh_decorators = [emitter];
+@@ -258,10 +270,12 @@ let TapPageElement = (() => {
+             _dim_decorators = [state];
+             _fullscreen_decorators = [state];
+             _private_spinIcon_decorators = [effect((i) => [i.#state.refreshing])];
+-            _private_watchPull_decorators = [effect((i) => [i.refreshable, i.#state.refreshing])];
++            _private_settle_decorators = [effect((i) => [i.#state.pull])];
++            _private_watchPull_decorators = [effect((i) => [i.refreshable])];
+             _private_watchHeader_decorators = [effect((i) => [i.floatheader, i.#state.scrolled])];
+             _private_watchExpandable_decorators = [effect(() => [pageStore.shouldDim])];
+             _private_watchMainFullscreen_decorators = [effect(() => [pageStore.shouldFullscreen])];
++            _private_observeBars_decorators = [mounted()];
+             _private_watchScroll_decorators = [effect((i) => [i.floatheader])];
+             _private_watchLoading_decorators = [effect((i) => [i.loading])];
+             _private_content_decorators = [template()];
+@@ -273,7 +287,6 @@ let TapPageElement = (() => {
+             __esDecorate(null, null, _refreshable_decorators, { kind: "field", name: "refreshable", static: false, private: false, access: { has: obj => "refreshable" in obj, get: obj => obj.refreshable, set: (obj, value) => { obj.refreshable = value; } }, metadata: _metadata }, _refreshable_initializers, _refreshable_extraInitializers);
+             __esDecorate(null, null, _loading_decorators, { kind: "field", name: "loading", static: false, private: false, access: { has: obj => "loading" in obj, get: obj => obj.loading, set: (obj, value) => { obj.loading = value; } }, metadata: _metadata }, _loading_initializers, _loading_extraInitializers);
+             __esDecorate(null, null, _disableNavigation_decorators, { kind: "field", name: "disableNavigation", static: false, private: false, access: { has: obj => "disableNavigation" in obj, get: obj => obj.disableNavigation, set: (obj, value) => { obj.disableNavigation = value; } }, metadata: _metadata }, _disableNavigation_initializers, _disableNavigation_extraInitializers);
+-            __esDecorate(null, null, _scrollMask_decorators, { kind: "field", name: "scrollMask", static: false, private: false, access: { has: obj => "scrollMask" in obj, get: obj => obj.scrollMask, set: (obj, value) => { obj.scrollMask = value; } }, metadata: _metadata }, _scrollMask_initializers, _scrollMask_extraInitializers);
+             __esDecorate(null, null, _trackVisibility_decorators, { kind: "field", name: "trackVisibility", static: false, private: false, access: { has: obj => "trackVisibility" in obj, get: obj => obj.trackVisibility, set: (obj, value) => { obj.trackVisibility = value; } }, metadata: _metadata }, _trackVisibility_initializers, _trackVisibility_extraInitializers);
+             __esDecorate(null, null, _pullThreshold_decorators, { kind: "field", name: "pullThreshold", static: false, private: false, access: { has: obj => "pullThreshold" in obj, get: obj => obj.pullThreshold, set: (obj, value) => { obj.pullThreshold = value; } }, metadata: _metadata }, _pullThreshold_initializers, _pullThreshold_extraInitializers);
+             __esDecorate(null, null, _refresh_decorators, { kind: "field", name: "refresh", static: false, private: false, access: { has: obj => "refresh" in obj, get: obj => obj.refresh, set: (obj, value) => { obj.refresh = value; } }, metadata: _metadata }, _refresh_initializers, _refresh_extraInitializers);
+@@ -281,10 +294,12 @@ let TapPageElement = (() => {
+             __esDecorate(null, null, _dim_decorators, { kind: "field", name: "dim", static: false, private: false, access: { has: obj => "dim" in obj, get: obj => obj.dim, set: (obj, value) => { obj.dim = value; } }, metadata: _metadata }, _dim_initializers, _dim_extraInitializers);
+             __esDecorate(null, null, _fullscreen_decorators, { kind: "field", name: "fullscreen", static: false, private: false, access: { has: obj => "fullscreen" in obj, get: obj => obj.fullscreen, set: (obj, value) => { obj.fullscreen = value; } }, metadata: _metadata }, _fullscreen_initializers, _fullscreen_extraInitializers);
+             __esDecorate(null, null, _private_spinIcon_decorators, { kind: "field", name: "#spinIcon", static: false, private: true, access: { has: obj => #spinIcon in obj, get: obj => obj.#spinIcon, set: (obj, value) => { obj.#spinIcon = value; } }, metadata: _metadata }, _private_spinIcon_initializers, _private_spinIcon_extraInitializers);
++            __esDecorate(null, null, _private_settle_decorators, { kind: "field", name: "#settle", static: false, private: true, access: { has: obj => #settle in obj, get: obj => obj.#settle, set: (obj, value) => { obj.#settle = value; } }, metadata: _metadata }, _private_settle_initializers, _private_settle_extraInitializers);
+             __esDecorate(null, null, _private_watchPull_decorators, { kind: "field", name: "#watchPull", static: false, private: true, access: { has: obj => #watchPull in obj, get: obj => obj.#watchPull, set: (obj, value) => { obj.#watchPull = value; } }, metadata: _metadata }, _private_watchPull_initializers, _private_watchPull_extraInitializers);
+             __esDecorate(null, null, _private_watchHeader_decorators, { kind: "field", name: "#watchHeader", static: false, private: true, access: { has: obj => #watchHeader in obj, get: obj => obj.#watchHeader, set: (obj, value) => { obj.#watchHeader = value; } }, metadata: _metadata }, _private_watchHeader_initializers, _private_watchHeader_extraInitializers);
+             __esDecorate(null, null, _private_watchExpandable_decorators, { kind: "field", name: "#watchExpandable", static: false, private: true, access: { has: obj => #watchExpandable in obj, get: obj => obj.#watchExpandable, set: (obj, value) => { obj.#watchExpandable = value; } }, metadata: _metadata }, _private_watchExpandable_initializers, _private_watchExpandable_extraInitializers);
+             __esDecorate(null, null, _private_watchMainFullscreen_decorators, { kind: "field", name: "#watchMainFullscreen", static: false, private: true, access: { has: obj => #watchMainFullscreen in obj, get: obj => obj.#watchMainFullscreen, set: (obj, value) => { obj.#watchMainFullscreen = value; } }, metadata: _metadata }, _private_watchMainFullscreen_initializers, _private_watchMainFullscreen_extraInitializers);
++            __esDecorate(null, null, _private_observeBars_decorators, { kind: "field", name: "#observeBars", static: false, private: true, access: { has: obj => #observeBars in obj, get: obj => obj.#observeBars, set: (obj, value) => { obj.#observeBars = value; } }, metadata: _metadata }, _private_observeBars_initializers, _private_observeBars_extraInitializers);
+             __esDecorate(null, null, _private_watchScroll_decorators, { kind: "field", name: "#watchScroll", static: false, private: true, access: { has: obj => #watchScroll in obj, get: obj => obj.#watchScroll, set: (obj, value) => { obj.#watchScroll = value; } }, metadata: _metadata }, _private_watchScroll_initializers, _private_watchScroll_extraInitializers);
+             __esDecorate(null, null, _private_watchLoading_decorators, { kind: "field", name: "#watchLoading", static: false, private: true, access: { has: obj => #watchLoading in obj, get: obj => obj.#watchLoading, set: (obj, value) => { obj.#watchLoading = value; } }, metadata: _metadata }, _private_watchLoading_initializers, _private_watchLoading_extraInitializers);
+             __esDecorate(null, null, _private_content_decorators, { kind: "field", name: "#content", static: false, private: true, access: { has: obj => #content in obj, get: obj => obj.#content, set: (obj, value) => { obj.#content = value; } }, metadata: _metadata }, _private_content_initializers, _private_content_extraInitializers);
+@@ -305,8 +320,7 @@ let TapPageElement = (() => {
+         refreshable = (__runInitializers(this, _floatheader_extraInitializers), __runInitializers(this, _refreshable_initializers, void 0));
+         loading = (__runInitializers(this, _refreshable_extraInitializers), __runInitializers(this, _loading_initializers, void 0));
+         disableNavigation = (__runInitializers(this, _loading_extraInitializers), __runInitializers(this, _disableNavigation_initializers, void 0));
+-        scrollMask = (__runInitializers(this, _disableNavigation_extraInitializers), __runInitializers(this, _scrollMask_initializers, void 0));
+-        trackVisibility = (__runInitializers(this, _scrollMask_extraInitializers), __runInitializers(this, _trackVisibility_initializers, true));
++        trackVisibility = (__runInitializers(this, _disableNavigation_extraInitializers), __runInitializers(this, _trackVisibility_initializers, true));
+         pullThreshold = (__runInitializers(this, _trackVisibility_extraInitializers), __runInitializers(this, _pullThreshold_initializers, void 0));
+         /**
+          * Fired when pull exceeds the threshold.
+@@ -324,21 +338,33 @@ let TapPageElement = (() => {
+             rotate: 0,
+             progress: 0,
+             showProgress: false,
++            headerHeight: 0,
++            footerHeight: 0,
++            animateInsets: false,
++            pulled: false,
+         }));
+         #mainRef = createRef();
+         #headerSlotRef = createRef();
+         #iconRef = createRef();
++        #headerRef = createRef();
+         #footerRef = createRef();
+         get #pullThreshold() {
+             return this.pullThreshold || PULL_THRESHOLD;
+         }
++        /**The scroll container of the page content, e.g. to keep a chat scrolled to the bottom */
++        get scrollElement() {
++            return this.#mainRef.value;
++        }
++        /**Measures the bars directly, the main insets are only set after the first resize observation */
+         get contentHeight() {
+-            const header = this.floatheader ? 0 : this.#headerSlotRef.value?.parentElement?.getBoundingClientRect().height || 0;
+-            const footer = this.#footerRef.value?.getBoundingClientRect().height || 0;
++            const header = this.floatheader ? 0 : this.#headerRef.value?.offsetHeight || 0;
++            const footer = this.#footerRef.value?.offsetHeight || 0;
+             const mainEl = this.#mainRef.value;
+             let main = 0;
+             if (mainEl) {
+                 const mainRect = mainEl.getBoundingClientRect();
++                const paddingTop = parseFloat(getComputedStyle(mainEl).paddingTop);
++                const paddingBottom = parseFloat(getComputedStyle(mainEl).paddingBottom);
+                 const mainElements = [...this.children].filter((el) => !el.slot && el instanceof HTMLElement);
+                 let maxBottom = 0;
+                 for (const el of mainElements) {
+@@ -349,11 +375,10 @@ let TapPageElement = (() => {
+                         maxBottom = bottom;
+                 }
+                 if (maxBottom > 0) {
+-                    const paddingBottom = parseFloat(getComputedStyle(mainEl).paddingBottom) || 0;
+-                    main = maxBottom - mainRect.top + mainEl.scrollTop + paddingBottom;
++                    main = maxBottom - mainRect.top - paddingTop + mainEl.scrollTop;
+                 }
+                 else {
+-                    main = mainEl.scrollHeight;
++                    main = mainEl.scrollHeight - paddingTop - paddingBottom;
+                 }
+             }
+             return Math.ceil(header + footer + main);
+@@ -371,12 +396,12 @@ let TapPageElement = (() => {
+         #doneRefresh = () => {
+             if (!this.#state.refreshing)
+                 return;
+-            this.#state({ refreshing: false, pull: 0, dragging: false });
++            this.#state({ refreshing: false, pull: 0 });
+         };
+         #startRefresh = () => {
+             if (this.#state.refreshing)
+                 return;
+-            this.#state({ refreshing: true, pull: PULL_HOLD, dragging: false });
++            this.#state({ refreshing: true, pull: PULL_HOLD });
+             this.refresh(this.#doneRefresh);
+         };
+         #spinIcon = __runInitializers(this, _private_spinIcon_initializers, () => {
+@@ -405,17 +430,23 @@ let TapPageElement = (() => {
+             this.#state({ pull, dragging: true, rotate: this.#pullRotate(pull) });
+         });
+         #onPullEnd = (evt) => {
+-            const pull = this.#damp(evt.detail.distance);
+-            this.#state({ pull, dragging: false });
+-            if (pull >= this.#pullThreshold)
++            this.#state({ pull: 0, dragging: false });
++            if (this.#damp(evt.detail.distance) >= this.#pullThreshold)
+                 this.#startRefresh();
+-            else
+-                this.#state({ pull: 0 });
+         };
+-        #watchPull = __runInitializers(this, _private_watchPull_initializers, () => {
++        /** Stays pulled until the content settles back */
++        #settle = __runInitializers(this, _private_settle_initializers, () => {
++            if (this.#state.pull) {
++                this.#state({ pulled: true });
++                return;
++            }
++            const timer = setTimeout(() => this.#state({ pulled: false }), 200);
++            return () => clearTimeout(timer);
++        });
++        #watchPull = (__runInitializers(this, _private_settle_extraInitializers), __runInitializers(this, _private_watchPull_initializers, () => {
+             if (!this.refreshable)
+                 this.#state({ pull: 0, dragging: false, refreshing: false, rotate: 0 });
+-        });
++        }));
+         #syncHeaderTransparent = (__runInitializers(this, _private_watchPull_extraInitializers), () => {
+             const transparent = this.floatheader && !this.#state.scrolled;
+             this.#headerSlotRef.value?.assignedElements().forEach((el) => {
+@@ -436,10 +467,25 @@ let TapPageElement = (() => {
+                 this.dim = !!pageStore.shouldDim;
+         }));
+         #watchMainFullscreen = (__runInitializers(this, _private_watchExpandable_extraInitializers), __runInitializers(this, _private_watchMainFullscreen_initializers, () => {
+-            if (Stack.inCurrentStack(this))
+-                this.fullscreen = !!pageStore.shouldFullscreen;
++            if (!Stack.inCurrentStack(this))
++                return;
++            const fullscreen = !!pageStore.shouldFullscreen;
++            if (fullscreen !== this.fullscreen)
++                this.#state({ animateInsets: true });
++            this.fullscreen = fullscreen;
+         }));
+-        #watchScroll = (__runInitializers(this, _private_watchMainFullscreen_extraInitializers), __runInitializers(this, _private_watchScroll_initializers, () => {
++        #observeBars = (__runInitializers(this, _private_watchMainFullscreen_extraInitializers), __runInitializers(this, _private_observeBars_initializers, () => {
++            const header = this.#headerRef.value;
++            const ro = new ResizeObserver((entries) => {
++                entries.forEach(({ target, borderBoxSize: [{ blockSize }] }) => {
++                    this.#state(target === header ? { headerHeight: blockSize } : { footerHeight: blockSize });
++                });
++            });
++            ro.observe(header);
++            ro.observe(this.#footerRef.value);
++            return () => ro.disconnect();
++        }));
++        #watchScroll = (__runInitializers(this, _private_observeBars_extraInitializers), __runInitializers(this, _private_watchScroll_initializers, () => {
+             if (!this.floatheader) {
+                 this.#state({ scrolled: false });
+                 return;
+@@ -465,36 +511,40 @@ let TapPageElement = (() => {
+             return () => clearTimeout(timer);
+         }));
+         #content = (__runInitializers(this, _private_watchLoading_extraInitializers), __runInitializers(this, _private_content_initializers, () => {
+-            const { pull, dragging, refreshing, rotate } = this.#state;
+-            const offset = this.refreshable ? (refreshing ? Math.max(pull, PULL_HOLD) : pull) : 0;
++            const { pull, dragging, refreshing, rotate, headerHeight, footerHeight, animateInsets, pulled } = this.#state;
+             return html `
+-      <div class="header" part=${TapPageElement.header}>
++      <div ${this.#headerRef} class="header" part=${TapPageElement.header}>
+         <slot ${this.#headerSlotRef} name=${TapPageElement.header}></slot>
++        <div
++          v-if=${this.#state.showProgress}
++          class="progress"
++          style=${styleMap({ scale: `${this.#state.progress / 100} 1` })}
++        ></div>
+       </div>
+       <tap-pull-container
+         ${this.#mainRef}
+-        class=${classMap({ main: true, dragging })}
++        class=${classMap({ main: true, dragging, pulled, 'animate-insets': animateInsets })}
+         part=${TapPageElement.main}
+-        style=${styleMap({ '--pull': offset ? `${offset}px` : undefined })}
+-        ?disable-scroll-mask=${!this.scrollMask}
++        style=${styleMap({
++                '--pull': pull ? `${pull}px` : undefined,
++                '--header-height': `${headerHeight}px`,
++                '--footer-height': `${footerHeight}px`,
++            })}
++        disable-scroll-mask
+         ?disable-gesture=${!this.refreshable || refreshing || pageStore.shouldDim}
+         @pull=${this.#onPull}
+         @pull-end=${this.#onPullEnd}
+         @scroll=${this.#closeSwipeout}
+       >
+-        <div
+-          v-if=${this.#state.showProgress}
+-          class="progress"
+-          style=${styleMap({ scale: `${this.#state.progress / 100} 1` })}
+-        ></div>
+-        <tap-use
+-          v-if=${this.refreshable}
+-          ${this.#iconRef}
+-          class="refresh"
+-          part=${TapPageElement.refresh}
+-          style=${styleMap({ transform: !refreshing && `rotate(${rotate}deg)` })}
+-          .element=${icons.refresh}
+-        ></tap-use>
++        <div v-if=${this.refreshable} class="refresh">
++          <tap-use
++            ${this.#iconRef}
++            class="refresh-icon"
++            part=${TapPageElement.refresh}
++            style=${styleMap({ transform: !refreshing && `rotate(${rotate}deg)` })}
++            .element=${icons.refresh}
++          ></tap-use>
++        </div>
+         <slot></slot>
+       </tap-pull-container>
+       <div ${this.#footerRef} class="footer" part=${TapPageElement.footer}>
+diff --git a/elements/segmented.js b/elements/segmented.js
+index de5161818bdccecaa6367b7cf8d728aefb1a4576..8f289f30e8c932837c132eac6a82d4303c58d2dc 100644
+--- a/elements/segmented.js
++++ b/elements/segmented.js
+@@ -71,7 +71,7 @@ const style = css `
+     gap: 0.3em;
+     padding: calc(0.5em - var(--padding) + 1px) 1em;
+     border-radius: var(--inner-radius);
+-    min-width: 5em;
++    min-width: 4em;
+   }
+   :host(:where(:not([disabled], :state(animating)))) .segment:hover {
+     background: color-mix(in srgb, ${theme.hoverBackgroundColor}, currentColor 6%);
 diff --git a/elements/sheet.js b/elements/sheet.js
-index c8ff7f4150cdc884a540ff6883db26c91ef525d6..dd029637684b33f0877ba4074b7905582267e8e0 100644
+index a8287891b5650da0a400aba3ea2899529d82a22d..29112c0cf00ba46b21c1ab511bf13f8e8bde2663 100644
 --- a/elements/sheet.js
 +++ b/elements/sheet.js
 @@ -34,6 +34,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
@@ -10,7 +497,7 @@ index c8ff7f4150cdc884a540ff6883db26c91ef525d6..dd029637684b33f0877ba4074b790558
  import { styleMap } from '@mantou/gem/lib/utils';
  import { easeOutCubic } from '../lib/easing';
  import { setBodyInert } from '../lib/element';
-@@ -260,15 +261,19 @@ let TapSheetElement = (() => {
+@@ -270,15 +271,19 @@ let TapSheetElement = (() => {
              const sheet = new this({
                  ...options,
                  paddingless: options.paddingless ?? options.hasStack,
@@ -36,3 +523,17 @@ index c8ff7f4150cdc884a540ff6883db26c91ef525d6..dd029637684b33f0877ba4074b790558
              const restoreInert = setBodyInert(sheet);
              document.body.append(sheet);
              return DyPromise.new((res) => {
+diff --git a/elements/tabbar.js b/elements/tabbar.js
+index c78bc2205b803b225b3731a2193be220b7984137..50a830ac4979f03d7700e3a71f41ed9b52023119 100644
+--- a/elements/tabbar.js
++++ b/elements/tabbar.js
+@@ -48,7 +48,8 @@ const style = css `
+     box-sizing: border-box;
+     padding-block: 0.4em;
+     padding-block-end: calc(0.4em + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+-    background: ${theme.backgroundColor};
++    background: color-mix(in srgb, ${theme.backgroundColor} 75%, transparent);
++    backdrop-filter: blur(16px);
+     border-block-start: 1px solid ${theme.borderColor};
+     color: ${theme.describeColor};
+   }

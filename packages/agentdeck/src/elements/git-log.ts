@@ -70,7 +70,7 @@ export class DeckGitLogPageElement extends GemElement {
             @click=${() => this.#state({ revision: this.#state.revision + 1 })}
           ></tap-use>
         </tap-navbar>
-        <div slot="header" class="flex min-w-0 items-center gap-2 border-b border-border-strong bg-bg-light px-4 py-2.5">
+        <div slot="header" class="flex min-w-0 items-center gap-2 border-b border-border-strong bg-bg-light/75 px-4 py-2.5 backdrop-blur-lg">
           <span class="truncate font-mono text-xs font-medium text-text">${repoName}</span>
           <span
             v-if=${!!branch}
@@ -81,7 +81,7 @@ export class DeckGitLogPageElement extends GemElement {
           </span>
         </div>
 
-        <main class="h-full overflow-auto overscroll-contain">
+        <main class="min-h-full">
           <!-- Loading state; the commit list waits for the Stack enter animation -->
           <deck-loading v-if=${loading || !entered} label=${i18n.get('changes.loadingHistory')}></deck-loading>
 

@@ -40,7 +40,6 @@ export class DeckFileViewerElement extends GemElement {
     source: false,
     entered: false,
   });
-  #mainRef = createRef<HTMLElement>();
   #lineRef = createRef<HTMLElement>();
   #codeBlockRef = createRef<TapCodeBlockElement>();
 
@@ -85,13 +84,8 @@ export class DeckFileViewerElement extends GemElement {
     requestAnimationFrame(() => {
       const lineEl =
         this.#codeBlockRef.value?.shadowRoot?.querySelector<HTMLElement>('.gem-highlight') || this.#lineRef.value;
-      const mainEl = this.#mainRef.value;
-      if (!lineEl || !mainEl?.clientHeight) return;
-      const lineRect = lineEl.getBoundingClientRect();
-      const mainRect = mainEl.getBoundingClientRect();
-      if (!mainRect.height) return;
-      const targetTop = mainEl.scrollTop + (lineRect.top - mainRect.top) - (mainEl.clientHeight - lineRect.height) / 2;
-      mainEl.scrollTop = Math.max(0, targetTop);
+      // The page's scroll padding keeps the line centered between the header and footer
+      lineEl?.scrollIntoView({ block: 'center' });
     });
   };
 
@@ -134,10 +128,10 @@ export class DeckFileViewerElement extends GemElement {
         </tap-navbar>
         <deck-file-path
           slot="header"
-          class="border-b border-border-strong bg-bg-light px-4 py-2 font-mono text-xs text-describe"
+          class="border-b border-border-strong bg-bg-light/75 px-4 py-2 font-mono text-xs text-describe backdrop-blur-lg"
           path=${path}
         ></deck-file-path>
-        <main ${this.#mainRef} class="h-full overflow-auto overscroll-contain">
+        <main class="flex min-h-full flex-col">
           <!-- Highlighting and markdown wait for the Stack enter animation -->
           <deck-loading v-if=${loading || !entered} label=${i18n.get('file.loading')}></deck-loading>
           <deck-error
@@ -159,7 +153,7 @@ export class DeckFileViewerElement extends GemElement {
           </div>
           <gem-bind-marked
             v-else-if=${markdown && !source}
-            class="select-text mx-auto block max-w-[760px] p-5"
+            class="select-text mx-auto block w-full max-w-[760px] p-5"
             .mdStyle=${fileViewerMarkdownStyle}
             .extensions=${this.#markdownExtensions}
             @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
@@ -167,7 +161,7 @@ export class DeckFileViewerElement extends GemElement {
           <tap-code-block
             v-else-if=${isText && isSmall}
             ${this.#codeBlockRef}
-            class="select-text m-0 grid min-h-full w-full grid-rows-1 text-sm bg-transparent rounded-none"
+            class="select-text m-0 grid grow w-full grid-rows-1 text-sm bg-transparent rounded-none"
             codelang=${getCodeLang(path)}
             highlight=${this.line ? String(this.line) : ''}
           >${text}</tap-code-block>

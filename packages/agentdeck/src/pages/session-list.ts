@@ -105,13 +105,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
     return html`
       <tap-page
         class="bg-bg text-text"
-        scroll-mask
         refreshable
         @refresh=${this.#onRefresh}
       >
         <header
           slot="header"
-          class="menu-header flex items-center gap-4 bg-bg/90 px-5 pb-2.5 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
+          class="menu-header flex items-center gap-4 bg-bg/75 px-5 backdrop-blur-lg pb-2.5 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div class="flex min-w-0 flex-1 items-center gap-3">
             <img class="size-11 shrink-0 rounded-[13px] shadow-card" src="/agentdeck-icon.png" alt="" draggable="false"/>
@@ -244,7 +243,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
         <footer
           v-if=${!showErrorState}
           slot="footer"
-          class="menu-footer bg-bg/90 px-4 pt-2 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
+          class="menu-footer bg-bg/75 px-4 backdrop-blur-lg pt-2 min-[680px]:mx-auto min-[680px]:w-full min-[680px]:max-w-[620px]"
         >
           <div class="flex items-center justify-between gap-3">
             <button

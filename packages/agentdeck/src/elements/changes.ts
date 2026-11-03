@@ -109,7 +109,7 @@ export class DeckChangesPageElement extends GemElement {
             @click=${() => this.#state({ revision: this.#state.revision + 1 })}
           ></tap-use>
         </tap-navbar>
-        <div slot="header" class="flex flex-wrap items-center justify-between gap-2 border-b border-border-strong bg-bg-light px-4 py-2.5">
+        <div slot="header" class="flex flex-wrap items-center justify-between gap-2 border-b border-border-strong bg-bg-light/75 px-4 py-2.5 backdrop-blur-lg">
           <div class="flex min-w-0 items-center gap-2">
             <span class="truncate font-mono text-xs font-medium text-text">${repoName}</span>
             <button
@@ -137,7 +137,7 @@ export class DeckChangesPageElement extends GemElement {
           </div>
         </div>
 
-        <main class="h-full overflow-auto overscroll-contain">
+        <main class="min-h-full">
           <!-- Loading state; the file list waits for the Stack enter animation -->
           <deck-loading v-if=${loading || !entered} label=${i18n.get('changes.loading')}></deck-loading>
 

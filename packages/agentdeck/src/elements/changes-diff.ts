@@ -73,7 +73,7 @@ export class DeckChangesDiffPageElement extends GemElement {
             @click=${() => this.#state({ revision: this.#state.revision + 1 })}
           ></tap-use>
         </tap-navbar>
-        <div slot="header" class="flex items-center gap-2 border-b border-border-strong bg-bg-light px-4 py-2 font-mono text-xs">
+        <div slot="header" class="flex items-center gap-2 border-b border-border-strong bg-bg-light/75 px-4 py-2 font-mono text-xs backdrop-blur-lg">
           <deck-file-path class="min-w-0 flex-1 text-describe" path=${this.path}></deck-file-path>
           <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5">
             ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
@@ -81,7 +81,7 @@ export class DeckChangesDiffPageElement extends GemElement {
           </div>
         </div>
 
-        <main class="flex h-full flex-col overflow-auto overscroll-contain">
+        <main class="flex min-h-full flex-col">
 
           <!-- Loading state; diff2html waits for the Stack enter animation -->
           <deck-loading v-if=${loading || !entered} label=${i18n.get('changes.loadingDiff')}></deck-loading>

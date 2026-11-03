@@ -156,7 +156,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
       <tap-page class="bg-bg text-text" @hide=${() => this.#state({ showRelayId: false })}>
         <header
           slot="header"
-          class="settings-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong px-3 pb-1.5"
+          class="settings-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-border-strong bg-bg/75 px-3 pb-1.5 backdrop-blur-lg"
         >
           <button
             class="grid size-11 cursor-pointer place-items-center rounded-[14px] border-0 bg-transparent text-highlight active:scale-[0.94] active:bg-primary-soft disabled:invisible"
