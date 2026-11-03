@@ -14,7 +14,7 @@
 - `packages/extension/`：AgentDeck 浏览器扩展（Chrome & Firefox）。详情参见 [`packages/extension/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/extension/CLAUDE.md)。
 - `packages/website/`：官网落地页（`https://agentdeck.xianqiao.wang`），Gemkit 应用，中英双语，部署在 Vercel。详情参见 [`packages/website/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/website/CLAUDE.md)。
 - `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置、防自动睡眠与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
-- `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程。
+- `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程；`src/frontend_update.rs` 为前端热更新（见下方发布）。
 - `docs/`：内部资料，如竞品对比 `comparison.md`。
 - `.github/workflows/`：
   - `ci.yml`：push 到 main 与 PR 时运行全局检查（Biome、tsc、前端与扩展测试和构建、`cargo check` 与 Daemon 测试）；Tauri crate 编译需要前端构建产物与系统 WebView，所以 Rust 检查跑在 macOS。
@@ -201,5 +201,6 @@ class DuoyunTestElement extends GemElement {
 
 - 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核；iOS 以 run number 为 build 号构建 IPA，经 fastlane 同步 `distribution/appstore/metadata` 后提交 App Store 审核，通过后自动发布。
 - macOS Daemon 用 `MACOS_CERT_P12_BASE64` / `MACOS_CERT_PASSWORD`（Developer ID Application 证书）签名，identifier 为 `com.agentdeck.daemon`，使隐私授权在升级后保留；secret 缺失或证书失效时保留 ad-hoc 签名继续发布。
+- 前端热更新：移动端发布构建带 `AGENTDECK_NATIVE_ID`（`crates/agentdeck` 与 `Cargo.lock` 的 git 对象哈希），Android 流水线把整个 `dist` 打成 `agentdeck-frontend-<id>.tar.gz` 附到 Release。App 启动时取比自身新、同 native ID 的最新 Release 包，按 GitHub 记录的 sha256 校验后下次启动生效；新包启动后前端调用 `frontend_update_ready` 确认，未确认的包下次启动回退且不再下载。原生层（含 Rust 依赖）改动会换 ID，旧 App 只能经商店更新。热更新只用于修复与小改动，新功能仍走商店审核。
 - 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 与 App Store 更新说明。更新前把旧说明按其版本存到 `history/`（如 `history/whatsnew-en-US-0.8.0`）；不能放在 `whatsnew/` 根目录，Google Play 上传会把根目录下所有 `whatsnew-*` 文件名当语言代码提交。
 - 所需 Secrets 以各 workflow 文件中的引用为准。

@@ -15,6 +15,7 @@
       {
         "useHttpsScheme": true,
         "label": "main",
+        "create": false,
         "title": "AgentDeck",
         "width": 430,
         "height": 860,

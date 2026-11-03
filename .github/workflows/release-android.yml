@@ -87,6 +87,12 @@ jobs:
           writeFileSync('crates/agentdeck/gen/android/key.properties', Object.entries(properties).map(([key, value]) => `${key}=${escape(value)}`).join('\n'), { mode: 0o600 });
           NODE
 
+      - name: Compute native ID
+        # Hot-updated frontends only reach apps built with the same native layer.
+        run: |
+          id=$(printf '%s %s' "$(git rev-parse HEAD:crates/agentdeck)" "$(git rev-parse HEAD:Cargo.lock)" | git hash-object --stdin | cut -c1-16)
+          echo "AGENTDECK_NATIVE_ID=$id" >> "$GITHUB_ENV"
+
       - name: Build signed Android bundles
         run: pnpm tauri android build --ci --apk --aab
 
@@ -103,6 +109,7 @@ jobs:
           mkdir release
           cp "$aab" "release/AgentDeck-$VERSION.aab"
           cp "$apk" "release/AgentDeck-$VERSION.apk"
+          tar -czf "release/agentdeck-frontend-$AGENTDECK_NATIVE_ID.tar.gz" -C packages/agentdeck/dist .
 
       - name: Save build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

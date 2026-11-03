@@ -97,6 +97,12 @@ jobs:
           ].join('\n') + '\n');
           NODE
 
+      - name: Compute native ID
+        # Hot-updated frontends only reach apps built with the same native layer.
+        run: |
+          id=$(printf '%s %s' "$(git rev-parse HEAD:crates/agentdeck)" "$(git rev-parse HEAD:Cargo.lock)" | git hash-object --stdin | cut -c1-16)
+          echo "AGENTDECK_NATIVE_ID=$id" >> "$GITHUB_ENV"
+
       - name: Build signed IPA
         run: pnpm tauri ios build --ci --export-method app-store-connect --build-number "$GITHUB_RUN_NUMBER"
 

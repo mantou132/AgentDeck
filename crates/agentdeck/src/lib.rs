@@ -1,3 +1,4 @@
+mod frontend_update;
 mod js_protocol;
 
 /// Serves host files to the preview browser; answered by `packages/agentdeck/src/agent/preview.ts`.
@@ -5,20 +6,27 @@ const PREVIEW_SCHEME: &str = "agentdeck-preview";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut context = tauri::generate_context!();
+    let frontend_dir = frontend_update::wrap_assets(&mut context);
     tauri::Builder::default()
-        .setup(|_app| {
+        .setup(move |app| {
+            // The main window is created here so its first request already
+            // sees the frontend bundle picked for this launch.
+            frontend_update::setup(app, &frontend_dir);
+            tauri::WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
+                .build()?;
             #[cfg(mobile)]
-            _app.handle().plugin(tauri_plugin_fcm::init())?;
+            app.handle().plugin(tauri_plugin_fcm::init())?;
             #[cfg(mobile)]
-            _app.handle().plugin(tauri_plugin_haptics::init())?;
+            app.handle().plugin(tauri_plugin_haptics::init())?;
             #[cfg(mobile)]
-            _app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
+            app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
             #[cfg(mobile)]
-            _app.handle().plugin(tauri_plugin_selection_menu::init())?;
+            app.handle().plugin(tauri_plugin_selection_menu::init())?;
             #[cfg(mobile)]
-            _app.handle().plugin(tauri_plugin_stt::init())?;
+            app.handle().plugin(tauri_plugin_stt::init())?;
             #[cfg(mobile)]
-            _app.handle().plugin(tauri_plugin_tts::init())?;
+            app.handle().plugin(tauri_plugin_tts::init())?;
             Ok(())
         })
         .manage(js_protocol::JsProtocol::default())
@@ -28,12 +36,13 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             js_protocol::js_protocol_register,
-            js_protocol::js_protocol_respond
+            js_protocol::js_protocol_respond,
+            frontend_update::frontend_update_ready
         ])
         .plugin(tauri_plugin_edge_to_edge::init())
         .plugin(tauri_plugin_webproxy::init())
         .plugin(tauri_plugin_vnidrop_share::init())
         .plugin(tauri_plugin_opener::init())
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
