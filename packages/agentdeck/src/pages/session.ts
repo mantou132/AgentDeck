@@ -7,6 +7,7 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import type { Attachment } from '../attachment/types';
 import { draftKey, removeDraft, restoreDraft, saveDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
+import { markSessionProposalStarted } from '../elements/new-session';
 import { openSessionConfig } from '../elements/session-config';
 import type { ForkRequest } from '../elements/session-timeline';
 import { getConnectionLabel, i18n } from '../i18n';
@@ -225,6 +226,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       Toast.open('warning', getConnectionLabel(connection));
       return;
     }
+    markSessionProposalStarted(prompt);
     openSession(createPendingSession({ agent: session.agent, cwd: session.cwd }).sessionId, { prompt });
   };
 

@@ -13,6 +13,13 @@ const parseProposal = (source: string): NewSessionProposal | undefined => {
   } catch {}
 };
 
+/** Prompts already started, so a card stays disabled after the user returns from the session it opened. */
+const startedStore = createStore({ prompts: new Set<string>() });
+
+export const markSessionProposalStarted = (prompt: string) => {
+  startedStore({ prompts: new Set(startedStore.prompts).add(prompt) });
+};
+
 const style = css`
   :host {
     display: block;
@@ -32,7 +39,13 @@ const style = css`
     text-align: start;
     cursor: pointer;
   }
-  .card:active {
+  .card:disabled {
+    cursor: default;
+  }
+  .card:disabled .start {
+    color: ${agentDeckTheme.describeColor};
+  }
+  .card:not(:disabled):active {
     background: color-mix(in srgb, currentColor 5%, transparent);
   }
   tap-use {
@@ -77,6 +90,7 @@ const style = css`
 /** A follow-up task the agent proposes; tapping it starts a new session in the same place with its prompt. */
 @customElement('deck-new-session')
 @adoptedStyle(style)
+@connectStore(startedStore)
 @shadow()
 export class DeckNewSessionElement extends GemElement {
   @attribute source: string;
@@ -94,14 +108,15 @@ export class DeckNewSessionElement extends GemElement {
     // Invalid JSON stays readable as the original block.
     if (!proposal) return html`<pre>${this.source}</pre>`;
     const { title, prompt } = proposal;
+    const started = startedStore.prompts.has(prompt);
     return html`
-      <button class="card" type="button" @click=${() => this.newSession(prompt)}>
+      <button class="card" type="button" ?disabled=${started} @click=${() => this.newSession(prompt)}>
         <tap-use .element=${icons.add}></tap-use>
         <div class="text">
           <div class="title">${title || i18n.get('session.newSession')}</div>
           <div class="prompt">${prompt}</div>
         </div>
-        <span class="start">${i18n.get('newSession.start')}</span>
+        <span class="start">${i18n.get(started ? 'newSession.started' : 'newSession.start')}</span>
       </button>
     `;
   };

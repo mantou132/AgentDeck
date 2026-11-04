@@ -253,6 +253,7 @@
   "screen.failed": "Live view stopped",
   "screen.timeout": "Screen capture timed out.",
   "newSession.start": "Start",
+  "newSession.started": "Started",
   "map.title": "Map",
   "map.open": "Open map",
   "map.loading": "Loading map…",
