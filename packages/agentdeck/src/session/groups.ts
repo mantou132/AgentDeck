@@ -9,6 +9,9 @@ export type SessionGroup = {
 /** Claude desktop runs project-less chats in their own `…/Claude/scratch-workspaces/…` directory; they share one group. */
 export const scratchWorkspacesRoot = (cwd: string) => /^.*[\\/]Claude[\\/]scratch-workspaces(?=[\\/]|$)/.exec(cwd)?.[0];
 
+/** Updated groups already within these top slots stay put, so switching between a few active projects doesn't reshuffle the list. */
+const STABLE_TOP_GROUPS = 3;
+
 export const getSortedSessionGroups = (
   sessions: DeckSession[],
   prevGroups: readonly SessionGroup[] = [],
@@ -29,20 +32,22 @@ export const getSortedSessionGroups = (
     groups.push({ cwd, latestActivity, sessions: sortedItems });
   }
 
-  const prevIndex = new Map(prevGroups.map((group, index) => [group.cwd, index]));
-  const newGroups: SessionGroup[] = [];
-  const existingGroups: SessionGroup[] = [];
-
+  const prevGroupsMap = new Map(
+    prevGroups.map((group, index) => [group.cwd, { index, latestActivity: group.latestActivity }]),
+  );
+  const raised: SessionGroup[] = [];
+  const kept: { index: number; group: SessionGroup }[] = [];
   for (const group of groups) {
-    if (prevIndex.has(group.cwd)) {
-      existingGroups.push(group);
+    const prev = prevGroupsMap.get(group.cwd);
+    if (!prev || (prev.index >= STABLE_TOP_GROUPS && group.latestActivity > prev.latestActivity)) {
+      raised.push(group);
     } else {
-      newGroups.push(group);
+      kept.push({ index: prev.index, group });
     }
   }
 
-  newGroups.sort((a, b) => b.latestActivity - a.latestActivity);
-  existingGroups.sort((a, b) => (prevIndex.get(a.cwd) ?? 0) - (prevIndex.get(b.cwd) ?? 0));
+  raised.sort((a, b) => b.latestActivity - a.latestActivity);
+  kept.sort((a, b) => a.index - b.index);
 
-  return [...newGroups, ...existingGroups];
+  return [...raised, ...kept.map(({ group }) => group)];
 };

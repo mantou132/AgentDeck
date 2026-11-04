@@ -35,35 +35,36 @@ test('getSortedSessionGroups: initial sort orders groups by latest activity desc
   );
 });
 
-test('getSortedSessionGroups: subsequent sort preserves existing group order even after new activity', () => {
-  const sessions = [
-    { sessionId: '1', cwd: '/project-a', updatedAt: '2026-01-01T10:00:00.000Z' },
-    { sessionId: '2', cwd: '/project-b', updatedAt: '2026-01-01T12:00:00.000Z' },
-    { sessionId: '3', cwd: '/project-c', updatedAt: '2026-01-01T11:00:00.000Z' },
-  ];
+const at = (hour) => `2026-01-01T${String(hour).padStart(2, '0')}:00:00.000Z`;
+const sessionsAt = (hours) =>
+  Object.entries(hours).map(([cwd, hour]) => ({ sessionId: cwd, cwd, updatedAt: at(hour) }));
 
-  const initialGroups = getSortedSessionGroups(sessions);
+test('getSortedSessionGroups: updated groups within the top slots keep their position', () => {
+  const initialGroups = getSortedSessionGroups(sessionsAt({ '/a': 10, '/b': 9, '/c': 8, '/d': 7 }));
   assert.deepEqual(
     initialGroups.map((g) => g.cwd),
-    ['/project-b', '/project-c', '/project-a'],
+    ['/a', '/b', '/c', '/d'],
   );
 
-  // Now project-a gets new activity making it the most recent
-  const updatedSessions = [
-    { sessionId: '1', cwd: '/project-a', updatedAt: '2026-01-01T15:00:00.000Z' },
-    { sessionId: '2', cwd: '/project-b', updatedAt: '2026-01-01T12:00:00.000Z' },
-    { sessionId: '3', cwd: '/project-c', updatedAt: '2026-01-01T11:00:00.000Z' },
-  ];
-
-  const nextGroups = getSortedSessionGroups(updatedSessions, initialGroups);
-  // Order of groups should remain as the old order: b, c, a
+  const nextGroups = getSortedSessionGroups(sessionsAt({ '/a': 10, '/b': 9, '/c': 15, '/d': 7 }), initialGroups);
   assert.deepEqual(
     nextGroups.map((g) => g.cwd),
-    ['/project-b', '/project-c', '/project-a'],
+    ['/a', '/b', '/c', '/d'],
   );
-  // But latestActivity and session order inside project-a should be updated
-  const groupA = nextGroups.find((g) => g.cwd === '/project-a');
-  assert.equal(groupA.latestActivity, Date.parse('2026-01-01T15:00:00.000Z'));
+  assert.equal(nextGroups[2].latestActivity, Date.parse(at(15)));
+});
+
+test('getSortedSessionGroups: updated groups below the top slots move to the front', () => {
+  const initialGroups = getSortedSessionGroups(sessionsAt({ '/a': 10, '/b': 9, '/c': 8, '/d': 7, '/e': 6 }));
+
+  const nextGroups = getSortedSessionGroups(
+    sessionsAt({ '/a': 10, '/b': 9, '/c': 16, '/d': 15, '/e': 17 }),
+    initialGroups,
+  );
+  assert.deepEqual(
+    nextGroups.map((g) => g.cwd),
+    ['/e', '/d', '/a', '/b', '/c'],
+  );
 });
 
 test('getSortedSessionGroups: brand new groups appear at the beginning', () => {
