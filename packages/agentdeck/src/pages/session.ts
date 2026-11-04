@@ -7,7 +7,7 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import type { Attachment } from '../attachment/types';
 import { draftKey, removeDraft, restoreDraft, saveDraft } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
-import { markSessionProposalStarted } from '../elements/new-session';
+import { markSessionProposalStarted, type NewSessionProposal } from '../elements/new-session';
 import { openSessionConfig } from '../elements/session-config';
 import type { ForkRequest } from '../elements/session-timeline';
 import { getConnectionLabel, i18n } from '../i18n';
@@ -217,8 +217,9 @@ export class AgentDeckSessionPageElement extends GemElement {
     if (this.initialPrompt) this.#send({ text: this.initialPrompt, attachments: [] });
   };
 
-  // An `agentdeck-session` card starts a session with the same agent and directory and sends its prompt right away.
-  #startNewSession = ({ detail: prompt }: CustomEvent<string>) => {
+  // An `agentdeck-session` card starts a session with the same agent and sends its prompt right away, in the directory
+  // the card names or else the main checkout of this session's worktree.
+  #startNewSession = ({ detail: { prompt, cwd } }: CustomEvent<NewSessionProposal>) => {
     const session = getSession(this.sessionId);
     if (!session) return;
     const { connection } = agentdeckStore;
@@ -227,7 +228,8 @@ export class AgentDeckSessionPageElement extends GemElement {
       return;
     }
     markSessionProposalStarted(prompt);
-    openSession(createPendingSession({ agent: session.agent, cwd: session.cwd }).sessionId, { prompt });
+    const target = cwd || session.worktree?.mainCwd || session.cwd;
+    openSession(createPendingSession({ agent: session.agent, cwd: target }).sessionId, { prompt });
   };
 
   #previewAttachment = (event: CustomEvent<Attachment>) =>

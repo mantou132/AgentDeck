@@ -5,7 +5,7 @@ description: Offer the user a follow-up task to run in a new AgentDeck session. 
 
 # AgentDeck new-session cards
 
-The AgentDeck client renders a fenced code block with the `agentdeck-session` language as a card. Tapping it starts a new session with the same agent in the same working directory and sends the prompt as its first message right away; nothing runs until the user taps.
+The AgentDeck client renders a fenced code block with the `agentdeck-session` language as a card. Tapping it starts a new session with the same agent and sends the prompt as its first message right away; nothing runs until the user taps.
 
 ````markdown
 ```agentdeck-session
@@ -18,9 +18,10 @@ The AgentDeck client renders a fenced code block with the `agentdeck-session` la
 
 ## Format
 
-- The body is one strict JSON object with string fields `title` and `prompt`.
+- The body is one strict JSON object with string fields `title`, `prompt` and optional `cwd`.
 - `title`: a few words naming the task, shown as the card heading.
 - `prompt`: the full brief. The new session sees none of this conversation, so name the files or area, what you already found, constraints and what done looks like.
+- `cwd`: absolute path of the directory to run the new session in, only when the task belongs somewhere other than the current project (another repository, a sibling package with its own setup). Without it the session runs in the current project, or in the main checkout when the current session is in a git worktree.
 
 ## Rules
 

@@ -3,13 +3,19 @@ import { i18n } from '../i18n';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
-type NewSessionProposal = { title: string; prompt: string };
+/** `cwd` is the directory the agent asked for; without it the session page picks one. */
+export type NewSessionProposal = { title: string; prompt: string; cwd?: string };
 
 /** Body of an `agentdeck-session` fenced block, as taught by the host's session skill. */
 const parseProposal = (source: string): NewSessionProposal | undefined => {
   try {
-    const { title, prompt } = JSON.parse(source);
-    if (typeof prompt === 'string' && prompt.trim()) return { title: typeof title === 'string' ? title : '', prompt };
+    const { title, prompt, cwd } = JSON.parse(source);
+    if (typeof prompt === 'string' && prompt.trim())
+      return {
+        title: typeof title === 'string' ? title : '',
+        prompt,
+        cwd: typeof cwd === 'string' && cwd.trim() ? cwd.trim() : undefined,
+      };
   } catch {}
 };
 
@@ -61,6 +67,14 @@ const style = css`
     color: ${agentDeckTheme.highlightColor};
     font-weight: 600;
   }
+  .cwd {
+    overflow: hidden;
+    color: ${agentDeckTheme.describeColor};
+    font-family: ${agentDeckTheme.codeFont};
+    font-size: ${agentDeckTheme.fontSizeXs};
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .prompt {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -87,15 +101,15 @@ const style = css`
   }
 `;
 
-/** A follow-up task the agent proposes; tapping it starts a new session in the same place with its prompt. */
+/** A follow-up task the agent proposes; tapping it starts a new session with its prompt. */
 @customElement('deck-new-session')
 @adoptedStyle(style)
 @connectStore(startedStore)
 @shadow()
 export class DeckNewSessionElement extends GemElement {
   @attribute source: string;
-  /** Prompt for the session page to send in a new session. */
-  @globalemitter newSession: Emitter<string>;
+  /** Proposal for the session page to start a new session with. */
+  @globalemitter newSession: Emitter<NewSessionProposal>;
 
   @memo((i) => [i.source])
   get #proposal() {
@@ -107,13 +121,14 @@ export class DeckNewSessionElement extends GemElement {
     const proposal = this.#proposal;
     // Invalid JSON stays readable as the original block.
     if (!proposal) return html`<pre>${this.source}</pre>`;
-    const { title, prompt } = proposal;
+    const { title, prompt, cwd } = proposal;
     const started = startedStore.prompts.has(prompt);
     return html`
-      <button class="card" type="button" ?disabled=${started} @click=${() => this.newSession(prompt)}>
+      <button class="card" type="button" ?disabled=${started} @click=${() => this.newSession(proposal)}>
         <tap-use .element=${icons.add}></tap-use>
         <div class="text">
           <div class="title">${title || i18n.get('session.newSession')}</div>
+          <div class="cwd" v-if=${!!cwd}>${cwd}</div>
           <div class="prompt">${prompt}</div>
         </div>
         <span class="start">${i18n.get(started ? 'newSession.started' : 'newSession.start')}</span>
