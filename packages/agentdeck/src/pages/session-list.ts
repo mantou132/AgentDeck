@@ -2,7 +2,7 @@ import { repeat } from '@mantou/gem/lib/element';
 import { sleep } from '@mantou/tap-ui/lib/timer';
 import { hapticWarning } from 'src/lib/haptics';
 import { getConnectionLabel, i18n } from '../i18n';
-import { openSession, openSettings } from '../navigation';
+import { openSettings, selectSession } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore, hostAgents, isConnecting, type SessionRuntime, sessionsStore } from '../state/store';
@@ -27,6 +27,9 @@ const style = css`
 @connectStore(agentdeckStore)
 @connectStore(sessionsStore)
 export class AgentDeckSessionListPageElement extends GemElement {
+  /** Highlighted in the split view */
+  @property activeSessionId?: string;
+
   #state = createState({
     sheetOpen: false,
     newSessionError: '',
@@ -65,7 +68,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
     if (!selectedCwd || navigatingCwd) return;
     const session = createPendingSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
     this.#state({ sheetOpen: false, newSessionError: '' });
-    openSession(session.sessionId);
+    selectSession(session.sessionId);
   };
 
   #onRefresh = async (event: CustomEvent<() => void>) => {
@@ -184,8 +187,9 @@ export class AgentDeckSessionListPageElement extends GemElement {
                   .pendingSessionSet=${pendingSessionSet}
                   .permissionSessionSet=${permissionSessionSet}
                   .deletingSessionSet=${deletingSessionSet}
+                  .activeSessionId=${this.activeSessionId}
                   ?deletion-disabled=${!isConnected}
-                  @select=${(event: CustomEvent<string>) => openSession(event.detail)}
+                  @select=${(event: CustomEvent<string>) => selectSession(event.detail)}
                   @request-delete=${(event: CustomEvent<string>) => deleteSession(event.detail)}
                 ></deck-session-group>
               `,

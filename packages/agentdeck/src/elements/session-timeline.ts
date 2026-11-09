@@ -17,6 +17,7 @@ import type { Elicitation } from '../session/elicitation';
 import { getProcessSummary, getToolStatus, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import type { ChatMessage, TextMessage } from '../session/types';
 import { stripVoiceChatMarker } from '../session/voice-chat';
+import { isSplitView } from '../state/layout';
 import { answerElicitation } from '../state/user-input';
 import { icons } from '../styles/icons';
 import { DeckStreamMarkdownElement } from './stream-markdown';
@@ -80,7 +81,8 @@ export class DeckSessionTimelineElement extends GemElement {
     Sheet.open({
       maskClosable: true,
       hasStack: true,
-      snap: true,
+      // Pulling up scales only the Stack beside the split view sidebar; fit the content instead
+      snap: !isSplitView(),
       body: html`
         <deck-process-detail .sessionId=${this.sessionKey} .groupId=${group.id}></deck-process-detail>
       `,

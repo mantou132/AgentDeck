@@ -18,6 +18,7 @@ export class DeckSessionGroupElement extends GemElement {
   @property pendingSessionSet = new Set<string>();
   @property permissionSessionSet = new Set<string>();
   @property deletingSessionSet = new Set<string>();
+  @property activeSessionId?: string;
   @boolattribute deletionDisabled: boolean;
   @emitter select: Emitter<string>;
   @emitter requestDelete: Emitter<string>;
@@ -62,7 +63,11 @@ export class DeckSessionGroupElement extends GemElement {
                 >
                   <button
                     type="button"
-                    class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-bg-light px-4 py-3 text-left text-text transition-colors duration-150 disabled:cursor-default disabled:opacity-50"
+                    class=${classMap({
+                      'grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 px-4 py-3 text-left text-text transition-colors duration-150 disabled:cursor-default disabled:opacity-50': true,
+                      'bg-bg-light': session.sessionId !== this.activeSessionId,
+                      'bg-bg-hover': session.sessionId === this.activeSessionId,
+                    })}
                     ?disabled=${isDeleting}
                     aria-busy=${isDeleting}
                     @click=${(event: MouseEvent) => {

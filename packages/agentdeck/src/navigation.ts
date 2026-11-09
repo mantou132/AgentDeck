@@ -11,6 +11,8 @@ import type { Attachment } from './attachment/types';
 import { i18n } from './i18n';
 import { parseMessageLink } from './lib/links';
 import { toPreviewUrl } from './lib/preview';
+import type { AgentDeckSessionPageElement } from './pages/session';
+import { isSplitView } from './state/layout';
 import { icons } from './styles/icons';
 
 export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
@@ -214,24 +216,37 @@ export const openSettings = () => {
   });
 };
 
+const sessionPage = (sessionId: string, prompt?: string) => html`
+  <agentdeck-session-page class="block h-full" .sessionId=${sessionId} .initialPrompt=${prompt}></agentdeck-session-page>
+`;
+
 /** `prompt` is sent once the page opens, e.g. a new session started from an `agentdeck-session` card. */
 export const openSession = (sessionId: string, options?: { replace?: boolean; prompt?: string }) => {
   const method = options?.replace ? Stack.replace : Stack.push;
   method({
     animated: true,
-    content: html`
-      <agentdeck-session-page
-        class="block h-full"
-        .sessionId=${sessionId}
-        .initialPrompt=${options?.prompt}
-      ></agentdeck-session-page>
-    `,
+    content: sessionPage(sessionId, options?.prompt),
     gesture: true,
   });
 };
 
 export const replaceSession = (sessionId: string) => {
   openSession(sessionId, { replace: true });
+};
+
+/** The topmost session page on the global Stack, which may be covered by pages opened from it. */
+export const getOpenSessionId = () =>
+  [...(Stack.instance?.querySelectorAll<AgentDeckSessionPageElement>('agentdeck-session-page') ?? [])].at(-1)
+    ?.sessionId;
+
+/** Opens a session picked from the list; in the split view it takes over the content side instead of stacking. */
+export const selectSession = (sessionId: string) => {
+  if (!isSplitView() || (Stack.instance?.store.pages.length ?? 0) < 2) {
+    openSession(sessionId);
+    return;
+  }
+  if (getOpenSessionId() === sessionId) return;
+  Stack.replace({ animated: false, content: sessionPage(sessionId), gesture: true }, { keep: 1 });
 };
 
 /** Read-only view of subagent `subagentId` of session `sessionId`: it can only be watched and, when allowed, stopped. */

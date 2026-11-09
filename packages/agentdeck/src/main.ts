@@ -13,7 +13,7 @@ import './pages/subagent';
 import './pages/settings';
 
 initApp({
-  template: html`<agentdeck-app class="block h-full"></agentdeck-app>`,
+  layout: html`<agentdeck-app class="block h-full"></agentdeck-app>`,
 });
 
 startApp();

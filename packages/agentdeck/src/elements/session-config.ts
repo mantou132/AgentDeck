@@ -6,6 +6,7 @@ import { i18n } from '../i18n';
 import { hapticSelection } from '../lib/haptics';
 import { type ConfigSelect, getConfigSelects, isModelSelect } from '../session/config-options';
 import { changeSessionConfig } from '../state/config-options';
+import { isSplitView } from '../state/layout';
 import { getSession } from '../state/sessions';
 import { getRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
@@ -148,6 +149,6 @@ export const openSessionConfig = (sessionId: string) =>
   Sheet.open({
     maskClosable: true,
     hasStack: true,
-    snap: true,
+    snap: !isSplitView(),
     body: html`<deck-session-config .sessionId=${sessionId}></deck-session-config>`,
   });

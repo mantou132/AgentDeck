@@ -28,6 +28,7 @@
   "sessionList.errorTitle": "暂时无法读取会话",
   "sessionList.errorDesc": "检查远端 Agent 是否在线，然后重新加载。",
   "sessionList.newSession": "新建会话",
+  "sessionList.selectSession": "选择一个会话",
   "sessionList.newSessionHeading": "新建会话",
   "sessionList.newSessionDesc": "选择这个会话的工作目录",
   "sessionList.openSettingsAria": "打开设置",

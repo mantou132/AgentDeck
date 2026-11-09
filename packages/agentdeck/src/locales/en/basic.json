@@ -28,6 +28,7 @@
   "sessionList.errorTitle": "Unable to load sessions",
   "sessionList.errorDesc": "Check if the remote agent is online, then reload.",
   "sessionList.newSession": "New Session",
+  "sessionList.selectSession": "Select a session",
   "sessionList.newSessionHeading": "New Session",
   "sessionList.newSessionDesc": "Select the working directory for this session",
   "sessionList.openSettingsAria": "Open settings",

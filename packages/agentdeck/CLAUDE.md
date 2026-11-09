@@ -4,7 +4,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 ## 代码导航
 
-- 启动：`main.ts` → `app.ts`；未配置 Pairing ID 时打开 settings，否则打开 session-list。页面在 `pages/`，Stack 入口在 `navigation.ts`。
+- 启动：`main.ts` → `app.ts`；未配置 Pairing ID 时打开 settings，否则打开 session-list（宽屏时在侧栏，见下方宽屏双栏）。页面在 `pages/`，Stack 入口在 `navigation.ts`。
 - 状态：`state/store.ts` 按变化频率拆成三个 store：`agentdeckStore`（设置、连接）、`sessionsStore`（会话列表与按会话聚合的 `runtimes`，即 `SessionRuntime`：加载状态 `load`、进行中回合 `turn`、错误、配置、权限、问题、建议等）、`messagesStore`（消息，随流式增量变化，只有显示消息的元素连接；Stack 下层页面仍挂载，所以列表页不连）。删除会话即删 runtime 与消息。`state/sessions.ts` 会话生命周期；`state/app.ts` 启动、设置保存、重置与 transport 消息消费。
 - 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/relay-codec.ts`（RPC 消息与 Relay 载荷互转：加密、帧大小限制、二进制回复）、`agent/encryption.ts`（`adk1_` 端到端加密原语）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
 - ACP 事件：`session/events.ts` 为 reducer，`session/turn.ts` 控制流式任务；等待用户输入（权限请求与问题）的状态在 `state/user-input.ts`，问题（form elicitation）的 schema 解析在 `session/elicitation.ts`，卡片为 `elements/elicitation.ts`。
@@ -40,6 +40,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - **页面进场**：Stack 动画由 JS 逐帧驱动，重渲染会让它中途卡顿。更改列表、提交历史、diff、文件查看、文件浏览、实时画面与会话时间线等请求返回后才渲染的内容，在 `tap-page` 首次 `full-show`（完全进入视口且可见，即进场动画结束；这些页面关闭 `trackVisibility` 以免延迟）后才渲染，请求照常立即发出；会话只在需要远端加载时等待、实时画面只在没有缓存帧时等待，其余直接渲染。
 - **手势**：对齐 iOS，一次触摸只锁定一个方向，cell 横滑与列表下拉刷新互斥，下拉时自动收起已打开的 swipeout；下拉用 `translate` 平移内容。
 - **页面布局**：内容交给 `tap-page` 自己滚动，不另包滚动容器，这样内容能从 header / footer 下方滚过；需要滚动元素时用 `tap-page` 的 `scrollElement`（会话页跟随到底部）。slot 进 header / footer 的自定义栏用半透明背景加 `backdrop-blur-lg`（`tap-navbar` 自带）。地图、实时画面、文件浏览为固定内容，不滚动。
+- **宽屏双栏**（`state/layout.ts`、`app.ts`）：宽 ≥ 800 且高 ≥ 500（排除横屏手机与竖屏 iPad mini），或双屏设备横跨铰链（`horizontal-viewport-segments: 2`）时分两栏。`agentdeck-app` 由 `initApp` 的 `layout` 渲染到 body，自己持有全局 `<tap-stack>`（首个挂载的成为 `Stack.instance`）：双栏时会话列表在左栏、Stack 在右侧（双屏时各占一块屏），Stack 根页 `agentdeck-home` 改为“选择一个会话”提示。所有页面仍推入同一个全局 Stack，所以宽窄切换（旋转、分屏、折叠屏开合）时已打开的页面原样保留。列表点选经 `selectSession`：双栏中以 `Stack.replace(…, { keep: 1 })` 无动画替换根页以上的所有页面（tap-ui 一次回退被移除页面的 history），已打开的同一会话不动；高亮取 Stack 中最上层会话页。Sheet 仍在整个窗口居中；双栏时工具过程与会话配置的 Sheet 不用多档 snap（拉起只会缩放右侧 Stack），改为按内容高度。`layout` 与 `keep` 由 `patches/@mantou__tap-ui@*.patch` 带入，上游发版后删除。
 - **弹层**：Sheet 与页面一致用灰底（主题 `backgroundColor`），其中的卡片、代码块用 `lightBackgroundColor`。`elements/sheet.ts` 通过 tap-reflect 映射到 body 并保留样式作用域；`foldable.ts` 的 Sheet 在全局 Stack 变化时关闭。`Sheet.open` 的 body 由 `patches/@mantou__tap-ui@*.patch` 改为渲染到 sheet 的 light DOM 再经 slot 投影：WebKit 27 不把 shadow root 中的 `@scope` 规则应用到被 slot 进内层 shadow host 的元素（[Bug 327165](https://bugs.webkit.org/show_bug.cgi?id=327165)），Gem light DOM 元素的样式会全部失效；上游发版后删除 patch。
 - **Android**：`crates/agentdeck/gen/android/app/google-services.json` 禁止放入服务账号私钥。identifier / namespace / applicationId / MainActivity package 统一为 `com.mantou.agentdeck`（`tauri.conf.json`、`build.gradle.kts`、`MainActivity.kt`）。FCM token 经 `peer_attach` 同步，更新 token 不切换连接状态。
 - **iOS**：原生资源在 `crates/agentdeck/`；更新应用图标时同步更新 `LaunchIcon`。

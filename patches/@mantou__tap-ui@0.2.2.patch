@@ -36,3 +36,151 @@ index a8287891b5650da0a400aba3ea2899529d82a22d..29112c0cf00ba46b21c1ab511bf13f8e
              const restoreInert = setBodyInert(sheet);
              document.body.append(sheet);
              return DyPromise.new((res) => {
+diff --git a/elements/stack.d.ts b/elements/stack.d.ts
+index af398d7773722900756d74cee8d7a1847e6e2409..043a4a4ad837e3b1035b6e8f8a019cbc195d31f8 100644
+--- a/elements/stack.d.ts
++++ b/elements/stack.d.ts
+@@ -1,5 +1,9 @@
+ import type { TemplateResult } from '@mantou/gem/lib/element';
+ import { GemElement } from '@mantou/gem/lib/element';
++export type StackReplaceOptions = {
++    /**Number of bottom pages to keep; default all but the top, e.g. `1` replaces everything above the root page */
++    keep?: number;
++};
+ export type StackPushOptions = {
+     content: string | number | TemplateResult | Element | Element[];
+     /**Play enter animation; default `true` */
+@@ -17,7 +21,7 @@ export declare class TapStackElement extends GemElement {
+     maxHeight: number;
+     static instance?: TapStackElement;
+     static push(options: StackPushOptions): void;
+-    static replace(options: StackPushOptions): void;
++    static replace(options: StackPushOptions, replaceOptions?: StackReplaceOptions): void;
+     static pop(): void;
+     static inCurrentStack(ele: HTMLElement): boolean;
+     static getClosestStack(ele?: Element): TapStackElement | undefined;
+@@ -43,7 +47,7 @@ export declare class TapStackElement extends GemElement {
+         sheetProgress: number;
+     };
+     push(options: StackPushOptions): void;
+-    replace(options: StackPushOptions): void;
++    replace(options: StackPushOptions, { keep }?: StackReplaceOptions): void;
+     pop(): void;
+ }
+ export declare const Stack: typeof TapStackElement;
+diff --git a/elements/stack.js b/elements/stack.js
+index f1396e5a35b4da2a662a0ab36313bb07d33efe1f..8589bccd69db52bef527603674f11170158e891e 100644
+--- a/elements/stack.js
++++ b/elements/stack.js
+@@ -155,9 +155,9 @@ let TapStackElement = (() => {
+             if (!stack.isConnected)
+                 document.body.append(stack);
+         }
+-        static replace(options) {
++        static replace(options, replaceOptions) {
+             const stack = (TapStackElement.instance ??= new TapStackElement());
+-            stack.replace(options);
++            stack.replace(options, replaceOptions);
+             if (!stack.isConnected)
+                 document.body.append(stack);
+         }
+@@ -271,13 +271,13 @@ let TapStackElement = (() => {
+                 requestAnimationFrame(() => this.#syncHeight(0));
+         };
+         #restore = (page) => this.#push(page);
+-        #replace = async (page) => {
++        #replace = async (page, keep) => {
+             if (this.#store.pages.at(-1) === page)
+                 return;
+             this.#busy = false;
+             const animated = page.animated ?? false;
+             if (!animated) {
+-                this.#store({ offset: 0, pages: [...this.#store.pages.slice(0, -1), page] });
++                this.#store({ offset: 0, pages: [...this.#store.pages.slice(0, keep), page] });
+                 requestAnimationFrame(() => this.#syncHeight(0));
+                 return;
+             }
+@@ -288,7 +288,7 @@ let TapStackElement = (() => {
+             await this.#enter(page);
+             const pages = this.#store.pages;
+             if (pages.length >= 2 && pages.at(-1) === page) {
+-                this.#store({ pages: [...pages.slice(0, -2), page] });
++                this.#store({ pages: [...pages.slice(0, keep), page] });
+             }
+         };
+         #pop = async (page) => {
+@@ -353,6 +353,7 @@ let TapStackElement = (() => {
+                 history: false,
+                 animated: false,
+                 gesture: false,
++                keepAlive: true,
+             });
+         });
+         #init = (__runInitializers(this, _private_initUpdateStore_extraInitializers), __runInitializers(this, _private_init_initializers, () => {
+@@ -453,18 +454,30 @@ let TapStackElement = (() => {
+             }
+             this.#push(options);
+         }
+-        replace(options) {
+-            if (!this.#store.pages.length) {
++        replace(options, { keep = this.#store.pages.length - 1 } = {}) {
++            const { pages } = this.#store;
++            if (!pages.length) {
+                 this.push(options);
+                 return;
+             }
+-            if (!this.disableHistory && options.history !== false) {
+-                history.replace({
+-                    close: () => this.#pop(options),
+-                    open: () => this.#restore(options),
+-                });
++            const replaceHistory = () => {
++                if (!this.disableHistory && options.history !== false) {
++                    history.replace({
++                        close: () => this.#pop(options),
++                        open: () => this.#restore(options),
++                    });
++                }
++            };
++            // Rewind the entries of the other removed pages in one step; their close handles no longer find a page to pop
++            const back = this.disableHistory ? 0 : pages.slice(keep, -1).filter((page) => page.history !== false).length;
++            if (back) {
++                addEventListener('popstate', replaceHistory, { once: true });
++                globalThis.history.go(-back);
++            }
++            else {
++                replaceHistory();
+             }
+-            this.#replace(options);
++            this.#replace(options, keep);
+         }
+         pop() {
+             const top = this.#store.pages.at(-1);
+diff --git a/helper/webapp.d.ts b/helper/webapp.d.ts
+index 792f9ba7636739c5e9c9c0083e4a1420880bfc58..fd1af324e3323c5189bd6cfd43a19084ca53f2ff 100644
+--- a/helper/webapp.d.ts
++++ b/helper/webapp.d.ts
+@@ -1,7 +1,10 @@
++import { type TemplateResult } from '@mantou/gem/lib/lit-html';
+ import { type TapInitAppOptions } from './base/webapp';
+ import '../elements/reflect';
+ export { getWebManifestURL } from './base/webapp';
+ interface InitAppOptions extends TapInitAppOptions {
++    /**Rendered into `body` instead of the root page of the global Stack, for layouts beside it (e.g. a split view sidebar); its `<tap-stack>` becomes the global Stack */
++    layout?: TemplateResult;
+ }
+ export declare function initApp(options?: InitAppOptions): void;
+ //# sourceMappingURL=webapp.d.ts.map
+\ No newline at end of file
+diff --git a/helper/webapp.js b/helper/webapp.js
+index ed07582c3d02706fc0fbbd2dcb020b7ee2b5f446..52b0aaf0791ce36113bc48327966217f5595981f 100644
+--- a/helper/webapp.js
++++ b/helper/webapp.js
+@@ -45,6 +45,7 @@ export function initApp(options = {}) {
+           }
+         </style>
+       </tap-reflect>
++      ${options.layout}
+     `,
+     });
+     if (options.template) {
