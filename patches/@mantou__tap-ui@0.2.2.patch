@@ -1,5 +1,5 @@
 diff --git a/elements/sheet.js b/elements/sheet.js
-index a8287891b5650da0a400aba3ea2899529d82a22d..29112c0cf00ba46b21c1ab511bf13f8e8bde2663 100644
+index a8287891b5650da0a400aba3ea2899529d82a22d..b2750066ce8953ca4a9913d7be83702f35ec356e 100644
 --- a/elements/sheet.js
 +++ b/elements/sheet.js
 @@ -34,6 +34,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
@@ -36,6 +36,38 @@ index a8287891b5650da0a400aba3ea2899529d82a22d..29112c0cf00ba46b21c1ab511bf13f8e
              const restoreInert = setBodyInert(sheet);
              document.body.append(sheet);
              return DyPromise.new((res) => {
+@@ -307,6 +312,7 @@ let TapSheetElement = (() => {
+             this.bodySlot = body;
+         }
+         #sheetRef = (__runInitializers(this, _bodySlot_extraInitializers), createRef());
++        #maskRef = createRef();
+         #bodyRef = createRef();
+         #state = createState({ offset: 0 });
+         #closeSpeed = 0;
+@@ -433,8 +439,13 @@ let TapSheetElement = (() => {
+         #animation = (__runInitializers(this, _private_closeWatcher_extraInitializers), __runInitializers(this, _private_animation_initializers, async () => {
+             if (this.open) {
+                 !this.shadowRoot?.activeElement && this.focus();
+-                const { maxHeight, offsets } = this.#snapOffsets;
+-                this.#animateOffset(maxHeight, offsets[0]);
++                // Rest at the lowest snap and slide in from below by percentage: content without snaps may not have its height yet
++                // (e.g. an auto-height Stack measures its page later)
++                const rest = this.#snapOffsets.offsets[0];
++                this.#updateOffset(rest);
++                const options = { duration: SHEET_DURATION, easing: 'cubic-bezier(0.33, 1, 0.68, 1)' /* easeOutCubic */ };
++                this.#sheetRef.value?.animate({ translate: [`0 calc(100% - ${rest}px)`, '0 0'] }, options);
++                this.#maskRef.value?.animate({ opacity: [0, 1] }, options);
+             }
+             else if (this.closing) {
+                 await this.#finishClose();
+@@ -458,6 +469,7 @@ let TapSheetElement = (() => {
+                 : 1 - (offset - lowestOffset) / (maxHeight - lowestOffset || 1);
+             return html `
+       <div
++        ${this.#maskRef}
+         class="mask"
+         style=${styleMap({ opacity: clamp(0, maskProgress, 1) })}
+         @click=${this.#onMaskClick}
 diff --git a/elements/stack.d.ts b/elements/stack.d.ts
 index af398d7773722900756d74cee8d7a1847e6e2409..043a4a4ad837e3b1035b6e8f8a019cbc195d31f8 100644
 --- a/elements/stack.d.ts
