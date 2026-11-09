@@ -1,4 +1,5 @@
 import { Browser } from '@mantou/tap-ui/elements/browser';
+import { PhotoBrowser } from '@mantou/tap-ui/elements/photo-browser';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack, type TapStackElement } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
@@ -171,8 +172,24 @@ export const openPath = async (path: string, cwd: string, line?: number, stack?:
   }
 };
 
+/** Markdown image outside a link opens in the photo browser, swiping through the images of the same markdown. */
+const openMessageImage = (event: MouseEvent) => {
+  const [target] = event.composedPath();
+  if (!(target instanceof HTMLImageElement) || target.closest('a')) return false;
+  const root = target.getRootNode();
+  if (!(root instanceof ShadowRoot) || root.host.localName !== 'gem-bind-marked') return false;
+  const images = [...root.querySelectorAll('img')];
+  PhotoBrowser.open({
+    items: images.map((img) => ({ src: img.currentSrc || img.src, alt: img.alt, origin: img })),
+    index: images.indexOf(target),
+  });
+  return true;
+};
+
+/** Returns whether a page was opened; images open in the photo browser above the current page and return `false`. */
 export const openMessageLink = (event: MouseEvent, cwd: string) => {
   if (event.defaultPrevented || event.button !== 0) return false;
+  if (openMessageImage(event)) return false;
   const anchor = event
     .composedPath()
     .find((element): element is HTMLAnchorElement => element instanceof HTMLAnchorElement);

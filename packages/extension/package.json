@@ -12,11 +12,11 @@
     "@gem-bind/latex": "^0.0.3",
     "@gem-bind/marked": "^0.0.7",
     "@gem-bind/mermaid": "^0.0.6",
-    "@mantou/gem": "^2.3.1",
+    "@mantou/gem": "^2.3.2",
     "@swc/helpers": "^0.5.23",
     "agentdeck": "workspace:*",
     "diff": "^8.0.4",
-    "duoyun-ui": "^2.3.1",
+    "duoyun-ui": "^2.3.2",
     "relay-client-ts": "^0.1.9"
   },
   "devDependencies": {
@@ -25,6 +25,6 @@
     "extension": "^3.16.0",
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
-    "unplugin-gem": "^0.3.0"
+    "unplugin-gem": "^0.3.1"
   }
 }
