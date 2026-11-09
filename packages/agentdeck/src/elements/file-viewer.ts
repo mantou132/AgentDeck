@@ -1,13 +1,20 @@
 import type { TapCodeBlockElement } from '@mantou/tap-ui/elements/code-block';
 import { Stack } from '@mantou/tap-ui/elements/stack';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
+import { isTauri } from '@tauri-apps/api/core';
+import { share } from '@vnidrop/tauri-plugin-share';
 import type { RemoteFile } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
-import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
+import { getCodeLang, getMimeType, isSmallTextFile } from '../lib/file-preview';
 import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { openFileBrowser, openMessageLink } from '../navigation';
+import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
+
+// Daemon's per-read limit for `file_read`.
+const RAW_CHUNK_BYTES = 8 * 1024 * 1024;
 
 const style = css`
   :scope {
@@ -89,6 +96,36 @@ export class DeckFileViewerElement extends GemElement {
     });
   };
 
+  /** Hands the file to the system share sheet, where it can be saved to Files or the device; works for binaries like PDFs that the viewer can't show. */
+  #share = async (path: string, name: string) => {
+    const closeToast = Toast.open({ type: 'loading', content: i18n.get('file.preparing'), duration: Infinity });
+    try {
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      for (let offset = 0, size = 1; offset < size; ) {
+        const result = await agentApi.readRawFile(path, [offset, RAW_CHUNK_BYTES], this.cwd);
+        // The file shrank while reading
+        if (!result.data.length) break;
+        chunks.push(result.data);
+        offset += result.data.length;
+        size = result.size;
+      }
+      closeToast();
+      const file = new File(chunks, name, { type: getMimeType(name) });
+      if (isTauri()) {
+        await share({ title: name, files: [file] });
+      } else {
+        // The extension has no share plugin; a regular browser download
+        const url = URL.createObjectURL(file);
+        Object.assign(document.createElement('a'), { href: url, download: name }).click();
+        // Firefox drops the download if the URL is revoked right away
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch (error) {
+      closeToast();
+      Toast.open('error', error instanceof Error ? error.message : String(error));
+    }
+  };
+
   #renderText = (text: string) => {
     if (!this.line || this.line < 1) return text;
     let start = 0;
@@ -125,6 +162,15 @@ export class DeckFileViewerElement extends GemElement {
             class="min-h-11 cursor-pointer border-0 bg-transparent px-3 text-sm font-semibold text-highlight"
             @click=${() => this.#state({ source: !source })}
           >${i18n.get(source ? 'file.preview' : 'file.source')}</button>
+          <tap-use
+            v-if=${!loading}
+            slot="right"
+            role="button"
+            title=${i18n.get('browser.share')}
+            aria-label=${i18n.get('browser.share')}
+            .element=${icons.share}
+            @click=${() => this.#share(path, name)}
+          ></tap-use>
         </tap-navbar>
         <deck-file-path
           slot="header"

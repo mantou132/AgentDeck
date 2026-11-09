@@ -13,6 +13,7 @@
   "file.opening": "Opening…",
   "file.preview": "Preview",
   "file.source": "Source",
+  "file.preparing": "Preparing…",
   "error.readFileTimeout": "Reading the remote file timed out. Please retry.",
   "connection.connecting": "Connecting to Relay",
   "connection.connected": "Remote connected",

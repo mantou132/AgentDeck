@@ -13,6 +13,7 @@
   "file.opening": "正在打开…",
   "file.preview": "预览",
   "file.source": "源码",
+  "file.preparing": "正在准备…",
   "error.readFileTimeout": "读取远端文件超时，请重试。",
   "connection.connecting": "正在连接 Relay",
   "connection.connected": "远端已连接",

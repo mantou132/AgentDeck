@@ -301,10 +301,10 @@ export class AgentApi {
     );
 
   /** Any host file as raw bytes, for serving it verbatim; `range` is `[offset, length]` of one slice. */
-  readRawFile = (path: string, range?: [number, number]) =>
+  readRawFile = (path: string, range?: [number, number], cwd?: string) =>
     this.#peer.call<{ path: string; type: 'binary'; size: number; data: Uint8Array<ArrayBuffer> }>(
       'file_read',
-      range ? { path, raw: true, offset: range[0], length: range[1] } : { path, raw: true },
+      range ? { path, cwd, raw: true, offset: range[0], length: range[1] } : { path, cwd, raw: true },
       undefined,
       {
         timeoutMs: 30_000,
