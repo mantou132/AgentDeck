@@ -51,6 +51,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Calendar access is needed on iOS 16 and earlier to add events you choose</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is needed to scan barcodes and QR codes</string>
 	<key>NSMicrophoneUsageDescription</key>

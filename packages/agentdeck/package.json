@@ -36,6 +36,7 @@
     "maplibre-gl": "^6.12.0",
     "preact": "^11.0.1",
     "relay-client-ts": "^0.1.9",
+    "tauri-plugin-add-to-calendar-api": "^0.1.0",
     "tauri-plugin-edge-to-edge-api": "^0.1.1",
     "tauri-plugin-fcm": "^0.2.0",
     "tauri-plugin-selection-menu-api": "^0.1.2",

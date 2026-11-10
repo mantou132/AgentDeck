@@ -1,5 +1,6 @@
 import type { AvailableCommand, ClientCapabilities } from './agent/api';
 import { isPairingId } from './agent/encryption';
+import { calendarSupported } from './lib/calendar';
 import { previewSupported } from './lib/preview';
 import type { SessionOptions } from './session/types';
 
@@ -20,6 +21,7 @@ export const FALLBACK_KEY = 'agentdeck.in_flight_fallback.v1';
 export const SESSION_META_KEY = 'agentdeck.meta.v1';
 export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
 export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';
+export const EVENTS_ADDED_KEY = 'agentdeck.events_added.v1';
 
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.
@@ -36,9 +38,15 @@ export const MIN_DAEMON_VERSION = '0.8.0';
 
 /** Markdown blocks this client renders; the host teaches agents to write them (e.g. `agentdeck-chart`). */
 export const RENDER_CAPABILITIES: ClientCapabilities = {
-  render: previewSupported
-    ? ['widget', 'chart', 'map', 'preview', 'screen', 'session']
-    : ['widget', 'chart', 'map', 'screen', 'session'],
+  render: [
+    'widget',
+    'chart',
+    'map',
+    ...(previewSupported ? ['preview'] : []),
+    'screen',
+    'session',
+    ...(calendarSupported ? ['event'] : []),
+  ],
 };
 
 export type AgentInfo = { id: string; name: string };

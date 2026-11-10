@@ -79,6 +79,7 @@ dependencies = [
  "tar",
  "tauri",
  "tauri-build",
+ "tauri-plugin-add-to-calendar",
  "tauri-plugin-barcode-scanner",
  "tauri-plugin-edge-to-edge",
  "tauri-plugin-fcm",
@@ -5729,6 +5730,17 @@ dependencies = [
  "serde_json",
  "tauri-utils",
  "walkdir",
+]
+
+[[package]]
+name = "tauri-plugin-add-to-calendar"
+version = "0.1.0"
+source = "git+https://github.com/mantou132/tauri-plugin-add-to-calendar#77173e0e56e43dfab7cbf69aa44a8dff8b9cfc78"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

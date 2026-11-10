@@ -28,6 +28,8 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_stt::init())?;
             #[cfg(mobile)]
             app.handle().plugin(tauri_plugin_tts::init())?;
+            #[cfg(mobile)]
+            app.handle().plugin(tauri_plugin_add_to_calendar::init())?;
             Ok(())
         })
         .manage(js_protocol::JsProtocol::default())
