@@ -116,6 +116,12 @@ export const resetRemoteState = () => {
   messagesStore({ bySession: {} });
 };
 
+/** Switching agents on the same host only swaps the list; runtimes keep receiving updates of turns still running. */
+export const resetSessionList = () => {
+  sessionsRequest += 1;
+  sessionsStore({ sessions: [], sessionGroups: [], sessionsLoading: false, sessionsLoaded: false, sessionsError: '' });
+};
+
 export const mergeSessionsWithInFlight = (
   remoteSessions: DeckSession[],
   inFlightList: Iterable<DeckSession>,
@@ -149,7 +155,7 @@ export const mergeSessionsWithInFlight = (
 /** Created sessions with a running turn, which the remote list may not have yet. */
 const runningLocalSessions = () =>
   Object.values(sessionsStore.runtimes).flatMap(({ session, turn }) =>
-    session && turn && !session.pendingCreation ? [session] : [],
+    session && turn && !session.pendingCreation && session.agent === agentdeckStore.settings.agent ? [session] : [],
   );
 
 export const isPlaceholderTitle = (title?: string) => {

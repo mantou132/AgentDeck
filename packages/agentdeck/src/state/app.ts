@@ -19,6 +19,7 @@ import {
   endSession,
   refreshSessions,
   resetRemoteState,
+  resetSessionList,
   resumeInFlightTurn,
   settleLostTurns,
   showUserInput,
@@ -169,9 +170,8 @@ export const saveSettings = (settings: AppSettings) => {
       ),
     );
   }
-  if (relayChanged || agentChanged) {
-    resetRemoteState();
-  }
+  if (relayChanged) resetRemoteState();
+  else if (agentChanged) resetSessionList();
   const { relayUrl } = next;
   if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, capabilities: RENDER_CAPABILITIES });
   else if (notConnected) startTransport(next.relayId, { relayUrl, capabilities: RENDER_CAPABILITIES });
