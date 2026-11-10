@@ -26,7 +26,8 @@ const parseEvent = (source: string): CalendarEvent | undefined => {
     const startTime = parseTime(start);
     if (typeof title !== 'string' || !title.trim() || startTime === undefined) return;
     const event: CalendarEvent = { title, start: startTime, allDay: allDay === true };
-    const endTime = parseTime(end);
+    // The last day of an all-day event is inclusive; iOS drops a day ending at its midnight.
+    const endTime = parseTime(end, true);
     if (endTime !== undefined && endTime >= startTime) event.end = endTime;
     if (typeof location === 'string' && location.trim()) event.location = location;
     if (typeof notes === 'string' && notes.trim()) event.notes = notes;
@@ -76,10 +77,11 @@ const formatRecurrence = ({ frequency, interval, count, until }: Recurrence) => 
   const repeat = interval
     ? i18n.get(`event.${frequency}N` as LocaleKey, String(interval))
     : i18n.get(`event.${frequency}` as LocaleKey);
-  if (count) return `${repeat} · ${i18n.get('event.times', String(count))}`;
+  // `i18n.get` with arguments returns a template, not a string.
+  if (count) return html`${repeat} · ${i18n.get('event.times', String(count))}`;
   if (until !== undefined) {
     const date = new Intl.DateTimeFormat(i18n.currentLanguage, { dateStyle: 'medium' }).format(until);
-    return `${repeat} · ${i18n.get('event.until', date)}`;
+    return html`${repeat} · ${i18n.get('event.until', date)}`;
   }
   return repeat;
 };
