@@ -199,7 +199,7 @@ class DuoyunTestElement extends GemElement {
 
 # 发布
 
-- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核；iOS 以 run number 为 build 号构建 IPA，经 fastlane 同步 `distribution/appstore/metadata` 后提交 App Store 审核，通过后自动发布。
+- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核；iOS 以 run number 为 build 号构建 IPA，经 fastlane 同步 `distribution/appstore/metadata` 后提交 App Store 审核，通过后自动发布；已有版本在审或待发布时停在提交前（deliver 会先改名该版本再在换包时失败），审核结束后重跑该 job。
 - macOS Daemon 用 `MACOS_CERT_P12_BASE64` / `MACOS_CERT_PASSWORD`（Developer ID Application 证书）签名，identifier 为 `com.agentdeck.daemon`，使隐私授权在升级后保留；secret 缺失或证书失效时保留 ad-hoc 签名继续发布。
 - 前端热更新：移动端发布构建带 `AGENTDECK_NATIVE_ID`（`crates/agentdeck` 与 `Cargo.lock` 的 git 对象哈希），Android 流水线把整个 `dist` 打成 `agentdeck-frontend-<id>.tar.gz` 附到 Release。App 启动时取比自身新、同 native ID 的最新 Release 包，按 GitHub 记录的 sha256 校验后下次启动生效；新包启动后前端调用 `frontend_update_ready` 确认，未确认的包下次启动回退且不再下载。原生层（含 Rust 依赖）改动会换 ID，旧 App 只能经商店更新。热更新只用于修复与小改动，新功能仍走商店审核。
 - 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 与 App Store 更新说明。更新前把旧说明按其版本存到 `history/`（如 `history/whatsnew-en-US-0.8.0`）；不能放在 `whatsnew/` 根目录，Google Play 上传会把根目录下所有 `whatsnew-*` 文件名当语言代码提交。

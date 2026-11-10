@@ -142,6 +142,35 @@ jobs:
             --groups "朋友" \
             --changelog "$(git log -1 --format=%s)"
 
+      - name: Check pending App Store review
+        # 已有版本在审或待发布时 deliver 无法换包，却会先把该版本改名并改资料；此时停在这里，等审核结束后重跑本 job
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { sign } from 'node:crypto';
+          const env = process.env;
+          const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+          const now = Math.floor(Date.now() / 1000);
+          const unsigned = `${b64({ alg: 'ES256', kid: env.APPLE_API_KEY, typ: 'JWT' })}.${b64({ iss: env.APPLE_API_ISSUER, iat: now, exp: now + 600, aud: 'appstoreconnect-v1' })}`;
+          const signature = sign('sha256', Buffer.from(unsigned), { key: readFileSync(env.APPLE_API_KEY_PATH), dsaEncoding: 'ieee-p1363' });
+          const api = async (path) => {
+            const res = await fetch(`https://api.appstoreconnect.apple.com/v1/${path}`, {
+              headers: { Authorization: `Bearer ${unsigned}.${signature.toString('base64url')}` },
+            });
+            if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
+            return (await res.json()).data;
+          };
+          const [app] = await api(`apps?filter[bundleId]=${env.APP_IDENTIFIER}`);
+          const states = 'WAITING_FOR_REVIEW,IN_REVIEW,PENDING_APPLE_RELEASE,PENDING_DEVELOPER_RELEASE';
+          const [pending] = await api(`apps/${app.id}/appStoreVersions?filter[platform]=IOS&filter[appStoreState]=${states}`);
+          if (pending) {
+            const { versionString, appStoreState } = pending.attributes;
+            console.log(`::error::App Store version ${versionString} is ${appStoreState}; re-run this job once it is resolved`);
+            process.exit(1);
+          }
+          NODE
+
       - name: Prepare App Store metadata
         if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
