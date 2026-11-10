@@ -1,10 +1,13 @@
 import { repeat } from '@mantou/gem/lib/element';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import { sleep } from '@mantou/tap-ui/lib/timer';
 import { hapticWarning } from 'src/lib/haptics';
+import { appendDraftAttachments, draftKey } from '../composer/drafts';
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSettings, selectSession } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
+import { clearShare, shareStore } from '../state/share';
 import { agentdeckStore, hostAgents, isConnecting, type SessionRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
 
@@ -26,6 +29,7 @@ const style = css`
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
 @connectStore(sessionsStore)
+@connectStore(shareStore)
 export class AgentDeckSessionListPageElement extends GemElement {
   /** Highlighted in the split view */
   @property activeSessionId?: string;
@@ -53,6 +57,13 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
   #closeNewSession = () => {
     this.#state({ sheetOpen: false, newSessionError: '', navigatingCwd: false });
+    clearShare();
+  };
+
+  /** Content shared from other apps goes into a new session in the directory picked here. */
+  @effect(() => [shareStore.attachments])
+  #openShare = () => {
+    if (shareStore.attachments.length) this.#openNewSession();
   };
 
   #onCwdChange = (event: CustomEvent<string>) => {
@@ -63,11 +74,21 @@ export class AgentDeckSessionListPageElement extends GemElement {
     this.#state({ navigatingCwd: true });
   };
 
-  #confirmNewSession = () => {
+  #confirmNewSession = async () => {
     const { selectedCwd, navigatingCwd } = this.#state;
     if (!selectedCwd || navigatingCwd) return;
     const session = createPendingSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
+    const { attachments } = shareStore;
     this.#state({ sheetOpen: false, newSessionError: '' });
+    clearShare();
+    // Saved before the page opens, where the composer reads its draft.
+    if (attachments.length) {
+      try {
+        await appendDraftAttachments(draftKey(session), attachments);
+      } catch {
+        Toast.open('error', i18n.get('composer.draftSaveFailed'));
+      }
+    }
     selectSession(session.sessionId);
   };
 
@@ -272,7 +293,11 @@ export class AgentDeckSessionListPageElement extends GemElement {
         ?open=${sheetOpen}
         .snap=${[0.7]}
         .heading=${i18n.get('sessionList.newSessionHeading')}
-        .description=${i18n.get('sessionList.newSessionDesc')}
+        .description=${
+          shareStore.attachments.length
+            ? i18n.get('sessionList.shareDesc', String(shareStore.attachments.length))
+            : i18n.get('sessionList.newSessionDesc')
+        }
         @close=${this.#closeNewSession}
         .content=${html`
           <div class="flex h-full flex-col">

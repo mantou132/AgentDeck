@@ -35,7 +35,7 @@ const style = css`
   }
 `;
 
-const attachmentErrorMessage = (error: unknown) =>
+export const attachmentErrorMessage = (error: unknown) =>
   error instanceof AttachmentError
     ? getStringFromTemplate(
         i18n.get(

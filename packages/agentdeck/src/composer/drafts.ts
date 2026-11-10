@@ -14,5 +14,12 @@ export const saveDraft = (key: string, draft: ComposerDraft) =>
   draft.text || draft.attachments.length || draft.quote ? drafts.set(key, draft) : drafts.delete(key);
 export const restoreDraft = (key: string, draft: ComposerDraft) =>
   drafts.update(key, (existing) => existing ?? draft) as Promise<ComposerDraft>;
+/** Adds attachments shared from other apps to whatever is already drafted. */
+export const appendDraftAttachments = (key: string, attachments: Attachment[]) =>
+  drafts.update(key, (existing) => ({
+    text: '',
+    ...existing,
+    attachments: [...(existing?.attachments ?? []), ...attachments],
+  }));
 export const removeDraft = drafts.delete;
 export const clearDrafts = drafts.clear;

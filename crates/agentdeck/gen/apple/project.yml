@@ -54,8 +54,15 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "0.1.0"
+        # Opened by the share extension to bring the app to the front
+        CFBundleURLTypes:
+          - CFBundleURLName: com.mantou.agentdeck
+            CFBundleURLSchemes: [agentdeck]
     entitlements:
       path: agentdeck_iOS/agentdeck_iOS.entitlements
+      properties:
+        aps-environment: development
+        com.apple.security.application-groups: [group.com.mantou.agentdeck]
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -71,6 +78,7 @@ targets:
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
       groups: [app]
     dependencies:
+      - target: agentdeck_ShareExtension
       - framework: libapp.a
         embed: false
       - sdk: CoreGraphics.framework
@@ -86,4 +94,48 @@ targets:
         basedOnDependencyAnalysis: false
         outputFiles:
           - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a
-          - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a
+          - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a  # Receives shared content, see `crates/agentdeck/src/share.rs`. Not named `*_iOS`: tauri treats that target as the app.
+  agentdeck_ShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: AgentDeck
+        CFBundleShortVersionString: 0.1.0
+        CFBundleVersion: "0.1.0"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsMovieWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.mantou.agentdeck]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mantou.agentdeck.share
+        DEVELOPMENT_TEAM: L42P5Q9798
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    preBuildScripts:
+      # tauri only writes the version into the app's Info.plist; the store requires the extension to match.
+      - script: |
+          plist="${SRCROOT}/agentdeck_iOS/Info.plist"
+          for key in CFBundleShortVersionString CFBundleVersion; do
+            /usr/libexec/PlistBuddy -c "Set :$key $(/usr/libexec/PlistBuddy -c "Print :$key" "$plist")" "${SRCROOT}/${INFOPLIST_FILE}"
+          done
+        name: Sync App Version
+        inputFiles: [$(SRCROOT)/agentdeck_iOS/Info.plist]
+        # Declared so the Info.plist processing waits for it
+        outputFiles: [$(SRCROOT)/ShareExtension/Info.plist]
+        basedOnDependencyAnalysis: false

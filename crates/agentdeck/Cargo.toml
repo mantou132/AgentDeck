@@ -39,3 +39,7 @@ tauri-plugin-barcode-scanner = "2"
 tauri-plugin-selection-menu = { git = "https://github.com/mantou132/tauri-plugin-selection-menu" }
 tauri-plugin-stt = "0.2"
 tauri-plugin-tts = "0.2"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+# App Group container shared with the share extension
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSString", "NSURL"] }

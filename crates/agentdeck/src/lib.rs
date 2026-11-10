@@ -1,5 +1,6 @@
 mod frontend_update;
 mod js_protocol;
+mod share;
 
 /// Serves host files to the preview browser; answered by `packages/agentdeck/src/agent/preview.ts`.
 const PREVIEW_SCHEME: &str = "agentdeck-preview";
@@ -37,7 +38,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             js_protocol::js_protocol_register,
             js_protocol::js_protocol_respond,
-            frontend_update::frontend_update_ready
+            frontend_update::frontend_update_ready,
+            share::share_take
         ])
         .plugin(tauri_plugin_edge_to_edge::init())
         .plugin(tauri_plugin_webproxy::init())

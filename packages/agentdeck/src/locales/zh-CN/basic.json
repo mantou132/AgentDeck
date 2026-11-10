@@ -32,6 +32,7 @@
   "sessionList.selectSession": "选择一个会话",
   "sessionList.newSessionHeading": "新建会话",
   "sessionList.newSessionDesc": "选择这个会话的工作目录",
+  "sessionList.shareDesc": "选择工作目录，分享的 $1 个附件会加入新会话",
   "sessionList.openSettingsAria": "打开设置",
   "sessionList.delete": "删除",
   "sessionList.deleting": "删除中…",

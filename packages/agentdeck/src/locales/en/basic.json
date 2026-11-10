@@ -32,6 +32,7 @@
   "sessionList.selectSession": "Select a session",
   "sessionList.newSessionHeading": "New Session",
   "sessionList.newSessionDesc": "Select the working directory for this session",
+  "sessionList.shareDesc": "Select a working directory; the $1 shared attachments go into the new session",
   "sessionList.openSettingsAria": "Open settings",
   "sessionList.delete": "Delete",
   "sessionList.deleting": "Deleting…",
