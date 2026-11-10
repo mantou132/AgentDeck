@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { documentFixture, relayKey, tick } from './helpers/app-fixture.mjs';
+import { documentFixture, tick } from './helpers/app-fixture.mjs';
 
-const outbox = (fixture) => JSON.parse(fixture.localStorage.getItem(relayKey)).outbox;
+const outbox = (fixture) => fixture.relayState().outbox;
 const reject = async (fixture, request, reason = 'queue_full: pending message count limit reached') => {
   fixture.sockets.at(-1).frame({ type: 'rejected', message_id: request.message_id, reason });
   await tick();
@@ -117,18 +117,13 @@ test('local storage failure does not silently strand a prompt', async () => {
   const fixture = documentFixture();
   await fixture.connect();
   await fixture.openSession();
-  const save = fixture.localStorage.setItem;
   const requestCount = fixture.requests.length;
-  fixture.localStorage.setItem = (key, value) => {
-    if (key === relayKey) throw new Error('Quota exceeded');
-    save(key, value);
-  };
+  fixture.indexedDB.fail('agentdeck-relay');
   fixture.app.sendPrompt('s1', 'cannot persist');
   await tick();
   assert.equal(fixture.requests.length, requestCount);
   assert.equal(fixture.app.runningSessionIds().length, 0);
   assert.match(fixture.app.getRuntime('s1').error, /Failed to store pending message/);
-  fixture.localStorage.setItem = save;
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
   fixture.reply(fixture.requests.at(-1), { answer: 'done' });

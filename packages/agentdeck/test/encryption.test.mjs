@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { documentFixture, relayKey, tick } from './helpers/app-fixture.mjs';
+import { documentFixture, tick } from './helpers/app-fixture.mjs';
 
 const vector = JSON.parse(readFileSync(new URL('./fixtures/e2ee-v1.json', import.meta.url)));
 const { RelayEncryption, isPairingId } = documentFixture().encryption;
@@ -86,7 +86,7 @@ test('encrypted app handshake, prompt, streaming and retry keep plaintext off th
   const wire = fixture.sockets.at(-1).sent.find((f) => f.message_id === request.message_id);
   assert.equal(wire.payload.e2ee, 1);
   assert.ok(!JSON.stringify(wire).includes('secret prompt'));
-  const outbox = fixture.localStorage.getItem(relayKey);
+  const outbox = JSON.stringify(fixture.relayState());
   assert.ok(!outbox.includes('secret prompt'));
   assert.ok(!outbox.includes(vector.id));
   fixture.transport.reconnectTransport(true);
@@ -114,7 +114,7 @@ test('encrypted request expiry and Relay rejection still correlate with the RPC'
   fixture.heldMethods.add('peer_attach');
   await fixture.connect();
   await fixture.advance(10_000);
-  assert.equal(JSON.parse(fixture.localStorage.getItem(relayKey)).outbox.length, 0);
+  assert.equal(fixture.relayState().outbox.length, 0);
   fixture.heldMethods.clear();
   fixture.transport.reconnectTransport(true);
   await tick();

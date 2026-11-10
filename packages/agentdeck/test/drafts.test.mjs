@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { memoryIndexedDB } from './helpers/indexed-db.mjs';
 
 const source = readFileSync(new URL('../src/composer/drafts.ts', import.meta.url), 'utf8');
 const databaseSource = readFileSync(new URL('../src/lib/database.ts', import.meta.url), 'utf8');
@@ -21,66 +22,7 @@ vm.runInNewContext(
   { exports: config, require: () => ({}) },
 );
 
-// Browser storage survives document/module reloads. Requests and transaction
-// completion are asynchronous, including requests added from success handlers.
-function storage() {
-  const records = new Map();
-  let failNext = false;
-  const db = {
-    transaction() {
-      let aborted = false;
-      const tx = {
-        abort: () => {
-          aborted = true;
-          queueMicrotask(() => tx.onabort());
-        },
-      };
-      let requests = 0;
-      const request = (operation) => {
-        const result = {};
-        requests++;
-        queueMicrotask(() => {
-          if (failNext) {
-            failNext = false;
-            tx.error = new Error('Storage full');
-            tx.onabort();
-            return;
-          }
-          result.result = structuredClone(operation());
-          result.onsuccess?.();
-          if (--requests === 0 && !aborted) queueMicrotask(() => tx.oncomplete());
-        });
-        return result;
-      };
-      tx.objectStore = () => ({
-        transaction: tx,
-        get: (key) => request(() => records.get(key)),
-        getAll: () => request(() => [...records.values()]),
-        put: (value, key) =>
-          request(() => {
-            records.set(key ?? value.sessionId, structuredClone(value));
-            return key;
-          }),
-        delete: (key) =>
-          request(() => {
-            records.delete(key);
-          }),
-        clear: () => request(() => records.clear()),
-      });
-      return tx;
-    },
-  };
-  return {
-    open() {
-      const request = { result: db };
-      queueMicrotask(() => request.onsuccess());
-      return request;
-    },
-    fail: () => {
-      failNext = true;
-    },
-  };
-}
+const storage = memoryIndexedDB;
 
 function load(indexedDB) {
   const exports = {};

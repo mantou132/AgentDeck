@@ -19,16 +19,16 @@ import * as chacha from '@noble/ciphers/chacha.js';
 import * as hkdf from '@noble/hashes/hkdf.js';
 import * as sha2 from '@noble/hashes/sha2.js';
 import ts from 'typescript';
+import { memoryIndexedDB } from './indexed-db.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 export const relayId = '01234567-89ab-cdef-0123-456789abcdef';
 export const settingsKey = 'agentdeck.settings.v1';
 export const deviceKey = 'agentdeck.device_id.v1';
 export const resetKey = 'agentdeck.reset_pending.v1';
-export const relayKey = 'relay-client.v1';
 const compiledModules = new Map();
 export const tick = async () => {
-  for (let i = 0; i < 40; i++) await Promise.resolve();
+  for (let i = 0; i < 200; i++) await Promise.resolve();
 };
 
 const memoryStorage = () => {
@@ -45,6 +45,7 @@ const memoryStorage = () => {
 export function documentFixture(previous, options = {}) {
   const localStorage = previous?.localStorage ?? memoryStorage();
   const sessionStorage = previous?.sessionStorage ?? memoryStorage();
+  const indexedDB = previous?.indexedDB ?? memoryIndexedDB();
   const host = previous?.host ?? { sequence: 0 };
   if (!previous) {
     localStorage.setItem(settingsKey, JSON.stringify({ relayId: options.pairingId ?? relayId, agent: 'codex' }));
@@ -114,6 +115,7 @@ export function documentFixture(previous, options = {}) {
     queueMicrotask,
     localStorage,
     sessionStorage,
+    indexedDB,
     WebSocket: Socket,
     window,
     document,
@@ -291,7 +293,7 @@ export function documentFixture(previous, options = {}) {
     await tick();
   }
   async function connect() {
-    app.startApp();
+    await app.startApp();
     sockets.at(-1).open();
     await settleHost();
   }
@@ -326,6 +328,15 @@ export function documentFixture(previous, options = {}) {
     },
     localStorage,
     sessionStorage,
+    indexedDB,
+    /** Relay store contents: the route, receive cursor and outbox in send order. */
+    relayState: () => {
+      const { cursor, ...queued } = Object.fromEntries(indexedDB.records('agentdeck-relay'));
+      const outbox = Object.values(queued)
+        .sort((a, b) => a.order - b.order)
+        .map((record) => record.message);
+      return { ...cursor, outbox };
+    },
     host,
     sockets,
     requests,

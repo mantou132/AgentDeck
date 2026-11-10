@@ -28,6 +28,7 @@ export const EVENTS_ADDED_KEY = 'agentdeck.events_added.v1';
 export const DATABASES = {
   inFlight: { name: 'agentdeck-db', version: 1, storeName: 'in_flight_sessions', keyPath: 'sessionId' },
   drafts: { name: 'agentdeck-drafts', version: 1, storeName: 'drafts' },
+  relay: { name: 'agentdeck-relay', version: 1, storeName: 'relay' },
 } as const;
 
 export const RELAY_URL = 'wss://agentdeck.xianqiao.wang/ws';

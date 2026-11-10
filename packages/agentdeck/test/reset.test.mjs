@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { deviceKey, documentFixture, relayId, relayKey, resetKey, settingsKey, tick } from './helpers/app-fixture.mjs';
+import { deviceKey, documentFixture, relayId, resetKey, settingsKey, tick } from './helpers/app-fixture.mjs';
 
 for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
   test(`reset during ${operation} reloads a clean App that can close/load and prompt again`, async () => {
@@ -42,10 +42,9 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
 
     // The old document can still write storage before navigation commits.
     // Cleanup must run in the new document, not before reload.
-    old.localStorage.setItem(
-      relayKey,
-      JSON.stringify({ relayId, lastReceived: 9999, outbox: [{ messageId: 'stale', payload: staleRequest.payload }] }),
-    );
+    const relay = old.indexedDB.records('agentdeck-relay');
+    relay.set('cursor', { routeId: relayId, lastReceived: 9999 });
+    relay.set('stale', { order: Date.now(), message: { messageId: 'stale', payload: staleRequest.payload } });
     const fresh = documentFixture(old);
     await fresh.connect();
     assert.equal(fresh.sessionStorage.getItem(resetKey), null);
@@ -101,10 +100,10 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
   });
 }
 
-test('reset remains available while offline and across repeated reloads', () => {
+test('reset remains available while offline and across repeated reloads', async () => {
   let current = documentFixture();
   for (let i = 0; i < 3; i++) {
-    current.app.startApp();
+    await current.app.startApp();
     assert.equal(current.app.agentdeckStore.connection, 'connecting');
     current.app.hardResetApp();
     assert.equal(current.reloads, 1);
@@ -124,28 +123,30 @@ test('failure to mark a reset is surfaced before navigation', () => {
 test('failed cleanup keeps the reset marker and does not replay the old outbox', async () => {
   const failed = documentFixture();
   failed.app.hardResetApp();
-  failed.localStorage.setItem(relayKey, 'old queue');
-  const remove = failed.localStorage.removeItem;
-  failed.localStorage.removeItem = () => {
-    throw new Error('Storage unavailable');
-  };
+  const relay = failed.indexedDB.records('agentdeck-relay');
+  relay.set('cursor', { routeId: relayId });
+  relay.set('old', { order: Date.now(), message: { messageId: 'old', payload: { method: 'agent_prompt' } } });
+  failed.indexedDB.fail('agentdeck-relay');
   const boot = documentFixture(failed);
-  boot.app.startApp();
+  await boot.app.startApp();
   assert.equal(boot.sockets.length, 0);
   assert.match(boot.app.sessionsStore.sessionsError, /Failed to reset local connection/);
   assert.equal(boot.sessionStorage.getItem(resetKey), 'true');
-  boot.localStorage.removeItem = remove;
   boot.app.hardResetApp();
   const recovered = documentFixture(boot);
   await recovered.connect();
   assert.equal(recovered.app.sessionsStore.sessionsLoaded, true);
   assert.equal(recovered.sessionStorage.getItem(resetKey), null);
+  assert.equal(
+    recovered.requests.some((request) => request.message_id === 'old'),
+    false,
+  );
 });
 
 test('ordinary startup keeps the Relay store when no reset was requested', async () => {
   const fixture = documentFixture();
-  fixture.localStorage.setItem(relayKey, JSON.stringify({ relayId, lastReceived: 12, outbox: [] }));
-  fixture.app.startApp();
+  fixture.indexedDB.records('agentdeck-relay').set('cursor', { routeId: relayId, lastReceived: 12 });
+  await fixture.app.startApp();
   await tick();
-  assert.equal(JSON.parse(fixture.localStorage.getItem(relayKey)).lastReceived, 12);
+  assert.equal(fixture.relayState().lastReceived, 12);
 });

@@ -6,10 +6,10 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 - 启动：`main.ts` → `app.ts`；未配置 Pairing ID 时打开 settings，否则打开 session-list（宽屏时在侧栏，见下方宽屏双栏）。页面在 `pages/`，Stack 入口在 `navigation.ts`。
 - 状态：`state/store.ts` 按变化频率拆成三个 store：`agentdeckStore`（设置、连接）、`sessionsStore`（会话列表与按会话聚合的 `runtimes`，即 `SessionRuntime`：加载状态 `load`、进行中回合 `turn`、错误、配置、权限、问题、建议等）、`messagesStore`（消息，随流式增量变化，只有显示消息的元素连接；Stack 下层页面仍挂载，所以列表页不连）。删除会话即删 runtime 与消息。`state/sessions.ts` 会话生命周期；`state/app.ts` 启动、设置保存、重置与 transport 消息消费。
-- 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/relay-codec.ts`（RPC 消息与 Relay 载荷互转：加密、帧大小限制、二进制回复）、`agent/encryption.ts`（`adk1_` 端到端加密原语）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
+- 远端通信：`agent/transport.ts`（Relay 连接、host 握手）、`agent/api.ts`（远端接口）、`agent/relay-codec.ts`（RPC 消息与 Relay 载荷互转：加密、帧大小限制、二进制回复）、`agent/encryption.ts`（`adk1_` 端到端加密原语）、`agent/relay-store.ts`（Relay outbox 与接收游标，存 IndexedDB，与扩展共用；localStorage / chrome.storage 配额放不下带附件的 prompt，启动时删除旧的 `relay-client.v1`）。连接常量、存储键、`DATABASES`、`RENDER_CAPABILITIES` 统一在 `src/config.ts`。
 - ACP 事件：`session/events.ts` 为 reducer，`session/turn.ts` 控制流式任务；等待用户输入（权限请求与问题）的状态在 `state/user-input.ts`，问题（form elicitation）的 schema 解析在 `session/elicitation.ts`，卡片为 `elements/elicitation.ts`。
 - 附件：`attachment/`（与扩展共用，不依赖 App 的 i18n 与状态，文案由调用方传入）。`types.ts` 为 `Attachment`；`read.ts` 读取选择或粘贴的文件；`prompt.ts` 转成 `agent_prompt` 的线上格式；`message.ts` 处理消息与历史中的附件（ACP 图片、内联 data 图片、上传到主机的文件链接）。卡片与预览元素在 `elements/attachment*.ts`，粘贴引用与草稿在 `composer/`。
-- 持久化：`lib/database.ts` 为 drafts 与 in-flight 共用的 IndexedDB Store API；新增库或 store 在 `DATABASES` 声明，已有名称不得改动。
+- 持久化：`lib/database.ts` 为 drafts、in-flight 与 Relay 存储共用的 IndexedDB Store API；新增库或 store 在 `DATABASES` 声明，已有名称不得改动。
 - 原生插件：推送 `agent/push.ts`（`tauri-plugin-fcm`）；语音识别 `lib/speech-recognition.ts`（`tauri-plugin-stt`）与朗读 `lib/speech-synthesis.ts`（`tauri-plugin-tts`），均只在移动端注册，以 `speechSupported` 判断；日历事件见下方事件卡片（`tauri-plugin-add-to-calendar`，以 `calendarSupported` 判断）。
 
 ## 行为约束

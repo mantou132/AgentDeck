@@ -1,5 +1,6 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
+import { DEFAULT_STORAGE_KEY } from 'relay-client-ts';
 import { isPairingId } from '../agent/encryption';
 import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
@@ -106,15 +107,18 @@ const handleTransportMessage = (message: TransportMessage) => {
   }
 };
 
-export const startApp = () => {
+export const startApp = async () => {
+  // The Relay store moved to IndexedDB; drop the old localStorage copy.
+  localStorage.removeItem(DEFAULT_STORAGE_KEY);
   let resetWasPending = false;
   try {
     if (sessionStorage.getItem(RESET_PENDING_KEY)) {
       resetWasPending = true;
       // Clear after reload: callbacks in the old document can no longer refill the outbox.
-      clearTransportStorage();
       clearAllInFlight();
       clearDrafts().catch(console.error);
+      // The transport must not start before the old outbox is gone, or it would replay it.
+      await clearTransportStorage();
       sessionStorage.removeItem(RESET_PENDING_KEY);
     }
   } catch (error) {

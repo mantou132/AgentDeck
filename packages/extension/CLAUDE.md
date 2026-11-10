@@ -7,7 +7,7 @@
 ## 架构与核心文件
 
 - `pages/agent-panel.html` & `pages/agent-panel.ts`：核心交互面板，Side Panel 与 DevTools 共同复用；状态与消息类型在 `pages/agent-panel/types.ts`。
-- `shared/agent-storage.ts`：基于 `chrome.storage.local` 适配 `relay-client-ts` 的持久化存储（RelayStore）。
+- `shared/agent-storage.ts`：扩展设备 ID（`chrome.storage.local`）；Relay outbox 与游标用 App 的 `agent/relay-store.ts`（IndexedDB）。
 - `shared/agent-session-store.ts`：本地会话状态与配置持久化。
 - **类型**：`agentdeck/*` 经 `tsconfig.json` 的 `paths` 指向 App 源码，API 与附件等类型直接复用 App 定义；`extension-env.d.ts` 由 Extension.js 生成。
 - **通信架构**：直接复用 `agentdeck/agent/transport`（`agentApi` / `startTransport`），经 `relay-client-ts` 接入 Relay 服务与 Daemon 通信。

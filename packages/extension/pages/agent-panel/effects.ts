@@ -1,18 +1,17 @@
 import { addListener } from '@mantou/gem/lib/utils';
 import { isPairingId } from 'agentdeck/agent/encryption';
 import { addTransportMessageHandler, agentApi, startTransport } from 'agentdeck/agent/transport';
+import { DEFAULT_STORAGE_KEY } from 'relay-client-ts';
 import { observeAgentPanelState, readAgentPanelState } from '../../shared/agent-session-store';
-import { createChromeStorageStore, getExtensionDeviceId } from '../../shared/agent-storage';
+import { getExtensionDeviceId } from '../../shared/agent-storage';
 import type { SessionController } from './session-controller';
 import type { TurnController } from './turn-controller';
 import type { PanelStore } from './types';
 
 export async function startExtensionTransport(relayId: string) {
-  const deviceId = await getExtensionDeviceId();
-  startTransport(relayId, {
-    deviceId,
-    createStore: (routeId) => createChromeStorageStore(routeId, deviceId),
-  });
+  // The Relay store moved to IndexedDB (shared with the App); drop the old chrome.storage copy.
+  chrome.storage.local.remove(DEFAULT_STORAGE_KEY).catch(console.error);
+  startTransport(relayId, { deviceId: await getExtensionDeviceId() });
 }
 
 /** Load the data required before the panel leaves its initial full-page loader. */

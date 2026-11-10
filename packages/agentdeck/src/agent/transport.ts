@@ -1,16 +1,10 @@
-import {
-  DEFAULT_STORAGE_KEY,
-  localStorageStore,
-  type OutboundMessage,
-  RelayClient,
-  type RelayConnectionState,
-  type RelayStore,
-} from 'relay-client-ts';
+import { type OutboundMessage, RelayClient, type RelayConnectionState, type RelayStore } from 'relay-client-ts';
 import { type AgentInfo, DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
 import { AgentApi, type ClientCapabilities, type SessionEvent, type UserInput } from './api';
 import { isPairingId } from './encryption';
 import { RelayCodec } from './relay-codec';
+import { clearRelayStore, indexedDbRelayStore } from './relay-store';
 import type { RpcId, RpcMessage } from './rpc';
 
 type HostSyncOptions = {
@@ -58,7 +52,6 @@ type MessageHandler = (message: TransportMessage) => void;
 export type TransportOptions = {
   ackHead?: boolean;
   relayUrl?: string;
-  createStore?: (routeId: string) => RelayStore;
   deviceId?: string;
   /** Rendering capabilities declared to the host; they decide the skills loaded into sessions. */
   capabilities?: ClientCapabilities;
@@ -122,10 +115,6 @@ class RpcOutboxStore implements RelayStore {
     if (!this.#active) return;
     await this.#baseStore.removeFromOutbox(messageId);
     this.#deliveries.delete(messageId);
-  }
-
-  deviceId(): string | undefined | Promise<string | undefined> {
-    return this.#baseStore.deviceId?.();
   }
 
   getDelivery(messageId: string): Pick<RpcMessage, 'id' | 'method'> | undefined {
@@ -425,8 +414,7 @@ class AgentTransport {
     const { routeId } = codec;
     this.#codec = codec;
 
-    const baseStore = options?.createStore ? options.createStore(routeId) : localStorageStore(routeId);
-    const store = new RpcOutboxStore(baseStore, codec);
+    const store = new RpcOutboxStore(indexedDbRelayStore(routeId), codec);
     this.#outboxStore = store;
 
     const client = new RelayClient({
@@ -567,7 +555,7 @@ export const syncHostConnection = (metadataOnly = false) => transport.syncHostCo
 export const startTransport = (relayId: string, options?: TransportOptions) => transport.start(relayId, options);
 export const reconnectTransport = (force = false) => transport.reconnect(force);
 export const closeTransport = () => transport.close();
-export const clearTransportStorage = () => localStorage.removeItem(DEFAULT_STORAGE_KEY);
+export const clearTransportStorage = clearRelayStore;
 
 let transportInitialized = false;
 export const initTransport = (options: InitTransportOptions) => {

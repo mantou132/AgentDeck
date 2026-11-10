@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { documentFixture, relayKey, tick } from './helpers/app-fixture.mjs';
+import { documentFixture, tick } from './helpers/app-fixture.mjs';
 
-const outbox = (fixture) => JSON.parse(fixture.localStorage.getItem(relayKey)).outbox;
+const outbox = (fixture) => fixture.relayState().outbox;
 
 test('foreground and online keep a live connection; manual reconnect preserves prompt replies', async () => {
   const fixture = documentFixture();
@@ -52,12 +52,12 @@ test('automatic SDK reconnect also keeps the receive cursor and unacknowledged r
   fixture.app.sendPrompt('s1', 'task');
   await tick();
   const prompt = fixture.requests.at(-1);
-  const cursor = JSON.parse(fixture.localStorage.getItem(relayKey)).lastReceived;
+  const cursor = fixture.relayState().lastReceived;
   fixture.sockets.at(-1).close();
   await fixture.advance(1000);
   const socket = fixture.sockets.at(-1);
   assert.equal(new URL(socket.url).searchParams.has('ack_head'), false);
-  assert.equal(JSON.parse(fixture.localStorage.getItem(relayKey)).lastReceived, cursor);
+  assert.equal(fixture.relayState().lastReceived, cursor);
   socket.open();
   await fixture.settleHost();
   const replay = socket.sent.find((frame) => frame.payload?.method === 'agent_prompt');
@@ -308,8 +308,8 @@ test('a disposed client cannot advance the cursor or reconnect under a new pairi
   fixture.app.saveSettings({ relayId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', agent: 'codex' });
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
-  assert.equal(JSON.parse(fixture.localStorage.getItem(relayKey)).relayId, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
-  assert.notEqual(JSON.parse(fixture.localStorage.getItem(relayKey)).lastReceived, 9999);
+  assert.equal(fixture.relayState().routeId, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+  assert.notEqual(fixture.relayState().lastReceived, 9999);
   const socketCount = fixture.sockets.length;
   await fixture.advance(12_000);
   assert.equal(fixture.sockets.length, socketCount);
