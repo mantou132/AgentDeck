@@ -88,6 +88,15 @@ targets:
       - sdk: Security.framework
       - sdk: UIKit.framework
       - sdk: WebKit.framework
+    postBuildScripts:
+      # tauri builds with signing disabled and restores only the app's entitlements before export;
+      # signing the embedded extension here keeps its App Group in the exported IPA.
+      - script: |
+          if [ "$CODE_SIGNING_ALLOWED" = "NO" ]; then
+            codesign --force --sign - --entitlements "$SRCROOT/ShareExtension/ShareExtension.entitlements" "$TARGET_BUILD_DIR/$PLUGINS_FOLDER_PATH/agentdeck_ShareExtension.appex"
+          fi
+        name: Keep Extension Entitlements
+        basedOnDependencyAnalysis: false
     preBuildScripts:
       - script: pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code

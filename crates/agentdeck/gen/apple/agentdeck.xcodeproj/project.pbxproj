@@ -211,6 +211,7 @@
 				BC748C5121DD11855B7D922F /* Resources */,
 				AFDFECC1B81BCD2D3373586B /* Frameworks */,
 				20BF2AD44E7A402F6BED5B94 /* Embed Foundation Extensions */,
+				5A1E2C7D9B3F4E8A0C6D2B71 /* Keep Extension Entitlements */,
 			);
 			buildRules = (
 			);
@@ -329,6 +330,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "plist=\"${SRCROOT}/agentdeck_iOS/Info.plist\"\nfor key in CFBundleShortVersionString CFBundleVersion; do\n  /usr/libexec/PlistBuddy -c \"Set :$key $(/usr/libexec/PlistBuddy -c \"Print :$key\" \"$plist\")\" \"${SRCROOT}/${INFOPLIST_FILE}\"\ndone\n";
+		};
+		5A1E2C7D9B3F4E8A0C6D2B71 /* Keep Extension Entitlements */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Keep Extension Entitlements";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CODE_SIGNING_ALLOWED\" = \"NO\" ]; then\n  codesign --force --sign - --entitlements \"$SRCROOT/ShareExtension/ShareExtension.entitlements\" \"$TARGET_BUILD_DIR/$PLUGINS_FOLDER_PATH/agentdeck_ShareExtension.appex\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
