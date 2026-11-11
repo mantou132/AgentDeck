@@ -41,10 +41,28 @@ agentdeckd start
   - Watch a live view of the iOS Simulator, Android emulator or browser tab your agent is driving.
 - **Built to keep running.** Drafts survive restarts, and the daemon can keep your computer awake while agents work.
 
-## How it works
+## Architecture
 
-```text
-AgentDeck app  ⇄  Relay (ciphertext only)  ⇄  agentdeckd (your computer)  ⇄  ACP agents
+The phone app and your computer connect through a relay. Messages are end-to-end encrypted between the app and `agentdeckd`, so the relay only forwards ciphertext and cannot read your prompts, replies or agent traffic.
+
+```mermaid
+flowchart LR
+    subgraph Phone["Your phone"]
+        App["AgentDeck app"]
+    end
+
+    subgraph Cloud["Relay"]
+        Relay["Encrypted message forwarding"]
+    end
+
+    subgraph Computer["Your computer"]
+        Daemon["agentdeckd<br/>ACP client"]
+        Agents["Claude Code · Codex · Cursor<br/>Other ACP agents"]
+        Daemon --> Agents
+    end
+
+    App <-->|"Ciphertext only"| Relay
+    Relay <-->|"Ciphertext only"| Daemon
 ```
 
 `agentdeckd` connects out to the relay, so you don't need to open ports or set up a VPN. Your phone and computer pair with a secret Pairing ID, which is carried in the QR code, and derive the encryption keys from it.
