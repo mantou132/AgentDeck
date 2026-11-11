@@ -30,6 +30,7 @@ type PendingCall = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   onEvent?: (event: unknown) => void | Promise<void>;
+  ephemeral?: boolean;
   timer?: ReturnType<typeof setTimeout>;
   startTimer?: () => void;
 };
@@ -68,7 +69,12 @@ export class RpcPeer {
     // Replies from before an App reload must never match a new call unless explicitly resumed.
     const id = callId ?? crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
-      const pending: PendingCall = { resolve: resolve as (value: unknown) => void, reject, onEvent };
+      const pending: PendingCall = {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        onEvent,
+        ephemeral: options?.ephemeral,
+      };
       this.#pending.set(id, pending);
       if (options) {
         // Counted from the last frame: a long event stream (e.g. a load replay) keeps the call alive.
@@ -172,6 +178,11 @@ export class RpcPeer {
 
   rejectAll = (error: Error) => {
     for (const id of this.#pending.keys()) this.#takePending(id)?.reject(error);
+  };
+
+  /** Fails ephemeral calls at once: a reply lost with the connection is never replayed. */
+  rejectEphemeral = (error: Error) => {
+    for (const [id, pending] of this.#pending) if (pending.ephemeral) this.#takePending(id)?.reject(error);
   };
 
   #takePending = (id: RpcId) => {

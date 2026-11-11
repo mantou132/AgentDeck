@@ -465,6 +465,8 @@ class AgentTransport {
           this.agentApi.rejectAll(new Error(i18n.get('error.relayPreempted')));
         }
         this.#emitConnection(connection, error || (connection === 'preempted' ? i18n.get('error.relayPreempted') : ''));
+        // After the state change, so callers already see the reconnection when their call fails.
+        this.agentApi.rejectEphemeral(new Error(i18n.get('error.remoteNotConnectedRetry')));
         if (connection === 'connecting') {
           this.#connectTimer = setTimeout(() => {
             if (this.#relayClient !== client || this.#relayConnected) return;
