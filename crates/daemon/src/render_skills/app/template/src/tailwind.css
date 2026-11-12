@@ -1,0 +1,92 @@
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities";
+
+@theme {
+  --color-primary: light-dark(#5a5fe8, #626bcc);
+  --color-highlight: light-dark(#17192b, #f0f1f4);
+  --color-text: light-dark(#383b50, #d5d7dc);
+  --color-describe: light-dark(#767a91, #a0a4ad);
+  --color-bg: light-dark(#f4f6fa, #18191b);
+  --color-bg-light: light-dark(#ffffff, #222427);
+  --color-border: light-dark(#e3e6ef, #383b40);
+}
+
+/*
+  Replaces Tailwind's preflight, whose `*` reset (margin, padding, border) would override the
+  Tap UI elements' own styles: document styles win over styles inside their shadow roots.
+  Gem elements are skipped through their `gem-element` custom state.
+*/
+@layer base {
+  :not(:state(gem-element)),
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html {
+    color-scheme: light dark;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    /* Tap UI paints body black and shrinks it above the keyboard */
+    background: var(--color-bg);
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+  b,
+  strong {
+    font-weight: bolder;
+  }
+  ol,
+  ul,
+  menu {
+    list-style: none;
+  }
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+  img,
+  video {
+    height: auto;
+  }
+  button,
+  input,
+  select,
+  textarea,
+  ::file-selector-button {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+  }
+  button {
+    cursor: pointer;
+  }
+  ::placeholder {
+    color: color-mix(in oklab, currentcolor 50%, transparent);
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    /* biome-ignore lint/complexity/noImportantStyles: as in Tailwind's preflight, so `hidden` beats display utilities */
+    display: none !important;
+  }
+}

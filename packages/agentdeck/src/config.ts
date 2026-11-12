@@ -43,7 +43,7 @@ export const RENDER_CAPABILITIES: ClientCapabilities = {
     'widget',
     'chart',
     'map',
-    ...(previewSupported ? ['preview'] : []),
+    ...(previewSupported ? ['preview', 'app'] : []),
     'screen',
     'session',
     ...(calendarSupported ? ['event'] : []),

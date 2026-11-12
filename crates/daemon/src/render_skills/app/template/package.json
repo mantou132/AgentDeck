@@ -1,0 +1,21 @@
+{
+  "name": "app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build"
+  },
+  "dependencies": {
+    "@mantou/gem": "^2.3.2",
+    "@mantou/tap-ui": "^0.2.2"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "^2.3.0",
+    "@tailwindcss/postcss": "^4.3.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.9.3",
+    "unplugin-gem": "^0.3.1"
+  }
+}

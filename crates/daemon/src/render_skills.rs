@@ -1,7 +1,8 @@
 //! Output-format skills for the rendering capabilities a client declares in
 //! `peer_attach`. Each capability ships as a directory mounted through ACP
 //! `additionalDirectories`; its skill teaches the agent a fenced block the
-//! client renders from Markdown.
+//! client renders from Markdown; the `app` skill also ships a project template
+//! the agent copies. The skill directories are embedded whole.
 
 use std::{
     fs,
@@ -9,7 +10,8 @@ use std::{
     sync::OnceLock,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use include_dir::{Dir, include_dir};
 use serde::Deserialize;
 
 use crate::app_data::AppPaths;
@@ -21,57 +23,49 @@ pub struct ClientCapabilities {
     pub render: Vec<String>,
 }
 
-struct RenderSkill {
-    /// `ClientCapabilities::render` entry that enables this skill; also the
-    /// skill and directory name.
-    capability: &'static str,
-    skill_md: &'static str,
-}
+/// `src/render_skills/<capability>/`: `SKILL.md`, plus any files it ships.
+static SKILLS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/render_skills");
 
-const SKILLS: &[RenderSkill] = &[
-    RenderSkill {
-        capability: "widget",
-        skill_md: include_str!("render_skills/widget/SKILL.md"),
-    },
-    RenderSkill {
-        capability: "chart",
-        skill_md: include_str!("render_skills/chart/SKILL.md"),
-    },
-    RenderSkill {
-        capability: "map",
-        skill_md: include_str!("render_skills/map/SKILL.md"),
-    },
-    RenderSkill {
-        capability: "preview",
-        skill_md: include_str!("render_skills/preview/SKILL.md"),
-    },
-    RenderSkill {
-        capability: "screen",
-        skill_md: include_str!("render_skills/screen/SKILL.md"),
-    },
-    RenderSkill {
-        capability: "session",
-        skill_md: include_str!("render_skills/session/SKILL.md"),
-    },
-    RenderSkill {
-        capability: "event",
-        skill_md: include_str!("render_skills/event/SKILL.md"),
-    },
+/// `ClientCapabilities::render` entries with a skill; each is also the skill
+/// and directory name.
+const SKILLS: &[&str] = &[
+    "widget", "chart", "map", "preview", "screen", "session", "event", "app",
 ];
 
 /// Skill locations agents scan in additional directories: Codex reads
 /// `.agents/skills`, Claude Code reads `.claude/skills`.
 const SKILL_ROOTS: &[&str] = &[".agents/skills", ".claude/skills"];
 
+fn write_dir(dir: &Dir, skill_dir: &Path, target: &Path) -> Result<()> {
+    for file in dir.files() {
+        let path = target.join(file.path().strip_prefix(skill_dir)?);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, file.contents())?;
+    }
+    for sub in dir.dirs() {
+        write_dir(sub, skill_dir, target)?;
+    }
+    Ok(())
+}
+
 fn write_skills(root: &Path) -> Result<()> {
-    for skill in SKILLS {
+    for &skill in SKILLS {
+        let dir = SKILLS_DIR
+            .get_dir(skill)
+            .with_context(|| format!("missing render skill {skill}"))?;
+        // Drop files an older build wrote, such as renamed template files
+        match fs::remove_dir_all(root.join(skill)) {
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err.into()),
+            _ => {}
+        }
         for skill_root in SKILL_ROOTS {
-            let dir = root
-                .join(skill.capability)
-                .join(skill_root)
-                .join(skill.capability);
-            fs::create_dir_all(&dir)?;
-            fs::write(dir.join("SKILL.md"), skill.skill_md)?;
+            write_dir(
+                dir,
+                Path::new(skill),
+                &root.join(skill).join(skill_root).join(skill),
+            )?;
         }
     }
     Ok(())
@@ -97,12 +91,7 @@ fn skills_root() -> Option<&'static PathBuf> {
 pub fn skill_directories(capabilities: &ClientCapabilities) -> Vec<PathBuf> {
     let mut skills = SKILLS
         .iter()
-        .filter(|skill| {
-            capabilities
-                .render
-                .iter()
-                .any(|render| render == skill.capability)
-        })
+        .filter(|skill| capabilities.render.iter().any(|render| render == *skill))
         .peekable();
     if skills.peek().is_none() {
         return Vec::new();
@@ -110,7 +99,7 @@ pub fn skill_directories(capabilities: &ClientCapabilities) -> Vec<PathBuf> {
     let Some(root) = skills_root() else {
         return Vec::new();
     };
-    skills.map(|skill| root.join(skill.capability)).collect()
+    skills.map(|skill| root.join(skill)).collect()
 }
 
 /// Skill folders for every capability, for agents configured once per
@@ -121,7 +110,7 @@ pub fn all_skill_paths() -> Vec<PathBuf> {
     };
     SKILLS
         .iter()
-        .map(|skill| root.join(skill.capability).join(SKILL_ROOTS[0]))
+        .map(|skill| root.join(skill).join(SKILL_ROOTS[0]))
         .collect()
 }
 
@@ -138,6 +127,9 @@ mod tests {
                 fs::read_to_string(root.join("chart").join(skill_root).join("chart/SKILL.md"))
                     .unwrap();
             assert!(skill.starts_with("---\nname: chart\n"));
+            let app = root.join("app").join(skill_root).join("app");
+            assert!(app.join("template/.gitignore").is_file());
+            assert!(app.join("template/src/elements/home.ts").is_file());
         }
         fs::remove_dir_all(root).unwrap();
 
