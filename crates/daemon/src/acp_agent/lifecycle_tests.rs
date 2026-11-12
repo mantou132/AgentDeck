@@ -1,3 +1,4 @@
+use super::session::SESSION_CLOSE_TIMEOUT;
 use super::*;
 use agent_client_protocol::{Channel, TransportFrame};
 use futures_util::StreamExt;
