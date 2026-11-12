@@ -21,5 +21,8 @@ export const appendDraftAttachments = (key: string, attachments: Attachment[]) =
     ...existing,
     attachments: [...(existing?.attachments ?? []), ...attachments],
   }));
+/** Replaces the quote of whatever is already drafted, e.g. text sent here from another session. */
+export const setDraftQuote = (key: string, quote: string) =>
+  drafts.update(key, (existing) => ({ text: '', attachments: [], ...existing, quote }));
 export const removeDraft = drafts.delete;
 export const clearDrafts = drafts.clear;

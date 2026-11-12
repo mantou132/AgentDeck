@@ -38,7 +38,8 @@ export class DeckSessionTimelineElement extends GemElement {
   /** The agent can fork at a given message. */
   @boolattribute forkable: boolean;
   @emitter preview: Emitter<Attachment>;
-  @emitter quote: Emitter<string>;
+  /** Selected reply text to send to a session the user picks. */
+  @emitter sendTo: Emitter<string>;
   @emitter fork: Emitter<ForkRequest>;
 
   /** User message id → the latest agent message before it, where a fork keeps the history up to. */
@@ -220,7 +221,9 @@ export class DeckSessionTimelineElement extends GemElement {
     // Only replies: user messages render with `user`, process details live in sheets outside the timeline.
     const markdown = closestElement(ele, DeckStreamMarkdownElement);
     if (!markdown || markdown.user || !this.contains(markdown)) return;
-    setSelectionMenuItems({ items: [{ label: i18n.get('timeline.quote'), onClick: ({ text }) => this.quote(text) }] });
+    setSelectionMenuItems({
+      items: [{ label: i18n.get('timeline.sendTo'), onClick: ({ text }) => this.sendTo(text) }],
+    });
   };
 
   @mounted()

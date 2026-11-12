@@ -2,7 +2,7 @@ import { repeat } from '@mantou/gem/lib/element';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { sleep } from '@mantou/tap-ui/lib/timer';
 import { hapticWarning } from 'src/lib/haptics';
-import { appendDraftAttachments, draftKey } from '../composer/drafts';
+import { appendDraftAttachments, draftKey, setDraftQuote } from '../composer/drafts';
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSettings, selectSession } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
@@ -60,10 +60,10 @@ export class AgentDeckSessionListPageElement extends GemElement {
     clearShare();
   };
 
-  /** Content shared from other apps goes into a new session in the directory picked here. */
-  @effect(() => [shareStore.attachments])
+  /** Shared content and text sent from a reply go into a new session in the directory picked here. */
+  @effect(() => [shareStore.attachments, shareStore.quote])
   #openShare = () => {
-    if (shareStore.attachments.length) this.#openNewSession();
+    if (shareStore.attachments.length || shareStore.quote) this.#openNewSession();
   };
 
   #onCwdChange = (event: CustomEvent<string>) => {
@@ -78,13 +78,14 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const { selectedCwd, navigatingCwd } = this.#state;
     if (!selectedCwd || navigatingCwd) return;
     const session = createPendingSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
-    const { attachments } = shareStore;
+    const { attachments, quote } = shareStore;
     this.#state({ sheetOpen: false, newSessionError: '' });
     clearShare();
     // Saved before the page opens, where the composer reads its draft.
-    if (attachments.length) {
+    if (attachments.length || quote) {
       try {
-        await appendDraftAttachments(draftKey(session), attachments);
+        if (attachments.length) await appendDraftAttachments(draftKey(session), attachments);
+        if (quote) await setDraftQuote(draftKey(session), quote);
       } catch {
         Toast.open('error', i18n.get('composer.draftSaveFailed'));
       }
@@ -296,7 +297,9 @@ export class AgentDeckSessionListPageElement extends GemElement {
         .description=${
           shareStore.attachments.length
             ? i18n.get('sessionList.shareDesc', String(shareStore.attachments.length))
-            : i18n.get('sessionList.newSessionDesc')
+            : shareStore.quote
+              ? i18n.get('sessionList.quoteDesc')
+              : i18n.get('sessionList.newSessionDesc')
         }
         @close=${this.#closeNewSession}
         .content=${html`

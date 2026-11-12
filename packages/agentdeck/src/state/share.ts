@@ -1,4 +1,5 @@
-// Content shared from other apps (Android `MainActivity.kt`, iOS share extension); the session list opens a new session with it.
+// Content for a new session whose directory the session list asks for: shared from other apps (Android `MainActivity.kt`,
+// iOS share extension) or text sent from a reply with "Send to".
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { base64ToArrayBuffer } from '@mantou/tap-ui/lib/encode';
 import { invoke, isTauri } from '@tauri-apps/api/core';
@@ -9,10 +10,10 @@ import { i18n } from '../i18n';
 
 type SharedFile = { name: string; mimeType: string; data?: string; tooLarge: boolean };
 
-/** Attachments waiting for the user to pick the new session's directory. */
-export const shareStore = createStore({ attachments: [] as Attachment[] });
+/** Attachments and quote waiting for the user to pick the new session's directory. */
+export const shareStore = createStore({ attachments: [] as Attachment[], quote: '' });
 
-export const clearShare = () => shareStore({ attachments: [] });
+export const clearShare = () => shareStore({ attachments: [], quote: '' });
 
 const readSharedFile = async ({ name, mimeType, data, tooLarge }: SharedFile) => {
   if (!data) throw new AttachmentError(tooLarge ? 'tooLarge' : 'readFailed', name);

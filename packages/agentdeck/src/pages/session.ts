@@ -5,9 +5,10 @@ import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import type { Attachment } from '../attachment/types';
-import { draftKey, removeDraft, restoreDraft, saveDraft } from '../composer/drafts';
+import { draftKey, removeDraft, restoreDraft, saveDraft, setDraftQuote } from '../composer/drafts';
 import type { ComposerInput, DeckComposerElement } from '../elements/composer';
 import { markSessionProposalStarted, type NewSessionProposal } from '../elements/new-session';
+import { pickSendTarget } from '../elements/send-to';
 import { openSessionConfig } from '../elements/session-config';
 import type { ForkRequest } from '../elements/session-timeline';
 import { getConnectionLabel, i18n } from '../i18n';
@@ -30,6 +31,7 @@ import {
   retrySessionLoad,
   sendPrompt,
 } from '../state/sessions';
+import { shareStore } from '../state/share';
 import {
   agentdeckStore,
   getMessages,
@@ -92,8 +94,23 @@ export class AgentDeckSessionPageElement extends GemElement {
   @effect(() => [])
   #watchVisibility = () => addListener(document, 'visibilitychange', this.#markRead);
 
-  #onQuote = (evt: CustomEvent<string>) => {
-    this.#composerRef.value?.quoteText(evt.detail);
+  /** Selected reply text becomes a quote in the composer of the picked session. */
+  #onSendTo = async ({ detail: text }: CustomEvent<string>) => {
+    const target = await pickSendTarget(this.sessionId);
+    if (target === 'current') {
+      this.#composerRef.value?.quoteText(text);
+    } else if (target === 'new') {
+      shareStore({ quote: text.trim() });
+    } else if (target) {
+      const session = getSession(target.sessionId);
+      if (!session) return;
+      try {
+        await setDraftQuote(draftKey(session), text.trim());
+      } catch {
+        Toast.open('error', i18n.get('composer.draftSaveFailed'));
+      }
+      openSession(session.sessionId);
+    }
   };
 
   // The forked session opens with the user message in its composer, ready to edit and resend.
@@ -346,7 +363,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 ?pending=${pending}
                 ?forkable=${session.agent === 'claude-acp'}
                 @preview=${this.#previewAttachment}
-                @quote=${this.#onQuote}
+                @send-to=${this.#onSendTo}
                 @fork=${this.#onFork}
                 @widget-send=${this.#sendFromWidget}
                 @new-session=${this.#startNewSession}
