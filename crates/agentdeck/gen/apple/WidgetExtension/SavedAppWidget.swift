@@ -88,30 +88,46 @@ struct SavedAppProvider: AppIntentTimelineProvider {
   }
 }
 
+private func appURL(_ app: SavedAppEntity) -> URL? { URL(string: "agentdeck://app/\(app.id)") }
+
+private struct AppIcon: View {
+  let app: SavedAppEntity
+  let cornerRadius: CGFloat
+
+  var body: some View {
+    Group {
+      if let icon = app.icon {
+        Image(uiImage: icon).resizable().scaledToFit()
+      } else {
+        Image(systemName: "app.dashed").resizable().scaledToFit().foregroundStyle(.secondary)
+      }
+    }
+    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+  }
+}
+
+private struct EmptyHint: View {
+  var body: some View {
+    Text("Save an app in AgentDeck first").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+  }
+}
+
 struct SavedAppWidgetView: View {
   let entry: SavedAppEntry
 
   var body: some View {
     if let app = entry.app {
       VStack(spacing: 8) {
-        Group {
-          if let icon = app.icon {
-            Image(uiImage: icon).resizable().scaledToFit()
-          } else {
-            Image(systemName: "app.dashed").resizable().scaledToFit().foregroundStyle(.secondary)
-          }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        AppIcon(app: app, cornerRadius: 16)
         Text(app.name).font(.footnote.weight(.semibold)).lineLimit(1)
       }
-      .widgetURL(URL(string: "agentdeck://app/\(app.id)"))
+      .widgetURL(appURL(app))
     } else {
-      Text("Save an app in AgentDeck first").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+      EmptyHint()
     }
   }
 }
 
-@main
 struct SavedAppWidget: Widget {
   var body: some WidgetConfiguration {
     AppIntentConfiguration(kind: "SavedApp", intent: SelectAppIntent.self, provider: SavedAppProvider()) { entry in
@@ -120,5 +136,81 @@ struct SavedAppWidget: Widget {
     .configurationDisplayName("Saved App")
     .description("Opens an app saved in AgentDeck.")
     .supportedFamilies([.systemSmall])
+  }
+}
+
+// All saved apps as a grid of icons, each opening its app; as many as the size holds, most recently saved first.
+
+struct AllAppsEntry: TimelineEntry {
+  let date = Date()
+  let apps: [SavedAppEntity]
+}
+
+struct AllAppsProvider: TimelineProvider {
+  func placeholder(in context: Context) -> AllAppsEntry { AllAppsEntry(apps: []) }
+
+  func getSnapshot(in context: Context, completion: @escaping (AllAppsEntry) -> Void) {
+    completion(AllAppsEntry(apps: SavedAppEntity.all()))
+  }
+
+  // Polls like `SavedAppProvider`, for the same reason.
+  func getTimeline(in context: Context, completion: @escaping (Timeline<AllAppsEntry>) -> Void) {
+    completion(
+      Timeline(entries: [AllAppsEntry(apps: SavedAppEntity.all())], policy: .after(Date().addingTimeInterval(30 * 60))))
+  }
+}
+
+struct AllAppsWidgetView: View {
+  @Environment(\.widgetFamily) private var family
+  let entry: AllAppsEntry
+
+  private let columns = 4
+  private var rows: Int { family == .systemLarge ? 4 : 2 }
+
+  var body: some View {
+    if entry.apps.isEmpty {
+      EmptyHint()
+    } else {
+      let apps = Array(entry.apps.prefix(columns * rows))
+      Grid(horizontalSpacing: 12, verticalSpacing: 10) {
+        ForEach(0..<rows, id: \.self) { row in
+          GridRow {
+            ForEach(0..<columns, id: \.self) { column in
+              let index = row * columns + column
+              if index < apps.count {
+                Link(destination: appURL(apps[index])!) {
+                  VStack(spacing: 4) {
+                    AppIcon(app: apps[index], cornerRadius: 12)
+                    Text(apps[index].name).font(.caption2).lineLimit(1)
+                  }
+                }
+              } else {
+                Color.clear
+              }
+            }
+          }
+        }
+      }
+      .frame(maxHeight: .infinity, alignment: .top)
+    }
+  }
+}
+
+struct AllAppsWidget: Widget {
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: "AllApps", provider: AllAppsProvider()) { entry in
+      AllAppsWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
+    }
+    .configurationDisplayName("Saved Apps")
+    .description("Opens any app saved in AgentDeck.")
+    .supportedFamilies([.systemMedium, .systemLarge])
+  }
+}
+
+@main
+struct SavedAppWidgets: WidgetBundle {
+  var body: some Widget {
+    SavedAppWidget()
+    AllAppsWidget()
   }
 }

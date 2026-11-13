@@ -3,3 +3,5 @@
 "Save an app in AgentDeck first" = "先在 AgentDeck 中保存应用";
 "Saved App" = "已保存的应用";
 "Opens an app saved in AgentDeck." = "打开保存在 AgentDeck 中的应用。";
+"Saved Apps" = "所有应用";
+"Opens any app saved in AgentDeck." = "打开任一保存在 AgentDeck 中的应用。";

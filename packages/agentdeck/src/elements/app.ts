@@ -9,6 +9,7 @@ import {
   pinSupported,
   readAppManifest,
   saveApp,
+  savedAppsStore,
   savedAppsSupported,
 } from '../state/saved-apps';
 import { hostHome } from '../state/store';
@@ -19,10 +20,31 @@ const style = css`
   :host {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
     box-sizing: border-box;
-    padding: 0.75rem;
     overflow: hidden;
+  }
+  button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  button:not(:disabled):active {
+    background: color-mix(in srgb, currentColor 5%, transparent);
+  }
+  .main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.75rem;
+    text-align: start;
   }
   .icon {
     flex-shrink: 0;
@@ -54,26 +76,22 @@ const style = css`
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  button {
+  .action {
     flex-shrink: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
     color: ${agentDeckTheme.primaryStrongColor};
-    font: inherit;
     font-size: ${agentDeckTheme.fontSizeXs};
     font-weight: 600;
-    cursor: pointer;
   }
-  button:disabled {
-    opacity: 0.5;
-    cursor: default;
+  button.action {
+    align-self: stretch;
+    padding: 0 0.75rem;
   }
 `;
 
 /** Body of an `agentdeck-app` fenced block: the `index.html` of an app built with the host's `app` skill. */
 @customElement('deck-app')
 @adoptedStyle(style)
+@connectStore(savedAppsStore)
 @shadow()
 export class DeckAppElement extends GemElement {
   @attribute path: string;
@@ -103,15 +121,23 @@ export class DeckAppElement extends GemElement {
     }
   };
 
-  // Saves over an earlier copy too. Android then asks the launcher to pin it (the launcher keeps one per app); iOS
-  // can't add to the home screen, so it points to the widget.
-  #addToHomeScreen = async () => {
+  get #saved() {
+    const { manifest } = this.#state;
+    return !!manifest && savedAppsStore.apps.some(({ id }) => id === manifest.id);
+  }
+
+  // A first save then asks the Android launcher to pin it; iOS can't add to the home screen, so it points to the
+  // widget. Saving again only replaces the copy, which its home screen entry keeps opening.
+  #save = async () => {
+    const update = this.#saved;
     this.#state({ saving: true });
     const closeToast = Toast.open({ type: 'loading', content: i18n.get('app.saving'), duration: Infinity });
     try {
       const manifest = await saveApp(this.#entry);
       closeToast();
-      if (pinSupported) {
+      if (update) {
+        Toast.open('success', i18n.get('app.updated'));
+      } else if (pinSupported) {
         await pinSavedApp(manifest);
       } else {
         Toast.open('success', i18n.get('app.widgetHint'));
@@ -129,29 +155,30 @@ export class DeckAppElement extends GemElement {
     const { manifest, iconFailed, saving } = this.#state;
     // `<app>/dist/index.html`
     const [dirName, parent] = this.#dir.split(/[\\/]/).reverse();
+    // The card previews the app; on the phone, the one button saves it there.
     return html`
-      <img
-        v-if=${this.#usable && !iconFailed}
-        class="icon"
-        alt=""
-        src=${toPreviewUrl(`${this.#dir}/icon.svg`)}
-        @error=${() => this.#state({ iconFailed: true })}
-      />
-      <tap-use v-else .element=${icons.code}></tap-use>
-      <div class="text">
-        <div class="name">${manifest?.name || (dirName === 'dist' ? parent : dirName)}</div>
-        <div class="dir">${displayPath(this.#entry, hostHome())}</div>
-      </div>
-      <button type="button" ?disabled=${!this.#usable} @click=${() => openPreview(this.#entry, { headerless: true })}>
-        ${i18n.get('app.preview')}
-      </button>
       <button
-        v-if=${savedAppsSupported}
+        class="main"
         type="button"
-        ?disabled=${!this.#usable || saving}
-        @click=${this.#addToHomeScreen}
+        ?disabled=${!this.#usable}
+        @click=${() => openPreview(this.#entry, { headerless: true })}
       >
-        ${i18n.get('app.pin')}
+        <img
+          v-if=${this.#usable && !iconFailed}
+          class="icon"
+          alt=""
+          src=${toPreviewUrl(`${this.#dir}/icon.svg`)}
+          @error=${() => this.#state({ iconFailed: true })}
+        />
+        <tap-use v-else .element=${icons.code}></tap-use>
+        <div class="text">
+          <div class="name">${manifest?.name || (dirName === 'dist' ? parent : dirName)}</div>
+          <div class="dir">${displayPath(this.#entry, hostHome())}</div>
+        </div>
+        <span v-if=${!savedAppsSupported} class="action">${i18n.get('app.preview')}</span>
+      </button>
+      <button v-if=${savedAppsSupported} class="action" type="button" ?disabled=${!this.#usable || saving} @click=${this.#save}>
+        ${i18n.get(this.#saved ? 'app.update' : 'app.save')}
       </button>
     `;
   };
