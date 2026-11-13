@@ -2,8 +2,10 @@
 //! `peer_attach`. Each capability ships as a directory mounted through ACP
 //! `additionalDirectories`; its skill teaches the agent a fenced block the
 //! client renders from Markdown; the `app` skill also ships a project template
-//! the agent copies. `job` is a workflow skill rather than an output format,
-//! toggled the same way. The skill directories are embedded whole.
+//! the agent copies. `job` and `travel` are workflow skills rather than output formats,
+//! toggled the same way. The skill directories are embedded whole. The workflow
+//! skills also keep `learned.md` at the root of their directory, notes agents
+//! write while using them, which rewrites keep.
 
 use std::{
     fs,
@@ -30,7 +32,7 @@ static SKILLS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/render_skills");
 /// `ClientCapabilities::render` entries with a skill; each is also the skill
 /// and directory name.
 const SKILLS: &[&str] = &[
-    "widget", "chart", "map", "preview", "screen", "session", "event", "app", "job",
+    "widget", "chart", "map", "preview", "screen", "session", "event", "app", "job", "travel",
 ];
 
 /// Skill locations agents scan in additional directories: Codex reads
@@ -56,12 +58,13 @@ fn write_skills(root: &Path) -> Result<()> {
         let dir = SKILLS_DIR
             .get_dir(skill)
             .with_context(|| format!("missing render skill {skill}"))?;
-        // Drop files an older build wrote, such as renamed template files
-        match fs::remove_dir_all(root.join(skill)) {
-            Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err.into()),
-            _ => {}
-        }
         for skill_root in SKILL_ROOTS {
+            // Drop files an older build wrote, such as renamed template files;
+            // the agents' `learned.md` beside these roots stays
+            match fs::remove_dir_all(root.join(skill).join(skill_root)) {
+                Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err.into()),
+                _ => {}
+            }
             write_dir(
                 dir,
                 Path::new(skill),
@@ -132,6 +135,10 @@ mod tests {
             assert!(app.join("template/.gitignore").is_file());
             assert!(app.join("template/src/elements/home.ts").is_file());
         }
+        let learned = root.join("chart/learned.md");
+        fs::write(&learned, "notes").unwrap();
+        write_skills(&root).unwrap();
+        assert!(learned.is_file());
         fs::remove_dir_all(root).unwrap();
 
         assert!(skill_directories(&ClientCapabilities::default()).is_empty());

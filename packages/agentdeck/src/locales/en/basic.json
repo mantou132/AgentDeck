@@ -186,6 +186,8 @@
   "skill.eventDesc": "Add events to the phone calendar",
   "skill.job": "Job Search",
   "skill.jobDesc": "Build a resume, apply on job sites in batches and track progress",
+  "skill.travel": "Trip Planner",
+  "skill.travelDesc": "Plan routes, sights, lodging, meals, fuel stops and packing within your budget",
   "relayGuide.step1Title": "Install agentdeckd",
   "relayGuide.step1Desc": "Install $1<agentdeckd> on your computer via npm, Homebrew, or Scoop.",
   "relayGuide.step2Title": "Start & Pair",
