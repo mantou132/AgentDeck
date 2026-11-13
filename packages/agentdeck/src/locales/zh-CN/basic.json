@@ -55,6 +55,7 @@
   "session.newSessionHint": "输入任务后将在此目录创建远端会话并开始执行。",
   "session.emptyHistoryHint": "历史记录为空。发送消息后，回复、思考与工具进度会出现在同一条时间线上。",
   "session.scrollToLatest": "回到最新",
+  "session.questionBelow": "有问题待回答",
   "session.placeholderHistory": "正在回放历史…",
   "session.placeholderPrompt": "交代一个任务…",
   "session.placeholderQuestion": "请先回答上方问题",

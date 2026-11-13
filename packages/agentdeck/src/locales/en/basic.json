@@ -55,6 +55,7 @@
   "session.newSessionHint": "After entering a task, a remote session will be created in this directory to begin execution.",
   "session.emptyHistoryHint": "History is empty. After sending a message, replies, thoughts, and tool progress will appear on the timeline.",
   "session.scrollToLatest": "Jump to latest",
+  "session.questionBelow": "Question waiting",
   "session.placeholderHistory": "Replaying history…",
   "session.placeholderPrompt": "Describe a task…",
   "session.placeholderQuestion": "Answer the question above first",

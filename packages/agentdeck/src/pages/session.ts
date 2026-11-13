@@ -366,6 +366,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       (isConnecting() ? '' : agentdeckStore.connectionError) ||
       (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
+    const questionPending = hasPendingElicitation(runtime.elicitations);
     return html`
       <tap-page ${this.#pageRef} class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         ${this.#renderHeader(session.title || (session.pendingCreation ? i18n.get('session.newTitle') : i18n.get('session.untitled')), session.cwd)}
@@ -408,7 +409,16 @@ export class AgentDeckSessionPageElement extends GemElement {
 
         <footer slot="footer" class="relative bg-bg/75 backdrop-blur-lg">
           <button
-            v-if=${!this.#state.followMessages}
+            v-if=${!this.#state.followMessages && questionPending}
+            type="button"
+            class="absolute bottom-full mb-3 left-1/2 flex h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/20 bg-primary-soft pr-3 pl-4 text-sm font-semibold text-primary-strong shadow-float active:bg-bg-light"
+            @click=${() => this.#following?.resume()}
+          >
+            ${i18n.get('session.questionBelow')}
+            <tap-use class="size-5" .element=${icons.arrowDown}></tap-use>
+          </button>
+          <button
+            v-else-if=${!this.#state.followMessages}
             type="button"
             class="absolute bottom-full mb-3 left-1/2 grid size-10 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-primary/20 bg-bg-light text-primary-strong shadow-float active:bg-primary-soft"
             aria-label=${i18n.get('session.scrollToLatest')}
@@ -458,7 +468,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             .draftKey=${draftKey(session)}
             config-label=${getConfigLabel(getConfigSelects(runtime.options))}
             @config-open=${() => openSessionConfig(session.sessionId)}
-            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(hasPendingElicitation(runtime.elicitations) ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
+            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(questionPending ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
             .suggestion=${connected && loaded ? (runtime.suggestion ?? '') : ''}
             .commands=${agentdeckStore.commandsByAgent[session.agent] ?? []}
             .submit=${this.#send}
