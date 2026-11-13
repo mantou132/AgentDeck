@@ -1,6 +1,6 @@
 ---
 name: app
-description: Build a small mobile web app the user can open and use in the AgentDeck client. Use when the user asks to make an app, tool, tracker, mini game or other interactive screen for their phone, beyond what a one-off widget can hold; copy the bundled Gem + Tap UI template next to this file, build it to static files and answer with an `agentdeck-preview headerless` block holding the absolute path of `dist/index.html`.
+description: Build a small mobile web app the user can open and use in the AgentDeck client. Use when the user asks to make an app, tool, tracker, mini game or other interactive screen for their phone, beyond what a one-off widget can hold; copy the bundled Gem + Tap UI template next to this file, build it to static files and answer with an `agentdeck-app` block holding the absolute path of `dist/index.html`.
 ---
 
 # AgentDeck apps
@@ -10,17 +10,18 @@ The user reads your replies in the AgentDeck app, usually on a phone away from t
 ## Workflow
 
 1. Copy the whole `template` directory (it includes a `.gitignore`) to a new directory in the working directory named after the app, e.g. `cp -R <this skill>/template ./habit-tracker`. Never edit the template in place: it is rewritten whenever agentdeckd restarts. If the user points at an app made earlier, keep working in that one.
-2. Install dependencies with the package manager available (`pnpm install`, else `npm install`).
-3. Replace the example (`src/store.ts`, `src/elements/*`) with the app, keeping `src/sheet.ts`. Run `npm run build` (it also generates `src/auto-import.d.ts`), then `npx tsc -p .`, and fix every error.
-4. Reply with a short note on what to try and the preview block (absolute path, `headerless` because the app draws its own navbar):
+2. In a new app, fill `public/agentdeck.json`: `id` is 12 random lowercase letters and digits, starting with a letter (e.g. `k3m9q2xv7a1p`), set once and never changed, since it names the copy saved on the phone and its data; `name` is a short app name shown under the home screen icon. Replace `public/icon.svg` with an icon for the app: square, filled to the edges (the phone rounds or crops the corners, so keep the main shape within the center two thirds), no text.
+3. Install dependencies with the package manager available (`pnpm install`, else `npm install`).
+4. Replace the example (`src/store.ts`, `src/elements/*`) with the app, keeping `src/sheet.ts`. Run `npm run build` (it also generates `src/auto-import.d.ts`), then `npx tsc -p .`, and fix every error.
+5. Reply with a short note on what to try and the app block (absolute path). The user can preview it from this machine, or save it on the phone to use without this machine:
 
 ````markdown
-```agentdeck-preview headerless
+```agentdeck-app
 /Users/me/project/habit-tracker/dist/index.html
 ```
 ````
 
-After each change, rebuild and send the block again.
+After each change, rebuild and send the block again; a copy saved on the phone changes only when the user saves it again from the new block.
 
 ## Limits
 
@@ -30,7 +31,7 @@ After each change, rebuild and send the block again.
 
 ## Project layout
 
-- `src/main.ts` calls Tap UI's `initApp`, which renders the root page `<app-home>` into the global Stack. Open more pages with `Stack.push({ content: html`<app-xxx .prop=${value}></app-xxx>` })` and go back with `Stack.pop()` or `<tap-navbar back default-back>`; pushed pages close with the edge swipe. For tabs, keep one root page with a `<tap-tabbar slot="footer">` and switch its content.
+- `src/main.ts` calls Tap UI's `initApp`, which renders the root page `<app-home>` into the global Stack; keep its `onRootClose`, which takes the app saved on the phone back to AgentDeck. Open more pages with `Stack.push({ content: html`<app-xxx .prop=${value}></app-xxx>` })` and go back with `Stack.pop()` or `<tap-navbar back default-back>`; pushed pages close with the edge swipe. For tabs, keep one root page with a `<tap-tabbar slot="footer">` and switch its content.
 - `src/elements/<name>.ts` defines `<app-<name>>`. `unplugin-gem` auto-imports Gem APIs (`html`, `css`, `createStore`, decorators …), Tap UI elements (`<tap-*>`) and project elements (`<app-*>`) used in templates; import other things, such as `Stack` or `Toast`, explicitly.
 - `src/sheet.ts`: `const close = openSheet({ header, body: html`<app-xxx @done=${() => close()}></app-xxx>` })` opens a bottom sheet above all pages (see `src/elements/home.ts`). Use it instead of `Sheet.open`, and pass only strings to `Dialog.open`: both render their body inside a shadow root, where Tailwind classes and the styles of `app-*` elements don't apply. `ActionSheet.open` and `Toast.open` are fine.
 - `src/tailwind.css` holds the colors (light and dark through `light-dark()`) and replaces Tailwind's preflight with a reset that skips Gem elements; don't import `tailwindcss/preflight`, it strips the padding of Tap UI elements. `src/theme.ts` passes the colors to Tap UI.

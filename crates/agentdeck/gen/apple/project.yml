@@ -79,6 +79,7 @@ targets:
       groups: [app]
     dependencies:
       - target: agentdeck_ShareExtension
+      - target: agentdeck_WidgetExtension
       - framework: libapp.a
         embed: false
       - sdk: CoreGraphics.framework
@@ -90,10 +91,12 @@ targets:
       - sdk: WebKit.framework
     postBuildScripts:
       # tauri builds with signing disabled and restores only the app's entitlements before export;
-      # signing the embedded extension here keeps its App Group in the exported IPA.
+      # signing the embedded extensions here keeps their App Group in the exported IPA.
       - script: |
           if [ "$CODE_SIGNING_ALLOWED" = "NO" ]; then
-            codesign --force --sign - --entitlements "$SRCROOT/ShareExtension/ShareExtension.entitlements" "$TARGET_BUILD_DIR/$PLUGINS_FOLDER_PATH/agentdeck_ShareExtension.appex"
+            for name in ShareExtension WidgetExtension; do
+              codesign --force --sign - --entitlements "$SRCROOT/$name/$name.entitlements" "$TARGET_BUILD_DIR/$PLUGINS_FOLDER_PATH/agentdeck_$name.appex"
+            done
           fi
         name: Keep Extension Entitlements
         basedOnDependencyAnalysis: false
@@ -147,4 +150,44 @@ targets:
         inputFiles: [$(SRCROOT)/agentdeck_iOS/Info.plist]
         # Declared so the Info.plist processing waits for it
         outputFiles: [$(SRCROOT)/ShareExtension/Info.plist]
+        basedOnDependencyAnalysis: false
+  # Home screen widget opening apps saved by `crates/agentdeck/src/saved_apps.rs`.
+  agentdeck_WidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: WidgetExtension
+    info:
+      path: WidgetExtension/Info.plist
+      properties:
+        CFBundleDisplayName: AgentDeck
+        CFBundleShortVersionString: 0.1.0
+        CFBundleVersion: "0.1.0"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: WidgetExtension/WidgetExtension.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.mantou.agentdeck]
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mantou.agentdeck.widget
+        DEVELOPMENT_TEAM: L42P5Q9798
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # AppIntentConfiguration and containerBackground
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    preBuildScripts:
+      # tauri only writes the version into the app's Info.plist; the store requires the extension to match.
+      - script: |
+          plist="${SRCROOT}/agentdeck_iOS/Info.plist"
+          for key in CFBundleShortVersionString CFBundleVersion; do
+            /usr/libexec/PlistBuddy -c "Set :$key $(/usr/libexec/PlistBuddy -c "Print :$key" "$plist")" "${SRCROOT}/${INFOPLIST_FILE}"
+          done
+        name: Sync App Version
+        inputFiles: [$(SRCROOT)/agentdeck_iOS/Info.plist]
+        outputFiles: [$(SRCROOT)/WidgetExtension/Info.plist]
         basedOnDependencyAnalysis: false

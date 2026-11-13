@@ -8,7 +8,7 @@
     "start": "gemkit start"
   },
   "dependencies": {
-    "@mantou/gem": "^2.3.2",
+    "@mantou/gem": "^2.3.3",
     "@mantou/gemkit": "^0.2.1"
   },
   "devDependencies": {

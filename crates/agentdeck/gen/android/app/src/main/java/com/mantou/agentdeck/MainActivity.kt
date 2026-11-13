@@ -40,7 +40,19 @@ class MainActivity : TauriActivity() {
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
+    leaveSavedApp(intent)
     receiveShare(intent)
+  }
+
+  /**
+   * A share or push tap while a saved app shows goes back to AgentDeck, which takes it as it starts; links
+   * (`ACTION_VIEW`) are handled in `crates/agentdeck/src/saved_apps.rs`.
+   */
+  private fun leaveSavedApp(intent: Intent) {
+    if (intent.action == Intent.ACTION_VIEW) return
+    val webView = webView ?: return
+    if (Uri.parse(webView.url ?: return).host?.startsWith("agentdeck-app.") != true) return
+    webView.evaluateJavascript("location.assign('/__agentdeck/exit')", null)
   }
 
   /**

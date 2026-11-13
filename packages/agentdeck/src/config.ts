@@ -22,6 +22,8 @@ export const SESSION_META_KEY = 'agentdeck.meta.v1';
 export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
 export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';
 export const EVENTS_ADDED_KEY = 'agentdeck.events_added.v1';
+/** sessionStorage: the link that started the App was handled; AgentDeck reloads each time a saved app exits. */
+export const LAUNCH_LINK_TAKEN_KEY = 'agentdeck.launch_link_taken.v1';
 export const DISABLED_SKILLS_KEY = 'agentdeck.disabled_skills.v1';
 
 // IndexedDB database names are unique within this app's origin.

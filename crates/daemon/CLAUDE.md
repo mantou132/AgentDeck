@@ -17,7 +17,7 @@
 - `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密原语。
 - `src/push.rs`：prompt 成功完成时，向发起该 prompt 的设备推送 FCM 通知；正文用 `notification_response_complete` 由 App 本地化（Android strings、iOS `Localizable.strings`）；`data` 带 `host`（`push::host_key`，配对 ID 的 SHA-256 前 8 字节，不泄露配对 ID）、`agent` 与 `sessionId`，供 App 点击通知时打开会话。
 - `src/screen_capture.rs`：`screen_capture` RPC，按 target 截一帧（`ios:` 用 `simctl` 的 alpha 遮罩得到屏幕形状；`android:` 用 adb，形状取自 `dumpsys display`；`browser:` 用 rmcp 连 browser4agent 本地 MCP 服务 `127.0.0.1:39271/mcp`，并以页面脚本判断标签页是否在模拟手机），缩放后以 JPEG 字节回复，不保存状态。
-- `src/render_skills.rs`：渲染能力对应的 skill（`src/render_skills/<能力>/`，以 `include_dir` 整个目录嵌入，新增能力只需在 `SKILLS` 加名字），每个 daemon 进程首次使用时清空并重写到 `AppPaths::skills_dir()`；`app` skill 另带 `template/`（Gem + Tap UI + Rsbuild 的最小移动端工程，Agent 复制后构建，用 `agentdeck-preview headerless` 预览）；mermaid / LaTeX 不单独声明能力，写在 chart skill 里。
+- `src/render_skills.rs`：渲染能力对应的 skill（`src/render_skills/<能力>/`，以 `include_dir` 整个目录嵌入，新增能力只需在 `SKILLS` 加名字），每个 daemon 进程首次使用时清空并重写到 `AppPaths::skills_dir()`；`app` skill 另带 `template/`（Gem + Tap UI + Rsbuild 的最小移动端工程，Agent 复制后构建，以 `agentdeck-app` 块回复，App 可预览或保存到手机；`public/agentdeck.json` 的 `id` / `name` 与 `icon.svg` 供保存到手机，`main.ts` 在保存的副本中以 `onRootClose` 请求 `/__agentdeck/exit` 回到 AgentDeck）；mermaid / LaTeX 不单独声明能力，写在 chart skill 里。
 - `src/logger.rs`：`tracing` 日志（含依赖库事件）按天写入 `logs/agentdeckd.YYYY-MM-DD.log`，保留 7 个文件；默认 `info`，`RUST_LOG` 可覆盖；只在 `run` 中初始化，不输出到终端。
 
 ## 约束与现状

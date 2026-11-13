@@ -13,9 +13,6 @@ import { openFileBrowser, openMessageLink } from '../navigation';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
-// Daemon's per-read limit for `file_read`.
-const RAW_CHUNK_BYTES = 8 * 1024 * 1024;
-
 const style = css`
   :scope {
     height: 100%;
@@ -100,15 +97,7 @@ export class DeckFileViewerElement extends GemElement {
   #share = async (path: string, name: string) => {
     const closeToast = Toast.open({ type: 'loading', content: i18n.get('file.preparing'), duration: Infinity });
     try {
-      const chunks: Uint8Array<ArrayBuffer>[] = [];
-      for (let offset = 0, size = 1; offset < size; ) {
-        const result = await agentApi.readRawFile(path, [offset, RAW_CHUNK_BYTES], this.cwd);
-        // The file shrank while reading
-        if (!result.data.length) break;
-        chunks.push(result.data);
-        offset += result.data.length;
-        size = result.size;
-      }
+      const chunks = await agentApi.readWholeRawFile(path, this.cwd);
       closeToast();
       const file = new File(chunks, name, { type: getMimeType(name) });
       if (isTauri()) {
