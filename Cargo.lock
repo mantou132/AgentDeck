@@ -5791,7 +5791,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-fcm"
 version = "0.2.0"
-source = "git+https://github.com/mantou132/tauri-plugin-fcm#dc92ddfbfdbe4db8c57bc77cc2afd4fa3d9cd88c"
+source = "git+https://github.com/mantou132/tauri-plugin-fcm#8f4851c9dc6780a723813c08455b74dfc93361f6"
 dependencies = [
  "log",
  "serde",

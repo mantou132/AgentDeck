@@ -104,11 +104,16 @@ pub struct RemotePeerManager {
     ephemeral_calls: EphemeralCalls,
     next_peer_id: Arc<AtomicU64>,
     push_client: reqwest::Client,
+    /// `push::host_key` of the pairing ID, sent with every push.
+    push_host: String,
 }
 
 impl RemotePeerManager {
-    pub fn new(service: AgentService, outbound_tx: OutboundSender) -> Self {
-        Self::with_devices(service, outbound_tx, load_persisted_peers())
+    pub fn new(service: AgentService, outbound_tx: OutboundSender, relay_id: &str) -> Self {
+        Self {
+            push_host: push::host_key(relay_id),
+            ..Self::with_devices(service, outbound_tx, load_persisted_peers())
+        }
     }
 
     pub fn with_devices(
@@ -129,6 +134,7 @@ impl RemotePeerManager {
             ephemeral_calls: Arc::default(),
             next_peer_id: Arc::new(AtomicU64::new(max_id + 1)),
             push_client: reqwest::Client::new(),
+            push_host: String::new(),
         }
     }
 
@@ -178,6 +184,7 @@ impl RemotePeerManager {
     fn completion_handler(&self, peer_id: u64) -> crate::agent_rpc::PromptCompletion {
         let devices = self.devices.clone();
         let client = self.push_client.clone();
+        let host = self.push_host.clone();
         Arc::new(move |agent, session_id| {
             let token = devices.lock().ok().and_then(|devs| {
                 devs.values()
@@ -186,10 +193,11 @@ impl RemotePeerManager {
             });
             let Some(token) = token else { return };
             let client = client.clone();
+            let host = host.clone();
             let agent = agent.to_owned();
             let session_id = session_id.to_owned();
             tokio::spawn(async move {
-                push::send(&client, &token, &agent, &session_id).await;
+                push::send(&client, &token, &host, &agent, &session_id).await;
             });
         })
     }
@@ -389,7 +397,11 @@ pub fn start(
     // the async client through an unbounded channel drained by a dedicated task.
     let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel::<Outbound>();
 
-    let manager = Arc::new(RemotePeerManager::new(service.clone(), outbound_tx));
+    let manager = Arc::new(RemotePeerManager::new(
+        service.clone(),
+        outbound_tx,
+        relay_id,
+    ));
 
     let client = Client::new_with_ack_head(
         endpoint_url(relay_url, &codec.route_id),
@@ -510,6 +522,7 @@ mod tests {
             ephemeral_calls: Arc::default(),
             next_peer_id: Arc::new(AtomicU64::new(2)),
             push_client: reqwest::Client::new(),
+            push_host: String::new(),
         });
         let handler = Handler {
             manager,

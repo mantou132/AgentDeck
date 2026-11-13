@@ -123,8 +123,13 @@ export class AgentDeckSessionPageElement extends GemElement {
     openSession(forked.sessionId);
   };
 
-  // Also runs once connected: a session opened while reconnecting loads then
-  @effect((instance) => [instance.sessionId, agentdeckStore.connection === 'connected'])
+  // Also runs once connected: a session opened while reconnecting loads then. A session opened from a push may also
+  // wait for the list to have it.
+  @effect((instance) => [
+    instance.sessionId,
+    agentdeckStore.connection === 'connected',
+    !!getSession(instance.sessionId),
+  ])
   #openSession = () => {
     ensureSessionLoaded(this.sessionId);
     // Remote load may return midway through the enter animation; delay timeline rendering until animation finishes. Existing in-memory sessions render immediately
@@ -306,9 +311,32 @@ export class AgentDeckSessionPageElement extends GemElement {
     `;
   };
 
+  #renderLoading = () => html`
+    <section class="grid flex-1 place-items-center content-center px-6 py-12 text-center">
+      <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
+        <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
+      </div>
+      <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">${i18n.get('session.loadingTitle')}</h2>
+      <p class="m-0 text-sm text-describe">${i18n.get('session.loadingDesc')}</p>
+    </section>
+  `;
+
   @template()
   #render = () => {
     const session = getSession(this.sessionId);
+    // Opened from a push before the list has it.
+    const listPending =
+      isConnecting() ||
+      sessionsStore.sessionsLoading ||
+      (agentdeckStore.connection === 'connected' && !sessionsStore.sessionsLoaded);
+    if (!session && listPending) {
+      return html`
+        <tap-page class="bg-bg text-text">
+          ${this.#renderHeader('')}
+          <main class="flex h-full flex-col">${this.#renderLoading()}</main>
+        </tap-page>
+      `;
+    }
     if (!session) {
       return html`
         <tap-page class="bg-bg text-text">
@@ -347,13 +375,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           class="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-4 pt-4 pb-5 sm:px-6"
           aria-label=${i18n.get('session.messagesAria')}
         >
-              <section v-if=${loading} class="grid flex-1 place-items-center content-center px-6 py-12 text-center">
-                <div class="grid size-14 place-items-center rounded-[18px] border border-border bg-bg-light shadow-card">
-                  <tap-use class="size-6 text-primary" .element=${icons.loading}></tap-use>
-                </div>
-                <h2 class="mt-4 mb-1.5 font-display text-lg font-semibold text-highlight">${i18n.get('session.loadingTitle')}</h2>
-                <p class="m-0 text-sm text-describe">${i18n.get('session.loadingDesc')}</p>
-              </section>
+              ${loading ? this.#renderLoading() : ''}
               <deck-session-timeline
                 v-if=${!loading && !!messages.length}
                 .sessionKey=${this.sessionId}

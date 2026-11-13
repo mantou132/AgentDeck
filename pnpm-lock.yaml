@@ -64,6 +64,9 @@ importers:
       '@mantou/tap-ui':
         specifier: ^0.2.2
         version: 0.2.2(patch_hash=4000acb8e9f20cfad4de44acd794c2837fc1b5480adada9f5385eaf40856bd38)(@mantou/gem@2.3.2)
+      '@mantou/tauri-plugin-fcm':
+        specifier: ^0.2.0
+        version: 0.2.0
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -109,9 +112,6 @@ importers:
       tauri-plugin-edge-to-edge-api:
         specifier: ^0.1.1
         version: 0.1.1
-      tauri-plugin-fcm:
-        specifier: ^0.2.0
-        version: 0.2.0
       tauri-plugin-selection-menu-api:
         specifier: ^0.1.2
         version: 0.1.2
@@ -723,6 +723,10 @@ packages:
     resolution: {integrity: sha512-ku15tT1xw6r/aEEzb/BzkyAFbMnaUKblaH6uEIbHynqtsgODtcy1zpbyaJzJOFpbi2UHtA6xjerPduZJpC7FgA==}
     peerDependencies:
       '@mantou/gem': ^2.x
+
+  '@mantou/tauri-plugin-fcm@0.2.0':
+    resolution: {integrity: sha512-zSBZ5+EhMXQG3/wEkY9PQI1LnLSZ8y1Sbnm8ZYjpzbyiaRG39kx73r/JG4T7he9TNAL1zWRjtsOeCwrta4w6Yg==}
+    engines: {node: '>=18'}
 
   '@mapbox/jsonlint-lines-primitives@2.0.3':
     resolution: {integrity: sha512-0SElaV0uMxEnxzBhhX9WTuPyUeMsAN/SS0i16tjuba4/mio63MG9khjC1a0JAiPGXAwvwm4UfHJURCN7nyudQg==}
@@ -4642,10 +4646,6 @@ packages:
   tauri-plugin-edge-to-edge-api@0.1.1:
     resolution: {integrity: sha512-opGf01TcofIKsI2ieMGXYYvh3xkerDi9Pu6v9Y/pUSuZGwYHUKuSpIuvtdutk6l2ttO9TYlivqlJa2lZuX83fQ==}
 
-  tauri-plugin-fcm@0.2.0:
-    resolution: {integrity: sha512-8GmSUlpjUKjDekqPaAKntxbzmt7P2kicAC55kGqdHILtwU25Ja1N7rhmWjp9XZJnybWmdaQqi0Wxx/YLQoEw3w==}
-    engines: {node: '>=18'}
-
   tauri-plugin-selection-menu-api@0.1.2:
     resolution: {integrity: sha512-BDOcpRzQ+bXJAkfPD3zSSiHXrdTwC/+Iun9UPa1Bip3LFwAE1QcwRWyGjRKu29Vwo/8v7S6VbUg4EtlIdGjfog==}
 
@@ -5657,6 +5657,10 @@ snapshots:
   '@mantou/tap-ui@0.2.2(patch_hash=4000acb8e9f20cfad4de44acd794c2837fc1b5480adada9f5385eaf40856bd38)(@mantou/gem@2.3.2)':
     dependencies:
       '@mantou/gem': 2.3.2
+
+  '@mantou/tauri-plugin-fcm@0.2.0':
+    dependencies:
+      '@tauri-apps/api': 2.12.3
 
   '@mapbox/jsonlint-lines-primitives@2.0.3': {}
 
@@ -9771,10 +9775,6 @@ snapshots:
       '@tauri-apps/api': 2.12.3
 
   tauri-plugin-edge-to-edge-api@0.1.1:
-    dependencies:
-      '@tauri-apps/api': 2.12.3
-
-  tauri-plugin-fcm@0.2.0:
     dependencies:
       '@tauri-apps/api': 2.12.3
 

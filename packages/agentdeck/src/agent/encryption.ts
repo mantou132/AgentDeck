@@ -113,3 +113,7 @@ export const createRelayEncryption = (id: string, sender: string): RelayEncrypti
   if (!id.startsWith(PREFIX)) return;
   return new RelayEncryption(id, 'app', sender);
 };
+
+/** Same as the daemon's `push::host_key`: names the host in push data without revealing the pairing ID. */
+export const pushHostKey = (id: string): string =>
+  Array.from(sha256(encoder.encode(id)).subarray(0, 8), (byte) => byte.toString(16).padStart(2, '0')).join('');

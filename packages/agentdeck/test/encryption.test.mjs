@@ -7,7 +7,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { documentFixture, tick } from './helpers/app-fixture.mjs';
 
 const vector = JSON.parse(readFileSync(new URL('./fixtures/e2ee-v1.json', import.meta.url)));
-const { RelayEncryption, isPairingId } = documentFixture().encryption;
+const { RelayEncryption, isPairingId, pushHostKey } = documentFixture().encryption;
 
 test('ID version, alphabet, and key length are checked without silently downgrading encryption', () => {
   assert.ok(isPairingId('01234567-89ab-cdef-0123-456789abcdef'));
@@ -222,4 +222,9 @@ test('plaintext injection cannot establish a connection with an encrypted ID', a
   await tick();
   assert.notEqual(fixture.app.agentdeckStore.connection, 'connected');
   assert.match(fixture.app.agentdeckStore.connectionError, /verification failed/i);
+});
+
+test('push host key matches the daemon', () => {
+  // Same vector as `push::host_key` in `crates/daemon/src/push.rs`.
+  assert.equal(pushHostKey('123e4567-e89b-12d3-a456-426614174000'), '986c0dc956dc822b');
 });
