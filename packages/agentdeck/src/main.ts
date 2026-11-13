@@ -3,6 +3,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { startPreviewServer } from './agent/preview';
 import { startPushNotifications } from './agent/push';
 import { startApp } from './state/app';
+import { openLaunchedApp, startSavedApps } from './state/saved-apps';
 import { startShareTarget } from './state/share';
 
 import './styles/theme';
@@ -12,14 +13,21 @@ import './pages/session';
 import './pages/subagent';
 import './pages/settings';
 
-initApp({
-  layout: html`<agentdeck-app class="block h-full"></agentdeck-app>`,
-});
+const start = async () => {
+  // Confirms a hot-updated frontend booted, see `crates/agentdeck/src/frontend_update.rs`; before opening a saved app,
+  // which leaves this page.
+  if (isTauri()) await invoke('frontend_update_ready');
+  if (await openLaunchedApp()) return;
 
-startApp();
-startPushNotifications();
-startPreviewServer();
-startShareTarget();
+  initApp({
+    layout: html`<agentdeck-app class="block h-full"></agentdeck-app>`,
+  });
 
-// Confirms a hot-updated frontend booted, see `crates/agentdeck/src/frontend_update.rs`.
-if (isTauri()) invoke('frontend_update_ready');
+  startApp();
+  startPushNotifications();
+  startPreviewServer();
+  startShareTarget();
+  startSavedApps();
+};
+
+start();

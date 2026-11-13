@@ -55,11 +55,17 @@ fn shared_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 
 #[cfg(target_os = "ios")]
 fn shared_dir(_app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(app_group_dir()?.join("shared"))
+}
+
+/// The App Group container, shared with the app's extensions.
+#[cfg(target_os = "ios")]
+pub fn app_group_dir() -> Result<std::path::PathBuf, String> {
     use objc2_foundation::{NSFileManager, NSString};
     let group = NSString::from_str("group.com.mantou.agentdeck");
     let path = NSFileManager::defaultManager()
         .containerURLForSecurityApplicationGroupIdentifier(&group)
         .and_then(|url| url.path())
         .ok_or("App Group container unavailable")?;
-    Ok(std::path::PathBuf::from(path.to_string()).join("shared"))
+    Ok(std::path::PathBuf::from(path.to_string()))
 }

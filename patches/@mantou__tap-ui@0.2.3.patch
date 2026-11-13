@@ -1,0 +1,76 @@
+diff --git a/elements/sheet.js b/elements/sheet.js
+index 948d8631eac8590f96ea6ab47f95462db456daa6..b2750066ce8953ca4a9913d7be83702f35ec356e 100644
+--- a/elements/sheet.js
++++ b/elements/sheet.js
+@@ -34,6 +34,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
+ };
+ import { adoptedStyle, attribute, boolattribute, customElement, effect, emitter, memo, part, property, shadow, slot, state, unmounted, } from '@mantou/gem/lib/decorators';
+ import { createRef, createState, css, GemElement, html } from '@mantou/gem/lib/element';
++import { render } from '@mantou/gem/lib/lit-html';
+ import { styleMap } from '@mantou/gem/lib/utils';
+ import { easeOutCubic } from '../lib/easing';
+ import { setBodyInert } from '../lib/element';
+@@ -270,15 +271,19 @@ let TapSheetElement = (() => {
+             const sheet = new this({
+                 ...options,
+                 paddingless: options.paddingless ?? options.hasStack,
+-                body: !options.hasStack
+-                    ? options.body
+-                    : html `
++                body: undefined,
++                open: true,
++            });
++            // Render the body into light DOM and project it through the default slot;
++            // WebKit doesn't apply shadow root `@scope` rules to elements slotted into a nested shadow host:
++            // https://bugs.webkit.org/show_bug.cgi?id=327165
++            render(!options.hasStack
++                ? options.body
++                : html `
+             <tap-stack .autoHeight=${!options.snap} disable-history .maxHeight=${innerHeight * 0.77}>
+               ${options.body}
+             </tap-stack>
+-          `,
+-                open: true,
+-            });
++          `, sheet);
+             const restoreInert = setBodyInert(sheet);
+             document.body.append(sheet);
+             return DyPromise.new((res) => {
+diff --git a/lib/image.js b/lib/image.js
+index 1203f94b078df2c3f765824bd15b90b3f977d40f..0a7ee59480a1524c843214f88f39412a34c169b8 100644
+--- a/lib/image.js
++++ b/lib/image.js
+@@ -11,7 +11,8 @@ export function createCanvas(width, height) {
+     return canvas;
+ }
+ export function createDataURLFromSVG(rawStr) {
+-    return `data:image/svg+xml;base64,${btoa(rawStr)}`;
++    // `btoa` throws on characters outside Latin-1
++    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(rawStr)}`;
+ }
+ // if `bg` is't `HexColor`, text fill color error
+ /**Create SVG according to the text */
+@@ -61,18 +62,11 @@ export async function createBitmapFromSvg(svg, { width = 512, height = 512, type
+     if (!ctx)
+         throw new Error('ctx is null');
+     img.src = createDataURLFromSVG(svg);
+-    await new Promise((res) => {
+-        img.onload = () => {
+-            ctx.drawImage(img, 0, 0, width, height);
+-            res(null);
+-        };
+-    });
+-    return new Promise((res) => {
+-        canvas.toBlob((b) => {
+-            if (!b)
+-                throw new Error();
+-            res(new File([b], '', { type: b.type }));
+-        }, type, quality);
++    // Rejects when the SVG can't be loaded
++    await img.decode();
++    ctx.drawImage(img, 0, 0, width, height);
++    return new Promise((res, rej) => {
++        canvas.toBlob((b) => (b ? res(new File([b], '', { type: b.type })) : rej(new Error('Canvas not encoded'))), type, quality);
+     });
+ }
+ export function createDataURLFromBlob(blob) {

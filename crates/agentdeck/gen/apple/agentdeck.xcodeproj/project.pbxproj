@@ -7,25 +7,37 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1FCCEE2C9400CEA06E1AC6EE /* agentdeck_ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		23CAC39803DD47A470AF83DD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0DFE2431F7D001860271AB3C /* WidgetKit.framework */; };
+		34D2C98EF29B5A29B11ABCD5 /* SavedAppWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC878F8315047BC76FF630FD /* SavedAppWidget.swift */; };
 		361E2D241516AAD2769A5D20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A03567258072F49EB1E09EC /* Assets.xcassets */; };
 		39DAD3D8DBB7ACF6D2C5BF0C /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = DAB9945DE9E9EFB52CC302D4 /* main.mm */; };
+		3E9E7C676C0DB73C7BCCB68C /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BCF85DD13BA035A2CFCE9FA /* ShareViewController.swift */; };
+		40795D285D402A723BF41F6D /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 845887D095CEC35D89E3F485 /* GoogleService-Info.plist */; };
 		4A8CBD01449644DCD17EE272 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F82D63050BFA082B2F66F7A8 /* Metal.framework */; };
 		4D8497A2664B350284200224 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */; };
+		5D616B9C859DED532070E086 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 658593F5FE2456E5F99AF369 /* Localizable.strings */; };
 		5FC641B441D0B7D3E2F209B5 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B7A019AC4B744FAFFA5604F /* Security.framework */; };
 		6E3E1B4C056668E3970FE775 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 860CBE7E3FB1776357472F4D /* CoreGraphics.framework */; };
-		791A0E1C30601A81001CBED7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */; };
+		7B07F2D7B42E32DC6FE842C1 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3502561D67090B61FEAA061D /* SwiftUI.framework */; };
 		81928F20E7671D77D34AC039 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D7466D105FC21244370BC876 /* QuartzCore.framework */; };
+		82674CBF772F3F0F99E5795A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3BDCDEF1BD3F2DF313453C7C /* Localizable.strings */; };
+		9C98E9981FD021A8FF8C1439 /* agentdeck_WidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8CEEA4304B29B97865BADBEA /* agentdeck_WidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A26CDA1E3A363364BA88ED5C /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 07FDE4F572A7A540D7796C5B /* libapp.a */; };
 		A3AA947601E86B0B7A41EF10 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 9D4F7221E2A457F89DF1019C /* assets */; };
 		B5D97BD73DBCF1438DE42274 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */; };
 		C9FAEEA58679281628E33BD4 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 78CB78DE555762C0467FFC5B /* UIKit.framework */; };
 		DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */; };
-		791A0E1E30601A81001CBED7 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 791A0E1D30601A81001CBED7 /* Localizable.strings */; };
-		1FCCEE2C9400CEA06E1AC6EE /* agentdeck_ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		3E9E7C676C0DB73C7BCCB68C /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BCF85DD13BA035A2CFCE9FA /* ShareViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		3914B682D72DA22F2ACD151A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D85E3B8E8AD5CE187049ABAA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F4378F18BBF60CD2951392E5;
+			remoteInfo = agentdeck_WidgetExtension;
+		};
 		E20E877B49D2EEAF2195EA1B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = D85E3B8E8AD5CE187049ABAA /* Project object */;
@@ -43,6 +55,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				1FCCEE2C9400CEA06E1AC6EE /* agentdeck_ShareExtension.appex in Embed Foundation Extensions */,
+				9C98E9981FD021A8FF8C1439 /* agentdeck_WidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -51,33 +64,54 @@
 
 /* Begin PBXFileReference section */
 		049FBEF9987A0C04AA457E71 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = agentdeck_ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		07FDE4F572A7A540D7796C5B /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		0A5086B168486BD57B2F72D4 /* WidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WidgetExtension.entitlements; sourceTree = "<group>"; };
+		0DFE2431F7D001860271AB3C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		14FEFCCE8C4E76330EF845D8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		19EC4957519500559466C137 /* agentdeck_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = agentdeck_iOS.entitlements; sourceTree = "<group>"; };
 		28EC4CBF5CD79F3223C3A7C3 /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
+		2D5E5E4E6AFBEC81FC2E42E4 /* frontend_update.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = frontend_update.rs; sourceTree = "<group>"; };
+		2DC37E5885A1541A1726E552 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		3502561D67090B61FEAA061D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		3B5ACFAC3A0710195E6E75C3 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		42E21D038C9CE8A6E15F443D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4BCF85DD13BA035A2CFCE9FA /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		4F76EB542D3B0A1AB004374F /* js_protocol.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = js_protocol.rs; sourceTree = "<group>"; };
 		5A03567258072F49EB1E09EC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		69F4EB1434773CED0CDD10F2 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
 		78CB78DE555762C0467FFC5B /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		845887D095CEC35D89E3F485 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		860CBE7E3FB1776357472F4D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		8CEEA4304B29B97865BADBEA /* agentdeck_WidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = agentdeck_WidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9ADAE33DBE866A878B78F3AF /* AgentDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9AEAAAB0C7B399242A58CD02 /* saved_apps.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = saved_apps.rs; sourceTree = "<group>"; };
 		9B7A019AC4B744FAFFA5604F /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		9D4F7221E2A457F89DF1019C /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		D2BD1AC6DAB7E9BEBA28B392 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		D2E694F9A66B244720BDE880 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		D7466D105FC21244370BC876 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		DAB9945DE9E9EFB52CC302D4 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		DC878F8315047BC76FF630FD /* SavedAppWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedAppWidget.swift; sourceTree = "<group>"; };
+		DDD6D3875B3D1EFE58A5022C /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		E4D6A67907EA8A61327DF8BB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E57FBA3477449C5FFF2DD3C4 /* share.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = share.rs; sourceTree = "<group>"; };
 		F82D63050BFA082B2F66F7A8 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
-		791A0E1F30601A81001CBED7 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		791A0E2030601A81001CBED7 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
-		06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = agentdeck_ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		4BCF85DD13BA035A2CFCE9FA /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
-		D2E694F9A66B244720BDE880 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
-		E4D6A67907EA8A61327DF8BB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		02F9F2FA88A9D64FDC3DE741 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23CAC39803DD47A470AF83DD /* WidgetKit.framework in Frameworks */,
+				7B07F2D7B42E32DC6FE842C1 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AFDFECC1B81BCD2D3373586B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -99,8 +133,12 @@
 		34C8EE1960D0206B29FABDBC /* src */ = {
 			isa = PBXGroup;
 			children = (
+				2D5E5E4E6AFBEC81FC2E42E4 /* frontend_update.rs */,
+				4F76EB542D3B0A1AB004374F /* js_protocol.rs */,
 				69F4EB1434773CED0CDD10F2 /* lib.rs */,
 				28EC4CBF5CD79F3223C3A7C3 /* main.rs */,
+				9AEAAAB0C7B399242A58CD02 /* saved_apps.rs */,
+				E57FBA3477449C5FFF2DD3C4 /* share.rs */,
 			);
 			name = src;
 			path = ../../src;
@@ -115,10 +153,23 @@
 				FB0A7EF9F304CFD4657BB5E7 /* MetalKit.framework */,
 				D7466D105FC21244370BC876 /* QuartzCore.framework */,
 				9B7A019AC4B744FAFFA5604F /* Security.framework */,
+				3502561D67090B61FEAA061D /* SwiftUI.framework */,
 				78CB78DE555762C0467FFC5B /* UIKit.framework */,
 				7E9EF6FB04D6942DF039C6D1 /* WebKit.framework */,
+				0DFE2431F7D001860271AB3C /* WidgetKit.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4F1F8BAC9BA1D677476B6B2C /* WidgetExtension */ = {
+			isa = PBXGroup;
+			children = (
+				42E21D038C9CE8A6E15F443D /* Info.plist */,
+				DC878F8315047BC76FF630FD /* SavedAppWidget.swift */,
+				0A5086B168486BD57B2F72D4 /* WidgetExtension.entitlements */,
+				658593F5FE2456E5F99AF369 /* Localizable.strings */,
+			);
+			path = WidgetExtension;
 			sourceTree = "<group>";
 		};
 		557EFCF9B73B07DCB5D56DE9 /* Sources */ = {
@@ -139,8 +190,9 @@
 		75EF3CEF154FD2BDDC12676D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */,
 				9ADAE33DBE866A878B78F3AF /* AgentDeck.app */,
+				06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */,
+				8CEEA4304B29B97865BADBEA /* agentdeck_WidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -148,10 +200,10 @@
 		7F64332A44AB37722E628EBE /* agentdeck_iOS */ = {
 			isa = PBXGroup;
 			children = (
-				791A0E1B30601A81001CBED7 /* GoogleService-Info.plist */,
 				19EC4957519500559466C137 /* agentdeck_iOS.entitlements */,
+				845887D095CEC35D89E3F485 /* GoogleService-Info.plist */,
 				14FEFCCE8C4E76330EF845D8 /* Info.plist */,
-				791A0E1D30601A81001CBED7 /* Localizable.strings */,
+				3BDCDEF1BD3F2DF313453C7C /* Localizable.strings */,
 			);
 			path = agentdeck_iOS;
 			sourceTree = "<group>";
@@ -164,11 +216,12 @@
 				80AE1740D7965163F51A5CE8 /* LaunchScreen.storyboard */,
 				7F64332A44AB37722E628EBE /* agentdeck_iOS */,
 				637D9498452F30CCE8E8AEAA /* Externals */,
+				E4B840E3E49C99FB7CB6BFF3 /* ShareExtension */,
 				557EFCF9B73B07DCB5D56DE9 /* Sources */,
 				34C8EE1960D0206B29FABDBC /* src */,
+				4F1F8BAC9BA1D677476B6B2C /* WidgetExtension */,
 				4B7CC197ECE79FE5486EF5A0 /* Frameworks */,
 				75EF3CEF154FD2BDDC12676D /* Products */,
-				E4B840E3E49C99FB7CB6BFF3 /* ShareExtension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -181,14 +234,6 @@
 			path = agentdeck;
 			sourceTree = "<group>";
 		};
-		F81232708DED67146E81A703 /* bindings */ = {
-			isa = PBXGroup;
-			children = (
-				049FBEF9987A0C04AA457E71 /* bindings.h */,
-			);
-			path = bindings;
-			sourceTree = "<group>";
-		};
 		E4B840E3E49C99FB7CB6BFF3 /* ShareExtension */ = {
 			isa = PBXGroup;
 			children = (
@@ -199,32 +244,17 @@
 			path = ShareExtension;
 			sourceTree = "<group>";
 		};
+		F81232708DED67146E81A703 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				049FBEF9987A0C04AA457E71 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		949E988C9B1A2BCF6FAE6AB5 /* agentdeck_iOS */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B57A3033204F1D2C2C10442F /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */;
-			buildPhases = (
-				12ED8C7F8895FC89011C8F7E /* Build Rust Code */,
-				4EB8A49A9E0E0B582B3086EF /* Sources */,
-				BC748C5121DD11855B7D922F /* Resources */,
-				AFDFECC1B81BCD2D3373586B /* Frameworks */,
-				20BF2AD44E7A402F6BED5B94 /* Embed Foundation Extensions */,
-				5A1E2C7D9B3F4E8A0C6D2B71 /* Keep Extension Entitlements */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				34CA45F14459148BED9112C6 /* PBXTargetDependency */,
-			);
-			name = agentdeck_iOS;
-			packageProductDependencies = (
-			);
-			productName = agentdeck_iOS;
-			productReference = 9ADAE33DBE866A878B78F3AF /* AgentDeck.app */;
-			productType = "com.apple.product-type.application";
-		};
 		267CA6AC2E886732A00DEE1F /* agentdeck_ShareExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1ABE95954BDE9E91DEE0BD3D /* Build configuration list for PBXNativeTarget "agentdeck_ShareExtension" */;
@@ -241,6 +271,50 @@
 			);
 			productName = agentdeck_ShareExtension;
 			productReference = 06EE354968F722EAD9E2B63D /* agentdeck_ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		949E988C9B1A2BCF6FAE6AB5 /* agentdeck_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B57A3033204F1D2C2C10442F /* Build configuration list for PBXNativeTarget "agentdeck_iOS" */;
+			buildPhases = (
+				12ED8C7F8895FC89011C8F7E /* Build Rust Code */,
+				4EB8A49A9E0E0B582B3086EF /* Sources */,
+				BC748C5121DD11855B7D922F /* Resources */,
+				AFDFECC1B81BCD2D3373586B /* Frameworks */,
+				20BF2AD44E7A402F6BED5B94 /* Embed Foundation Extensions */,
+				C40FBF7AEB3402CD0B79E8A9 /* Keep Extension Entitlements */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				34CA45F14459148BED9112C6 /* PBXTargetDependency */,
+				6718DD7F770013A6ABA213E1 /* PBXTargetDependency */,
+			);
+			name = agentdeck_iOS;
+			packageProductDependencies = (
+			);
+			productName = agentdeck_iOS;
+			productReference = 9ADAE33DBE866A878B78F3AF /* AgentDeck.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F4378F18BBF60CD2951392E5 /* agentdeck_WidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E3949879C2AACDB361A1A2CE /* Build configuration list for PBXNativeTarget "agentdeck_WidgetExtension" */;
+			buildPhases = (
+				6EF7F37D8BD5BB39C7A44FEC /* Sync App Version */,
+				89F39E1EEBEA77AD9D1500E0 /* Sources */,
+				D861FAEAC85880642A337F32 /* Resources */,
+				02F9F2FA88A9D64FDC3DE741 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = agentdeck_WidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = agentdeck_WidgetExtension;
+			productReference = 8CEEA4304B29B97865BADBEA /* agentdeck_WidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -269,6 +343,7 @@
 			targets = (
 				949E988C9B1A2BCF6FAE6AB5 /* agentdeck_iOS */,
 				267CA6AC2E886732A00DEE1F /* agentdeck_ShareExtension */,
+				F4378F18BBF60CD2951392E5 /* agentdeck_WidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -279,10 +354,18 @@
 			buildActionMask = 2147483647;
 			files = (
 				361E2D241516AAD2769A5D20 /* Assets.xcassets in Resources */,
-				791A0E1C30601A81001CBED7 /* GoogleService-Info.plist in Resources */,
+				40795D285D402A723BF41F6D /* GoogleService-Info.plist in Resources */,
 				DB24B1A38E0820DA0B5ED1BF /* LaunchScreen.storyboard in Resources */,
+				82674CBF772F3F0F99E5795A /* Localizable.strings in Resources */,
 				A3AA947601E86B0B7A41EF10 /* assets in Resources */,
-				791A0E1E30601A81001CBED7 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D861FAEAC85880642A337F32 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D616B9C859DED532070E086 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -310,6 +393,27 @@
 			shellPath = /bin/sh;
 			shellScript = "pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
 		};
+		6EF7F37D8BD5BB39C7A44FEC /* Sync App Version */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/agentdeck_iOS/Info.plist",
+			);
+			name = "Sync App Version";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/WidgetExtension/Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "plist=\"${SRCROOT}/agentdeck_iOS/Info.plist\"\nfor key in CFBundleShortVersionString CFBundleVersion; do\n  /usr/libexec/PlistBuddy -c \"Set :$key $(/usr/libexec/PlistBuddy -c \"Print :$key\" \"$plist\")\" \"${SRCROOT}/${INFOPLIST_FILE}\"\ndone\n";
+		};
 		974CD3F52E108AA301D4F5E6 /* Sync App Version */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -331,7 +435,7 @@
 			shellPath = /bin/sh;
 			shellScript = "plist=\"${SRCROOT}/agentdeck_iOS/Info.plist\"\nfor key in CFBundleShortVersionString CFBundleVersion; do\n  /usr/libexec/PlistBuddy -c \"Set :$key $(/usr/libexec/PlistBuddy -c \"Print :$key\" \"$plist\")\" \"${SRCROOT}/${INFOPLIST_FILE}\"\ndone\n";
 		};
-		5A1E2C7D9B3F4E8A0C6D2B71 /* Keep Extension Entitlements */ = {
+		C40FBF7AEB3402CD0B79E8A9 /* Keep Extension Entitlements */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -348,19 +452,11 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$CODE_SIGNING_ALLOWED\" = \"NO\" ]; then\n  codesign --force --sign - --entitlements \"$SRCROOT/ShareExtension/ShareExtension.entitlements\" \"$TARGET_BUILD_DIR/$PLUGINS_FOLDER_PATH/agentdeck_ShareExtension.appex\"\nfi\n";
+			shellScript = "if [ \"$CODE_SIGNING_ALLOWED\" = \"NO\" ]; then\n  for name in ShareExtension WidgetExtension; do\n    codesign --force --sign - --entitlements \"$SRCROOT/$name/$name.entitlements\" \"$TARGET_BUILD_DIR/$PLUGINS_FOLDER_PATH/agentdeck_$name.appex\"\n  done\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		4EB8A49A9E0E0B582B3086EF /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				39DAD3D8DBB7ACF6D2C5BF0C /* main.mm in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		172426965781572D01FA3FAE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -369,19 +465,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXSourcesBuildPhase section */
-
-/* Begin PBXVariantGroup section */
-		791A0E1D30601A81001CBED7 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				791A0E1F30601A81001CBED7 /* en */,
-				791A0E2030601A81001CBED7 /* zh-Hans */,
+		4EB8A49A9E0E0B582B3086EF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				39DAD3D8DBB7ACF6D2C5BF0C /* main.mm in Sources */,
 			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
+			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXVariantGroup section */
+		89F39E1EEBEA77AD9D1500E0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				34D2C98EF29B5A29B11ABCD5 /* SavedAppWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		34CA45F14459148BED9112C6 /* PBXTargetDependency */ = {
@@ -389,7 +489,33 @@
 			target = 267CA6AC2E886732A00DEE1F /* agentdeck_ShareExtension */;
 			targetProxy = E20E877B49D2EEAF2195EA1B /* PBXContainerItemProxy */;
 		};
+		6718DD7F770013A6ABA213E1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F4378F18BBF60CD2951392E5 /* agentdeck_WidgetExtension */;
+			targetProxy = 3914B682D72DA22F2ACD151A /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		3BDCDEF1BD3F2DF313453C7C /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				DDD6D3875B3D1EFE58A5022C /* en */,
+				2DC37E5885A1541A1726E552 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		658593F5FE2456E5F99AF369 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				3B5ACFAC3A0710195E6E75C3 /* en */,
+				D2BD1AC6DAB7E9BEBA28B392 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		2A82DC17B19623D9EDAAA59B /* debug */ = {
@@ -400,7 +526,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = "S6U2D4P869";
+				DEVELOPMENT_TEAM = S6U2D4P869;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -408,7 +534,6 @@
 					"\".\"",
 				);
 				INFOPLIST_FILE = agentdeck_iOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -435,6 +560,63 @@
 			};
 			name = debug;
 		};
+		2B3E1352207F6C08629D8360 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = WidgetExtension/WidgetExtension.entitlements;
+				DEVELOPMENT_TEAM = S6U2D4P869;
+				INFOPLIST_FILE = WidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck.widget;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = debug;
+		};
+		462735CC47930313ED02C201 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = WidgetExtension/WidgetExtension.entitlements;
+				DEVELOPMENT_TEAM = S6U2D4P869;
+				INFOPLIST_FILE = WidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck.widget;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = release;
+		};
+		70F42ACD3F421199128C3F8C /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEVELOPMENT_TEAM = S6U2D4P869;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck.share;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = debug;
+		};
 		87747C0FDC52EEB92DDAEBF3 /* release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -443,7 +625,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = agentdeck_iOS/agentdeck_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = "S6U2D4P869";
+				DEVELOPMENT_TEAM = S6U2D4P869;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -451,7 +633,6 @@
 					"\".\"",
 				);
 				INFOPLIST_FILE = agentdeck_iOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -475,6 +656,25 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		91137FA067C6730AA98C506C /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEVELOPMENT_TEAM = S6U2D4P869;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck.share;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = release;
 		};
@@ -529,7 +729,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -586,7 +786,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -597,47 +797,18 @@
 			};
 			name = release;
 		};
-		70F42ACD3F421199128C3F8C /* debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
-				DEVELOPMENT_TEAM = "S6U2D4P869";
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck.share;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = debug;
-		};
-		91137FA067C6730AA98C506C /* release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
-				DEVELOPMENT_TEAM = "S6U2D4P869";
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.mantou.agentdeck.share;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1ABE95954BDE9E91DEE0BD3D /* Build configuration list for PBXNativeTarget "agentdeck_ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70F42ACD3F421199128C3F8C /* debug */,
+				91137FA067C6730AA98C506C /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
 		20F4B391756C1675211270C0 /* Build configuration list for PBXProject "agentdeck" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -656,11 +827,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;
 		};
-		1ABE95954BDE9E91DEE0BD3D /* Build configuration list for PBXNativeTarget "agentdeck_ShareExtension" */ = {
+		E3949879C2AACDB361A1A2CE /* Build configuration list for PBXNativeTarget "agentdeck_WidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				70F42ACD3F421199128C3F8C /* debug */,
-				91137FA067C6730AA98C506C /* release */,
+				2B3E1352207F6C08629D8360 /* debug */,
+				462735CC47930313ED02C201 /* release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;

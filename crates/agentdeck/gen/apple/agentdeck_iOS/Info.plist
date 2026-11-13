@@ -21,12 +21,12 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.mantou.agentdeck</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>agentdeck</string>
 			</array>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).agentdeck</string>
 		</dict>
 	</array>
 	<key>LSRequiresIPhoneOS</key>

@@ -241,6 +241,8 @@ type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 
 // Allow ACP startup/history work more time than the lightweight host handshake.
 const sessionTimeoutSeconds = 60;
+// Daemon's per-read limit for `file_read`.
+const RAW_CHUNK_BYTES = 8 * 1024 * 1024;
 
 type PeerAttachResult = {
   peerId: number;
@@ -314,6 +316,20 @@ export class AgentApi {
         ephemeral: true,
       },
     );
+
+  /** A whole host file as raw bytes, read in slices within the daemon's per-read limit. */
+  readWholeRawFile = async (path: string, cwd?: string) => {
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    for (let offset = 0, size = 1; offset < size; ) {
+      const result = await this.readRawFile(path, [offset, RAW_CHUNK_BYTES], cwd);
+      // The file shrank while reading
+      if (!result.data.length) break;
+      chunks.push(result.data);
+      offset += result.data.length;
+      size = result.size;
+    }
+    return chunks;
+  };
 
   readFile = (path: string, cwd: string) =>
     this.#peer.call<RemoteFile>('file_read', { path, cwd }, undefined, {

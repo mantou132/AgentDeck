@@ -5,6 +5,7 @@ import { isSmallTextFile } from './file-preview';
 import { parseMessageLink } from './links';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
 
+import '../elements/app';
 import '../elements/event';
 import '../elements/new-session';
 import '../elements/preview';
@@ -117,6 +118,7 @@ const createMarkdownExtensions = (options: MarkdownOptions = {}): MarkedExtensio
           const attrs = ['edge-to-edge', 'headerless'].filter((flag) => flags.includes(flag)).join(' ');
           return `<deck-preview path="${source}" ${attrs}></deck-preview>`;
         }
+        if (closed && language === 'agentdeck-app') return `<deck-app path="${source}"></deck-app>`;
         if (closed && language === 'agentdeck-map') return `<deck-map source="${source}"></deck-map>`;
         if (closed && language === 'agentdeck-screen') return `<deck-screen target="${source}"></deck-screen>`;
         if (closed && language === 'agentdeck-session')
@@ -213,6 +215,7 @@ const baseMarkdownStyle = `
   deck-chart,
   deck-map,
   deck-preview,
+  deck-app,
   deck-screen,
   deck-new-session,
   deck-event {
@@ -284,6 +287,7 @@ userMarkdownStyle.replaceSync(`
   deck-chart,
   deck-map,
   deck-preview,
+  deck-app,
   deck-screen,
   deck-new-session,
   deck-event {

@@ -7,8 +7,8 @@
     "build": "rsbuild build"
   },
   "dependencies": {
-    "@mantou/gem": "^2.3.2",
-    "@mantou/tap-ui": "^0.2.2"
+    "@mantou/gem": "^2.3.3",
+    "@mantou/tap-ui": "^0.2.3"
   },
   "devDependencies": {
     "@rsbuild/core": "^2.3.0",
