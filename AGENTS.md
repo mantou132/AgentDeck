@@ -29,8 +29,8 @@
 - **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，agentdeckd 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。
 - **端到端加密（E2EE）**：普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - **会话状态机制**：新会话先建本地待创建会话（App 中称 pending session），首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
-- **连接与重试**：host 握手成功才算 connected。普通重连保留 SDK 消息状态；短请求有超时，prompt 不套相同的固定短时限；带事件流的调用（load）从最后一帧起计时，`peer_attach` 等待期间收到 host 的任何帧也会重新计时（重连后 Relay 先补发积压消息，attach 回复排在其后）。等待用户输入的权限请求与问题（ACP form elicitation）由 daemon 保存，以通知投递、`agent_user_input_respond` 作答，App 每次连上 host 都经 `agent_prompts_running` 补回，不依赖请求重投。
-- **投递方式**：调用通过 `CallOptions.ephemeral` 显式声明走 Relay ephemeral（不落库、不 ack，host 离线时立即失败，断线时进行中的调用也立即失败），host 对其 event / 回复同样走 ephemeral；目前只有 `file_read` 和 `screen_capture`，其余请求、回复与通知都走可靠投递。`file_read` 的 raw 与图片回复、`screen_capture` 的截图在 Relay 上以二进制帧传输（配对为 `adk1_` 时加密）。旧版 relay-client 无法解析 ephemeral 帧，App 与 daemon 需一起升级。
+- **连接与重试**：host 握手成功才算 connected，普通重连保留 SDK 消息状态。短请求有超时，prompt 不套固定短时限；load 等事件流调用与 `peer_attach` 从收到 host 的最后一帧起计时（重连后 Relay 先补发积压消息）。权限请求与问题由 daemon 保存，App 每次连上经 `agent_prompts_running` 补回，不依赖请求重投。
+- **投递方式**：只有 `file_read` 与 `screen_capture` 经 `CallOptions.ephemeral` 走 Relay ephemeral（不落库、不 ack，host 离线或断线即失败，回复同样 ephemeral，字节回复为二进制帧），其余一律可靠投递。
 - **重置与清理**：异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
 
 # 前端开发（Gem 规范与语法指南）
@@ -47,147 +47,7 @@
 - 全局状态用 `createStore` / `@connectStore`；事件用 `@emitter`，跨 Shadow DOM 冒泡用 `@globalemitter`；part / slot 用静态装饰字段。
 - Toast 的消息文案应该适当简短
 
-### Gem Syntax Example
-
-```ts
-// 如果需要全局状态，就可以创建一个 Store
-// 也许是从其他模块中导入的
-const store = createStore({
-  globalCount: 1,
-  text: '',
-});
-
-// 一个更新 Store 的函数，Store 即是个数据对象，也可以用来更新内容
-// 一般和 Store 的定义写在模块中，也可能没有这样的函数，因为可以直接调用 `store({})` 更新
-const addCount = () => store({ globalCount: store.globalCount + 1 });
-
-// 创建一个给元素实例用的主题
-// 当元素的样式基于元素的属性时使用这种方法
-// 这是个特殊的主题，在应用到元素时他也是个装饰器，作用是用来反应元素属性的变化来更改主题值
-const elementTheme = createDecoratorTheme({ color: 'red' });
-
-// 用 `css` 创建 Gem 元素可挂载的样式表，可以使用 CSS 嵌套语法
-// 只有元素通过 `@shadow` 定义成了 Shadow DOM，CSS 中才能使用 `:host`
-// 否则使用 `:scope`，请注意区分他们的使用方法而不是简单的替换
-// 不要在模板内写内联样式，以此种方式定义的样式可以共享，而且和 DOM 分离
-// 如果项目定义了主题，CSS 规则值可以从主题读取
-const style = css`
-  :scope {
-    display: block;
-    color: ${theme.textColor};
-  }
-`;
-
-// 复杂的元素，可以使用这个方案编写样式表，在模板中用 `style1.header` 来引用类名
-const style1 = css({
-  // `$` 表示 `:host` 或 `:scope`
-  $: `
-    font-size: small;
-  `,
-  content: `
-    font-size: 24px;
-    color: ${elementTheme.color};
-  `,
-});
-
-// 自定义元素标签名，使用统一的 `dy` 命名空间
-@customElement('dy-test')
-// 将创建的样式表挂载到元素上，使用多次就可以挂载多个样式表
-@adoptedStyle(style)
-@adoptedStyle(style1)
-// 将全局 store 链接到元素上，store 更新时驱动元素更新，使用多次就可以链接多个 store
-@connectStore(store)
-// 默认是 Light DOM，只有使用了 `@shadow()` 才是 Shadow DOM，参数是 `ShadowRootInit`
-@shadow()
-// 一般不需要使用，只有该元素的内容需要能被外部样式化时才使用
-@light({ penetrable: true })
-// 指定元素渲染不会阻塞主线程，如果这个元素需要一次渲染很多个实例，可以使用
-@async()
-// 用来指定元素的 ARIA 属性，加强元素的可访问性
-@aria({ role: 'region' })
-// 这里的元素类名，`Duoyun` 是 `dy` 的全称，后面要加 `Element`，类似原生 HTML 元素类名
-class DuoyunTestElement extends GemElement {
-  // 定义元素的 part，使用静态字段可以让外部引用 part 名称，不需要设置初始值，状态器会提供一个同名初始值
-  static @part img: string;
-  // 定义元素的 slot，和 `@part` 一样的原则
-  static @slot content: string;
-  // 指定一个称为 `src` 的 Attribute，当没有赋值时默认解析成空字符串
-  @attribute src: string;
-  // 指定一个称为 `count` 的 Attribute，但解析成数字，当没有赋值时默认解析成 `0`
-  @numattribute count: number;
-  // 指定一个称为 `show` 的 Attribute，但解析成布尔值，当没有赋值时默认解析成 `false`
-  @boolattribute show: boolean;
-  // 当 Attribute 不能表示的属性时用 Property 表示，由于用户可以不传递属性，所以总要处理为空的情况，更改时会触发元素重新渲染
-  @property data?: {};
-  // 定义了一个 `display-content` 事件，直接调用触发，参数是自定义事件的 `detail` 属性
-  // 只需要指定类型，类型中的参数是自定义事件的 `detail` 属性，`this.displayContent(true)` 触发
-  // 很多时候传递数据，就使用 `null` 占位
-  // `@globalemitter` 可以穿透 ShadowDOM 进行冒泡
-  @emitter displayContent: Emitter<boolean>;
-  // 定义 CSS 状态，仅仅是用来供外部 CSS 选择器使用，例如 `dy-test:state(open)`
-  // 修改方法：`this.open = true`，没有特别的限制
-  @state open: boolean;
-
-  // 创建一个 { value?: HTMLImageElement } 对象，用来访问 DOM
-  #imgRef = createRef<HTMLImageElement>();
-  // 创建一个内部状态对象，`this.#state({ ... })` 来更新状态
-  // 元素内部不应该更新元素的 Attribute/Property，就像原生元素一样
-  // 注意和 CSS 状态 `@state` 无关
-  #state = createState({ internalCount: 1 });
-
-  // Attribute 不要赋初始值，因为 DOM 序列化会多出一些内容，如果需要默认值，可以定义一个 `getter`
-  // Property 可以赋初始值，但也同样可以用 `getter`
-  get #src() {
-    return this.src || 'test';
-  }
-
-  // 一些复杂计算可以使用 `@memo`，他的参数是一个函数，参数是当前实例，返回一个依赖数组
-  // 在元素每次渲染前执行，只有依赖数组有更改时才会执行函数内容
-  // 基于 `@memo` 实现了 `@willMount`
-  @memo((i) => [i.src])
-  get #text() {
-    return this.src.repeat(10);
-  }
-
-  // 每次渲染后的副作用，参数和 `@memo` 一样，没有参数时每次都执行
-  // 返回的函数会作为清理函数，在下次调用前执行
-  // 类似 React 的 `useLayoutEffect`
-  // 基于 `@effect` 实现了 `@mounted` `@unmounted`
-  @effect()
-  #print = () => {
-    console.log('updated');
-    return () => console.log('clear');
-  }
-
-  // `@template` 指定模板渲染函数，参数是一个条件函数，可以为不同条件指定不同渲染内容
-  // 不提供条件函数时直接认为满足条件
-  @template()
-  #content = () => {
-    const imgProps = { dataTest: 1 };
-    // 模板语法基于 lit-html，添加了 Vue 的 `v-if` 语法、Ref 语法和剩余属性语法
-    // 必要时候使用 `classMap` `styleMap` `partMap` `exportPartsMap`
-    return html`
-      <img ${this.#imgRef} ${imgProps} src=${this.#src} part=${DuoyunTestElement.part} />
-      <div class=${classMap({ div: true })} v-if=${this.show}>Show</div>
-      <div v-else class=${style1.content} style=${styleMap({ fontSize: '10px' })}>None</div>
-    `;
-  }
-
-  // 当元素更新后，会根据依赖是否变化重新计算主题，不提供依赖函数则每次更新都更新主题
-  @elementTheme((i) => [i.show])
-  #updateTheme = () => ({ color: this.show ? 'red' : 'blue' });
-
-  // 渲染出错时的后备内容，只有可能会渲染出错时才需要提供后备模板内容
-  @fallback()
-  #errorContent = (err) => {
-    return html`Error: ${err}`;
-  }
-
-  // Gem 元素使用 ES 装饰器定义特性，装饰器本身就完整的表示了意义，所以不需要额外写自定义元素声明
-  // Gem 元素不要使用生命周期函数，应该使用各种装饰器装饰普通函数，生命周期已经弃用了!!!
-  // 应该尽量使用 ES 私有字段（`#aaa`）来替代类方法，这样没有 `this` 指向的问题
-}
-```
+完整写法见带注释的示例 `packages/agentdeck/node_modules/@mantou/gem/AGENTS.md`，写元素前先读。
 
 # 常用全局命令
 
@@ -199,8 +59,8 @@ class DuoyunTestElement extends GemElement {
 
 # 发布
 
-- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon 多平台二进制 → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展同步 `manifest.json` 版本后发布到 Chrome、Edge、Firefox 商店；Android 同步 `tauri.conf.json` 版本，APK/AAB 附到 Release，AAB 提交 Google Play Production 审核；iOS 以 run number 为 build 号构建 IPA，经 fastlane 同步 `distribution/appstore/metadata` 后提交 App Store 审核，通过后自动发布；已有版本在审或待发布时停在提交前（deliver 会先改名该版本再在换包时失败），审核结束后重跑该 job。
-- macOS Daemon 用 `MACOS_CERT_P12_BASE64` / `MACOS_CERT_PASSWORD`（Developer ID Application 证书）签名，identifier 为 `com.agentdeck.daemon`，使隐私授权在升级后保留；secret 缺失或证书失效时保留 ad-hoc 签名继续发布。
-- 前端热更新：移动端发布构建带 `AGENTDECK_NATIVE_ID`（`crates/agentdeck` 与 `Cargo.lock` 的 git 对象哈希），Android 流水线把整个 `dist` 打成 `agentdeck-frontend-<id>.tar.gz` 附到 Release。App 启动时取比自身新、同 native ID 的最新 Release 包，按 GitHub 记录的 sha256 校验后下次启动生效；新包启动后前端调用 `frontend_update_ready` 确认，未确认的包下次启动回退且不再下载。原生层（含 Rust 依赖）改动会换 ID，旧 App 只能经商店更新。热更新只用于修复与小改动，新功能仍走商店审核。
+- 推送 `vX.Y.Z` tag 触发全部发布，版本号取自 tag：Daemon → npm / Homebrew（`mantou132/homebrew-tap`）/ Scoop（`mantou132/scoop-bucket`）/ GitHub Release；扩展发布到 Chrome、Edge、Firefox 商店；Android 提交 Google Play；iOS 经 fastlane 提交 App Store（已有版本在审或待发布时停在提交前，审核结束后重跑该 job）。
+- macOS Daemon 用 Developer ID 证书签名（identifier `com.agentdeck.daemon`，使隐私授权在升级后保留），证书不可用时退回 ad-hoc。
+- 前端热更新：Release 附带 `agentdeck-frontend-<native id>.tar.gz`（native id 为 `crates/agentdeck` 与 `Cargo.lock` 的 git 哈希），App 下载同 id 的更新包，下次启动生效，未经 `frontend_update_ready` 确认的包回退。原生层改动会换 id，只能走商店。热更新只用于修复与小改动，新功能仍走商店审核。
 - 可选：打 tag 前更新 `distribution/whatsnew/`（每种语言不超过 500 字符）作为 Google Play 与 App Store 更新说明。更新前把旧说明按其版本存到 `history/`（如 `history/whatsnew-en-US-0.8.0`）；不能放在 `whatsnew/` 根目录，Google Play 上传会把根目录下所有 `whatsnew-*` 文件名当语言代码提交。
 - 所需 Secrets 以各 workflow 文件中的引用为准。

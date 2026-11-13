@@ -24,7 +24,7 @@ export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';
 export const EVENTS_ADDED_KEY = 'agentdeck.events_added.v1';
 /** sessionStorage: the link that started the App was handled; AgentDeck reloads each time a saved app exits. */
 export const LAUNCH_LINK_TAKEN_KEY = 'agentdeck.launch_link_taken.v1';
-export const DISABLED_SKILLS_KEY = 'agentdeck.disabled_skills.v1';
+export const SKILL_TOGGLES_KEY = 'agentdeck.skill_toggles.v1';
 
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.
@@ -42,7 +42,7 @@ export const MIN_DAEMON_VERSION = '0.8.0';
 
 /**
  * Rendering capabilities this client supports, in settings order; the enabled ones are declared to the host,
- * which teaches agents the matching skill (e.g. `agentdeck-chart`).
+ * which teaches agents the matching skill (e.g. `agentdeck-chart`). `job` is a workflow skill, toggled the same way.
  */
 export const SUPPORTED_SKILLS = [
   'widget',
@@ -52,10 +52,14 @@ export const SUPPORTED_SKILLS = [
   'screen',
   'session',
   ...(calendarSupported ? ['event'] : []),
+  'job',
 ];
 
 /** Skills that only work with another one, e.g. built apps open through `agentdeck-preview`; off with it. */
 export const SKILL_REQUIRES: Record<string, string> = { app: 'preview' };
+
+/** Off until turned on in settings, e.g. workflows most users never need. */
+export const DEFAULT_OFF_SKILLS = ['job'];
 
 export type AgentInfo = { id: string; name: string };
 
@@ -127,12 +131,13 @@ export const readPairingHistory = (): PairingRecord[] => {
   }
 };
 
-export const readDisabledSkills = (): string[] => {
+/** Skills the user switched in settings; the others follow `DEFAULT_OFF_SKILLS`. */
+export const readSkillToggles = (): Record<string, boolean> => {
   try {
-    const value = JSON.parse(localStorage.getItem(DISABLED_SKILLS_KEY) || '[]');
-    return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
+    const value = JSON.parse(localStorage.getItem(SKILL_TOGGLES_KEY) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch {
-    return [];
+    return {};
   }
 };
 

@@ -13,12 +13,12 @@ import {
 import { clearDrafts } from '../composer/drafts';
 import {
   type AppSettings,
-  DISABLED_SKILLS_KEY,
   MIN_DAEMON_VERSION,
   PAIRING_HISTORY_KEY,
   type PairingRecord,
   RESET_PENDING_KEY,
   SETTINGS_KEY,
+  SKILL_TOGGLES_KEY,
   SUPPORTED_SKILLS,
 } from '../config';
 import { i18n } from '../i18n';
@@ -171,10 +171,9 @@ export const startApp = async () => {
 
 /** Takes effect immediately: the host is told again, and sessions created or loaded afterwards use it. */
 export const setSkillEnabled = (skill: string, enabled: boolean) => {
-  const disabledSkills = agentdeckStore.disabledSkills.filter((item) => item !== skill);
-  if (!enabled) disabledSkills.push(skill);
-  localStorage.setItem(DISABLED_SKILLS_KEY, JSON.stringify(disabledSkills));
-  agentdeckStore({ disabledSkills });
+  const skillToggles = { ...agentdeckStore.skillToggles, [skill]: enabled };
+  localStorage.setItem(SKILL_TOGGLES_KEY, JSON.stringify(skillToggles));
+  agentdeckStore({ skillToggles });
   updateTransportCapabilities(renderCapabilities());
 };
 

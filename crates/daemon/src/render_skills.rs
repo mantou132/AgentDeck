@@ -2,7 +2,8 @@
 //! `peer_attach`. Each capability ships as a directory mounted through ACP
 //! `additionalDirectories`; its skill teaches the agent a fenced block the
 //! client renders from Markdown; the `app` skill also ships a project template
-//! the agent copies. The skill directories are embedded whole.
+//! the agent copies. `job` is a workflow skill rather than an output format,
+//! toggled the same way. The skill directories are embedded whole.
 
 use std::{
     fs,
@@ -29,7 +30,7 @@ static SKILLS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/render_skills");
 /// `ClientCapabilities::render` entries with a skill; each is also the skill
 /// and directory name.
 const SKILLS: &[&str] = &[
-    "widget", "chart", "map", "preview", "screen", "session", "event", "app",
+    "widget", "chart", "map", "preview", "screen", "session", "event", "app", "job",
 ];
 
 /// Skill locations agents scan in additional directories: Codex reads

@@ -1,11 +1,12 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
 import {
+  DEFAULT_OFF_SKILLS,
   defaultAgents,
-  readDisabledSkills,
   readPairingHistory,
   readSavedCommands,
   readSettings,
+  readSkillToggles,
   SKILL_REQUIRES,
 } from '../config';
 import type { Elicitation } from '../session/elicitation';
@@ -18,8 +19,8 @@ const initialSettings = readSettings();
 export const agentdeckStore = createStore({
   settings: initialSettings,
   pairingHistory: readPairingHistory(),
-  /** Skills turned off in settings; the rest of `SUPPORTED_SKILLS` are declared to the host. */
-  disabledSkills: readDisabledSkills(),
+  /** Skills switched in settings; enabled ones (`isSkillEnabled`) are declared to the host. */
+  skillToggles: readSkillToggles(),
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
   /** Daemon version of the connected host; old hosts omit it. */
@@ -82,10 +83,11 @@ export const hostAgents = (relayId = agentdeckStore.settings.relayId) => {
   return [free, ...custom, ...popular.filter((agent) => !custom.some(({ id }) => id === agent.id))];
 };
 
-/** Turned on in settings, and so is the skill it requires. */
+/** Turned on (in settings, else by default), and so is the skill it requires. */
 export const isSkillEnabled = (skill: string): boolean => {
   const required = SKILL_REQUIRES[skill];
-  return !agentdeckStore.disabledSkills.includes(skill) && (!required || isSkillEnabled(required));
+  const enabled = agentdeckStore.skillToggles[skill] ?? !DEFAULT_OFF_SKILLS.includes(skill);
+  return enabled && (!required || isSkillEnabled(required));
 };
 
 const idleRuntime: SessionRuntime = { load: 'idle' };

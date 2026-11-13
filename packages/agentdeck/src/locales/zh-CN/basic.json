@@ -184,6 +184,8 @@
   "skill.sessionDesc": "提议另开会话处理后续任务",
   "skill.event": "日历事件",
   "skill.eventDesc": "把日程添加到手机日历",
+  "skill.job": "求职助手",
+  "skill.jobDesc": "整理资料、制作简历、在招聘网站批量投递并跟踪进度",
   "relayGuide.step1Title": "安装 agentdeckd",
   "relayGuide.step1Desc": "在电脑上通过 npm、Homebrew 或 Scoop 安装 $1<agentdeckd>。",
   "relayGuide.step2Title": "启动并配对",

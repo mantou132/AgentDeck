@@ -184,6 +184,8 @@
   "skill.sessionDesc": "Suggest follow-up tasks in new sessions",
   "skill.event": "Calendar Events",
   "skill.eventDesc": "Add events to the phone calendar",
+  "skill.job": "Job Search",
+  "skill.jobDesc": "Build a resume, apply on job sites in batches and track progress",
   "relayGuide.step1Title": "Install agentdeckd",
   "relayGuide.step1Desc": "Install $1<agentdeckd> on your computer via npm, Homebrew, or Scoop.",
   "relayGuide.step2Title": "Start & Pair",
