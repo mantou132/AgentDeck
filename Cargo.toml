@@ -10,3 +10,8 @@ codegen-units = 1
 strip = true
 panic = "abort"
 opt-level = "z"
+
+[patch.crates-io]
+# iOS: emit `Opened` for the URL a scene launches with (home screen widget links on a cold start);
+# drop once tauri-apps/tao ships it.
+tao = { git = "https://github.com/mantou132/tao", branch = "ios-scene-launch-url" }
