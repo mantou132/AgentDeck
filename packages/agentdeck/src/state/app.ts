@@ -1,17 +1,25 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { DEFAULT_STORAGE_KEY } from 'relay-client-ts';
+import type { ClientCapabilities } from '../agent/api';
 import { isPairingId } from '../agent/encryption';
-import { clearTransportStorage, initTransport, startTransport, type TransportMessage } from '../agent/transport';
+import {
+  clearTransportStorage,
+  initTransport,
+  startTransport,
+  type TransportMessage,
+  updateTransportCapabilities,
+} from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
 import {
   type AppSettings,
+  DISABLED_SKILLS_KEY,
   MIN_DAEMON_VERSION,
   PAIRING_HISTORY_KEY,
   type PairingRecord,
-  RENDER_CAPABILITIES,
   RESET_PENDING_KEY,
   SETTINGS_KEY,
+  SUPPORTED_SKILLS,
 } from '../config';
 import { i18n } from '../i18n';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
@@ -25,7 +33,7 @@ import {
   settleLostTurns,
   showUserInput,
 } from './sessions';
-import { agentdeckStore, isTurnRunning, sessionsStore, updateRuntime } from './store';
+import { agentdeckStore, isSkillEnabled, isTurnRunning, sessionsStore, updateRuntime } from './store';
 
 /** Older daemon versions that do not report a version are also considered outdated; prerelease suffixes are ignored in comparison */
 const isDaemonOutdated = (version?: string) => {
@@ -40,6 +48,10 @@ const isDaemonOutdated = (version?: string) => {
 };
 
 let daemonVersionChecked = false;
+
+const renderCapabilities = (): ClientCapabilities => ({
+  render: SUPPORTED_SKILLS.filter(isSkillEnabled),
+});
 
 const savePairingHistory = (pairingHistory: PairingRecord[]) => {
   localStorage.setItem(PAIRING_HISTORY_KEY, JSON.stringify(pairingHistory));
@@ -150,11 +162,20 @@ export const startApp = async () => {
     initialRelayId: agentdeckStore.settings.relayId,
     initialRelayUrl: agentdeckStore.settings.relayUrl,
     ackHead: shouldAckHead,
-    capabilities: RENDER_CAPABILITIES,
+    capabilities: renderCapabilities(),
     onUserInput: showUserInput,
     onMessage: handleTransportMessage,
     onBeforePayload: () => restoreInFlights,
   });
+};
+
+/** Takes effect immediately: the host is told again, and sessions created or loaded afterwards use it. */
+export const setSkillEnabled = (skill: string, enabled: boolean) => {
+  const disabledSkills = agentdeckStore.disabledSkills.filter((item) => item !== skill);
+  if (!enabled) disabledSkills.push(skill);
+  localStorage.setItem(DISABLED_SKILLS_KEY, JSON.stringify(disabledSkills));
+  agentdeckStore({ disabledSkills });
+  updateTransportCapabilities(renderCapabilities());
 };
 
 export const saveSettings = (settings: AppSettings) => {
@@ -177,8 +198,8 @@ export const saveSettings = (settings: AppSettings) => {
   if (relayChanged) resetRemoteState();
   else if (agentChanged) resetSessionList();
   const { relayUrl } = next;
-  if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, capabilities: RENDER_CAPABILITIES });
-  else if (notConnected) startTransport(next.relayId, { relayUrl, capabilities: RENDER_CAPABILITIES });
+  if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, capabilities: renderCapabilities() });
+  else if (notConnected) startTransport(next.relayId, { relayUrl, capabilities: renderCapabilities() });
   else if (agentChanged && agentdeckStore.connection === 'connected') refreshSessions();
 };
 

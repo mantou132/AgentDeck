@@ -42,6 +42,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
     agent: agentdeckStore.settings.agent,
     relayGuideOpen: !agentdeckStore.settings.relayId && !localStorage.getItem(RELAY_GUIDE_SEEN_KEY),
     showRelayId: false,
+    moreOpen: false,
   });
 
   @effect((i) => [i.#state.relayGuideOpen])
@@ -294,6 +295,12 @@ export class AgentDeckSettingsPageElement extends GemElement {
               class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
               @click=${this.#openFeedback}
             >${i18n.get('settings.feedback')}</button>
+            <span>·</span>
+            <button
+              type="button"
+              class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
+              @click=${() => this.#state({ moreOpen: true })}
+            >${i18n.get('settings.moreSettings')}</button>
             <span v-if=${!!agentdeckStore.settings.relayId}>·</span>
             <button
               type="button"
@@ -310,6 +317,12 @@ export class AgentDeckSettingsPageElement extends GemElement {
         .content=${html`
           <deck-relay-guide @close=${this.#closeRelayGuide}></deck-relay-guide>
         `}
+      ></deck-sheet>
+      <deck-sheet
+        ?open=${this.#state.moreOpen}
+        .heading=${i18n.get('settings.moreSettings')}
+        @close=${() => this.#state({ moreOpen: false })}
+        .content=${html`<deck-more-settings></deck-more-settings>`}
       ></deck-sheet>
     `;
   };

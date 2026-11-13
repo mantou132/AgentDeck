@@ -1,3 +1,76 @@
+diff --git a/elements/cell.d.ts b/elements/cell.d.ts
+index 428296b997c564fe7e8f9d9d7ece3a491d320502..7ed4dbf32e5a01e47606c95ad7eba3e234b6f308 100644
+--- a/elements/cell.d.ts
++++ b/elements/cell.d.ts
+@@ -30,6 +30,8 @@ export declare class TapCellGroupElement extends GemElement {
+     #private;
+     /**Optional group header, e.g. "Account" / "General" */
+     heading: string;
++    /**Optional group footer explaining the rows above it */
++    footer: string;
+     items?: CellItem[];
+ }
+ //# sourceMappingURL=cell.d.ts.map
+\ No newline at end of file
+diff --git a/elements/cell.js b/elements/cell.js
+index 542ecaeba2bdf9c95844748432ae4c06399b2099..0e6da6c514576cd8d1f593235502fd85ca75c4c2 100644
+--- a/elements/cell.js
++++ b/elements/cell.js
+@@ -221,6 +221,12 @@ const groupStyle = css({
+     display: block;
+     background: ${theme.backgroundColor};
+   `,
++    footer: `
++    padding: 0.5em calc(1.0625em / 0.8125) 0.75em;
++    font-size: 0.8125em;
++    line-height: 1.3;
++    color: ${theme.describeColor};
++  `,
+ });
+ let TapCellGroupElement = (() => {
+     let _classDecorators = [customElement('tap-cell-group'), adoptedStyle(groupStyle), aria({ role: 'group' }), light({ penetrable: true })];
+@@ -231,6 +237,9 @@ let TapCellGroupElement = (() => {
+     let _heading_decorators;
+     let _heading_initializers = [];
+     let _heading_extraInitializers = [];
++    let _footer_decorators;
++    let _footer_initializers = [];
++    let _footer_extraInitializers = [];
+     let _items_decorators;
+     let _items_initializers = [];
+     let _items_extraInitializers = [];
+@@ -245,10 +254,12 @@ let TapCellGroupElement = (() => {
+         static {
+             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+             _heading_decorators = [attribute];
++            _footer_decorators = [attribute];
+             _items_decorators = [property];
+             _private_updateAria_decorators = [effect((i) => [i.heading])];
+             _private_content_decorators = [template()];
+             __esDecorate(null, null, _heading_decorators, { kind: "field", name: "heading", static: false, private: false, access: { has: obj => "heading" in obj, get: obj => obj.heading, set: (obj, value) => { obj.heading = value; } }, metadata: _metadata }, _heading_initializers, _heading_extraInitializers);
++            __esDecorate(null, null, _footer_decorators, { kind: "field", name: "footer", static: false, private: false, access: { has: obj => "footer" in obj, get: obj => obj.footer, set: (obj, value) => { obj.footer = value; } }, metadata: _metadata }, _footer_initializers, _footer_extraInitializers);
+             __esDecorate(null, null, _items_decorators, { kind: "field", name: "items", static: false, private: false, access: { has: obj => "items" in obj, get: obj => obj.items, set: (obj, value) => { obj.items = value; } }, metadata: _metadata }, _items_initializers, _items_extraInitializers);
+             __esDecorate(null, null, _private_updateAria_decorators, { kind: "field", name: "#updateAria", static: false, private: true, access: { has: obj => #updateAria in obj, get: obj => obj.#updateAria, set: (obj, value) => { obj.#updateAria = value; } }, metadata: _metadata }, _private_updateAria_initializers, _private_updateAria_extraInitializers);
+             __esDecorate(null, null, _private_content_decorators, { kind: "field", name: "#content", static: false, private: true, access: { has: obj => #content in obj, get: obj => obj.#content, set: (obj, value) => { obj.#content = value; } }, metadata: _metadata }, _private_content_initializers, _private_content_extraInitializers);
+@@ -259,7 +270,9 @@ let TapCellGroupElement = (() => {
+         }
+         /**Optional group header, e.g. "Account" / "General" */
+         heading = __runInitializers(this, _heading_initializers, void 0);
+-        items = (__runInitializers(this, _heading_extraInitializers), __runInitializers(this, _items_initializers, void 0));
++        /**Optional group footer explaining the rows above it */
++        footer = (__runInitializers(this, _heading_extraInitializers), __runInitializers(this, _footer_initializers, void 0));
++        items = (__runInitializers(this, _footer_extraInitializers), __runInitializers(this, _items_initializers, void 0));
+         #isSwitch = (__runInitializers(this, _items_extraInitializers), (item) => typeof item.checked === 'boolean');
+         #showAction = (item) => item.action ?? !this.#isSwitch(item);
+         #onSwitchChange = (item, evt) => {
+@@ -306,6 +319,7 @@ let TapCellGroupElement = (() => {
+             return html `
+       <div class=${groupStyle.heading} v-if=${!!this.heading}>${this.heading}</div>
+       <div class=${groupStyle.body}>${(this.items || []).map((item) => this.#renderItem(item))}</div>
++      <div class=${groupStyle.footer} v-if=${!!this.footer}>${this.footer}</div>
+     `;
+         }));
+         constructor() {
 diff --git a/elements/page.js b/elements/page.js
 index 1916b09ce3b0a0e746c8e356f2d7ba19a4083d65..634b0f7019edb09443cf3f990a39de05a4661b2e 100644
 --- a/elements/page.js
@@ -218,6 +291,19 @@ index f1396e5a35b4da2a662a0ab36313bb07d33efe1f..8589bccd69db52bef527603674f11170
          }
          pop() {
              const top = this.#store.pages.at(-1);
+diff --git a/elements/switch.js b/elements/switch.js
+index f424f9debdda73b0ba533adc6a5ff83a63fd6cf1..e1d851e5567f64919f1d31dbb944afad6ddc6a3f 100644
+--- a/elements/switch.js
++++ b/elements/switch.js
+@@ -151,7 +151,7 @@ let TapSwitchElement = (() => {
+             const semanticColor = getSemanticColor(this.neutral);
+             if (semanticColor)
+                 return semanticColor;
+-            return theme.neutralColor;
++            return theme.positiveColor;
+         }
+         #onClick = (__runInitializers(this, _change_extraInitializers), () => {
+             if (!this.disabled) {
 diff --git a/helper/webapp.d.ts b/helper/webapp.d.ts
 index 792f9ba7636739c5e9c9c0083e4a1420880bfc58..fd1af324e3323c5189bd6cfd43a19084ca53f2ff 100644
 --- a/helper/webapp.d.ts

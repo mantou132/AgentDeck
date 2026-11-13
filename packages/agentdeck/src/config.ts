@@ -1,4 +1,4 @@
-import type { AvailableCommand, ClientCapabilities } from './agent/api';
+import type { AvailableCommand } from './agent/api';
 import { isPairingId } from './agent/encryption';
 import { calendarSupported } from './lib/calendar';
 import { previewSupported } from './lib/preview';
@@ -22,6 +22,7 @@ export const SESSION_META_KEY = 'agentdeck.meta.v1';
 export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
 export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';
 export const EVENTS_ADDED_KEY = 'agentdeck.events_added.v1';
+export const DISABLED_SKILLS_KEY = 'agentdeck.disabled_skills.v1';
 
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.
@@ -37,18 +38,22 @@ export const FEEDBACK_URL = 'https://github.com/mantou132/AgentDeck/issues/new';
 /** Raise when the app needs a newer agentdeckd; older hosts get an upgrade toast once per launch. */
 export const MIN_DAEMON_VERSION = '0.8.0';
 
-/** Markdown blocks this client renders; the host teaches agents to write them (e.g. `agentdeck-chart`). */
-export const RENDER_CAPABILITIES: ClientCapabilities = {
-  render: [
-    'widget',
-    'chart',
-    'map',
-    ...(previewSupported ? ['preview', 'app'] : []),
-    'screen',
-    'session',
-    ...(calendarSupported ? ['event'] : []),
-  ],
-};
+/**
+ * Rendering capabilities this client supports, in settings order; the enabled ones are declared to the host,
+ * which teaches agents the matching skill (e.g. `agentdeck-chart`).
+ */
+export const SUPPORTED_SKILLS = [
+  'widget',
+  'chart',
+  'map',
+  ...(previewSupported ? ['preview', 'app'] : []),
+  'screen',
+  'session',
+  ...(calendarSupported ? ['event'] : []),
+];
+
+/** Skills that only work with another one, e.g. built apps open through `agentdeck-preview`; off with it. */
+export const SKILL_REQUIRES: Record<string, string> = { app: 'preview' };
 
 export type AgentInfo = { id: string; name: string };
 
@@ -115,6 +120,15 @@ export const readPairingHistory = (): PairingRecord[] => {
     return Array.isArray(value)
       ? value.filter((item) => typeof item?.relayId === 'string' && isPairingId(item.relayId))
       : [];
+  } catch {
+    return [];
+  }
+};
+
+export const readDisabledSkills = (): string[] => {
+  try {
+    const value = JSON.parse(localStorage.getItem(DISABLED_SKILLS_KEY) || '[]');
+    return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
   } catch {
     return [];
   }

@@ -379,6 +379,13 @@ class AgentTransport {
     });
   }
 
+  /** Re-declares capabilities; a connected host gets them by attaching again, later sessions use them. */
+  updateCapabilities(capabilities: ClientCapabilities) {
+    if (!this.#currentOptions) return;
+    this.#currentOptions = { ...this.#currentOptions, capabilities };
+    if (this.#connectionState === 'connected') this.syncHostConnection(true);
+  }
+
   syncHostConnection(metadataOnly = false): Promise<void> {
     if (!this.#relayConnected) return Promise.resolve();
     if (this.hostSession.attaching) return this.hostSession.attaching;
@@ -553,6 +560,8 @@ export const getDeviceId = () => transport.getDeviceId();
 export const getPeerId = () => transport.hostSession.peerId;
 export const addTransportMessageHandler = (handler: MessageHandler) => transport.addMessageHandler(handler);
 export const updateFcmToken = (token: string | null) => transport.updateFcmToken(token);
+export const updateTransportCapabilities = (capabilities: ClientCapabilities) =>
+  transport.updateCapabilities(capabilities);
 export const syncHostConnection = (metadataOnly = false) => transport.syncHostConnection(metadataOnly);
 export const startTransport = (relayId: string, options?: TransportOptions) => transport.start(relayId, options);
 export const reconnectTransport = (force = false) => transport.reconnect(force);
