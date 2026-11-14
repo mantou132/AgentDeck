@@ -8,7 +8,15 @@ import { openSettings, selectSession } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
 import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
 import { clearShare, shareStore } from '../state/share';
-import { agentdeckStore, hostAgents, isConnecting, type SessionRuntime, sessionsStore } from '../state/store';
+import {
+  agentdeckStore,
+  getRuntime,
+  hostAgents,
+  isConnecting,
+  type SessionRuntime,
+  sessionsStore,
+  updateRuntime,
+} from '../state/store';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -213,6 +221,8 @@ export class AgentDeckSessionListPageElement extends GemElement {
                   ?deletion-disabled=${!isConnected}
                   @select=${(event: CustomEvent<string>) => selectSession(event.detail)}
                   @request-delete=${(event: CustomEvent<string>) => deleteSession(event.detail)}
+                  @toggle-unread=${({ detail }: CustomEvent<string>) =>
+                    updateRuntime(detail, { unread: !getRuntime(detail).unread })}
                 ></deck-session-group>
               `,
             )}

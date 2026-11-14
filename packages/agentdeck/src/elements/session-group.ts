@@ -22,6 +22,7 @@ export class DeckSessionGroupElement extends GemElement {
   @boolattribute deletionDisabled: boolean;
   @emitter select: Emitter<string>;
   @emitter requestDelete: Emitter<string>;
+  @emitter toggleUnread: Emitter<string>;
 
   #state = createState({ expanded: false });
 
@@ -55,18 +56,29 @@ export class DeckSessionGroupElement extends GemElement {
               const isPermission = permissionSessionSet.has(session.sessionId);
               const isPending = pendingSessionSet.has(session.sessionId);
               const isUnread = unreadSessionSet.has(session.sessionId);
+              const isActive = session.sessionId === this.activeSessionId;
 
               return html`
                 <tap-swipeout
                   class="border-0 border-b border-solid border-border/70 last:border-b-0"
-                  ?disabled=${this.deletionDisabled || isDeleting}
+                  ?disabled=${isDeleting}
                 >
+                  <button
+                    v-if=${!isPending && !isActive}
+                    slot="start"
+                    type="button"
+                    class="flex min-w-20 cursor-pointer flex-col items-center justify-center gap-1 border-0 bg-informative px-4 text-sm font-semibold text-white active:opacity-80"
+                    @click=${() => this.toggleUnread(session.sessionId)}
+                  >
+                    <tap-use class="size-5" .element=${isUnread ? icons.check : icons.messageSquare}></tap-use>
+                    ${i18n.get(isUnread ? 'sessionList.markRead' : 'sessionList.markUnread')}
+                  </button>
                   <button
                     type="button"
                     class=${classMap({
                       'grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 px-4 py-3 text-left text-text transition-colors duration-150 disabled:cursor-default disabled:opacity-50': true,
-                      'bg-bg-light': session.sessionId !== this.activeSessionId,
-                      'bg-bg-hover': session.sessionId === this.activeSessionId,
+                      'bg-bg-light': !isActive,
+                      'bg-bg-hover': isActive,
                     })}
                     ?disabled=${isDeleting}
                     aria-busy=${isDeleting}

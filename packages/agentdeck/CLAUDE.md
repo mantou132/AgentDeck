@@ -14,7 +14,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 ## 行为约束
 
-- **会话列表**：按 cwd 分组，worktree 会话归入 `mainCwd`，Claude 桌面版的 `…/Claude/scratch-workspaces/…` 合为「这台电脑」。
+- **会话列表**：按 cwd 分组，worktree 会话归入 `mainCwd`，Claude 桌面版的 `…/Claude/scratch-workspaces/…` 合为「这台电脑」。右滑切换未读（runtime 的 `unread`，仅内存；运行中与当前打开的会话不提供），左滑删除（未连接时按钮禁用）。
 - **会话配置**（`state/config-options.ts`）：select 类型的 `configOptions` 都可选（旧版 `modes` 作为 mode）。修改立即生效，失败回退；按 agent 存到 `CONFIG_DEFAULTS_KEY` 供新会话沿用（create 后逐项应用，不支持的跳过），settings 重置保留。
 - **进行中回合**：回合存入 in-flight，重启后恢复等待回复。Relay 会丢弃过期未 ack 的消息，所以每次连上 host 都调 `agent_prompts_running` 对账（`settleLostTurns`）：daemon 已不在运行的回合就地结束、标未读，并 close → load 历史；旧 daemon 无此接口时保持等待。
 - **等待用户输入**：权限请求与问题只在本设备的回合进行中显示（按 `requestId` 去重），用 `agent_user_input_respond` 作答，失败时恢复可答。回合结束、取消或会话关闭由 host 取消，App 只清本地状态；重连后由 `settleLostTurns` 补回。

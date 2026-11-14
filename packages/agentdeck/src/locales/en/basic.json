@@ -38,6 +38,8 @@
   "sessionList.delete": "Delete",
   "sessionList.deleting": "Deleting…",
   "sessionList.deleteAria": "Delete session “$1”",
+  "sessionList.markUnread": "Unread",
+  "sessionList.markRead": "Read",
   "session.backAria": "Back to session list",
   "session.openSettingsAria": "Open settings",
   "session.newSessionHereAria": "New session in this directory",

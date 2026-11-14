@@ -38,6 +38,8 @@
   "sessionList.delete": "删除",
   "sessionList.deleting": "删除中…",
   "sessionList.deleteAria": "删除会话“$1”",
+  "sessionList.markUnread": "标为未读",
+  "sessionList.markRead": "标为已读",
   "session.backAria": "返回会话列表",
   "session.openSettingsAria": "打开设置",
   "session.newSessionHereAria": "在此目录新建会话",
