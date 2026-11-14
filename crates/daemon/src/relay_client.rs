@@ -16,11 +16,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    agent_rpc::{AgentService, PeerCapabilities},
+    agent_rpc::{AgentService, PeerSkills},
     app_data::{self, AppPaths},
     peer::Peer,
     push,
     relay_codec::{Frame, RelayCodec},
+    render_skills::{self, SkillSelection},
 };
 
 const HOST_DEVICE_ID: &str = "host";
@@ -100,7 +101,7 @@ pub struct RemotePeerManager {
     service: AgentService,
     outbound_tx: OutboundSender,
     devices: Arc<Mutex<HashMap<String, RemoteDevice>>>,
-    peers: Arc<Mutex<HashMap<u64, (Peer, PeerCapabilities)>>>,
+    peers: Arc<Mutex<HashMap<u64, (Peer, PeerSkills)>>>,
     ephemeral_calls: EphemeralCalls,
     next_peer_id: Arc<AtomicU64>,
     push_client: reqwest::Client,
@@ -142,7 +143,7 @@ impl RemotePeerManager {
         self.peer_entry(peer_id).0
     }
 
-    fn peer_entry(&self, peer_id: u64) -> (Peer, PeerCapabilities) {
+    fn peer_entry(&self, peer_id: u64) -> (Peer, PeerSkills) {
         let mut peers = self.peers.lock().expect("lock poisoned");
         if let Some(entry) = peers.get(&peer_id) {
             return entry.clone();
@@ -171,14 +172,14 @@ impl RemotePeerManager {
                 tracing::info!("Relay client stopped; peer {peer_id} message dropped");
             }
         });
-        let capabilities = PeerCapabilities::default();
+        let skills = PeerSkills::default();
         self.service.attach_with_completion(
             &peer,
             Some(self.completion_handler(peer_id)),
-            capabilities.clone(),
+            skills.clone(),
         );
-        peers.insert(peer_id, (peer.clone(), capabilities.clone()));
-        (peer, capabilities)
+        peers.insert(peer_id, (peer.clone(), skills.clone()));
+        (peer, skills)
     }
 
     fn completion_handler(&self, peer_id: u64) -> crate::agent_rpc::PromptCompletion {
@@ -284,13 +285,19 @@ impl RemotePeerManager {
         let requested_peer_id = params.get("peerId").and_then(Value::as_u64);
 
         let peer_id = self.resolve_peer_id(&device_id, requested_peer_id, params.get("fcmToken"));
-        let (_peer, capabilities) = self.peer_entry(peer_id);
-        // Every attach re-declares the client's capabilities; later sessions use them.
-        *capabilities.lock().expect("lock poisoned") = params
-            .get("capabilities")
+        let (_peer, skills) = self.peer_entry(peer_id);
+        // Every attach re-declares the client's skills; later sessions use them.
+        let declared: SkillSelection = params
+            .get("skills")
             .cloned()
             .and_then(|value| serde_json::from_value(value).ok())
             .unwrap_or_default();
+        // The client sends this version through `skills_install` before using the host.
+        let skills_missing = declared
+            .hash
+            .as_deref()
+            .is_some_and(|hash| !render_skills::select(hash));
+        *skills.lock().expect("lock poisoned") = declared;
 
         // Clients compare it against their minimum supported host version.
         let version = env!("CARGO_PKG_VERSION");
@@ -304,12 +311,12 @@ impl RemotePeerManager {
             Some(req_id) => json!({
                 "peerId": peer_id,
                 "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents }
+                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing }
             }),
             None => json!({
                 "peerId": peer_id,
                 "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents }
+                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing }
             }),
         };
         let target = if device_id.is_empty() {

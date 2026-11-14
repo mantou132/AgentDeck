@@ -102,6 +102,12 @@ export function documentFixture(previous, options = {}) {
   const document = new EventTarget();
   document.visibilityState = 'visible';
   const context = vm.createContext({
+    // Build-time define and asset from `rsbuild.config.ts`.
+    __SKILLS_HASH__: 'test',
+    fetch: async (url) => {
+      assert.equal(url, '/skills.json');
+      return { ok: true, json: async () => ({ hash: 'test', files: {} }) };
+    },
     console,
     crypto,
     Map,

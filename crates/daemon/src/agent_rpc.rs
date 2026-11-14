@@ -22,7 +22,7 @@ use self::{
 use crate::{
     acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
     peer::{CallCtx, Peer, RpcError},
-    render_skills::ClientCapabilities,
+    render_skills::{self, SkillSelection},
     screen_capture,
 };
 
@@ -61,8 +61,8 @@ async fn settle_forwarder(
 
 pub type PromptCompletion = Arc<dyn Fn(&str, &str) + Send + Sync>;
 
-/// Capabilities the peer declared in its latest `peer_attach`.
-pub type PeerCapabilities = Arc<Mutex<ClientCapabilities>>;
+/// Skills the peer declared in its latest `peer_attach`.
+pub type PeerSkills = Arc<Mutex<SkillSelection>>;
 
 /// Central host service managing ACP agent sessions and exposing RPC routes.
 #[derive(Clone)]
@@ -96,14 +96,14 @@ impl AgentService {
     /// Attach this service's RPC handlers to a duplex Peer endpoint.
     #[allow(dead_code)]
     pub fn attach(&self, peer: &Peer) {
-        self.attach_with_completion(peer, None, PeerCapabilities::default());
+        self.attach_with_completion(peer, None, PeerSkills::default());
     }
 
     pub fn attach_with_completion(
         &self,
         peer: &Peer,
         on_complete: Option<PromptCompletion>,
-        capabilities: PeerCapabilities,
+        skills: PeerSkills,
     ) {
         // The device each session's notifications go to; see `SessionActor::notifier`.
         let notifier: acp_agent::Notifier = {
@@ -137,6 +137,16 @@ impl AgentService {
             tokio::task::spawn_blocking(move || complete_directories(&input, cwd.as_deref(), limit))
                 .await
                 .map_err(|err| format!("Directory completion task failed: {err}"))?
+        });
+
+        peer.handle("skills_install", move |params, _ctx| async move {
+            let bundle: render_skills::SkillBundle = serde_json::from_value(params)
+                .map_err(|err| format!("Invalid skills_install params: {err}"))?;
+            tokio::task::spawn_blocking(move || render_skills::install(&bundle))
+                .await
+                .map_err(|err| format!("Skills install task failed: {err}"))?
+                .map_err(|err| format!("Failed to install skills: {err:#}"))?;
+            Ok(json!({}))
         });
 
         peer.handle("file_browse", move |params, _ctx| async move {
@@ -231,16 +241,16 @@ impl AgentService {
         });
 
         let create_sessions = sessions.clone();
-        let create_capabilities = capabilities.clone();
+        let create_skills = skills.clone();
         let create_notifier = notifier.clone();
         peer.handle("agent_session_create", move |params, _ctx| {
             let sessions = create_sessions.clone();
-            let capabilities = create_capabilities.clone();
+            let skills = create_skills.clone();
             let notifier = create_notifier.clone();
             async move {
                 let agent = required_agent(&params, "agent_session_create")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities, notifier).await?;
+                let context = session_context(&params, &skills, notifier).await?;
                 let timeout_secs = message_timeout_secs(&params);
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
@@ -266,12 +276,12 @@ impl AgentService {
         let load_notifier = notifier.clone();
         peer.handle("agent_session_load", move |params, ctx| {
             let sessions = load_sessions.clone();
-            let capabilities = capabilities.clone();
+            let skills = skills.clone();
             let notifier = load_notifier.clone();
             async move {
                 let (agent, session_id) = required_agent_session(&params, "agent_session_load")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &capabilities, notifier).await?;
+                let context = session_context(&params, &skills, notifier).await?;
                 let timeout_secs = message_timeout_secs(&params);
 
                 // The actor drains the load-time history replay into this channel
@@ -577,12 +587,12 @@ fn message_cwd(params: &Value) -> Option<PathBuf> {
 
 async fn session_context(
     params: &Value,
-    capabilities: &PeerCapabilities,
+    skills: &PeerSkills,
     notifier: acp_agent::Notifier,
 ) -> Result<SessionContext, String> {
     Ok(SessionContext {
         system_prompt: message_panel_system_prompt(params).await?,
-        client_capabilities: capabilities.lock().expect("lock poisoned").clone(),
+        skills: skills.lock().expect("lock poisoned").clone(),
         notifier: Some(notifier),
     })
 }

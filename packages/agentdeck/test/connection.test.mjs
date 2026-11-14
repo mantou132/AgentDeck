@@ -314,3 +314,36 @@ test('a disposed client cannot advance the cursor or reconnect under a new pairi
   await fixture.advance(12_000);
   assert.equal(fixture.sockets.length, socketCount);
 });
+
+const attachMissingSkills = async (fixture) => {
+  fixture.heldMethods.add('peer_attach');
+  await fixture.connect();
+  const attach = fixture.requests.find((request) => request.payload.method === 'peer_attach');
+  assert.equal(attach.payload.params.skills.hash, 'test');
+  assert.ok(Array.isArray(attach.payload.params.skills.enabled));
+  fixture.reply(attach, { peerId: 1, customAgents: [], skillsMissing: true });
+  await tick();
+  const install = fixture.requests.find((request) => request.payload.method === 'skills_install');
+  assert.deepEqual(install.payload.params, { hash: 'test', files: {} });
+  assert.notEqual(fixture.app.agentdeckStore.connection, 'connected');
+  return install;
+};
+
+test('a host missing the skills gets them before the connection counts as connected', async () => {
+  const fixture = documentFixture();
+  const install = await attachMissingSkills(fixture);
+  fixture.reply(install, {});
+  await tick();
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+});
+
+test('a failed skills install still connects', async () => {
+  const fixture = documentFixture();
+  const install = await attachMissingSkills(fixture);
+  const error = console.error;
+  console.error = () => {};
+  fixture.deliver({ id: install.payload.id, error: 'disk full', peerId: 1 });
+  await tick();
+  console.error = error;
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+});

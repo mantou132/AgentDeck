@@ -1,120 +1,192 @@
-//! Output-format skills for the rendering capabilities a client declares in
-//! `peer_attach`. Each capability ships as a directory mounted through ACP
-//! `additionalDirectories`; its skill teaches the agent a fenced block the
-//! client renders from Markdown; the `app` skill also ships a project template
-//! the agent copies. `job` and `travel` are workflow skills rather than output formats,
-//! toggled the same way. The skill directories are embedded whole. The workflow
-//! skills also keep `learned.md` at the root of their directory, notes agents
-//! write while using them, which rewrites keep.
+//! Skills a client ships and enables in `peer_attach`. The client declares
+//! their content hash, and the daemon asks for the files through
+//! `skills_install` when that version is missing. Each enabled skill is
+//! mounted through ACP `additionalDirectories`; most teach the agent a fenced
+//! block the client renders from Markdown; the
+//! `app` skill also ships a project template the agent copies. `job` and
+//! `travel` are workflow skills rather than output formats, toggled the same
+//! way; they keep notes agents write while using them in `learned/<skill>/`,
+//! outside the versions, named in their skill through `{{LEARNED_PATH}}`.
 
 use std::{
+    collections::HashMap,
     fs,
-    path::{Path, PathBuf},
-    sync::OnceLock,
+    path::{Component, Path, PathBuf},
+    sync::Mutex,
 };
 
-use anyhow::{Context, Result};
-use include_dir::{Dir, include_dir};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
 use crate::app_data::AppPaths;
 
-/// Rendering capabilities a client declares in `peer_attach`.
+/// Skills a client declares in `peer_attach`.
 #[derive(Clone, Debug, Default, Deserialize)]
-pub struct ClientCapabilities {
+pub struct SkillSelection {
+    /// Content hash of the skills the client ships.
     #[serde(default)]
-    pub render: Vec<String>,
+    pub hash: Option<String>,
+    /// Skills of that version to mount into sessions.
+    #[serde(default)]
+    pub enabled: Vec<String>,
 }
 
-/// `src/render_skills/<capability>/`: `SKILL.md`, plus any files it ships.
-static SKILLS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/render_skills");
-
-/// `ClientCapabilities::render` entries with a skill; each is also the skill
-/// and directory name.
-const SKILLS: &[&str] = &[
-    "widget", "chart", "map", "preview", "screen", "session", "event", "app", "job", "travel",
-];
+/// Skill files a client sends through `skills_install`, keyed by
+/// `<skill>/<path>` relative paths.
+#[derive(Debug, Deserialize)]
+pub struct SkillBundle {
+    pub hash: String,
+    pub files: HashMap<String, String>,
+}
 
 /// Skill locations agents scan in additional directories: Codex reads
 /// `.agents/skills`, Claude Code reads `.claude/skills`.
 const SKILL_ROOTS: &[&str] = &[".agents/skills", ".claude/skills"];
 
-fn write_dir(dir: &Dir, skill_dir: &Path, target: &Path) -> Result<()> {
-    for file in dir.files() {
-        let path = target.join(file.path().strip_prefix(skill_dir)?);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, file.contents())?;
-    }
-    for sub in dir.dirs() {
-        write_dir(sub, skill_dir, target)?;
-    }
-    Ok(())
+const LEARNED_PLACEHOLDER: &str = "{{LEARNED_PATH}}";
+
+/// Versions kept on disk, so clients on different builds don't reinstall in turn.
+const KEPT_VERSIONS: usize = 3;
+
+/// Version the latest attaching client uses, for agents configured once per process.
+static CURRENT: Mutex<Option<String>> = Mutex::new(None);
+
+fn skills_dir() -> Result<PathBuf> {
+    Ok(AppPaths::discover()?.skills_dir())
 }
 
-fn write_skills(root: &Path) -> Result<()> {
-    for &skill in SKILLS {
-        let dir = SKILLS_DIR
-            .get_dir(skill)
-            .with_context(|| format!("missing render skill {skill}"))?;
+fn version_dir(root: &Path, hash: &str) -> Result<PathBuf> {
+    if hash.is_empty() || !hash.chars().all(|c| c.is_ascii_alphanumeric()) {
+        bail!("invalid skills hash {hash}");
+    }
+    Ok(root.join("versions").join(hash))
+}
+
+fn learned_dir(root: &Path, skill: &str) -> PathBuf {
+    root.join("learned").join(skill)
+}
+
+/// Whether the version is installed; an installed one becomes the current version.
+pub fn select(hash: &str) -> bool {
+    let installed = skills_dir()
+        .and_then(|root| version_dir(&root, hash))
+        .is_ok_and(|dir| dir.is_dir());
+    if installed {
+        *CURRENT.lock().expect("lock poisoned") = Some(hash.to_string());
+    }
+    installed
+}
+
+fn write_bundle(root: &Path, bundle: &SkillBundle) -> Result<()> {
+    let target = version_dir(root, &bundle.hash)?;
+    if target.is_dir() {
+        return Ok(());
+    }
+    let staging = root.join("versions").join(format!(".{}", bundle.hash));
+    match fs::remove_dir_all(&staging) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err.into()),
+        _ => {}
+    }
+    for (path, contents) in &bundle.files {
+        let path = Path::new(path);
+        if !path.components().all(|c| matches!(c, Component::Normal(_))) {
+            bail!("invalid skill file path {}", path.display());
+        }
+        let mut components = path.components();
+        let skill = components
+            .next()
+            .and_then(|c| c.as_os_str().to_str())
+            .context("empty skill file path")?;
+        let rest = components.as_path();
+        let contents = if contents.contains(LEARNED_PLACEHOLDER) {
+            let learned = learned_dir(root, skill);
+            fs::create_dir_all(&learned)?;
+            contents.replace(
+                LEARNED_PLACEHOLDER,
+                &learned.join("learned.md").to_string_lossy(),
+            )
+        } else {
+            contents.clone()
+        };
         for skill_root in SKILL_ROOTS {
-            // Drop files an older build wrote, such as renamed template files;
-            // the agents' `learned.md` beside these roots stays
-            match fs::remove_dir_all(root.join(skill).join(skill_root)) {
-                Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err.into()),
-                _ => {}
-            }
-            write_dir(
-                dir,
-                Path::new(skill),
-                &root.join(skill).join(skill_root).join(skill),
-            )?;
+            let file = staging.join(skill).join(skill_root).join(skill).join(rest);
+            fs::create_dir_all(file.parent().context("skill file without parent")?)?;
+            fs::write(file, &contents)?;
         }
+    }
+    fs::rename(&staging, &target)?;
+    prune(&root.join("versions"))
+}
+
+/// Drops all but the newest `KEPT_VERSIONS` versions.
+fn prune(versions: &Path) -> Result<()> {
+    let mut dirs = fs::read_dir(versions)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let modified = entry.metadata().ok()?.modified().ok()?;
+            Some((modified, entry.path()))
+        })
+        .filter(|(_, path)| path.is_dir())
+        .collect::<Vec<_>>();
+    dirs.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_, dir) in dirs.into_iter().skip(KEPT_VERSIONS) {
+        fs::remove_dir_all(dir)?;
     }
     Ok(())
 }
 
-/// Skills root, rewritten once per daemon process so it matches this build.
-fn skills_root() -> Option<&'static PathBuf> {
-    static ROOT: OnceLock<Option<PathBuf>> = OnceLock::new();
-    ROOT.get_or_init(|| {
-        let root = AppPaths::discover().map(|paths| paths.skills_dir());
-        match root.and_then(|root| write_skills(&root).map(|()| root)) {
-            Ok(root) => Some(root),
-            Err(err) => {
-                tracing::warn!("Failed to write render skills: {err:#}");
-                None
-            }
+/// Writes a client's skills as a new version and makes it current.
+pub fn install(bundle: &SkillBundle) -> Result<()> {
+    write_bundle(&skills_dir()?, bundle)?;
+    *CURRENT.lock().expect("lock poisoned") = Some(bundle.hash.clone());
+    Ok(())
+}
+
+fn directories(root: &Path, selection: &SkillSelection) -> Vec<PathBuf> {
+    let Some(Ok(version)) = selection
+        .hash
+        .as_deref()
+        .map(|hash| version_dir(root, hash))
+    else {
+        return Vec::new();
+    };
+    let mut dirs = Vec::new();
+    for skill in &selection.enabled {
+        let dir = version.join(skill);
+        if !dir.is_dir() {
+            continue;
         }
-    })
-    .as_ref()
-}
-
-/// Additional directories carrying the skills for the declared capabilities.
-pub fn skill_directories(capabilities: &ClientCapabilities) -> Vec<PathBuf> {
-    let mut skills = SKILLS
-        .iter()
-        .filter(|skill| capabilities.render.iter().any(|render| render == *skill))
-        .peekable();
-    if skills.peek().is_none() {
-        return Vec::new();
+        dirs.push(dir);
+        // Agents write their notes there, so it is mounted too.
+        let learned = learned_dir(root, skill);
+        if learned.is_dir() {
+            dirs.push(learned);
+        }
     }
-    let Some(root) = skills_root() else {
-        return Vec::new();
-    };
-    skills.map(|skill| root.join(skill)).collect()
+    dirs
 }
 
-/// Skill folders for every capability, for agents configured once per
-/// process instead of per session.
+/// Additional directories carrying the enabled skills.
+pub fn skill_directories(selection: &SkillSelection) -> Vec<PathBuf> {
+    skills_dir()
+        .map(|root| directories(&root, selection))
+        .unwrap_or_default()
+}
+
+/// Skill folders of every skill in the current version, for agents
+/// configured once per process instead of per session.
 pub fn all_skill_paths() -> Vec<PathBuf> {
-    let Some(root) = skills_root() else {
+    let Some(hash) = CURRENT.lock().expect("lock poisoned").clone() else {
         return Vec::new();
     };
-    SKILLS
-        .iter()
-        .map(|skill| root.join(skill).join(SKILL_ROOTS[0]))
+    let Ok(version) = skills_dir().and_then(|root| version_dir(&root, &hash)) else {
+        return Vec::new();
+    };
+    let Ok(entries) = fs::read_dir(version) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(|entry| Some(entry.ok()?.path().join(SKILL_ROOTS[0])))
         .collect()
 }
 
@@ -123,24 +195,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn writes_skills_for_codex_and_claude() {
+    fn installs_versions_for_codex_and_claude() {
         let root = std::env::temp_dir().join(format!("agentdeck-skills-{}", std::process::id()));
-        write_skills(&root).unwrap();
+        let bundle = SkillBundle {
+            hash: "abc".to_string(),
+            files: HashMap::from([
+                ("chart/SKILL.md".to_string(), "chart".to_string()),
+                (
+                    "job/SKILL.md".to_string(),
+                    format!("notes: {LEARNED_PLACEHOLDER}"),
+                ),
+                ("app/template/.gitignore".to_string(), "dist".to_string()),
+            ]),
+        };
+        write_bundle(&root, &bundle).unwrap();
+        let version = root.join("versions/abc");
         for skill_root in SKILL_ROOTS {
-            let skill =
-                fs::read_to_string(root.join("chart").join(skill_root).join("chart/SKILL.md"))
-                    .unwrap();
-            assert!(skill.starts_with("---\nname: chart\n"));
-            let app = root.join("app").join(skill_root).join("app");
+            let chart = version
+                .join("chart")
+                .join(skill_root)
+                .join("chart/SKILL.md");
+            assert_eq!(fs::read_to_string(chart).unwrap(), "chart");
+            let app = version.join("app").join(skill_root).join("app");
             assert!(app.join("template/.gitignore").is_file());
-            assert!(app.join("template/src/elements/home.ts").is_file());
         }
-        let learned = root.join("chart/learned.md");
-        fs::write(&learned, "notes").unwrap();
-        write_skills(&root).unwrap();
-        assert!(learned.is_file());
-        fs::remove_dir_all(root).unwrap();
+        let job = fs::read_to_string(version.join("job/.claude/skills/job/SKILL.md")).unwrap();
+        let learned = learned_dir(&root, "job");
+        assert_eq!(
+            job,
+            format!("notes: {}", learned.join("learned.md").display())
+        );
 
-        assert!(skill_directories(&ClientCapabilities::default()).is_empty());
+        let selection = SkillSelection {
+            hash: Some("abc".to_string()),
+            enabled: vec!["job".to_string(), "map".to_string()],
+        };
+        assert_eq!(
+            directories(&root, &selection),
+            vec![version.join("job"), learned]
+        );
+        assert!(directories(&root, &SkillSelection::default()).is_empty());
+
+        let escape = SkillBundle {
+            hash: "def".to_string(),
+            files: HashMap::from([("../x".to_string(), String::new())]),
+        };
+        assert!(write_bundle(&root, &escape).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 }

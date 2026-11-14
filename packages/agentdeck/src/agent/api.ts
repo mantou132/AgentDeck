@@ -218,8 +218,14 @@ export type PanelContext =
 
 export const REMOTE_APP_PANEL_CONTEXT: PanelContext = { surface: 'remote_app' };
 
-/** Output the client can render; the host loads matching skills into agent sessions (e.g. `render: ['chart']`). */
-export type ClientCapabilities = { render?: string[] };
+/** Skill files keyed by `<skill>/<path>`; the host stores each version under its content hash. */
+export type SkillBundle = { hash: string; files: Record<string, string> };
+
+/**
+ * Skills the client ships and the ones enabled on it; the host mounts those into agent sessions (e.g. `chart`).
+ * Only the hash and names go with `peer_attach`; `load` fetches the files when the host lacks this version.
+ */
+export type ClientSkills = { hash: string; enabled: string[]; load: () => Promise<SkillBundle> };
 
 /** Device shape drawn around a screen capture; geometry is in the capture's native pixels. */
 export type ScreenFrame =
@@ -250,6 +256,8 @@ type PeerAttachResult = {
   hostname?: string;
   home?: string;
   customAgents: AgentInfo[];
+  /** The host lacks the declared skills; the client sends them before using the host. */
+  skillsMissing?: boolean;
 };
 
 export class AgentApi {
@@ -288,12 +296,19 @@ export class AgentApi {
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());
 
-  attachPeer = async (deviceId: string, fcmToken?: string | null, capabilities?: ClientCapabilities) => {
-    return this.#peer.call<PeerAttachResult>('peer_attach', { deviceId, fcmToken, capabilities }, undefined, {
+  attachPeer = async (deviceId: string, fcmToken?: string | null, skills?: ClientSkills) => {
+    const declared = skills && { hash: skills.hash, enabled: skills.enabled };
+    return this.#peer.call<PeerAttachResult>('peer_attach', { deviceId, fcmToken, skills: declared }, undefined, {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.connectHostTimeout'),
     });
   };
+
+  installSkills = (skills: SkillBundle) =>
+    this.#peer.call('skills_install', skills, undefined, {
+      timeoutMs: 30_000,
+      timeoutMessage: i18n.get('error.connectHostTimeout'),
+    });
 
   /** One JPEG frame of an app on the host (`ios:` / `android:` / `browser:` target), at most `maxWidth` wide. */
   captureScreen = (target: string, maxWidth: number) =>

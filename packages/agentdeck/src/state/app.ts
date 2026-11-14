@@ -1,14 +1,14 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { DEFAULT_STORAGE_KEY } from 'relay-client-ts';
-import type { ClientCapabilities } from '../agent/api';
+import type { ClientSkills } from '../agent/api';
 import { isPairingId } from '../agent/encryption';
 import {
   clearTransportStorage,
   initTransport,
   startTransport,
   type TransportMessage,
-  updateTransportCapabilities,
+  updateTransportSkills,
 } from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
 import {
@@ -22,6 +22,7 @@ import {
   SUPPORTED_SKILLS,
 } from '../config';
 import { i18n } from '../i18n';
+import { loadSkills, skillsHash } from '../skills';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
 import {
   applySessionEvent,
@@ -49,8 +50,10 @@ const isDaemonOutdated = (version?: string) => {
 
 let daemonVersionChecked = false;
 
-const renderCapabilities = (): ClientCapabilities => ({
-  render: SUPPORTED_SKILLS.filter(isSkillEnabled),
+const clientSkills = (): ClientSkills => ({
+  hash: skillsHash,
+  enabled: SUPPORTED_SKILLS.filter(isSkillEnabled),
+  load: loadSkills,
 });
 
 const savePairingHistory = (pairingHistory: PairingRecord[]) => {
@@ -162,7 +165,7 @@ export const startApp = async () => {
     initialRelayId: agentdeckStore.settings.relayId,
     initialRelayUrl: agentdeckStore.settings.relayUrl,
     ackHead: shouldAckHead,
-    capabilities: renderCapabilities(),
+    skills: clientSkills(),
     onUserInput: showUserInput,
     onMessage: handleTransportMessage,
     onBeforePayload: () => restoreInFlights,
@@ -174,7 +177,7 @@ export const setSkillEnabled = (skill: string, enabled: boolean) => {
   const skillToggles = { ...agentdeckStore.skillToggles, [skill]: enabled };
   localStorage.setItem(SKILL_TOGGLES_KEY, JSON.stringify(skillToggles));
   agentdeckStore({ skillToggles });
-  updateTransportCapabilities(renderCapabilities());
+  updateTransportSkills(clientSkills());
 };
 
 export const saveSettings = (settings: AppSettings) => {
@@ -197,8 +200,8 @@ export const saveSettings = (settings: AppSettings) => {
   if (relayChanged) resetRemoteState();
   else if (agentChanged) resetSessionList();
   const { relayUrl } = next;
-  if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, capabilities: renderCapabilities() });
-  else if (notConnected) startTransport(next.relayId, { relayUrl, capabilities: renderCapabilities() });
+  if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, skills: clientSkills() });
+  else if (notConnected) startTransport(next.relayId, { relayUrl, skills: clientSkills() });
   else if (agentChanged && agentdeckStore.connection === 'connected') refreshSessions();
 };
 

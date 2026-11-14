@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
-use crate::render_skills::{self, ClientCapabilities};
+use crate::render_skills::{self, SkillSelection};
 
 mod catalog;
 mod provision;
@@ -96,7 +96,7 @@ struct ClaudeSdkMessage {
 #[derive(Clone, Default)]
 pub struct SessionContext {
     pub system_prompt: Option<String>,
-    pub client_capabilities: ClientCapabilities,
+    pub skills: SkillSelection,
     /// The device creating or loading the session; see `SessionActor::notifier`.
     pub notifier: Option<Notifier>,
 }
@@ -415,7 +415,7 @@ impl AcpRuntime {
             .additional_directories
             .is_some()
         {
-            render_skills::skill_directories(&context.client_capabilities)
+            render_skills::skill_directories(&context.skills)
         } else {
             Vec::new()
         };

@@ -1,16 +1,19 @@
 import { type OutboundMessage, RelayClient, type RelayConnectionState, type RelayStore } from 'relay-client-ts';
 import { type AgentInfo, DEVICE_ID_KEY, RELAY_URL } from '../config';
 import { getConnectionLabel, i18n } from '../i18n';
-import { AgentApi, type ClientCapabilities, type SessionEvent, type UserInput } from './api';
+import { AgentApi, type ClientSkills, type SessionEvent, type UserInput } from './api';
 import { isPairingId } from './encryption';
 import { RelayCodec } from './relay-codec';
 import { clearRelayStore, indexedDbRelayStore } from './relay-store';
 import type { RpcId, RpcMessage } from './rpc';
 
+/** Sent before the host counts as connected. */
+const HANDSHAKE_METHODS = new Set(['peer_attach', 'skills_install']);
+
 type HostSyncOptions = {
   metadataOnly: boolean;
   deviceId: string;
-  capabilities?: ClientCapabilities;
+  skills?: ClientSkills;
   agentApi: AgentApi;
   onStateChange: (state: ConnectionState, error?: string) => void;
   onSynced?: (sentToken: string | null | undefined) => void;
@@ -23,7 +26,7 @@ type InitTransportOptions = {
   onMessage: MessageHandler;
   onBeforePayload?: () => Promise<unknown> | undefined;
   ackHead?: boolean;
-  capabilities?: ClientCapabilities;
+  skills?: ClientSkills;
 };
 
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
@@ -53,8 +56,8 @@ export type TransportOptions = {
   ackHead?: boolean;
   relayUrl?: string;
   deviceId?: string;
-  /** Rendering capabilities declared to the host; they decide the skills loaded into sessions. */
-  capabilities?: ClientCapabilities;
+  /** Skills declared to the host; the enabled ones are loaded into sessions. */
+  skills?: ClientSkills;
 };
 
 // ---------------------------------------------------------------------------
@@ -217,14 +220,25 @@ class HostSessionManager {
     if (!silent) options.onStateChange('attaching');
 
     this.#attaching = options.agentApi
-      .attachPeer(options.deviceId, sentToken, options.capabilities)
-      .then((result) => {
+      .attachPeer(options.deviceId, sentToken, options.skills)
+      .then(async (result) => {
         if (version !== this.#attachVersion) return;
         if (!Number.isSafeInteger(result?.peerId) || result.peerId <= 0) {
           throw new Error(i18n.get('error.invalidDeviceId'));
         }
         const peerChanged = this.#peerId !== result.peerId;
         this.#peerId = result.peerId;
+        // Before `connected`, so the first session after a skills change already has them.
+        const skills = options.skills;
+        if (result.skillsMissing && skills) {
+          // Skills are optional: a failed install leaves sessions without them until the next attach retries.
+          try {
+            await options.agentApi.installSkills(await skills.load());
+          } catch (error) {
+            console.error('Failed to install skills:', error);
+          }
+          if (version !== this.#attachVersion) return;
+        }
         this.#hostVersion = result.version;
         this.#hostname = result.hostname;
         this.#home = result.home;
@@ -291,7 +305,7 @@ class AgentTransport {
         const client = this.#relayClient;
         const codec = this.#codec;
         if (!client || !codec) throw new Error(i18n.get('error.relayNotConfigured'));
-        if (message.method && message.method !== 'peer_attach' && this.#connectionState !== 'connected') {
+        if (message.method && !HANDSHAKE_METHODS.has(message.method) && this.#connectionState !== 'connected') {
           throw new Error(i18n.get('error.remoteNotConnectedRetry'));
         }
         if (message.method === 'peer_attach') {
@@ -379,10 +393,10 @@ class AgentTransport {
     });
   }
 
-  /** Re-declares capabilities; a connected host gets them by attaching again, later sessions use them. */
-  updateCapabilities(capabilities: ClientCapabilities) {
+  /** Re-declares skills; a connected host gets them by attaching again, later sessions use them. */
+  updateSkills(skills: ClientSkills) {
     if (!this.#currentOptions) return;
-    this.#currentOptions = { ...this.#currentOptions, capabilities };
+    this.#currentOptions = { ...this.#currentOptions, skills };
     if (this.#connectionState === 'connected') this.syncHostConnection(true);
   }
 
@@ -392,7 +406,7 @@ class AgentTransport {
     return this.hostSession.sync({
       metadataOnly: metadataOnly && this.#connectionState === 'connected',
       deviceId: this.getDeviceId(),
-      capabilities: this.#currentOptions?.capabilities,
+      skills: this.#currentOptions?.skills,
       agentApi: this.agentApi,
       onStateChange: (state, error) => this.#emitConnection(state, error),
       onSynced: (sentToken) => {
@@ -560,8 +574,7 @@ export const getDeviceId = () => transport.getDeviceId();
 export const getPeerId = () => transport.hostSession.peerId;
 export const addTransportMessageHandler = (handler: MessageHandler) => transport.addMessageHandler(handler);
 export const updateFcmToken = (token: string | null) => transport.updateFcmToken(token);
-export const updateTransportCapabilities = (capabilities: ClientCapabilities) =>
-  transport.updateCapabilities(capabilities);
+export const updateTransportSkills = (skills: ClientSkills) => transport.updateSkills(skills);
 export const syncHostConnection = (metadataOnly = false) => transport.syncHostConnection(metadataOnly);
 export const startTransport = (relayId: string, options?: TransportOptions) => transport.start(relayId, options);
 export const reconnectTransport = (force = false) => transport.reconnect(force);
@@ -591,6 +604,6 @@ export const initTransport = (options: InitTransportOptions) => {
     startTransport(options.initialRelayId, {
       ackHead: options.ackHead,
       relayUrl: options.initialRelayUrl,
-      capabilities: options.capabilities,
+      skills: options.skills,
     });
 };

@@ -17,7 +17,7 @@
 - `src/relay_encryption.rs`：XChaCha20-Poly1305 + HKDF-SHA256 端到端加密原语。
 - `src/push.rs`：prompt 成功完成时，向发起该 prompt 的设备推送 FCM 通知；正文用 `notification_response_complete` 由 App 本地化（Android strings、iOS `Localizable.strings`）；`data` 带 `host`（`push::host_key`，配对 ID 的 SHA-256 前 8 字节，不泄露配对 ID）、`agent` 与 `sessionId`，供 App 点击通知时打开会话。
 - `src/screen_capture.rs`：`screen_capture` RPC，按 target 截一帧（`ios:` 用 `simctl` 的 alpha 遮罩得到屏幕形状；`android:` 用 adb，形状取自 `dumpsys display`；`browser:` 用 rmcp 连 browser4agent 本地 MCP 服务 `127.0.0.1:39271/mcp`，并以页面脚本判断标签页是否在模拟手机），缩放后以 JPEG 字节回复，不保存状态。
-- `src/render_skills.rs`：内置 skill（`src/render_skills/<能力>/` 整个目录嵌入，新增只需在 `SKILLS` 加名字），每个进程首次使用时重写到 `AppPaths::skills_dir()`（只替换 `.agents` / `.claude`，保留 `<能力>/learned.md`：`job` 与 `travel` 末尾同一段让 Agent 在本机自优化 skill，只记用户纠正过或验证有效的做法，最多 20 条，错了即删，默认开启）。`app` 另带 Gem + Tap UI 的移动端模板；`job` 是求职流程（工作区 `~/JobSearch/`）、`travel` 是旅行规划（每次行程一个 `~/Trips/<YYYY-MM>-<地点>/`），不对应渲染块但同样按能力开关；mermaid / LaTeX 写在 chart skill 里。
+- `src/render_skills.rs`：skill 文件由 App 提供（源码在 `packages/agentdeck/skills/`），daemon 不内置。`peer_attach` 的 `skills.hash` 是内容哈希，本机没有该版本时回复 `skillsMissing: true`，App 随即用 `skills_install`（`{ hash, files }`）发来，写到 `AppPaths::skills_dir()/versions/<hash>/<能力>/{.agents,.claude}/skills/<能力>/`（先写临时目录再改名，只保留最新 3 个版本）。文件中的 `{{LEARNED_PATH}}` 替换为跨版本保留的 `learned/<能力>/learned.md`，该目录随 skill 一起挂载，供 Agent 写入：`job` 与 `travel` 末尾同一段让 Agent 在本机自优化 skill，只记用户纠正过或验证有效的做法，最多 20 条，错了即删。
 - `src/logger.rs`：`tracing` 日志（含依赖库事件）按天写入 `logs/agentdeckd.YYYY-MM-DD.log`，保留 7 个文件；默认 `info`，`RUST_LOG` 可覆盖；只在 `run` 中初始化，不输出到终端。
 
 ## 约束与现状
@@ -39,7 +39,7 @@
 - **分支会话**：`agent_session_fork` 发送 ACP `session/fork`（`unstable_session_fork`），不建 actor，客户端随后照常 load。分支点用 claude-agent-acp 识别的 `_meta.jetbrains.air.fork`，其他 Agent 会复制整个会话。
 - **回合间的会话更新**：会话 actor 空闲时也读取 ACP session update（如 `session/new` 返回后才推送的 `available_commands_update`），以 `agent_session_update` 通知（`{ agent, sessionId, update }`）发给会话设备；回合与 load 回放中的仍随各自事件流转发。
 - **语音对话**：`agent_prompt` 带 `voiceChat: true` 时在附件末尾追加 `<agentdeck-voice-chat/>` 标记；`remote_app` 系统提示说明见到标记要在回复末尾写 `<!-- agentdeck-speech … -->` 注释作为朗读摘要（只有 Claude 读系统提示）。客户端从历史用户消息中去掉该标记。
-- **渲染 skill**：客户端在 `peer_attach` 的 `capabilities.render` 声明能力，daemon 按设备保存，对声明了 `sessionCapabilities.additionalDirectories` 的 Agent 把对应 skill 目录传给 `session/new` / `session/load`；其他 Agent 不注入，`free` 进程级挂载全部 skill。
+- **Skill 挂载**：客户端在 `peer_attach` 带 `skills: { hash, enabled }`（版本与开启的 skill），daemon 按设备保存，对声明了 `sessionCapabilities.additionalDirectories` 的 Agent 把该版本对应的 skill 目录传给 `session/new` / `session/load`；其他 Agent 不注入，`free` 进程级挂载最近一次 attach 所用版本的全部 skill。
 
 ## 常用命令
 

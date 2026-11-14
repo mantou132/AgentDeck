@@ -89,7 +89,7 @@ Without them, use tables and Markdown links to map searches.
 
 ## Learned notes
 
-`../../../learned.md` from this file (the root of the directory this skill was mounted from) holds what earlier sessions on this machine learned about doing this skill's work. If it exists, read it before following this skill. Where a note and this skill disagree, follow the note; where a note and the user disagree, follow the user and fix the note.
+`{{LEARNED_PATH}}` holds what earlier sessions on this machine learned about doing this skill's work. If it exists, read it before following this skill. Where a note and this skill disagree, follow the note; where a note and the user disagree, follow the user and fix the note.
 
 Keep it up to date yourself:
 

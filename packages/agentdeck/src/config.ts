@@ -41,8 +41,9 @@ export const FEEDBACK_URL = 'https://github.com/mantou132/AgentDeck/issues/new';
 export const MIN_DAEMON_VERSION = '0.8.0';
 
 /**
- * Rendering capabilities this client supports, in settings order; the enabled ones are declared to the host,
- * which teaches agents the matching skill (e.g. `agentdeck-chart`). `job` and `travel` are workflow skills, toggled the same way.
+ * Skills in `skills/` this client can use, in settings order; the enabled ones are declared to the host, which mounts
+ * them into agent sessions. Most teach a block the client renders (e.g. `agentdeck-chart`); `job` and `travel` are
+ * workflow skills, toggled the same way.
  */
 export const SUPPORTED_SKILLS = [
   'widget',
