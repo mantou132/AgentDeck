@@ -13,7 +13,8 @@
     "build": "rsbuild build",
     "preview": "rsbuild preview",
     "test": "node --test --test-timeout=30000 test/*.test.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "skill-eval": "node skill-eval/run.mjs"
   },
   "dependencies": {
     "@gem-bind/diff2html": "^0.0.6",

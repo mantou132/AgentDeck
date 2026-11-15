@@ -1,0 +1,16 @@
+[
+  {
+    "id": "qingteng-fe",
+    "company": "青藤数据",
+    "role": "前端工程师",
+    "location": "上海",
+    "salary": "25-35K",
+    "source": "邮件",
+    "url": "",
+    "status": "applied",
+    "resume": "resume/resume.html",
+    "updated": "2026-11-05",
+    "next": "等回复",
+    "history": [{ "date": "2026-11-05", "status": "applied", "note": "邮件投递简历" }]
+  }
+]

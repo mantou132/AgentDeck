@@ -63,4 +63,5 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - `pnpm run dev` / `pnpm run build`：Rsbuild 开发服务器 / 生产打包。
 - `pnpm run test`：Node 单元测试（`test/*.test.mjs`）。
 - `pnpm run test:e2e`：Playwright 主流程 e2e（`e2e/`），连真实 host，只在本地手动跑；`E2E_PAIRING_ID`（必填，可用审核机的）与 `E2E_CHROME_PATH`（默认系统 Chrome）从环境或 gitignored 的 `.env.local` 读取。Free agent 上删除会话不生效，每次运行会在 host 上留下一个会话。
+- `pnpm skill-eval [skill …] [--all]`：用 free agent（托管的 OpenCode + `opencode/deepseek-v4.1-flash-free`，可用 `SKILL_EVAL_MODEL` 换）跑 `skill-eval/cases/<skill>.mjs` 的固定题，自动检查并截图，报告在 `~/SkillEval/<时间>/report.html`。不带参数时跑最近发布 tag 以来改过的 skill。只在用户要求时手动跑，不进 CI。OpenCode 2.x 的 `run` 默认连后台服务、不读环境里的配置，所以带 `--standalone`。courseware 写真实 `~/Courseware/`，重跑前把上次的输出移到 `~/SkillEval/old/`；job 只测本地环节，HOME 指向 `~/SkillEval/homes/job`，不碰用户的 `~/JobSearch/`。
 - `pnpm run tauri android dev`：Android 联调。
