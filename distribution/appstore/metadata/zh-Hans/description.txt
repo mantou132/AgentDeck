@@ -8,7 +8,7 @@ AgentDeck 让你在自己的电脑上运行 Claude Code、Codex、Cursor 或任�
 3. 用 AgentDeck 扫描终端里显示的二维码，然后选择一个 Agent。
 
 一个 App 管理所有 Agent
-支持 Claude Code、Codex、Cursor、GitHub Copilot、Google Antigravity、OpenCode、Qwen Code、Kimi CLI 等 ACP Agent，可在手机上切换 Agent、模式和模型。
+支持 Claude Code、Codex、Cursor、GitHub Copilot、Google Antigravity、OpenCode、Qwen Code、Kimi Code 等 ACP Agent，可在手机上切换 Agent、模式和模型。
 
 代码留在你自己的电脑上
 全程端到端加密，中继只转发密文，也可以自建中继。无账号、无统计、无追踪。

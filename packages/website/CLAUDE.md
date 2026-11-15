@@ -12,7 +12,7 @@
 
 ## 部署
 
-Vercel 项目的 Root Directory 设为 `packages/website`，push 到 main 自动部署；Gemkit 在 Vercel 上构建时自动输出 `.vercel/output`，不需要 `vercel.json`。域名在 Vercel 项目的 Domains 中添加，DNS 中把 `agentdeck` 指向 Vercel 给出的 CNAME。
+Vercel 项目的 Root Directory 设为 `packages/website`，push 到 main 自动部署；Gemkit 在 Vercel 上构建时自动输出 `.vercel/output`，不需要 `vercel.json`。`agentdeck.xianqiao.wang` 解析到腾讯云香港服务器：nginx 把 `/` 反代到 `agentdeck-website.vercel.app`，`/ws`、`/health`、`/push` 由同机的 Relay 与推送服务处理，所以不能把域名直接 CNAME 到 Vercel。
 
 ## 常用命令
 

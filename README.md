@@ -28,7 +28,7 @@ agentdeckd start
 
 ## Why AgentDeck
 
-- **One app for every agent.** Claude Code, Codex, Cursor, GitHub Copilot, Google Antigravity, OpenCode, Qwen Code, Kimi CLI and other [ACP](https://agentclientprotocol.com) agents. Switch agents and session options from your phone.
+- **One app for every agent.** Claude Code, Codex, Cursor, GitHub Copilot, Google Antigravity, OpenCode, Qwen Code, Kimi Code and other [ACP](https://agentclientprotocol.com) agents. Switch agents and session options from your phone.
 - **Start sessions from your phone.** The daemon runs in the background and starts with your computer, so you don't need to leave a terminal open or launch agents through a wrapper.
 - **Your code stays on your machine.** Everything is end-to-end encrypted: the relay only forwards ciphertext. You can also [self-host the relay][relay].
 - **Built for being away from the keyboard.**

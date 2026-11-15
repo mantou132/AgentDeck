@@ -76,7 +76,7 @@ export const defaultAgents: AgentInfo[] = [
   { id: 'antigravity-acp', name: 'Google Antigravity' },
   { id: 'opencode', name: 'OpenCode' },
   { id: 'qwen-code', name: 'Qwen Code' },
-  { id: 'kimi', name: 'Kimi CLI' },
+  { id: 'kimi-code', name: 'Kimi Code' },
   { id: 'junie', name: 'Junie' },
   { id: 'grok-build', name: 'Grok Build' },
   { id: 'codebuddy-code', name: 'CodeBuddy Code' },

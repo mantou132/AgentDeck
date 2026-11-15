@@ -39,7 +39,7 @@
 - **分支会话**：`agent_session_fork` 发送 ACP `session/fork`（`unstable_session_fork`），不建 actor，客户端随后照常 load。分支点用 claude-agent-acp 识别的 `_meta.jetbrains.air.fork`，其他 Agent 会复制整个会话。
 - **回合间的会话更新**：会话 actor 空闲时也读取 ACP session update（如 `session/new` 返回后才推送的 `available_commands_update`），以 `agent_session_update` 通知（`{ agent, sessionId, update }`）发给会话设备；回合与 load 回放中的仍随各自事件流转发。
 - **语音对话**：`agent_prompt` 带 `voiceChat: true` 时在附件末尾追加 `<agentdeck-voice-chat/>` 标记；`remote_app` 系统提示说明见到标记要在回复末尾写 `<!-- agentdeck-speech … -->` 注释作为朗读摘要（只有 Claude 读系统提示）。客户端从历史用户消息中去掉该标记。
-- **Skill 挂载**：客户端在 `peer_attach` 带 `skills: { hash, enabled }`（版本与开启的 skill），daemon 按设备保存，对声明了 `sessionCapabilities.additionalDirectories` 的 Agent 把该版本对应的 skill 目录传给 `session/new` / `session/load`；其他 Agent 不注入，`free` 进程级挂载最近一次 attach 所用版本的全部 skill。
+- **Skill 挂载**：客户端在 `peer_attach` 带 `skills: { hash, enabled }`（版本与开启的 skill），daemon 按设备保存，对声明了 `sessionCapabilities.additionalDirectories` 的 Agent 把该版本对应的 skill 目录传给 `session/new` / `session/load`；其他 Agent 不注入。OpenCode 只把这些目录当作访问授权，不从中加载 skill，所以 `free` 另在进程级挂载最近一次 attach 所用版本的全部 skill，开关对它不生效。
 
 ## 常用命令
 

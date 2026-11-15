@@ -4,7 +4,16 @@ const GITHUB = 'https://github.com/mantou132/AgentDeck';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', zh: '中文' };
 
-const AGENTS = ['Claude Code', 'Codex', 'Cursor', 'GitHub Copilot', 'Antigravity', 'OpenCode', 'Qwen Code', 'Kimi CLI'];
+const AGENTS = [
+  'Claude Code',
+  'Codex',
+  'Cursor',
+  'GitHub Copilot',
+  'Antigravity',
+  'OpenCode',
+  'Qwen Code',
+  'Kimi Code',
+];
 
 const FEATURES = [
   { icon: '🔔', key: 'notify' },

@@ -302,8 +302,8 @@ fn agentdeck_env(id: &str) -> Result<Vec<(String, String)>> {
             r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}}}"#.to_string(),
         )],
         // The free agent: its own session database, no user login, only the free
-        // OpenCode provider, and every render skill (OpenCode does not take
-        // per-session `additionalDirectories`).
+        // OpenCode provider, and every render skill (OpenCode takes
+        // `additionalDirectories` only as access grants, not as skill sources).
         FREE_AGENT_ID => {
             let data_dir = AppPaths::discover()?.agent(FREE_AGENT_ID).data_dir();
             app_data::ensure_dir(&data_dir)?;

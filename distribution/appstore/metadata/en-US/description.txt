@@ -8,7 +8,7 @@ GET STARTED IN A MINUTE
 3. Scan the QR code it prints with AgentDeck, then pick an agent.
 
 ONE APP FOR EVERY AGENT
-Claude Code, Codex, Cursor, GitHub Copilot, Google Antigravity, OpenCode, Qwen Code, Kimi CLI and other ACP agents. Switch agents, modes and models from your phone.
+Claude Code, Codex, Cursor, GitHub Copilot, Google Antigravity, OpenCode, Qwen Code, Kimi Code and other ACP agents. Switch agents, modes and models from your phone.
 
 YOUR CODE STAYS ON YOUR MACHINE
 Everything is end-to-end encrypted: the relay only forwards ciphertext. You can also self-host the relay. No accounts, no analytics, no tracking.
