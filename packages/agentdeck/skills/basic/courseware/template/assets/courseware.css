@@ -427,8 +427,82 @@ body {
   gap: 16px;
 }
 
+.cw-tool .cw-readout {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cw-readout > span {
+  white-space: nowrap;
+}
+
 .cw-readout:empty {
   display: none;
+}
+
+/* Formulas: LaTeX typeset by KaTeX when online (courseware.js); the source shows until then. */
+.tex.display {
+  display: block;
+  text-align: center;
+  margin: 12px 0;
+}
+
+.tex:not(.cw-typeset) {
+  font-family: var(--num);
+  color: var(--muted);
+}
+
+/* Parameter sliders of cw-graph */
+.cw-sliders {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px 48px;
+  font-size: 32px;
+}
+
+.cw-sliders label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cw-sliders i {
+  font-family: "Times New Roman", serif;
+  font-size: 44px;
+}
+
+.cw-sliders b {
+  min-width: 2.6em;
+  font-family: var(--num);
+}
+
+.cw-sliders input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 260px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--line);
+  outline: none;
+}
+
+.cw-sliders input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 5px solid #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+}
+
+.cw-sliders input::-moz-range-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 5px solid #fff;
 }
 
 /* Inside a choice or a draggable card a manipulative is only a picture. */

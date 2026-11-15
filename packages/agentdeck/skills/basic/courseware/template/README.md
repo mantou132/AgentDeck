@@ -15,8 +15,8 @@
 
 ## 硬约束
 
-- **离线、无构建**：双击 `index.html` 就能用，模板本身不引入 CDN、npm 依赖、Web 字体或构建步骤（只有可选的 `live.js` 用到时从 esm.sh 加载二维码库）。交付时 Agent 会把 CSS 和 JS 内联成一个文件（见 `SKILL.md` 的 Handing it over），所以 `assets/` 里不要出现 `</script>`、`</style>` 这样的字符串。只有课件需要 3D 时才按 `SKILL.md` 从 CDN 加载 three.js，这部分写在课件里，不进模板。
-- **只能放文本文件**：skill 打包（`rsbuild.config.ts` 的 `readSkills`）按 UTF-8 读取，图片、字体等二进制文件会损坏。图形用 SVG 画，公式用 `.frac` 和 Unicode 字符，所以不带 KaTeX。
+- **离线、无构建**：双击 `index.html` 就能用，模板本身不引入 CDN、npm 依赖、Web 字体或构建步骤（只有两处例外，都是用到时才联网：可选的 `live.js` 从 esm.sh 加载二维码库；页面里有 `.tex` 公式时 `courseware.js` 从 npmmirror 加载 KaTeX）。交付时 Agent 会把 CSS 和 JS 内联成一个文件（见 `SKILL.md` 的 Handing it over），所以 `assets/` 里不要出现 `</script>`、`</style>` 这样的字符串。只有课件需要 3D 时才按 `SKILL.md` 从 CDN 加载 three.js，这部分写在课件里，不进模板。
+- **只能放文本文件**：skill 打包（`rsbuild.config.ts` 的 `readSkills`）按 UTF-8 读取，图片、字体等二进制文件会损坏。图形用 SVG 画；KaTeX 的字体是二进制，所以不打包进模板，而是从 CDN 加载（npmmirror 带 CORS 头，`file://` 页面也能加载字体），断网时 `.tex` 显示灰色的 LaTeX 原文。
 - **兼容旧浏览器**：用普通 `<script>`，不用 `type="module"`（`file://` 下浏览器会拦截模块）；语法不超过 ES2017（不用 `?.`、`??`、私有字段）；CSS 不用嵌套、`:has()`、容器查询。目标是希沃 / 鸿合一体机自带的浏览器、360 和 QQ 浏览器的极速模式；IE 不支持（需要自定义元素）。
 - 仓库的 Biome 会检查这些文件，提交前运行 `pnpm run lint`。
 
@@ -33,22 +33,26 @@
 - **浮层**：计时器和点名是舞台内的 `.cw-overlay`，跟着一起缩放。计时器用 `requestAnimationFrame` 计时，关闭浮层也继续走，工具栏按钮会显示剩余时间；结束时用 WebAudio 响三声。点名名单存在 `localStorage['cw-picker-names']`（`file://` 下可能不可用，那就只在本次打开期间有效），本轮抽过的不重复。
 - **快捷键**：→ ↓ PageDown 空格 回车 前进；← ↑ PageUp Backspace 后退；Home / End；F 或 F5 全屏（翻页笔的「播放」键常发 F5，这里拦截，避免刷新页面）；B、`.`、W 黑屏，再按任意键恢复；P 画笔；T 计时；R 点名；Esc 关闭浮层或画笔。焦点在输入框内时不响应。
 - **URL 参数**：`#3` 打开第 3 页；`?steps=all` 显示全部步骤；`?toolbar=0` 隐藏工具栏。后两个用来截图检查。
+- **公式**：页面有 `.tex` 元素时才插入 KaTeX 的 CSS 和脚本（版本写死在 `KATEX` 常量），加载后逐个 `katex.render`，`.display` 为独立公式，排好的加 `.cw-typeset`。
 - **打印**：`@media print` 把每页排成 16in×9in（舞台 `zoom: 0.8`），显示全部步骤，隐藏工具栏、墨迹、浮层和教具按钮。PDF 导出靠它。
 - 对外暴露 `window.courseware = { next, prev, go, reset, setPickerSource }`，供测试和课件内的自定义脚本使用。`setPickerSource({ names(), picked(name) })` 由 `live.js` 设置：有人扫码时点名改从 `names()` 抽（优先于名单和学号），抽中后调用 `picked`。
 
 ## 教具（manipulatives.js）
 
-每个教具用 `define(name, build)` 注册：第一次挂载时记下元素原有的 innerHTML 并调用 `build`，`cwReset()` 恢复 innerHTML 后再调用一次 `build`。属性只在构建时读一次，状态放在 `build` 的闭包里。工具函数：`svg()` / `html()` 建节点，`draggable()` 处理 SVG 内的指针拖动，`num()` / `list()` 读属性，`svgFrac()` 在 SVG 里画竖排分数，`fracHtml()` 生成 HTML 分数。
+每个教具用 `define(name, build)` 注册（初中教具在文件后半部分，共用 `range()`、`splitTop()`、`compile()`、`formula()`、`sliders()`、`HALO`）：第一次挂载时记下元素原有的 innerHTML 并调用 `build`，`cwReset()` 恢复 innerHTML 后再调用一次 `build`。属性只在构建时读一次，状态放在 `build` 的闭包里。工具函数：`svg()` / `html()` 建节点，`draggable()` 处理 SVG 内的指针拖动，`num()` / `list()` 读属性，`svgFrac()` 在 SVG 里画竖排分数，`fracHtml()` 生成 HTML 分数。
 
 | 元素 | 主要属性 | 说明 |
 | --- | --- | --- |
-| `cw-number-line` | `min max step points hops fractions label-every snap width hide-readout` | 可拖动的点；`hops` 画跳跃弧线并标出差；`fractions="n"` 按 1/n 画刻度并用分数标注，读数会约分 |
+| `cw-number-line` | `min max step points hops fractions label-every snap width hide-readout opposite abs` | 可拖动的点；`hops` 画跳跃弧线并标出差；`fractions="n"` 按 1/n 画刻度并用分数标注，读数会约分；负数用「−」；`opposite` 画相反数的空心点，`abs` 在数轴上方画到 0 的距离 |
 | `cw-fraction` | `shape(circle/bar/grid) parts shaded size rows color controls hide-readout` | 点一份切换涂色；`controls` 增减份数 |
 | `cw-clock` | `time snap size hide-readout` | 拖分针时时针按比例跟着走，跨过 12 点会进退小时；也能拖时针；当前时间写在 `data-time` |
 | `cw-geoboard` | `cols rows cell points show(area perimeter lengths angles) unit color` | 拖动顶点吸附格点；面积用鞋带公式；周长和边长只在边都是横竖时显示（斜边是无理数）；不写 `points` 时点方格数面积 |
 | `cw-counter` | `places value` | 计数器；某一位到 10 颗时变色并出现「满十进一」，最高位最多 9 颗 |
 | `cw-bar-chart` | `items values unit tally` | 点柱子加一，可撤销；`tally` 按笔顺画「正」字 |
 | `cw-spinner` | `sectors size` | 扇区名称的第一个字是颜色名（红黄蓝绿紫橙白黑粉）时用对应颜色；转一次 / 快速转 10 次，统计次数 |
+| `cw-graph` | `x y fn params label marks points step snap width height hide-readout` | 坐标系，x、y 单位长度相等。`fn` 用 `compile()` 编成函数（`^` 转 `**`，`with (Math)` 提供 sqrt 等）；`params` 生成滑块（`sliders()`，松手后 blur，否则翻页笔按键会被滑块吃掉）；`label` 由 `formula()` 填值并按教材写法整理（系数 1 省略、0 项去掉、`+ −` 合并、`(x − 0)` 写成 x）。采样 800 点画曲线，跳变或非数处断开（反比例函数）；`marks` 用采样找变号点再二分求零点，找斜率变号点再三分求顶点 |
+| `cw-geometry` | `figure grid snap unit scale width height hide-readout` | 动态几何。`figure` 解析成点（自由点、`on` / `oncircle` 约束点、`constructions` 里的作图点）和图形；每次拖动按定义顺序重算所有点再重画。三角形三个角都显示时由 `roundedAngles()` 用最大余数法取整，保证和为 180°。识别不了的语句以红字列在读数处 |
+| `cw-algebra-tiles` | `expr negative x width height` | 代数瓦片。x 的长度取单位的 3.4 倍（故意不是整数，学生不会误以为 x 是确定的数）；松手时吸附到附近瓦片的边；拖回左侧托盘即删除；点一下 x 条绕中心转向。读数为盘面多项式，所有瓦片无重叠且恰好铺满外接矩形时，把长和宽分解成 a·x + b 写出因式 |
 | `cw-column` | `a b op(+ - ×) steps` | 竖式。加法进位小 1 写在横线上方；减法在被借位的数字上方打退位点；`+ −` 支持小数（按小数点对齐，原数没写的末位留空）；`×` 只支持整数，多位乘数逐行列部分积，不显示进位 |
 
 `cw-column` 的实现要点：先算出每个格子的行、列和出现顺序（`order`），按 `order` 排序后插入 DOM，再用 `grid-row` / `grid-column` 摆到正确位置。这样 DOM 顺序就是从右往左的出现顺序，可以直接用无编号的 `data-step`。

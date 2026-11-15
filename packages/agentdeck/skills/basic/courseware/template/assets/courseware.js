@@ -678,6 +678,30 @@
     if (handled) event.preventDefault();
   });
 
+  /* ---------- Formulas ---------- */
+
+  // LaTeX in .tex elements is typeset with KaTeX from a CDN, only when the deck has any; offline the source stays.
+  const KATEX = 'https://registry.npmmirror.com/katex/0.19.1/files/dist/';
+  const formulas = stage.querySelectorAll('.tex');
+  if (formulas.length) {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = `${KATEX}katex.min.css`;
+    document.head.appendChild(css);
+    const script = document.createElement('script');
+    script.src = `${KATEX}katex.min.js`;
+    script.onload = () => {
+      formulas.forEach((node) => {
+        window.katex.render(node.textContent, node, {
+          displayMode: node.classList.contains('display'),
+          throwOnError: false,
+        });
+        node.classList.add('cw-typeset');
+      });
+    };
+    document.head.appendChild(script);
+  }
+
   /* ---------- Start ---------- */
 
   window.addEventListener('resize', fit);

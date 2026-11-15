@@ -90,6 +90,118 @@
           <div class="center"><cw-column a="128" b="35" op="×" steps></cw-column></div>
         </div>
       </section>
+
+      <section class="slide">
+        <h2>有理数 cw-number-line（opposite 相反数，abs 绝对值）</h2>
+        <cw-number-line min="-6" max="6" points="-3.5" opposite></cw-number-line>
+        <div style="height:40px"></div>
+        <cw-number-line min="-6" max="6" points="-4,2" abs></cw-number-line>
+      </section>
+
+      <section class="slide">
+        <h2>公式 .tex（联网时用 KaTeX 排版）</h2>
+        <div class="center">
+          <p>一元二次方程 <span class="tex">ax^2+bx+c=0\ (a\neq 0)</span> 的求根公式：</p>
+          <div class="tex display big">x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}</div>
+          <p>勾股定理 <span class="tex">a^2+b^2=c^2</span>，二次根式 <span class="tex">\sqrt{12}=2\sqrt{3}</span></p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>一次函数 cw-graph</h2>
+        <div class="fill">
+          <cw-graph
+            x="-6,6"
+            y="-5,5"
+            fn="k*x+b"
+            params="k=1,-3,3,0.5; b=1,-4,4,1"
+            label="y = {k}x + {b}"
+            marks="intercepts"
+            points="P(2)"
+          ></cw-graph>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>二次函数与反比例函数 cw-graph</h2>
+        <div class="cols">
+          <div class="center">
+            <cw-graph
+              x="-5,5"
+              y="-4,6"
+              width="760"
+              height="420"
+              fn="a*(x-h)^2+k"
+              params="a=1,-2,2,0.5; h=1,-3,3,1; k=-2,-3,3,1"
+              label="y = {a}(x − {h})² + {k}"
+              marks="vertex axis intercepts"
+            ></cw-graph>
+          </div>
+          <div class="center">
+            <cw-graph
+              x="-6,6"
+              y="-6,6"
+              width="640"
+              height="480"
+              fn="k/x"
+              params="k=4,-8,8,1"
+              label="y = {k}/x"
+              points="A(2)"
+            ></cw-graph>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>平面直角坐标系 cw-graph（只画点）</h2>
+        <div class="fill"><cw-graph x="-6,6" y="-4,4" points="A(2,3) B(-3,1) C(-2,-3)"></cw-graph></div>
+      </section>
+
+      <section class="slide">
+        <h2>动态几何 cw-geometry（三角形的中线、内角和）</h2>
+        <div class="fill">
+          <cw-geometry
+            grid
+            snap="0.5"
+            unit="cm"
+            figure="A(2,1) B(11,1) C(5,7); M=mid(B,C); poly(A,B,C); dseg(A,M); angle(C,A,B); angle(A,B,C); angle(B,C,A); len(B,M); len(M,C); area(A,B,C)"
+          ></cw-geometry>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>动态几何 cw-geometry（轴对称、圆周角）</h2>
+        <div class="cols">
+          <div class="center">
+            <cw-geometry
+              width="700"
+              height="560"
+              scale="70"
+              grid
+              snap="1"
+              figure="P(2,6) Q(4,2) R(1,2) L1(5,0) L2(5,8); P'=reflect(P,L1,L2); Q'=reflect(Q,L1,L2); R'=reflect(R,L1,L2); line(L1,L2); poly(P,Q,R); poly(P',Q',R'); dseg(P,P')"
+            ></cw-geometry>
+          </div>
+          <div class="center">
+            <cw-geometry
+              width="620"
+              height="560"
+              scale="70"
+              figure="O(4.4,4) A(7.2,4); B=oncircle(O,A,200); C=oncircle(O,A,320); P=oncircle(O,A,100); circle(O,A); seg(P,B); seg(P,C); seg(O,B); seg(O,C); angle(B,P,C); angle(B,O,C)"
+            ></cw-geometry>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>代数瓦片 cw-algebra-tiles（拼成长方形：因式分解）</h2>
+        <div class="fill"><cw-algebra-tiles expr="x^2+3x+2"></cw-algebra-tiles></div>
+      </section>
+
+      <section class="slide">
+        <h2>代数瓦片 cw-algebra-tiles（negative：负的方块）</h2>
+        <div class="fill"><cw-algebra-tiles negative></cw-algebra-tiles></div>
+      </section>
     </main>
     <script src="assets/manipulatives.js"></script>
     <script src="assets/courseware.js"></script>
