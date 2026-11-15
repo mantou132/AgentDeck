@@ -465,6 +465,8 @@
     const info = el('div', { class: 'small muted' });
     let drawn = [];
     let rolling = false;
+    /** Set by live.js: draws among the audience's numbers while anyone has scanned in. */
+    let source = null;
     const listInput = el('textarea', { placeholder: '粘贴名单，每行一个；留空则按学号抽' });
     const countInput = el('input', { type: 'number', min: '2', max: '99', value: '40' });
     const settings = el('div', { style: 'display:none;flex-direction:column;align-items:center;gap:20px' }, [
@@ -516,7 +518,13 @@
       renderInfo();
     });
 
+    function fromAudience() {
+      return source ? source.names() : [];
+    }
+
     function pool() {
+      const audience = fromAudience();
+      if (audience.length) return audience;
       const names = listInput.value
         .split(/[\n,，、]/)
         .map((s) => s.trim())
@@ -530,7 +538,8 @@
 
     function renderInfo() {
       const all = pool();
-      info.textContent = `已抽 ${drawn.length} / ${all.length}，不重复`;
+      const scanned = fromAudience().length ? '扫码观众，' : '';
+      info.textContent = `${scanned}已抽 ${drawn.length} / ${all.length}，不重复`;
     }
 
     drawBtn.addEventListener('click', () => {
@@ -552,6 +561,7 @@
           drawn.push(pick);
           rolling = false;
           renderInfo();
+          if (source && fromAudience().indexOf(pick) >= 0) source.picked(pick);
         }
       }, 70);
     });
@@ -560,6 +570,11 @@
       open: () => {
         renderInfo();
         layer.classList.add('cw-on');
+      },
+      /** `{ names(): string[], picked(name) }` */
+      setSource: (s) => {
+        source = s;
+        drawn = [];
       },
     };
   })();
@@ -675,5 +690,5 @@
   go(Number.isNaN(start) ? 0 : start - 1);
   timer.render();
 
-  window.courseware = { next: next, prev: prev, go: go, reset: resetSlide };
+  window.courseware = { next: next, prev: prev, go: go, reset: resetSlide, setPickerSource: picker.setSource };
 })();

@@ -57,5 +57,12 @@
   "ctaTitle": "让智能体随你而行",
   "ctaSub": "免费开源，MIT 许可证。",
   "support": "支持",
-  "privacy": "隐私"
+  "privacy": "隐私",
+  "audienceTitle": "AgentDeck 互动",
+  "audienceConnecting": "正在连接…",
+  "audienceWaiting": "已加入，等待主讲人…",
+  "audienceReconnecting": "正在重连…",
+  "audienceInvalid": "链接不完整，请重新扫码。",
+  "audienceUnsupported": "这个浏览器无法加入，请换一个浏览器。",
+  "audienceNumber": "% 号"
 }

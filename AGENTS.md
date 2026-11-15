@@ -26,7 +26,7 @@
 
 # 全局运行与通信约束
 
-- **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，agentdeckd 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。
+- **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，agentdeckd 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。官网 `/live` 扫码互动也用同一个 Relay（relayId `live_*`，只发 ephemeral），与配对无关。
 - **端到端加密（E2EE）**：普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - **会话状态机制**：新会话先建本地待创建会话（App 中称 pending session），首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
 - **连接与重试**：host 握手成功才算 connected，普通重连保留 SDK 消息状态。短请求有超时，prompt 不套固定短时限；load 等事件流调用与 `peer_attach` 从收到 host 的最后一帧起计时（重连后 Relay 先补发积压消息）。权限请求与问题由 daemon 保存，App 每次连上经 `agent_prompts_running` 补回，不依赖请求重投。

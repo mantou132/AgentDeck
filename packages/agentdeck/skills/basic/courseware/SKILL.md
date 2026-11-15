@@ -73,6 +73,15 @@ The deck is plain HTML on a 1920×1080 stage scaled to any screen. Each `<sectio
 - `<cw-spinner sectors="红,红,黄,蓝">`: spin once or ten times quickly; counts the results (possibility lessons).
 - `<cw-column a="358" b="267" op="+|-|×" steps>` (竖式): the textbook layout with carries and borrow dots; `steps` reveals the answer digit by digit from the right (partial products row by row for ×). `+` and `−` take decimals; `×` takes whole numbers. Division and other layouts: draw them in SVG with `data-step`.
 
+**Scan to answer** (扫码互动, only when the teacher wants students to answer on phones or tablets; needs the classroom computer and the devices online): add `<script src="assets/live.js"></script>` after `courseware.js`. Students scan a QR code on the board, which opens the AgentDeck audience page in their browser; nothing to install. Each device gets a number (1 号, 2 号 …) that stays the same for this deck, shown on the device, and 点名 then draws among those numbers and pops 你被抽到了！ up on that device.
+
+- `<cw-live-join>`: a big QR code and how many have joined; put it on its own slide before the first question (`size` changes the QR size).
+- `<cw-poll options="A 的内容,B 的内容,C 的内容" correct="2" multiple qr>`: single choice (also 判断题 with `options="对,错"`), `multiple` for multiple choice with a 提交 button; the board shows a bar per option live, 公布答案 marks `correct` (1-based, comma-separated for multiple) on the board and on every device, 重新作答 clears.
+- `<cw-responses type="number" unit=" 克" answer="5">` collects a number (count, min, max, average, 公布答案 checks `answer`); `type="text"` collects a short sentence as cards (tap a card to hide it, e.g. an unkind one).
+- The question students see is the slide's `<h2>` (without the tag), or `question="…"`; `placeholder` sets the input hint. `qr` adds a small QR code beside a poll or responses for latecomers; use it only when the element has the full slide width (beside a figure in `.cols` it squeezes the bars).
+- The device shows the question of the slide on the board, so put one poll or responses per slide.
+- Ask first whether the students have phones or tablets with a browser and the classroom has internet. Keep an offline way through the lesson (a `.choices` question on the board does the same job).
+
 When a lesson needs something else (a ruler, a protractor, symmetry, a balance), draw it in inline SVG on the slide and use `data-drag` / `data-step`, or add a small script at the end of `index.html` in the same style as `assets/manipulatives.js`. Figures you don't draw must be free to use; prefer SVG.
 
 **3D** (solids, nets, views from different sides, stacking cubes): use three.js loaded from a CDN, in an inline module script at the end of `index.html`:
@@ -107,7 +116,7 @@ Fix and re-check until clean. Delete the screenshots afterwards.
 
 ## Handing it over
 
-- The deliverable is one file, `<topic>.html`, so the teacher can send it on WeChat or copy it to a USB drive and open it by double-clicking. Build it from `index.html` after every change: replace `<link rel="stylesheet" href="assets/courseware.css">` with a `<style>` holding that file's contents, and each `<script src="assets/….js"></script>` with a `<script>` holding that file's contents, in the same order; keep CDN imports as they are. Check the built file, not `index.html`. Say how to use it in one line the first time.
+- The deliverable is one file, `<topic>.html`, so the teacher can send it on WeChat or copy it to a USB drive and open it by double-clicking. Build it from `index.html` after every change: replace `<link rel="stylesheet" href="assets/courseware.css">` with a `<style>` holding that file's contents, and each `<script src="assets/….js"></script>` with a `<script>` holding that file's contents, in the same order; keep CDN imports as they are (`assets/live.js` is inlined like the others; it loads its QR code library from esm.sh itself). Check the built file, not `index.html`. Say how to use it in one line the first time.
 - Other formats on request: a PDF of the slides by printing with headless Chromium (`--headless --no-pdf-header-footer --print-to-pdf=lesson.pdf index.html`; every slide one 16:9 page with all steps shown, manipulatives as still pictures); a PPTX by putting the slide screenshots one per page with `python-pptx` when it's installed (say that interactives become pictures, and offer to install it if missing); the lesson plan as `.docx` with `pandoc plan.md -o plan.docx` or as a PDF.
 
 ## The lesson plan

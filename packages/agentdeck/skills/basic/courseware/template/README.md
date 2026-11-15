@@ -11,10 +11,11 @@
 | `assets/courseware.css` | 主题色（`:root`）、幻灯片版式、文字与分数样式、选择题、拖拽、工具栏、浮层、打印样式 |
 | `assets/courseware.js` | 引擎：舞台缩放、翻页、逐步显示、选择题、拖拽、画笔、计时器、随机点名、工具栏、快捷键 |
 | `assets/manipulatives.js` | 数学教具（自定义元素），必须在 `courseware.js` 之前加载 |
+| `assets/live.js` | 扫码互动（可选，需要联网），在 `courseware.js` 之后加载；示例 `index.html` 不带 |
 
 ## 硬约束
 
-- **离线、无构建**：双击 `index.html` 就能用，模板本身不引入 CDN、npm 依赖、Web 字体或构建步骤。交付时 Agent 会把 CSS 和 JS 内联成一个文件（见 `SKILL.md` 的 Handing it over），所以 `assets/` 里不要出现 `</script>`、`</style>` 这样的字符串。只有课件需要 3D 时才按 `SKILL.md` 从 CDN 加载 three.js，这部分写在课件里，不进模板。
+- **离线、无构建**：双击 `index.html` 就能用，模板本身不引入 CDN、npm 依赖、Web 字体或构建步骤（只有可选的 `live.js` 用到时从 esm.sh 加载二维码库）。交付时 Agent 会把 CSS 和 JS 内联成一个文件（见 `SKILL.md` 的 Handing it over），所以 `assets/` 里不要出现 `</script>`、`</style>` 这样的字符串。只有课件需要 3D 时才按 `SKILL.md` 从 CDN 加载 three.js，这部分写在课件里，不进模板。
 - **只能放文本文件**：skill 打包（`rsbuild.config.ts` 的 `readSkills`）按 UTF-8 读取，图片、字体等二进制文件会损坏。图形用 SVG 画，公式用 `.frac` 和 Unicode 字符，所以不带 KaTeX。
 - **兼容旧浏览器**：用普通 `<script>`，不用 `type="module"`（`file://` 下浏览器会拦截模块）；语法不超过 ES2017（不用 `?.`、`??`、私有字段）；CSS 不用嵌套、`:has()`、容器查询。目标是希沃 / 鸿合一体机自带的浏览器、360 和 QQ 浏览器的极速模式；IE 不支持（需要自定义元素）。
 - 仓库的 Biome 会检查这些文件，提交前运行 `pnpm run lint`。
@@ -33,7 +34,7 @@
 - **快捷键**：→ ↓ PageDown 空格 回车 前进；← ↑ PageUp Backspace 后退；Home / End；F 或 F5 全屏（翻页笔的「播放」键常发 F5，这里拦截，避免刷新页面）；B、`.`、W 黑屏，再按任意键恢复；P 画笔；T 计时；R 点名；Esc 关闭浮层或画笔。焦点在输入框内时不响应。
 - **URL 参数**：`#3` 打开第 3 页；`?steps=all` 显示全部步骤；`?toolbar=0` 隐藏工具栏。后两个用来截图检查。
 - **打印**：`@media print` 把每页排成 16in×9in（舞台 `zoom: 0.8`），显示全部步骤，隐藏工具栏、墨迹、浮层和教具按钮。PDF 导出靠它。
-- 对外暴露 `window.courseware = { next, prev, go, reset }`，供测试和课件内的自定义脚本使用。
+- 对外暴露 `window.courseware = { next, prev, go, reset, setPickerSource }`，供测试和课件内的自定义脚本使用。`setPickerSource({ names(), picked(name) })` 由 `live.js` 设置：有人扫码时点名改从 `names()` 抽（优先于名单和学号），抽中后调用 `picked`。
 
 ## 教具（manipulatives.js）
 
@@ -74,18 +75,20 @@
 - 只在 Chromium 内核里测试过，没在 Firefox、Safari 和真实的希沃一体机上测过。
 - 加法进位写在横线上方是按人教版的习惯，还没有找老师核实。
 
-## 规划：扫码互动（未实现）
+## 扫码互动（live.js）
 
-目标：老师在大屏上显示二维码，学生用自己的设备扫码作答，大屏实时显示统计（正确率、各选项人数），也能展示某个学生的答案。
+老师的大屏显示二维码，学生用手机或平板的浏览器扫码打开 AgentDeck 官网的观众页 `https://agentdeck.xianqiao.wang/zh/live`（代码在 `packages/website/src/pages/live/`），作答结果实时回到大屏。
 
-已确认可行的部分（读过 `mantou132/relay` 服务端源码）：
+- **房间**：每个课件一个房间，按 `location.pathname` 存在 `localStorage['cw-live:<路径>']`（`room`、`key`、`numbers`），刷新或重开课件后二维码和编号都不变。二维码链接是 `…/zh/live#<room>.<key>`，`#` 后面不发给服务器。
+- **传输**：复用 AgentDeck 的 Relay（`wss://agentdeck.xianqiao.wang/ws`），relayId 为 `live_<room>`。大屏连 endpoint 1，每台学生设备连 endpoint 2，`device_id` 是该设备在这个房间的固定 id（存在观众页的 localStorage）。全部用 ephemeral 消息（不落库、不 ack，只发给当时在线的设备）：广播的可靠消息要所有登记过的设备都 ack 才清除，学生离开会让消息一直挂着。Relay 不校验 Origin，`file://` 打开的课件也能连。
+- **加密**：消息体是 `{ iv, c }`，用链接里的 32 字节密钥做 AES-GCM，Relay 只看到密文。解不开的消息直接丢弃。
+- **消息**（加密前）：学生 → 大屏 `{ t: 'join', from }`、`{ t: 'data', from, value }`；大屏 → 学生 `{ t: 'present' }`（大屏连上时广播，在线设备回 `join`）、`{ t: 'hello', n }`（编号）、`{ t: 'view', html }`（要显示的界面）、`{ t: 'data', value }`、`{ t: 'notice', text }`（弹出提示）。大屏收到 `join` 就给该设备单发编号和当前界面，所以学生中途加入、刷新、大屏刷新都能恢复。观众页的类型定义在 `packages/website/src/pages/live/_protocol.ts`，两边要同步改。
+- **编号**：设备第一次 `join` 或作答时按顺序分配，永久保存在房间里。点名从所有编号里抽，不管是否在线（手机切到别的应用就会断开）；抽中的设备在线时弹出「你被抽到了！」。
+- **学生端界面**：`view` 的 HTML 放在观众页的 `<iframe sandbox="allow-scripts allow-forms">` 里运行（不同源，碰不到官网页面），带一套手机样式（按钮、输入框，`.selected`、`.right`、`.wrong`、`.primary`）。脚本里有 `live.send(value)`、`live.onmessage = (value) => {}`、`live.id`。同样的 HTML 再发一次不会重建 iframe，学生输了一半的内容不会丢。
+- **组件**：`cw-poll` 和 `cw-responses` 在所在页显示（`cw-enter` 事件）时发出自己的界面，用随机 id 区分答案；同一设备多次作答只算最后一次。`cwReset()` 清空统计并让学生端复位。`window.CwLive.room()` 返回房间（`url`、`count`、`numberOf(id)`、`on('join'|'data'|'status', fn)`、`show(html)`、`send(value, to?)`、`notice(text, to?)`、`qr(size)`），课件里的自定义互动可以直接用。
+- **二维码**：`qr()` 动态 `import('https://esm.sh/qrcode-generator@2.0.4')` 生成 SVG；加载失败时提示需要联网。
+- `live.js` 的模板字符串里把结束标签写成 `${'</'}script>`（Biome 会去掉 `<\/script>` 的转义），内联成单文件后也不会提前结束脚本。
 
-- 复用 AgentDeck 的 Relay（`wss://agentdeck.xianqiao.wang/ws`）。它与协议无关，只转发不透明的 JSON；不校验 Origin，`file://` 打开的课件也能连上；不限制每个房间的设备数。
-- 一节课一个随机 relayId（写在二维码里）。大屏连 endpoint 1，每个学生连 endpoint 2，各用自己的 `device_id`。消息默认广播给对端所有在线设备，也可以用 `target_device_id` 只发给一台。
-- 全部使用 ephemeral 消息：只转发给当时在线的设备，不落库、不需要 ack。不用可靠消息，因为广播消息要等所有登记过的设备都 ack 才会清除，学生中途离开会让消息一直挂着。学生中途加入时先发一条「加入」，大屏只回给他当前的题目。
-- 端到端加密：密钥放在二维码链接的 `#` 后面（不会发给服务器），Relay 只能看到密文。
-- 学生端是部署在线上的网页（例如官网 `/class`），因为学生扫码只能打开 https 链接。
+测试：本地运行 Relay（`mantou132/relay`）和官网（`pnpm run build && pnpm run start`），用 Playwright 打开课件和两个手机视口的观众页，把两边的 WebSocket 用 `routeWebSocket` 在 Node 里转到本地 Relay（`connectToServer()` 不能改地址）。检查加入人数与编号、投票计数与公布答案、数字与文字作答、学生刷新、大屏刷新后房间与编号不变、点名弹窗。
 
-要做的事：学生端页面和部署、课件里的「扫码作答」组件（显示二维码、收集答案、统计）、`SKILL.md` 的用法说明。
-
-前提与待确认：教室和学生的设备要能上网，学生设备能用浏览器扫码打开网页（学校的平板可能被管控，只能用指定应用）；学生用的是答题器还是平板，还没问清楚。
+前提：教室电脑和学生设备都要能上网，学生设备要能用浏览器扫码（学校平板可能被管控）；在真实的希沃一体机和学生平板上还没测过。

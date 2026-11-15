@@ -57,5 +57,12 @@
   "ctaTitle": "Take your agents with you",
   "ctaSub": "Free and open source under the MIT license.",
   "support": "Support",
-  "privacy": "Privacy"
+  "privacy": "Privacy",
+  "audienceTitle": "AgentDeck Live",
+  "audienceConnecting": "Connecting…",
+  "audienceWaiting": "You're in. Waiting for the presenter…",
+  "audienceReconnecting": "Reconnecting…",
+  "audienceInvalid": "This link is incomplete. Scan the QR code again.",
+  "audienceUnsupported": "This browser can't join. Try another browser.",
+  "audienceNumber": "No. %"
 }

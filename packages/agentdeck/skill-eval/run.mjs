@@ -219,7 +219,10 @@ const writeReport = (results) => {
       )
       .join('');
     const checks = result.checks
-      .map((c) => `<li>${mark(c.ok)} ${escapeHtml(c.name)}${c.detail ? `<small>${escapeHtml(c.detail)}</small>` : ''}</li>`)
+      .map(
+        (c) =>
+          `<li>${mark(c.ok)} ${escapeHtml(c.name)}${c.detail ? `<small>${escapeHtml(c.detail)}</small>` : ''}</li>`,
+      )
       .join('');
     return `<section><h2>${escapeHtml(result.skill)} · ${escapeHtml(result.title)}</h2>
 <p class="meta">${Math.round(result.ms / 60_000)} 分钟 · ${result.turns.length} 轮 · ${tokens(result.turns).toLocaleString()} tokens</p>
