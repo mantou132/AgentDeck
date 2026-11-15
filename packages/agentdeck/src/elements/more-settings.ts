@@ -1,5 +1,8 @@
 import { ActionSheet } from '@mantou/tap-ui/elements/action-sheet';
+import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { getVersion } from '@tauri-apps/api/app';
+import { isTauri } from '@tauri-apps/api/core';
 import { SKILL_REQUIRES, SUPPORTED_SKILLS } from '../config';
 import { i18n, type LocaleKey } from '../i18n';
 import { setSkillEnabled } from '../state/app';
@@ -57,6 +60,13 @@ const style = css`
 @connectStore(agentdeckStore)
 @connectStore(savedAppsStore)
 export class DeckMoreSettingsElement extends GemElement {
+  #state = createState({ version: '' });
+
+  @mounted()
+  #readVersion = async () => {
+    if (isTauri()) this.#state({ version: await getVersion() });
+  };
+
   #manageApp = async ({ id, name }: AppManifest) => {
     const action = await ActionSheet.open({
       title: name,
@@ -108,6 +118,20 @@ export class DeckMoreSettingsElement extends GemElement {
           `,
         };
       })}
+    ></tap-cell-group>
+    <tap-cell-group
+      .items=${[
+        {
+          label: i18n.get('settings.changelog'),
+          extra: this.#state.version,
+          onClick: () =>
+            Sheet.open({
+              maskClosable: true,
+              header: i18n.get('settings.changelog'),
+              body: html`<deck-changelog></deck-changelog>`,
+            }),
+        },
+      ]}
     ></tap-cell-group>
   `;
 }

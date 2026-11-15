@@ -169,6 +169,8 @@
   "settings.savedAppsWidgetDesc": "Apps saved on this phone work without the computer. Add the AgentDeck widget to the Home Screen to open them from there.",
   "settings.skillsTitle": "Skills",
   "settings.skillsDesc": "Enabled skills teach the agent to put matching content in replies. Changes apply to sessions created or opened afterwards.",
+  "settings.changelog": "Release notes",
+  "settings.changelogLatest": "Latest release",
   "settings.moreSettings": "More settings",
   "skill.widget": "Widgets",
   "skill.widgetDesc": "Calculators, comparisons, clickable options and more",

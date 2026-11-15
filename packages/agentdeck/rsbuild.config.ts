@@ -23,13 +23,49 @@ const readSkills = () => {
 /** Read once per build process, so a dev server needs a restart after editing `skills/`. */
 const skills = readSkills();
 
+/**
+ * Store release notes from `distribution/whatsnew`, newest first per language. The root file has no version: it
+ * belongs to the latest release, older ones are archived under `history/` with their version.
+ */
+const readChangelog = () => {
+  const root = path.resolve(import.meta.dirname, '../../distribution/whatsnew');
+  const changelog: Record<string, { version?: string; text: string }[]> = {};
+  const add = (dir: string, version: (rest: string) => string | undefined) => {
+    for (const name of readdirSync(dir)) {
+      const match = name.match(/^whatsnew-([a-z]{2}-[A-Z]{2})(?:-(.+))?$/);
+      if (!match) continue;
+      const [, lang, rest = ''] = match;
+      changelog[lang] ??= [];
+      changelog[lang].push({
+        version: version(rest),
+        text: readFileSync(path.join(dir, name), 'utf8').trim(),
+      });
+    }
+  };
+  add(root, () => undefined);
+  add(path.join(root, 'history'), (rest) => rest);
+  const parts = (version = '') => version.split('.').map(Number);
+  for (const entries of Object.values(changelog)) {
+    entries.sort((a, b) => {
+      if (!a.version || !b.version) return a.version ? 1 : -1;
+      const [x, y] = [parts(a.version), parts(b.version)];
+      return y[0] - x[0] || y[1] - x[1] || y[2] - x[2];
+    });
+  }
+  return changelog;
+};
+
 /** Emits `skills.json` beside the app and gives the code only the hash; the app fetches the file when a host lacks it. */
 const skillsPlugin: RsbuildPlugin = {
   name: 'agentdeck-skills',
   setup(api) {
     api.modifyRsbuildConfig((config) => {
       config.source ??= {};
-      config.source.define = { ...config.source.define, __SKILLS_HASH__: JSON.stringify(skills.hash) };
+      config.source.define = {
+        ...config.source.define,
+        __SKILLS_HASH__: JSON.stringify(skills.hash),
+        __CHANGELOG__: JSON.stringify(readChangelog()),
+      };
     });
     api.processAssets({ stage: 'additional' }, ({ compilation, sources }) => {
       compilation.emitAsset('skills.json', new sources.RawSource(JSON.stringify(skills)));
