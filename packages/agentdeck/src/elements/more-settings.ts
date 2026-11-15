@@ -3,7 +3,7 @@ import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
-import { SKILL_REQUIRES, SUPPORTED_SKILLS } from '../config';
+import { DISPLAY_SKILLS, SKILL_REQUIRES, WORKFLOW_SKILLS } from '../config';
 import { i18n, type LocaleKey } from '../i18n';
 import { setSkillEnabled } from '../state/app';
 import {
@@ -86,6 +86,29 @@ export class DeckMoreSettingsElement extends GemElement {
     }
   };
 
+  #skillItem = (skill: string) => {
+    const required = SKILL_REQUIRES[skill];
+    // The toggle is kept for hosts that offer it.
+    const restricted = isSkillRestricted(skill) || (!!required && isSkillRestricted(required));
+    return {
+      label: html`
+        <div>${i18n.get(`skill.${skill}` as LocaleKey)}</div>
+        <div class="description">
+          ${restricted ? i18n.get('settings.skillRestricted') : i18n.get(`skill.${skill}Desc` as LocaleKey)}
+        </div>
+      `,
+      action: false,
+      // Not the group's own switch rows, which cannot be disabled while the required skill is off.
+      extra: html`
+        <tap-switch
+          ?checked=${!restricted && isSkillEnabled(skill)}
+          ?disabled=${restricted || (!!required && !isSkillEnabled(required))}
+          @change=${(event: CustomEvent<boolean>) => setSkillEnabled(skill, event.detail)}
+        ></tap-switch>
+      `,
+    };
+  };
+
   @template()
   #render = () => html`
     <tap-cell-group
@@ -98,30 +121,14 @@ export class DeckMoreSettingsElement extends GemElement {
       }))}
     ></tap-cell-group>
     <tap-cell-group
-      heading=${i18n.get('settings.skillsTitle')}
+      heading=${i18n.get('settings.workflowSkillsTitle')}
+      footer=${i18n.get('settings.workflowSkillsDesc')}
+      .items=${WORKFLOW_SKILLS.map(this.#skillItem)}
+    ></tap-cell-group>
+    <tap-cell-group
+      heading=${i18n.get('settings.displaySkillsTitle')}
       footer=${i18n.get('settings.skillsDesc')}
-      .items=${SUPPORTED_SKILLS.map((skill) => {
-        const required = SKILL_REQUIRES[skill];
-        // The toggle is kept for hosts that offer it.
-        const restricted = isSkillRestricted(skill) || (!!required && isSkillRestricted(required));
-        return {
-          label: html`
-            <div>${i18n.get(`skill.${skill}` as LocaleKey)}</div>
-            <div class="description">
-              ${restricted ? i18n.get('settings.skillRestricted') : i18n.get(`skill.${skill}Desc` as LocaleKey)}
-            </div>
-          `,
-          action: false,
-          // Not the group's own switch rows, which cannot be disabled while the required skill is off.
-          extra: html`
-            <tap-switch
-              ?checked=${!restricted && isSkillEnabled(skill)}
-              ?disabled=${restricted || (!!required && !isSkillEnabled(required))}
-              @change=${(event: CustomEvent<boolean>) => setSkillEnabled(skill, event.detail)}
-            ></tap-switch>
-          `,
-        };
-      })}
+      .items=${DISPLAY_SKILLS.map(this.#skillItem)}
     ></tap-cell-group>
     <tap-cell-group
       .items=${[
