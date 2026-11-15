@@ -1,12 +1,10 @@
 //! Skills a client ships and enables in `peer_attach`. The client declares
 //! their content hash, and the daemon asks for the files through
 //! `skills_install` when that version is missing. Each enabled skill is
-//! mounted through ACP `additionalDirectories`; most teach the agent a fenced
-//! block the client renders from Markdown; the
-//! `app` skill also ships a project template the agent copies. `job` and
-//! `travel` are workflow skills rather than output formats, toggled the same
-//! way; they keep notes agents write while using them in `learned/<skill>/`,
-//! outside the versions, named in their skill through `{{LEARNED_PATH}}`.
+//! mounted through ACP `additionalDirectories`. The daemon doesn't know what
+//! any skill is for: a skill whose files contain `{{LEARNED_PATH}}` gets a
+//! `learned/<skill>/` directory, kept across versions and mounted with it, for
+//! notes agents write while using it.
 
 use std::{
     collections::HashMap,

@@ -42,8 +42,8 @@ export const MIN_DAEMON_VERSION = '0.8.0';
 
 /**
  * Skills in `skills/` this client can use, in settings order; the enabled ones are declared to the host, which mounts
- * them into agent sessions. Most teach a block the client renders (e.g. `agentdeck-chart`); `job` and `travel` are
- * workflow skills, toggled the same way.
+ * them into agent sessions. Most teach a block the client renders (e.g. `agentdeck-chart`); `job`, `travel` and
+ * `courseware` are workflow skills, toggled the same way.
  */
 export const SUPPORTED_SKILLS = [
   'widget',
@@ -55,13 +55,14 @@ export const SUPPORTED_SKILLS = [
   ...(calendarSupported ? ['event'] : []),
   'job',
   'travel',
+  'courseware',
 ];
 
 /** Skills that only work with another one, e.g. built apps open through `agentdeck-preview`; off with it. */
 export const SKILL_REQUIRES: Record<string, string> = { app: 'preview' };
 
 /** Off until turned on in settings, e.g. workflows most users never need. */
-export const DEFAULT_OFF_SKILLS = ['job', 'travel'];
+export const DEFAULT_OFF_SKILLS = ['job', 'travel', 'courseware'];
 
 export type AgentInfo = { id: string; name: string };
 

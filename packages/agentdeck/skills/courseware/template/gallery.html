@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>教具示例</title>
+    <link rel="stylesheet" href="assets/courseware.css">
+  </head>
+  <body>
+    <!-- Every manipulative with its markup, for reference and testing. Delete this file from a lesson's copy. -->
+    <main id="cw-stage">
+      <section class="slide">
+        <h2>数轴 cw-number-line</h2>
+        <cw-number-line min="0" max="20" step="1" points="8,13" hops></cw-number-line>
+        <div style="height:60px"></div>
+        <cw-number-line min="0" max="2" fractions="4" points="0.75"></cw-number-line>
+      </section>
+
+      <section class="slide">
+        <h2>分数 cw-fraction</h2>
+        <div class="cols">
+          <div class="center"><cw-fraction shape="circle" parts="8" shaded="3"></cw-fraction></div>
+          <div class="center"><cw-fraction shape="bar" parts="5" shaded="2" size="600" controls></cw-fraction></div>
+          <div class="center"><cw-fraction shape="grid" parts="12" shaded="4" size="360"></cw-fraction></div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>钟面 cw-clock</h2>
+        <div class="cols">
+          <div class="center"><cw-clock time="3:00"></cw-clock></div>
+          <div class="center"><cw-clock time="8:35" snap="5" hide-readout></cw-clock></div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>几何画板 cw-geoboard</h2>
+        <div class="cols">
+          <div class="center">
+            <cw-geoboard
+              cols="10"
+              rows="7"
+              cell="70"
+              points="1,1 7,1 7,5 1,5"
+              show="area perimeter lengths"
+              unit="cm"
+            ></cw-geoboard>
+          </div>
+          <div class="center">
+            <cw-geoboard cols="10" rows="7" cell="70" points="1,6 4,1 9,6" show="area angles"></cw-geoboard>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>数方格 cw-geoboard（不写 points）</h2>
+        <div class="fill"><cw-geoboard cols="12" rows="6" unit="cm"></cw-geoboard></div>
+      </section>
+
+      <section class="slide">
+        <h2>计数器 cw-counter</h2>
+        <div class="fill"><cw-counter places="4" value="1309"></cw-counter></div>
+      </section>
+
+      <section class="slide">
+        <h2>统计 cw-bar-chart</h2>
+        <div class="fill">
+          <cw-bar-chart items="苹果,香蕉,橘子,葡萄" values="6,3,8,2" unit="人" tally></cw-bar-chart>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>转盘 cw-spinner</h2>
+        <div class="fill"><cw-spinner sectors="红,红,红,黄,蓝,蓝"></cw-spinner></div>
+      </section>
+
+      <section class="slide">
+        <h2>竖式 cw-column（按翻页键逐位出现）</h2>
+        <div class="cols">
+          <div class="center"><cw-column a="358" b="267" op="+" steps></cw-column></div>
+          <div class="center"><cw-column a="503" b="178" op="-" steps></cw-column></div>
+          <div class="center"><cw-column a="12.5" b="3.75" op="+" steps></cw-column></div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>竖式乘法 cw-column</h2>
+        <div class="cols">
+          <div class="center"><cw-column a="236" b="4" op="×" steps></cw-column></div>
+          <div class="center"><cw-column a="128" b="35" op="×" steps></cw-column></div>
+        </div>
+      </section>
+    </main>
+    <script src="assets/manipulatives.js"></script>
+    <script src="assets/courseware.js"></script>
+  </body>
+</html>

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>分数的初步认识</title>
+    <link rel="stylesheet" href="assets/courseware.css">
+  </head>
+  <body>
+    <main id="cw-stage">
+      <section class="slide title">
+        <h1>分数的初步认识</h1>
+        <div class="subtitle">人教版 · 三年级上册 · 第八单元</div>
+      </section>
+
+      <section class="slide">
+        <h2><span class="tag">情境导入</span>分月饼</h2>
+        <div class="cols">
+          <div class="center">
+            <p class="big">2 个月饼，平均分给 2 个小朋友，<br>每人分得几个？</p>
+            <p class="huge primary-text" data-step>1 个</p>
+          </div>
+          <div class="center">
+            <p class="big">1 个月饼，平均分给 2 个小朋友，<br>每人分得多少？</p>
+            <p class="huge accent-text" data-step>半个</p>
+            <p class="big" data-step>“半个”可以用哪个数表示呢？</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2><span class="tag">探究新知</span>认识二分之一</h2>
+        <div class="cols">
+          <div class="center">
+            <cw-fraction shape="circle" parts="2" shaded="1"></cw-fraction>
+          </div>
+          <div class="center">
+            <p class="big">
+              把一个月饼<br><span class="mark">平均分</span>成 2 份，<br>每份是它的
+              <span class="frac"><span>1</span><span>2</span></span>
+            </p>
+            <div class="card primary" data-step>
+              <p class="big" style="margin:0">
+                <span class="frac"><span>1</span><span>2</span></span>
+                读作：二分之一
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2><span class="tag">动手操作</span>折一折，涂一涂</h2>
+        <p>
+          用一张长方形纸折出它的 <span class="frac"><span>1</span><span>4</span></span>，并涂上颜色。还能折出几分之一？
+        </p>
+        <div class="fill">
+          <cw-fraction shape="bar" parts="4" controls></cw-fraction>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2>
+          <span class="tag good">巩固练习</span>哪个图形的涂色部分是它的
+          <span class="frac"><span>1</span><span>3</span></span>？
+        </h2>
+        <ol class="choices">
+          <li><cw-fraction shape="circle" parts="4" shaded="1" size="220" hide-readout></cw-fraction></li>
+          <li data-correct><cw-fraction shape="bar" parts="3" shaded="1" size="460" hide-readout></cw-fraction></li>
+          <li><cw-fraction shape="grid" parts="6" shaded="1" size="220" hide-readout></cw-fraction></li>
+          <li><cw-fraction shape="bar" parts="2" shaded="1" size="460" hide-readout></cw-fraction></li>
+        </ol>
+      </section>
+
+      <section class="slide">
+        <h2><span class="tag good">巩固练习</span>是平均分的拖到左边，不是的拖到右边</h2>
+        <div class="row" style="justify-content:center;gap:40px;margin-bottom:40px">
+          <div class="card" data-drag="yes">
+            <cw-fraction shape="circle" parts="3" shaded="1" size="200" hide-readout></cw-fraction>
+          </div>
+          <div class="card" data-drag="no">
+            <svg width="240" height="120" viewBox="0 0 240 120">
+              <title>没有平均分的长方形</title>
+              <rect x="2" y="2" width="70" height="116" fill="var(--c2)" stroke="var(--ink)" stroke-width="4" />
+              <rect x="72" y="2" width="166" height="116" fill="var(--paper)" stroke="var(--ink)" stroke-width="4" />
+            </svg>
+          </div>
+          <div class="card" data-drag="yes">
+            <cw-fraction shape="bar" parts="4" shaded="1" size="260" hide-readout></cw-fraction>
+          </div>
+        </div>
+        <div class="cols">
+          <div class="card good center" data-drop="yes"><p class="big">平均分</p></div>
+          <div class="card accent center" data-drop="no"><p class="big">不是平均分</p></div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <h2><span class="tag accent">课堂小结</span>这节课你有什么收获？</h2>
+        <div class="center">
+          <p class="big" data-step>把一个物体<span class="mark">平均分</span>成几份，每份就是它的几分之一。</p>
+          <span class="frac huge" data-step><span>1</span><span>4</span></span>
+          <p data-step>中间的横线是分数线，下面的 4 是分母，上面的 1 是分子。</p>
+        </div>
+      </section>
+    </main>
+    <script src="assets/manipulatives.js"></script>
+    <script src="assets/courseware.js"></script>
+  </body>
+</html>
