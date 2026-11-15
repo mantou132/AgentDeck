@@ -32,7 +32,9 @@ export class DeckAttachmentElement extends GemElement {
           type="button"
           class=${classMap({
             'max-w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-bg-light text-left text-text active:bg-bg-hover': true,
-            'flex w-44 items-center gap-2 p-2': this.compact || attachment.kind !== 'image',
+            'flex items-center gap-2 p-2': this.compact || attachment.kind !== 'image',
+            'w-full': this.compact,
+            'w-44': !this.compact && attachment.kind !== 'image',
             'block p-1': !this.compact && attachment.kind === 'image',
           })}
           @click=${() => this.preview(attachment)}

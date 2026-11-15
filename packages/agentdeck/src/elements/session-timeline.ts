@@ -157,7 +157,7 @@ export class DeckSessionTimelineElement extends GemElement {
               <span v-if=${!!message.sessionMessageId} class="mb-1 text-xs text-describe">
                 ${i18n.get('subagent.fromParent')}
               </span>
-              <div v-if=${attachments.length} class="mb-2 flex flex-wrap justify-end gap-2">
+              <div v-if=${attachments.length} class="mb-2 flex max-w-full flex-col items-end gap-2">
                 ${attachments.map(
                   (attachment) => html`
                     <deck-attachment

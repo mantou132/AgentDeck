@@ -440,7 +440,7 @@ export class DeckComposerElement extends GemElement {
                   `,
                 )}
               </div>
-              <div v-if=${this.#state.attachments.length} class="flex max-h-40 flex-wrap gap-3 overflow-y-auto px-3.5 pt-3.5 pb-1.5">
+              <div v-if=${this.#state.attachments.length} class="grid max-h-40 grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 overflow-y-auto px-3.5 pt-3.5 pb-1.5">
                 ${this.#state.attachments.map(
                   (attachment) => html`
                     <deck-attachment
