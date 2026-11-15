@@ -110,7 +110,7 @@ for (const outcome of ['failed', 'cancelled', 'ended']) {
   });
 }
 
-test('newly created sessions receive completion reminders and resetting clears them', async () => {
+test('completion reminders of new sessions are saved locally until read', async () => {
   const f = documentFixture();
   await f.connect();
   const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
@@ -121,7 +121,10 @@ test('newly created sessions receive completion reminders and resetting clears t
   await tick();
   assert.ok(Boolean(f.app.getRuntime(session.sessionId).unread));
   f.app.resetRemoteState();
-  assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
+  assert.ok(Boolean(f.app.getRuntime(session.sessionId).unread));
+  f.app.updateRuntime(session.sessionId, { unread: false });
+  f.app.resetRemoteState();
+  assert.ok(!f.app.getRuntime(session.sessionId).unread);
 });
 
 test('pending permission requests expose active permission status for session list items', async () => {

@@ -12,6 +12,7 @@ import {
 import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
 import type { ChatMessage, DeckSession, SessionOptions, Subagent } from '../session/types';
+import { saveSessionMeta, unreadRuntimes } from './session-meta';
 
 const initialSettings = readSettings();
 
@@ -60,7 +61,7 @@ export const sessionsStore = createStore({
   sessionsLoading: false,
   sessionsLoaded: false,
   sessionsError: '',
-  runtimes: {} as Record<string, SessionRuntime>,
+  runtimes: unreadRuntimes() as Record<string, SessionRuntime>,
 });
 
 /** Messages change with every streamed chunk, so only elements that show them connect to this store. */
@@ -94,8 +95,12 @@ const idleRuntime: SessionRuntime = { load: 'idle' };
 
 export const getRuntime = (sessionId: string): SessionRuntime => sessionsStore.runtimes[sessionId] ?? idleRuntime;
 
-export const updateRuntime = (sessionId: string, patch: Partial<SessionRuntime>) =>
+export const updateRuntime = (sessionId: string, patch: Partial<SessionRuntime>) => {
+  if ('unread' in patch && patch.unread !== getRuntime(sessionId).unread) {
+    saveSessionMeta(sessionId, { unread: Boolean(patch.unread) });
+  }
   sessionsStore({ runtimes: { ...sessionsStore.runtimes, [sessionId]: { ...getRuntime(sessionId), ...patch } } });
+};
 
 export const isTurnRunning = (sessionId: string) => Boolean(getRuntime(sessionId).turn);
 

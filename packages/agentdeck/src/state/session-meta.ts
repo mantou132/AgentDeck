@@ -4,6 +4,7 @@ export type LocalSessionMeta = {
   title?: string;
   updatedAt?: string;
   deleted?: boolean;
+  unread?: boolean;
 };
 
 type CompactMeta = {
@@ -11,6 +12,7 @@ type CompactMeta = {
   /** `updatedAt` as epoch milliseconds */
   u?: number;
   d?: 1;
+  r?: 1;
 };
 
 const memoryStore = new Map<string, LocalSessionMeta>();
@@ -29,6 +31,7 @@ const syncToLocalStorage = () => {
       const updatedAt = Date.parse(meta.updatedAt || '');
       if (updatedAt) item.u = updatedAt;
       if (meta.deleted) item.d = 1;
+      if (meta.unread) item.r = 1;
       if (Object.keys(item).length) {
         record[id] = item;
       }
@@ -51,6 +54,7 @@ const loadFromLocalStorage = () => {
           // Older records hold an ISO string, which `Date` parses as well
           updatedAt: item.u ? new Date(item.u).toISOString() : undefined,
           deleted: item.d === 1,
+          unread: item.r === 1,
         });
       }
     }
@@ -73,10 +77,17 @@ export const saveSessionMeta = (sessionId: string, patch: Partial<LocalSessionMe
   const title = patch.title || existing.title;
   const updatedAt = patch.updatedAt || existing.updatedAt;
   const deleted = patch.deleted ?? existing.deleted;
-  memoryStore.set(sessionId, { title, updatedAt, deleted });
+  const unread = !deleted && (patch.unread ?? existing.unread);
+  memoryStore.set(sessionId, { title, updatedAt, deleted, unread });
   syncToLocalStorage();
 };
 
 export const markSessionDeleted = (sessionId: string): void => {
   saveSessionMeta(sessionId, { deleted: true });
 };
+
+/** Runtimes of the sessions left unread, so the mark survives restarts and host switches. */
+export const unreadRuntimes = () =>
+  Object.fromEntries(
+    [...memoryStore].filter(([, meta]) => meta.unread).map(([id]) => [id, { load: 'idle' as const, unread: true }]),
+  );

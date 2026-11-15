@@ -19,7 +19,7 @@ import {
   saveInFlight,
   updateInFlightMessages,
 } from './in-flight';
-import { getSessionMeta, isSessionDeleted, markSessionDeleted, saveSessionMeta } from './session-meta';
+import { getSessionMeta, isSessionDeleted, markSessionDeleted, saveSessionMeta, unreadRuntimes } from './session-meta';
 import {
   agentdeckStore,
   getMessages,
@@ -111,7 +111,7 @@ export const resetRemoteState = () => {
     sessionsLoading: false,
     sessionsLoaded: false,
     sessionsError: '',
-    runtimes: {},
+    runtimes: unreadRuntimes(),
   });
   messagesStore({ bySession: {} });
 };
