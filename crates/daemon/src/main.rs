@@ -10,6 +10,7 @@ mod app_data;
 mod awake;
 mod config;
 pub mod daemon;
+mod features;
 mod logger;
 mod peer;
 mod power;
@@ -23,7 +24,7 @@ mod ui;
 
 use agent_rpc::AgentService;
 use app_data::AppPaths;
-use config::{DaemonConfig, RelayOptions};
+use config::{ConfigOptions, DaemonConfig};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -42,7 +43,15 @@ struct Cli {
     /// Relay WebSocket URL (saved for subsequent starts)
     #[arg(long, global = true, value_parser = parse_relay_url)]
     relay_url: Option<String>,
+
+    /// Comma-separated features or groups offered to clients (e.g. `basic`), or `all` (saved for subsequent starts)
+    #[arg(long, global = true, value_parser = parse_features)]
+    features: Option<FeatureList>,
 }
+
+/// `--features` value; `None` is `all`.
+#[derive(Clone, Debug)]
+struct FeatureList(Option<Vec<String>>);
 
 #[derive(Subcommand, Debug)]
 enum Commands {
@@ -61,6 +70,12 @@ enum Commands {
     /// Configure automatic sleep prevention, or show its current status
     #[command(arg(clap::Arg::new("pairing_id").long("pairing-id").hide(true)))]
     #[command(arg(clap::Arg::new("relay_url").long("relay-url").hide(true)))]
+    #[command(arg(
+        clap::Arg::new("features")
+            .long("features")
+            .hide(true)
+            .value_parser(parse_features)
+    ))]
     Awake {
         #[command(subcommand)]
         command: Option<AwakeCommand>,
@@ -143,10 +158,26 @@ fn parse_relay_url(value: &str) -> std::result::Result<String, String> {
     Ok(value.to_owned())
 }
 
+fn parse_features(value: &str) -> std::result::Result<FeatureList, String> {
+    let features: Vec<String> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+        .collect();
+    if features.is_empty() {
+        return Err("expected feature or group names, or `all`".into());
+    }
+    if features.iter().any(|name| name == "all") {
+        return Ok(FeatureList(None));
+    }
+    Ok(FeatureList(Some(features)))
+}
+
 fn print_daemon_status(paths: &AppPaths) -> Result<()> {
     let status = daemon::daemon_status()?;
     let running_pid = daemon::InstanceLock::check_running_at(&paths.lock_file())?;
-    let config = DaemonConfig::load_or_init(paths, &RelayOptions::default())?;
+    let config = DaemonConfig::load_or_init(paths, &ConfigOptions::default())?;
     print_daemon_info(&config, Some((status, running_pid)));
     Ok(())
 }
@@ -182,6 +213,9 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
         ui::kv("Service", format!("{status_desc}{pid_str}"));
     }
     ui::kv("Relay URL", ui::underline(config.relay_url()));
+    if let Some(features) = &config.features {
+        ui::kv("Features", features.join(", "));
+    }
     ui::kv("Pairing ID", ui::cyan(config.relay_id()));
     println!();
     let uri = pairing_uri(config.relay_id(), config.relay_url());
@@ -193,7 +227,7 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
     ui::print_security_warning();
 }
 
-async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
+async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
     // Ensure runtime singleton
     let _instance_lock =
         daemon::InstanceLock::acquire_at(&paths.lock_file()).context("cannot start daemon")?;
@@ -202,6 +236,7 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
     tracing::info!("Starting AgentDeck daemon v{}", env!("CARGO_PKG_VERSION"));
 
     let config = DaemonConfig::load_or_init(paths, options)?;
+    features::init(config.features.clone());
     let _awake_monitor = awake::Monitor::start(paths)?;
     let relay_id = config.relay_id();
 
@@ -225,9 +260,10 @@ async fn run_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     let paths = AppPaths::discover()?;
-    let options = RelayOptions {
+    let options = ConfigOptions {
         relay_id: cli.pairing_id,
         relay_url: cli.relay_url,
+        features: cli.features.map(|list| list.0),
     };
 
     match cli.command {
@@ -235,7 +271,9 @@ async fn main() -> Result<()> {
             run_daemon(&paths, &options).await?;
         }
         Some(Commands::Start) => {
-            if (options.relay_id.is_some() || options.relay_url.is_some())
+            if (options.relay_id.is_some()
+                || options.relay_url.is_some()
+                || options.features.is_some())
                 && daemon::InstanceLock::check_running()?.is_some()
             {
                 anyhow::bail!(
@@ -335,12 +373,17 @@ mod tests {
             assert_eq!(help.kind(), clap::error::ErrorKind::DisplayHelp);
             assert!(!help.to_string().contains("--relay-url"));
             assert!(!help.to_string().contains("--pairing-id"));
+            assert!(!help.to_string().contains("--features"));
         }
     }
 
     #[test]
     fn awake_relay_options_are_local_and_do_not_validate_urls() {
-        for (option, value) in [("--pairing-id", "test-id"), ("--relay-url", "not-a-url")] {
+        for (option, value) in [
+            ("--pairing-id", "test-id"),
+            ("--relay-url", "not-a-url"),
+            ("--features", "basic"),
+        ] {
             assert!(Cli::try_parse_from(["agentdeckd", "awake", option, value]).is_ok());
             for command in [
                 "always", "plugged", "on", "active", "never", "off", "status",
@@ -382,6 +425,13 @@ mod tests {
                 assert_eq!(cli.pairing_id.as_deref(), Some("test-id"));
             }
         }
+        let features = |value| Cli::try_parse_from(["agentdeckd", "--features", value, "start"]);
+        assert_eq!(
+            features("basic, job").unwrap().features.unwrap().0,
+            Some(vec!["basic".to_string(), "job".to_string()])
+        );
+        assert_eq!(features("all").unwrap().features.unwrap().0, None);
+        assert!(features(",").is_err());
         for url in ["https://example.com/ws", "not-a-url", "ws://"] {
             assert!(Cli::try_parse_from(["agentdeckd", "--relay-url", url]).is_err());
         }

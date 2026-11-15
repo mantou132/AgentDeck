@@ -5,11 +5,11 @@ use anyhow::{Context, Result};
 use super::{InstanceLock, Status, daemon_status, start_daemon, stop_daemon};
 use crate::{
     app_data::AppPaths,
-    config::{DaemonConfig, RelayOptions},
+    config::{ConfigOptions, DaemonConfig},
 };
 
 /// Stop before clearing state, then restore the previous service state.
-pub(crate) fn reset_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<Status> {
+pub(crate) fn reset_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<Status> {
     let previous_status = daemon_status()?;
     let was_running = previous_status == Status::Running;
     if was_running {
@@ -44,7 +44,7 @@ pub(crate) fn reset_daemon(paths: &AppPaths, options: &RelayOptions) -> Result<S
     Ok(previous_status)
 }
 
-fn reset_local_data(paths: &AppPaths, options: &RelayOptions) -> Result<()> {
+fn reset_local_data(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
     let _lock = InstanceLock::acquire_at(&paths.lock_file())
         .context("daemon did not stop; no files were cleared")?;
     paths.clear_runtime_state()?;
@@ -62,7 +62,7 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("agentdeck-reset-flow-{}", std::process::id()));
         let paths = AppPaths::new(root.clone());
-        let options = RelayOptions::default();
+        let options = ConfigOptions::default();
         let original = DaemonConfig::load_or_init(&paths, &options).unwrap();
         fs::write(paths.peers_file(), "old peers").unwrap();
         let lock = InstanceLock::acquire_at(&paths.lock_file()).unwrap();

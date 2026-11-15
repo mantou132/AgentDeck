@@ -22,7 +22,7 @@ import {
   SUPPORTED_SKILLS,
 } from '../config';
 import { i18n } from '../i18n';
-import { loadSkills, skillsHash } from '../skills';
+import { loadSkills, skillGroups, skillsHash } from '../skills';
 import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
 import {
   applySessionEvent,
@@ -53,6 +53,7 @@ let daemonVersionChecked = false;
 const clientSkills = (): ClientSkills => ({
   hash: skillsHash,
   enabled: SUPPORTED_SKILLS.filter(isSkillEnabled),
+  groups: skillGroups,
   load: loadSkills,
 });
 
@@ -61,15 +62,15 @@ const savePairingHistory = (pairingHistory: PairingRecord[]) => {
   agentdeckStore({ pairingHistory });
 };
 
-type HostInfo = Pick<PairingRecord, 'hostname' | 'home' | 'customAgents'>;
+type HostInfo = Pick<PairingRecord, 'hostname' | 'home' | 'customAgents' | 'restrictedFeatures'>;
 
 /** Moves the connected pairing to the front; keeps the known hostname when an old daemon omits it. */
-const recordPairing = ({ hostname, home, customAgents }: HostInfo) => {
+const recordPairing = ({ hostname, home, customAgents, restrictedFeatures }: HostInfo) => {
   const { relayId, relayUrl, agent } = agentdeckStore.settings;
   const previous = agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
   const rest = agentdeckStore.pairingHistory.filter((item) => item !== previous);
   savePairingHistory([
-    { relayId, relayUrl, hostname: hostname || previous?.hostname, home, customAgents, agent },
+    { relayId, relayUrl, hostname: hostname || previous?.hostname, home, customAgents, restrictedFeatures, agent },
     ...rest,
   ]);
 };
@@ -88,14 +89,14 @@ const handleTransportMessage = (message: TransportMessage) => {
       break;
     }
     case 'connection': {
-      const { connection, error, hostVersion, hostname, home, customAgents } = message;
+      const { connection, error, hostVersion, hostname, home, customAgents, restrictedFeatures } = message;
       agentdeckStore({
         connection,
         connectionError: connection === 'connected' ? '' : error || agentdeckStore.connectionError,
       });
       if (connection === 'connected') {
         agentdeckStore({ hostVersion: hostVersion || '' });
-        recordPairing({ hostname, home, customAgents });
+        recordPairing({ hostname, home, customAgents, restrictedFeatures });
         refreshSessions();
         // Older daemon has no reconciliation endpoint; stay waiting if it fails
         settleLostTurns().catch(console.error);

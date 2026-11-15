@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use crate::{
     agent_rpc::{AgentService, PeerSkills},
     app_data::{self, AppPaths},
+    features,
     peer::Peer,
     push,
     relay_codec::{Frame, RelayCodec},
@@ -287,16 +288,15 @@ impl RemotePeerManager {
         let peer_id = self.resolve_peer_id(&device_id, requested_peer_id, params.get("fcmToken"));
         let (_peer, skills) = self.peer_entry(peer_id);
         // Every attach re-declares the client's skills; later sessions use them.
-        let declared: SkillSelection = params
+        let mut declared: SkillSelection = params
             .get("skills")
             .cloned()
             .and_then(|value| serde_json::from_value(value).ok())
             .unwrap_or_default();
+        // Clients disable the features this host doesn't offer.
+        let restricted_features = features::restricted(&declared.groups);
         // The client sends this version through `skills_install` before using the host.
-        let skills_missing = declared
-            .hash
-            .as_deref()
-            .is_some_and(|hash| !render_skills::select(hash));
+        let skills_missing = !render_skills::select(&mut declared);
         *skills.lock().expect("lock poisoned") = declared;
 
         // Clients compare it against their minimum supported host version.
@@ -311,12 +311,12 @@ impl RemotePeerManager {
             Some(req_id) => json!({
                 "peerId": peer_id,
                 "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing }
+                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing, "restrictedFeatures": restricted_features }
             }),
             None => json!({
                 "peerId": peer_id,
                 "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing }
+                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing, "restrictedFeatures": restricted_features }
             }),
         };
         let target = if device_id.is_empty() {

@@ -12,9 +12,11 @@ pub(crate) const DEFAULT_RELAY_URL: &str = "wss://agentdeck.xianqiao.wang/ws";
 const LEGACY_DEFAULT_RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
 
 #[derive(Default)]
-pub(crate) struct RelayOptions {
+pub(crate) struct ConfigOptions {
     pub relay_id: Option<String>,
     pub relay_url: Option<String>,
+    /// `Some(None)` lifts a saved restriction.
+    pub features: Option<Option<Vec<String>>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -23,6 +25,9 @@ pub(crate) struct DaemonConfig {
     relay_url: Option<String>,
     #[serde(default)]
     pub awake: crate::awake::Mode,
+    /// Features offered to clients (see `features`); unset offers everything.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub features: Option<Vec<String>>,
 }
 
 impl DaemonConfig {
@@ -64,7 +69,7 @@ impl DaemonConfig {
     }
 
     /// Normal starts reuse saved values unless explicitly overridden.
-    pub fn load_or_init(paths: &AppPaths, options: &RelayOptions) -> Result<Self> {
+    pub fn load_or_init(paths: &AppPaths, options: &ConfigOptions) -> Result<Self> {
         let mut config = Self::read(paths)?;
         let mut changed = false;
         if let Some(id) = &options.relay_id {
@@ -73,6 +78,10 @@ impl DaemonConfig {
         }
         if let Some(url) = &options.relay_url {
             config.relay_url = Some(url.clone());
+            changed = true;
+        }
+        if let Some(features) = &options.features {
+            config.features = features.clone();
             changed = true;
         }
         if config
@@ -89,8 +98,13 @@ impl DaemonConfig {
         Ok(config)
     }
 
-    /// Reset starts from defaults, never from the old configuration.
-    pub fn reset(paths: &AppPaths, options: &RelayOptions) -> Result<Self> {
+    /// Reset starts from defaults, keeping only the offered features, which describe the host rather than its pairing;
+    /// a corrupt config loses them too.
+    pub fn reset(paths: &AppPaths, options: &ConfigOptions) -> Result<Self> {
+        let features = match &options.features {
+            Some(features) => features.clone(),
+            None => Self::read(paths).ok().and_then(|config| config.features),
+        };
         let config = Self {
             awake: crate::awake::Mode::Never,
             relay_id: Some(
@@ -101,6 +115,7 @@ impl DaemonConfig {
                     .unwrap_or_else(generate_pairing_id),
             ),
             relay_url: options.relay_url.clone(),
+            features,
         };
         config.save(paths)?;
         Ok(config)
@@ -134,9 +149,10 @@ mod tests {
     ) -> Result<DaemonConfig> {
         DaemonConfig::load_or_init(
             paths,
-            &RelayOptions {
+            &ConfigOptions {
                 relay_id,
                 relay_url,
+                features: None,
             },
         )
     }
@@ -148,9 +164,10 @@ mod tests {
     ) -> Result<DaemonConfig> {
         DaemonConfig::reset(
             paths,
-            &RelayOptions {
+            &ConfigOptions {
                 relay_id,
                 relay_url,
+                features: None,
             },
         )
     }
@@ -232,12 +249,12 @@ mod tests {
         let paths = AppPaths::new(root.clone());
         app_data::ensure_dir(paths.root()).unwrap();
         fs::write(paths.config_file(), "invalid json").unwrap();
-        assert!(DaemonConfig::load_or_init(&paths, &RelayOptions::default()).is_err());
-        let reset = DaemonConfig::reset(&paths, &RelayOptions::default()).unwrap();
+        assert!(DaemonConfig::load_or_init(&paths, &ConfigOptions::default()).is_err());
+        let reset = DaemonConfig::reset(&paths, &ConfigOptions::default()).unwrap();
         assert!(reset.relay_id().starts_with("adk1_"));
         assert_eq!(reset.relay_url(), DEFAULT_RELAY_URL);
         assert_eq!(
-            DaemonConfig::load_or_init(&paths, &RelayOptions::default())
+            DaemonConfig::load_or_init(&paths, &ConfigOptions::default())
                 .unwrap()
                 .relay_id(),
             reset.relay_id()
@@ -281,5 +298,23 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(config.relay_url(), DEFAULT_RELAY_URL);
+    }
+
+    #[test]
+    fn features_persist_and_survive_reset() {
+        let root = std::env::temp_dir().join(format!("agentdeck-features-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let paths = AppPaths::new(root.clone());
+        let options = |features| ConfigOptions {
+            features,
+            ..Default::default()
+        };
+        let basic = Some(vec!["basic".to_string()]);
+        DaemonConfig::load_or_init(&paths, &options(Some(basic.clone()))).unwrap();
+        assert_eq!(load_config(&paths, None, None).unwrap().features, basic);
+        assert_eq!(reset_config(&paths, None, None).unwrap().features, basic);
+        DaemonConfig::load_or_init(&paths, &options(Some(None))).unwrap();
+        assert_eq!(load_config(&paths, None, None).unwrap().features, None);
+        fs::remove_dir_all(root).unwrap();
     }
 }

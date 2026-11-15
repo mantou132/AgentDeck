@@ -16,7 +16,10 @@ use std::{
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-use crate::app_data::AppPaths;
+use crate::{
+    app_data::AppPaths,
+    features::{self, FeatureGroups},
+};
 
 /// Skills a client declares in `peer_attach`.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -27,6 +30,9 @@ pub struct SkillSelection {
     /// Skills of that version to mount into sessions.
     #[serde(default)]
     pub enabled: Vec<String>,
+    /// Group of each skill the client supports, for `--features`.
+    #[serde(default)]
+    pub groups: FeatureGroups,
 }
 
 /// Skill files a client sends through `skills_install`, keyed by
@@ -49,6 +55,9 @@ const KEPT_VERSIONS: usize = 3;
 /// Version the latest attaching client uses, for agents configured once per process.
 static CURRENT: Mutex<Option<String>> = Mutex::new(None);
 
+/// Skill groups of the latest attaching client, which filter `CURRENT` by `--features`.
+static CURRENT_GROUPS: Mutex<Option<FeatureGroups>> = Mutex::new(None);
+
 fn skills_dir() -> Result<PathBuf> {
     Ok(AppPaths::discover()?.skills_dir())
 }
@@ -64,8 +73,16 @@ fn learned_dir(root: &Path, skill: &str) -> PathBuf {
     root.join("learned").join(skill)
 }
 
-/// Whether the version is installed; an installed one becomes the current version.
-pub fn select(hash: &str) -> bool {
+/// Whether the declared version is installed; an installed one becomes the current version.
+/// Drops the enabled skills this host doesn't offer.
+pub fn select(selection: &mut SkillSelection) -> bool {
+    selection
+        .enabled
+        .retain(|skill| features::allows(skill, &selection.groups));
+    *CURRENT_GROUPS.lock().expect("lock poisoned") = Some(selection.groups.clone());
+    let Some(hash) = selection.hash.as_deref() else {
+        return true;
+    };
     let installed = skills_dir()
         .and_then(|root| version_dir(&root, hash))
         .is_ok_and(|dir| dir.is_dir());
@@ -171,7 +188,7 @@ pub fn skill_directories(selection: &SkillSelection) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
-/// Skill folders of every skill in the current version, for agents
+/// Skill folders of every offered skill in the current version, for agents
 /// configured once per process instead of per session.
 pub fn all_skill_paths() -> Vec<PathBuf> {
     let Some(hash) = CURRENT.lock().expect("lock poisoned").clone() else {
@@ -183,8 +200,15 @@ pub fn all_skill_paths() -> Vec<PathBuf> {
     let Ok(entries) = fs::read_dir(version) else {
         return Vec::new();
     };
+    let groups = CURRENT_GROUPS
+        .lock()
+        .expect("lock poisoned")
+        .clone()
+        .unwrap_or_default();
     entries
-        .filter_map(|entry| Some(entry.ok()?.path().join(SKILL_ROOTS[0])))
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| features::allows(&entry.file_name().to_string_lossy(), &groups))
+        .map(|entry| entry.path().join(SKILL_ROOTS[0]))
         .collect()
 }
 
@@ -227,6 +251,7 @@ mod tests {
         let selection = SkillSelection {
             hash: Some("abc".to_string()),
             enabled: vec!["job".to_string(), "map".to_string()],
+            ..Default::default()
         };
         assert_eq!(
             directories(&root, &selection),

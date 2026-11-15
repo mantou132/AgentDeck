@@ -104,6 +104,7 @@ export function documentFixture(previous, options = {}) {
   const context = vm.createContext({
     // Build-time define and asset from `rsbuild.config.ts`.
     __SKILLS_HASH__: 'test',
+    __SKILL_GROUPS__: {},
     fetch: async (url) => {
       assert.equal(url, '/skills.json');
       return { ok: true, json: async () => ({ hash: 'test', files: {} }) };

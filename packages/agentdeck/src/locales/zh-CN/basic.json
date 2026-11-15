@@ -168,6 +168,7 @@
   "settings.savedAppsDesc": "保存在手机上的应用，不需要电脑在线也能使用。",
   "settings.savedAppsWidgetDesc": "保存在手机上的应用，不需要电脑在线也能使用。在主屏幕添加 AgentDeck 小组件，就能从桌面打开。",
   "settings.skillsTitle": "技能",
+  "settings.skillRestricted": "当前主机未开放",
   "settings.skillsDesc": "开启的技能会教 Agent 在回复中使用对应内容，修改后对之后新建或打开的会话生效。",
   "settings.changelog": "版本更新记录",
   "settings.changelogLatest": "最新版本",

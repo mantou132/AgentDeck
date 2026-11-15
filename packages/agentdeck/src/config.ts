@@ -118,6 +118,8 @@ export type PairingRecord = {
   home?: string;
   /** From `custom_agents.json` on the host. */
   customAgents?: AgentInfo[];
+  /** Skills the host doesn't offer (`agentdeckd --features`). */
+  restrictedFeatures?: string[];
   /** Agent last chosen for this host. */
   agent?: string;
 };

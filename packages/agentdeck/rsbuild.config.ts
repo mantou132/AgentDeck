@@ -4,20 +4,26 @@ import path from 'node:path';
 import { defineConfig, type RsbuildPlugin } from '@rsbuild/core';
 import unpluginGem from 'unplugin-gem/rspack';
 
-/** `skills/` files keyed by relative path, with a content hash the host stores each version under. */
+/**
+ * `skills/<group>/<skill>/` files keyed by `<skill>/<path>`, with a content hash the host stores each version under,
+ * and each skill's group, which hosts offer by name (`agentdeckd --features`).
+ */
 const readSkills = () => {
   const root = path.resolve(import.meta.dirname, 'skills');
+  const groups: Record<string, string> = {};
   const files = Object.fromEntries(
     readdirSync(root, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name !== '.DS_Store')
       .map((entry) => {
         const file = path.join(entry.parentPath, entry.name);
-        return [path.relative(root, file).split(path.sep).join('/'), readFileSync(file, 'utf8')];
+        const [group, skill, ...rest] = path.relative(root, file).split(path.sep);
+        groups[skill] = group;
+        return [[skill, ...rest].join('/'), readFileSync(file, 'utf8')];
       })
       .sort(([a], [b]) => (a < b ? -1 : 1)),
   );
   const hash = createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
-  return { hash, files };
+  return { hash, files, groups };
 };
 
 /** Read once per build process, so a dev server needs a restart after editing `skills/`. */
@@ -55,7 +61,7 @@ const readChangelog = () => {
   return changelog;
 };
 
-/** Emits `skills.json` beside the app and gives the code only the hash; the app fetches the file when a host lacks it. */
+/** Emits `skills.json` beside the app and gives the code only the hash and groups; the app fetches the file when a host lacks it. */
 const skillsPlugin: RsbuildPlugin = {
   name: 'agentdeck-skills',
   setup(api) {
@@ -64,11 +70,13 @@ const skillsPlugin: RsbuildPlugin = {
       config.source.define = {
         ...config.source.define,
         __SKILLS_HASH__: JSON.stringify(skills.hash),
+        __SKILL_GROUPS__: JSON.stringify(skills.groups),
         __CHANGELOG__: JSON.stringify(readChangelog()),
       };
     });
     api.processAssets({ stage: 'additional' }, ({ compilation, sources }) => {
-      compilation.emitAsset('skills.json', new sources.RawSource(JSON.stringify(skills)));
+      const { hash, files } = skills;
+      compilation.emitAsset('skills.json', new sources.RawSource(JSON.stringify({ hash, files })));
     });
   },
 };

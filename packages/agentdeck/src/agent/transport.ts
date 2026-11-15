@@ -35,7 +35,7 @@ export const connectionLabels = new Proxy({} as Record<ConnectionState, string>,
 });
 
 export type TransportMessage =
-  /** `hostVersion`, `hostname`, `home` and `customAgents` come with `connected`; old hosts omit the first two. */
+  /** Host info comes with `connected`; old hosts omit `hostVersion`, `hostname` and `restrictedFeatures`. */
   | {
       type: 'connection';
       connection: ConnectionState;
@@ -44,6 +44,7 @@ export type TransportMessage =
       hostname?: string;
       home?: string;
       customAgents?: AgentInfo[];
+      restrictedFeatures?: string[];
     }
   | { type: 'delivery_error'; error: string }
   | { type: 'session_event'; sessionId: string; event: SessionEvent }
@@ -146,6 +147,7 @@ class HostSessionManager {
   #hostname: string | undefined;
   #home: string | undefined;
   #customAgents: AgentInfo[] | undefined;
+  #restrictedFeatures: string[] | undefined;
   #attachId: RpcId | undefined;
   #attaching: Promise<void> | undefined;
   #fcmToken: string | null | undefined;
@@ -170,6 +172,10 @@ class HostSessionManager {
 
   get home() {
     return this.#home;
+  }
+
+  get restrictedFeatures() {
+    return this.#restrictedFeatures;
   }
 
   get customAgents() {
@@ -243,6 +249,7 @@ class HostSessionManager {
         this.#hostname = result.hostname;
         this.#home = result.home;
         this.#customAgents = result.customAgents;
+        this.#restrictedFeatures = result.restrictedFeatures;
         this.#syncedFcmToken = sentToken;
         if (!silent || peerChanged) options.onStateChange('connected');
       })
@@ -377,6 +384,7 @@ class AgentTransport {
       hostname: host?.hostname,
       home: host?.home,
       customAgents: host?.customAgents,
+      restrictedFeatures: host?.restrictedFeatures,
     });
   }
 

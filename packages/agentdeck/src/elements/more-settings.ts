@@ -15,7 +15,7 @@ import {
   savedAppIconUrl,
   savedAppsStore,
 } from '../state/saved-apps';
-import { agentdeckStore, isSkillEnabled } from '../state/store';
+import { agentdeckStore, isSkillEnabled, isSkillRestricted } from '../state/store';
 import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
@@ -102,17 +102,21 @@ export class DeckMoreSettingsElement extends GemElement {
       footer=${i18n.get('settings.skillsDesc')}
       .items=${SUPPORTED_SKILLS.map((skill) => {
         const required = SKILL_REQUIRES[skill];
+        // The toggle is kept for hosts that offer it.
+        const restricted = isSkillRestricted(skill) || (!!required && isSkillRestricted(required));
         return {
           label: html`
             <div>${i18n.get(`skill.${skill}` as LocaleKey)}</div>
-            <div class="description">${i18n.get(`skill.${skill}Desc` as LocaleKey)}</div>
+            <div class="description">
+              ${restricted ? i18n.get('settings.skillRestricted') : i18n.get(`skill.${skill}Desc` as LocaleKey)}
+            </div>
           `,
           action: false,
           // Not the group's own switch rows, which cannot be disabled while the required skill is off.
           extra: html`
             <tap-switch
-              ?checked=${isSkillEnabled(skill)}
-              ?disabled=${!!required && !isSkillEnabled(required)}
+              ?checked=${!restricted && isSkillEnabled(skill)}
+              ?disabled=${restricted || (!!required && !isSkillEnabled(required))}
               @change=${(event: CustomEvent<boolean>) => setSkillEnabled(skill, event.detail)}
             ></tap-switch>
           `,

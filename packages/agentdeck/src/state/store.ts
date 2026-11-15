@@ -84,6 +84,10 @@ export const hostAgents = (relayId = agentdeckStore.settings.relayId) => {
   return [free, ...custom, ...popular.filter((agent) => !custom.some(({ id }) => id === agent.id))];
 };
 
+/** The current host doesn't offer it (`agentdeckd --features`), as remembered from its last handshake. */
+export const isSkillRestricted = (skill: string): boolean =>
+  !!getPairing(agentdeckStore.settings.relayId)?.restrictedFeatures?.includes(skill);
+
 /** Turned on (in settings, else by default), and so is the skill it requires. */
 export const isSkillEnabled = (skill: string): boolean => {
   const required = SKILL_REQUIRES[skill];

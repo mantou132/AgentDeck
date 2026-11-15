@@ -225,7 +225,13 @@ export type SkillBundle = { hash: string; files: Record<string, string> };
  * Skills the client ships and the ones enabled on it; the host mounts those into agent sessions (e.g. `chart`).
  * Only the hash and names go with `peer_attach`; `load` fetches the files when the host lacks this version.
  */
-export type ClientSkills = { hash: string; enabled: string[]; load: () => Promise<SkillBundle> };
+export type ClientSkills = {
+  hash: string;
+  enabled: string[];
+  /** Group of each supported skill, which hosts offer by name or group. */
+  groups: Record<string, string>;
+  load: () => Promise<SkillBundle>;
+};
 
 /** Device shape drawn around a screen capture; geometry is in the capture's native pixels. */
 export type ScreenFrame =
@@ -258,6 +264,8 @@ type PeerAttachResult = {
   customAgents: AgentInfo[];
   /** The host lacks the declared skills; the client sends them before using the host. */
   skillsMissing?: boolean;
+  /** Declared skills the host doesn't offer; old hosts omit it. */
+  restrictedFeatures?: string[];
 };
 
 export class AgentApi {
@@ -297,7 +305,7 @@ export class AgentApi {
     this.#peer.onNotify('host_reconnected', () => handler?.());
 
   attachPeer = async (deviceId: string, fcmToken?: string | null, skills?: ClientSkills) => {
-    const declared = skills && { hash: skills.hash, enabled: skills.enabled };
+    const declared = skills && { hash: skills.hash, enabled: skills.enabled, groups: skills.groups };
     return this.#peer.call<PeerAttachResult>('peer_attach', { deviceId, fcmToken, skills: declared }, undefined, {
       timeoutMs: 10_000,
       timeoutMessage: i18n.get('error.connectHostTimeout'),
