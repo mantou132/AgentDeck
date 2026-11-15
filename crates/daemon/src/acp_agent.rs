@@ -573,10 +573,14 @@ fn system_prompt_meta(prompt: &str) -> serde_json::Map<String, serde_json::Value
 }
 
 /// Enable Claude's next-prompt suggestions and forward only those raw SDK
-/// messages; claude-agent-acp drops them otherwise.
+/// messages; claude-agent-acp drops them otherwise. Turn off the bundled
+/// `dataviz` skill, which answers chart requests in place of AgentDeck's.
 fn claude_code_meta() -> serde_json::Value {
     serde_json::json!({
-        "options": { "promptSuggestions": true },
+        "options": {
+            "promptSuggestions": true,
+            "settings": { "skillOverrides": { "dataviz": "off" } },
+        },
         "emitRawSDKMessages": [{ "type": "prompt_suggestion" }],
     })
 }
