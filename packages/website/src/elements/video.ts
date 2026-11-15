@@ -26,7 +26,7 @@ const style = css`
     height: 84px;
     border-radius: 50%;
     background:
-      rgb(14 17 51 / 0.75)
+      rgb(0 0 0 / 0.6)
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E")
       center / 40px no-repeat;
     transform: translate(-50%, -50%);

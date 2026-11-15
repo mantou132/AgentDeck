@@ -39,7 +39,7 @@ const style = css`
     top: 0;
     z-index: 10;
     backdrop-filter: blur(14px);
-    background: rgb(14 17 51 / 0.7);
+    background: rgb(255 255 255 / 0.8);
     border-bottom: 1px solid var(--line);
   }
   nav .wrap {
@@ -80,16 +80,6 @@ const style = css`
     overflow: hidden;
     padding: 88px 0 72px;
   }
-  .hero::before {
-    content: "";
-    position: absolute;
-    inset: -30% -10% auto;
-    height: 120%;
-    background:
-      radial-gradient(40% 40% at 70% 30%, rgb(85 104 239 / 0.35), transparent 70%),
-      radial-gradient(30% 30% at 85% 60%, rgb(98 211 223 / 0.2), transparent 70%);
-    pointer-events: none;
-  }
   .hero .wrap {
     position: relative;
     display: grid;
@@ -106,10 +96,9 @@ const style = css`
     border-radius: 999px;
     font-size: 13px;
     color: var(--muted);
-    background: var(--card);
   }
   .eyebrow b {
-    color: var(--cyan);
+    color: var(--accent-strong);
     font-weight: 600;
   }
   h1 {
@@ -119,10 +108,7 @@ const style = css`
     letter-spacing: -0.03em;
   }
   h1 span {
-    background: linear-gradient(90deg, var(--indigo), var(--cyan));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--accent);
   }
   .lead {
     margin: 0 0 32px;
@@ -142,11 +128,8 @@ const style = css`
     width: 300px;
     padding: 12px;
     border-radius: 46px;
-    background: linear-gradient(160deg, #2a2f63, #11143a);
-    box-shadow:
-      0 0 0 1px var(--line),
-      0 40px 80px -20px rgb(0 0 0 / 0.6),
-      0 0 120px -20px rgb(85 104 239 / 0.5);
+    background: #1c1d24;
+    box-shadow: 0 40px 80px -30px rgb(21 22 28 / 0.35);
   }
   .screen {
     position: relative;
@@ -193,7 +176,7 @@ const style = css`
   }
   .bubble.me {
     align-self: flex-end;
-    background: var(--indigo);
+    background: var(--accent);
     color: #fff;
     border-bottom-right-radius: 4px;
   }
@@ -245,7 +228,7 @@ const style = css`
     background: #eceef7;
   }
   .perm .btns span:first-child {
-    background: var(--indigo);
+    background: var(--accent);
     color: #fff;
   }
   @keyframes rise {
@@ -300,7 +283,6 @@ const style = css`
     padding: 26px;
     border: 1px solid var(--line);
     border-radius: 20px;
-    background: var(--card);
   }
   .card .ico {
     display: grid;
@@ -309,7 +291,7 @@ const style = css`
     height: 42px;
     margin-bottom: 16px;
     border-radius: 12px;
-    background: linear-gradient(135deg, rgb(85 104 239 / 0.3), rgb(98 211 223 / 0.2));
+    background: var(--accent-soft);
     font-size: 20px;
   }
   .card h3 {
@@ -340,7 +322,8 @@ const style = css`
     height: 32px;
     margin-bottom: 14px;
     border-radius: 50%;
-    background: var(--indigo);
+    background: var(--accent);
+    color: #fff;
     font-weight: 700;
   }
 
@@ -355,14 +338,14 @@ const style = css`
     padding: 32px;
     border: 1px solid var(--line);
     border-radius: 24px;
-    background: var(--card);
+    background: var(--bg-2);
     font-weight: 600;
   }
   .flow .node {
     padding: 12px 18px;
     border: 1px solid var(--line);
     border-radius: 14px;
-    background: var(--bg-2);
+    background: var(--bg);
     text-align: center;
   }
   .flow .node small {
@@ -375,13 +358,13 @@ const style = css`
     border-style: dashed;
   }
   .flow .arrow {
-    color: var(--cyan);
+    color: var(--accent);
   }
 
   /* CTA */
   .cta {
     text-align: center;
-    background: radial-gradient(50% 80% at 50% 100%, rgb(85 104 239 / 0.3), transparent 70%), var(--bg);
+    background: var(--bg-2);
   }
   .cta app-stores {
     justify-content: center;

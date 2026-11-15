@@ -14,6 +14,7 @@ const style = css`
     border: 1px solid var(--line);
     border-radius: 12px;
     background: #000;
+    color: #fff;
     text-decoration: none;
     transition: transform 0.15s;
   }

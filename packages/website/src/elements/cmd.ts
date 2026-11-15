@@ -7,7 +7,7 @@ const style = css`
     padding: 10px 12px;
     border: 1px solid var(--line);
     border-radius: 12px;
-    background: #0a0c26;
+    background: var(--bg-2);
     font: 13px var(--mono);
   }
   code {
@@ -17,7 +17,7 @@ const style = css`
   }
   code::before {
     content: "$ ";
-    color: var(--cyan);
+    color: var(--accent);
   }
   button {
     padding: 4px 8px;

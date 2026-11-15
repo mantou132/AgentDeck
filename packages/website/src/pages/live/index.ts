@@ -23,7 +23,7 @@ const style = css`
     display: flex;
     justify-content: space-between;
     padding: calc(6px + env(safe-area-inset-top)) 14px 6px;
-    background: #0e1133;
+    background: var(--text);
     color: #fff;
     font-size: 13px;
   }
@@ -47,7 +47,7 @@ const style = css`
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--cyan);
+    background: var(--accent);
     animation: pulse 1.2s ease-in-out infinite alternate;
   }
   @keyframes pulse {
@@ -69,7 +69,7 @@ const style = css`
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgb(14 17 51 / 0.55);
+    background: rgb(21 22 28 / 0.5);
     animation: pop 0.25s ease-out;
   }
   .popup p {

@@ -1,14 +1,14 @@
 :root {
-  --bg: #0e1133;
-  --bg-2: #141844;
-  --card: rgb(255 255 255 / 0.04);
-  --line: rgb(255 255 255 / 0.09);
-  --text: #eef0ff;
-  --muted: #a3a8d1;
-  --indigo: #5568ef;
-  --cyan: #62d3df;
+  --bg: #fff;
+  --bg-2: #f6f7f9;
+  --line: #e6e7ec;
+  --text: #15161c;
+  --muted: #5d606d;
+  --accent: #5568ef;
+  --accent-strong: #3d48c9;
+  --accent-soft: #eef0fe;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color-scheme: dark;
+  color-scheme: light;
 }
 * {
   box-sizing: border-box;
