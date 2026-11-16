@@ -991,3 +991,70 @@ async fn subagent_traffic_reaches_the_parent_turn_and_child_requests_settle() {
     // A subagent's text is not part of the parent's answer.
     assert_eq!(prompt.await.unwrap().unwrap(), "parent says");
 }
+
+#[tokio::test]
+async fn an_unanswered_request_is_refused_and_does_not_count_as_idle() {
+    let mut mock = MockAcp::new().await;
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel();
+    let notifier: Notifier = Arc::new(move |method, _params| {
+        let _ = request_tx.send(method.to_string());
+    });
+    let manager = mock.manager.clone();
+    let call = tokio::spawn(async move {
+        let context = SessionContext {
+            notifier: Some(notifier),
+            input_timeout: Some(Duration::from_secs(2)),
+            ..Default::default()
+        };
+        manager.create_session("codex-acp", None, context).await
+    });
+    let request = mock.next("session/new").await;
+    mock.respond(&request, json!({"sessionId": "session"}));
+    call.await.unwrap().unwrap();
+
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                1,
+                replay_sink(),
+                None,
+            )
+            .await
+    });
+    let request = mock.next("session/prompt").await;
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "id": "permission", "method": "session/request_permission",
+            "params": {
+                "sessionId": "session",
+                "toolCall": {"toolCallId": "tool", "title": "Test permission", "status": "pending"},
+                "options": [
+                    {"optionId": "allow", "name": "Allow once", "kind": "allow_once"},
+                    {"optionId": "reject", "name": "Reject", "kind": "reject_once"}
+                ]
+            }
+        })))
+        .unwrap();
+    assert_eq!(request_rx.recv().await.unwrap(), "agent_permission_request");
+    // Waiting for the user is not the agent being silent: past the 1s idle
+    // timeout, the turn is still running.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert!(!prompt.is_finished());
+    // At its 2s deadline the request is refused with its reject option.
+    let answer = tokio::time::timeout(Duration::from_secs(2), mock.peer.rx.next())
+        .await
+        .unwrap()
+        .map(frame_json)
+        .unwrap();
+    assert_eq!(answer["id"], "permission");
+    assert_eq!(answer["result"]["outcome"]["optionId"], "reject");
+    assert!(mock.manager.pending_user_inputs().await.is_empty());
+    mock.respond(&request, json!({"stopReason": "end_turn"}));
+    assert!(prompt.await.unwrap().is_ok());
+}

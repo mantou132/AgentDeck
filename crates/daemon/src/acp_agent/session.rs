@@ -31,6 +31,7 @@ pub(super) async fn run_session_actor(
 ) -> bool {
     let (load, replay_tx) = load.unzip();
     let notifier = context.notifier.clone();
+    let input_timeout = context.input_timeout;
     let started = tokio::select! {
         result = runtime.start_session(cwd, load, context) => result,
         _ = closing.cancelled() => return false,
@@ -53,6 +54,7 @@ pub(super) async fn run_session_actor(
         agent: runtime.agent.clone(),
         session_id: ready.session_id.clone(),
         notifier,
+        input_timeout,
         status,
         turn: None,
         pending_inputs: Vec::new(),
@@ -112,6 +114,8 @@ struct SessionActor {
     /// the session's notifications: requests waiting for the user, next-prompt
     /// suggestions and updates sent between turns.
     notifier: Option<Notifier>,
+    /// See `SessionContext::input_timeout`.
+    input_timeout: Option<std::time::Duration>,
     status: watch::Sender<SessionStatus>,
     turn: Option<Turn>,
     /// One at a time per session, but subagents ask alongside their parent.
@@ -131,6 +135,8 @@ struct Turn {
     event_tx: mpsc::UnboundedSender<AgentEvent>,
     answer: String,
     idle_timeout: std::time::Duration,
+    /// Idle deadline; paused while a request waits for the user, who may take
+    /// longer than the agent is allowed to stay silent.
     deadline: tokio::time::Instant,
     /// Taken when the turn times out: the caller gets the timeout right away
     /// while the turn runs until the agent confirms the cancellation.
@@ -141,6 +147,8 @@ struct Turn {
 struct PendingUserInput {
     input: UserInput,
     answer: oneshot::Sender<serde_json::Value>,
+    /// When it is refused unanswered (`SessionContext::input_timeout`).
+    expires: Option<tokio::time::Instant>,
 }
 
 impl SessionActor {
@@ -159,13 +167,19 @@ impl SessionActor {
             Stop(Result<PromptResponse, agent_client_protocol::Error>),
             Command(SessionCommand),
             Idle,
+            RequestExpired,
         }
         loop {
             let deadline = self
                 .turn
                 .as_ref()
-                .filter(|turn| turn.reply.is_some())
+                .filter(|turn| turn.reply.is_some() && self.pending_inputs.is_empty())
                 .map(|turn| turn.deadline);
+            let expires = self
+                .pending_inputs
+                .iter()
+                .filter_map(|pending| pending.expires)
+                .min();
             let turn = &mut self.turn;
             // `biased` drains updates the agent sent before its prompt response;
             // a random pick could take Stop first and leave the final chunks
@@ -187,6 +201,8 @@ impl SessionActor {
                 },
                 _ = tokio::time::sleep_until(deadline.unwrap_or_else(tokio::time::Instant::now)),
                     if deadline.is_some() => Input::Idle,
+                _ = tokio::time::sleep_until(expires.unwrap_or_else(tokio::time::Instant::now)),
+                    if expires.is_some() => Input::RequestExpired,
             };
             match input {
                 Input::Update(SessionMessage::SessionMessage(dispatch)) => {
@@ -216,6 +232,7 @@ impl SessionActor {
                         )));
                     }
                 }
+                Input::RequestExpired => self.refuse_expired_inputs(),
                 Input::Command(command) => self.on_command(session, command).await,
             }
         }
@@ -250,7 +267,14 @@ impl SessionActor {
                     .to_string();
                 input.params_mut()["requestId"] = request_id.into();
                 notifier(input.method(), input.params().clone());
-                self.pending_inputs.push(PendingUserInput { input, answer });
+                let expires = self
+                    .input_timeout
+                    .map(|timeout| tokio::time::Instant::now() + timeout);
+                self.pending_inputs.push(PendingUserInput {
+                    input,
+                    answer,
+                    expires,
+                });
                 self.publish();
             }
             SessionCommand::AnswerUserInput {
@@ -264,6 +288,9 @@ impl SessionActor {
                     .position(|pending| pending.input.params()["requestId"] == request_id)
                     .map(|index| self.pending_inputs.remove(index));
                 let answered = pending.is_some_and(|pending| pending.answer.send(response).is_ok());
+                if answered {
+                    self.resume_idle();
+                }
                 self.publish();
                 let _ = reply.send(answered);
             }
@@ -381,6 +408,33 @@ impl SessionActor {
         }
     }
 
+    /// Refuse the requests whose `expires` passed, so the agent reads a refusal
+    /// and carries on.
+    fn refuse_expired_inputs(&mut self) {
+        let now = tokio::time::Instant::now();
+        let (expired, waiting) = std::mem::take(&mut self.pending_inputs)
+            .into_iter()
+            .partition(|pending| pending.expires.is_some_and(|at| at <= now));
+        self.pending_inputs = waiting;
+        for pending in expired {
+            tracing::info!(
+                "Refusing unanswered {} of {}",
+                pending.input.method(),
+                self.session_id
+            );
+            let _ = pending.answer.send(refusal(pending.input.params()));
+        }
+        self.resume_idle();
+        self.publish();
+    }
+
+    /// The agent works again after an answer: its idle time counts from now.
+    fn resume_idle(&mut self) {
+        if let Some(turn) = &mut self.turn {
+            turn.deadline = tokio::time::Instant::now() + turn.idle_timeout;
+        }
+    }
+
     /// Settle a subagent's pending requests as cancelled.
     fn drop_child_inputs(&mut self, session_id: &str) {
         let before = self.pending_inputs.len();
@@ -435,6 +489,28 @@ impl SessionActor {
                 .collect(),
         });
     }
+}
+
+/// Answer refusing a request: the permission request's reject option, so the
+/// agent reads a refusal and carries on (a bare cancel reads as a failed
+/// request in claude-agent-acp). Questions have no options; an empty response
+/// cancels them.
+fn refusal(params: &serde_json::Value) -> serde_json::Value {
+    params
+        .get("options")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|options| {
+            ["reject_once", "reject_always"].iter().find_map(|kind| {
+                options.iter().find(|option| {
+                    option.get("kind").and_then(serde_json::Value::as_str) == Some(kind)
+                })
+            })
+        })
+        .and_then(|option| option.get("optionId"))
+        .map_or_else(
+            || serde_json::json!({}),
+            |id| serde_json::json!({ "optionId": id }),
+        )
 }
 
 fn send_cancel(session: &ActiveSession<'_, Agent>) {
