@@ -108,8 +108,9 @@ struct Broadcaster {
 }
 
 impl Broadcaster {
-    /// Pushes to every device that registered a push token.
-    fn push(&self, kind: push::PushKind, agent: &str, session_id: &str) {
+    /// Pushes to every device that registered a push token; `task_id` marks
+    /// the run of a scheduled task.
+    fn push(&self, kind: push::PushKind, agent: &str, session_id: &str, task_id: Option<&str>) {
         let tokens: Vec<String> = self
             .devices
             .lock()
@@ -122,8 +123,18 @@ impl Broadcaster {
             let host = self.push_host.clone();
             let agent = agent.to_owned();
             let session_id = session_id.to_owned();
+            let task_id = task_id.map(str::to_owned);
             tokio::spawn(async move {
-                push::send(&client, &token, &host, kind, &agent, &session_id).await;
+                push::send(
+                    &client,
+                    &token,
+                    &host,
+                    kind,
+                    &agent,
+                    &session_id,
+                    task_id.as_deref(),
+                )
+                .await;
             });
         }
     }
@@ -253,7 +264,7 @@ impl RemotePeerManager {
             let agent = agent.to_owned();
             let session_id = session_id.to_owned();
             tokio::spawn(async move {
-                push::send(&client, &token, &host, kind, &agent, &session_id).await;
+                push::send(&client, &token, &host, kind, &agent, &session_id, None).await;
             });
         })
     }
@@ -514,20 +525,26 @@ pub fn start(
 /// Scheduled runs have no device: their notifications go to every device, and
 /// permission requests and questions also push to every device.
 impl crate::tasks::TaskHost for RemotePeerManager {
-    fn notifier(&self) -> crate::acp_agent::Notifier {
+    fn notifier(&self, task_id: &str) -> crate::acp_agent::Notifier {
         let broadcaster = self.broadcaster();
+        let task_id = task_id.to_owned();
         Arc::new(move |method, params| {
             if let Some((agent, session_id)) =
                 crate::agent_rpc::input_request_session(method, &params)
             {
-                broadcaster.push(push::PushKind::InputRequest, agent, session_id);
+                broadcaster.push(
+                    push::PushKind::InputRequest,
+                    agent,
+                    session_id,
+                    Some(&task_id),
+                );
             }
             broadcaster.notify(method, &params);
         })
     }
 
     fn push(&self, kind: push::PushKind, agent: &str, session_id: &str) {
-        self.broadcaster().push(kind, agent, session_id);
+        self.broadcaster().push(kind, agent, session_id, None);
     }
 
     fn broadcast(&self, method: &str, params: Value) {

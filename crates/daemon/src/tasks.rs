@@ -4,7 +4,7 @@
 //! rules (e.g. Claude Code's project settings) keep known actions from asking.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs,
     io::Write,
     path::PathBuf,
@@ -32,10 +32,12 @@ const TICK: Duration = Duration::from_secs(30);
 /// A run missed by up to this long (computer asleep, daemon stopped) runs once
 /// when the daemon notices; older ones are skipped.
 const MISSED_WINDOW: chrono::Duration = chrono::Duration::hours(6);
-/// A turn without any update for this long is cancelled (`prompt`'s idle timeout).
-const IDLE_TIMEOUT_SECS: u64 = 10 * 60;
 /// An unanswered permission request or question is rejected after this long.
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+/// A turn without any update for this long is cancelled (`prompt`'s idle timeout).
+/// A waiting request sends no updates, so this outlasts `APPROVAL_TIMEOUT`: the
+/// request is rejected and the run carries on instead of being cancelled.
+const IDLE_TIMEOUT_SECS: u64 = APPROVAL_TIMEOUT.as_secs() + 5 * 60;
 const APPROVAL_CHECK: Duration = Duration::from_secs(15);
 const DEFAULT_TIMEOUT_MINUTES: u32 = 60;
 /// Successful runs kept per task; their sessions are deleted with them.
@@ -220,8 +222,9 @@ pub struct Run {
 
 /// What the scheduler needs from the connection to the devices.
 pub trait TaskHost: Send + Sync {
-    /// Sends a session's notifications to every connected device.
-    fn notifier(&self) -> Notifier;
+    /// Sends the notifications of a run of `task_id` to every connected device;
+    /// its pushes name the task, where the run's requests are answered.
+    fn notifier(&self, task_id: &str) -> Notifier;
     /// Pushes to every device with a push token.
     fn push(&self, kind: PushKind, agent: &str, session_id: &str);
     /// Notifies every connected device.
@@ -237,7 +240,8 @@ pub struct Tasks {
     tasks: Mutex<Vec<Task>>,
     /// The scheduled time each task last fired for.
     fired: Mutex<HashMap<String, DateTime<Local>>>,
-    running: Mutex<HashSet<String>>,
+    /// Running tasks, with the session of the current attempt once created.
+    running: Mutex<HashMap<String, Option<String>>>,
     /// Sessions created by runs, for `agent_session_list`.
     run_sessions: Mutex<HashMap<String, String>>,
 }
@@ -310,14 +314,13 @@ impl Tasks {
 
     /// Runs a task unless it is already running; `false` if it is.
     fn spawn_run(self: &Arc<Self>, task: Task, scheduled_for: Option<DateTime<Utc>>) -> bool {
-        if !self
-            .running
-            .lock()
-            .expect("lock poisoned")
-            .insert(task.id.clone())
         {
-            tracing::info!("Task {} is still running; skipped a run", task.id);
-            return false;
+            let mut running = self.running.lock().expect("lock poisoned");
+            if running.contains_key(&task.id) {
+                tracing::info!("Task {} is still running; skipped a run", task.id);
+                return false;
+            }
+            running.insert(task.id.clone(), None);
         }
         self.broadcast_update(&task.id);
         let this = self.clone();
@@ -362,7 +365,7 @@ impl Tasks {
                 crate::agent_rpc::remote_app_system_prompt()
             )),
             skills: host.skills(),
-            notifier: Some(host.notifier()),
+            notifier: Some(host.notifier(&task.id)),
         };
         let created = self
             .sessions
@@ -381,6 +384,12 @@ impl Tasks {
             .lock()
             .expect("lock poisoned")
             .insert(session_id.clone(), task.id.clone());
+        // Devices answer the run's permission requests from its task.
+        self.running
+            .lock()
+            .expect("lock poisoned")
+            .insert(task.id.clone(), Some(session_id.clone()));
+        self.broadcast_update(&task.id);
 
         let mut options: Vec<_> = task.config_options.iter().collect();
         options.sort();
@@ -404,7 +413,7 @@ impl Tasks {
             Vec::new(),
             IDLE_TIMEOUT_SECS,
             event_tx,
-            Some(host.notifier()),
+            Some(host.notifier(&task.id)),
         );
         tokio::pin!(prompt);
         let limit = Duration::from_secs(u64::from(task.timeout_minutes.max(1)) * 60);
@@ -550,7 +559,8 @@ impl Tasks {
                 let mut value = serde_json::to_value(&task).unwrap_or_default();
                 value["nextRunAt"] = json!(next);
                 value["lastRun"] = json!(last);
-                value["running"] = json!(running.contains(&task.id));
+                value["running"] = json!(running.contains_key(&task.id));
+                value["runningSessionId"] = json!(running.get(&task.id).cloned().flatten());
                 value
             })
             .collect();

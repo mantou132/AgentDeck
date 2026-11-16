@@ -48,6 +48,7 @@ pub async fn send(
     kind: PushKind,
     agent: &str,
     session_id: &str,
+    task_id: Option<&str>,
 ) {
     // A newer notification of the same session replaces the older one.
     let tag = format!("{agent}:{session_id}");
@@ -74,7 +75,7 @@ pub async fn send(
                     }
                 }
             },
-            "data": { "type": kind.data_type(), "host": host, "agent": agent, "sessionId": session_id }
+            "data": { "type": kind.data_type(), "host": host, "agent": agent, "sessionId": session_id, "taskId": task_id }
         }]
     });
     let _ = client
