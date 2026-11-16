@@ -174,20 +174,17 @@ impl RemotePeerManager {
             }
         });
         let skills = PeerSkills::default();
-        self.service.attach_with_completion(
-            &peer,
-            Some(self.completion_handler(peer_id)),
-            skills.clone(),
-        );
+        self.service
+            .attach_with_push(&peer, Some(self.push_handler(peer_id)), skills.clone());
         peers.insert(peer_id, (peer.clone(), skills.clone()));
         (peer, skills)
     }
 
-    fn completion_handler(&self, peer_id: u64) -> crate::agent_rpc::PromptCompletion {
+    fn push_handler(&self, peer_id: u64) -> crate::agent_rpc::PeerPush {
         let devices = self.devices.clone();
         let client = self.push_client.clone();
         let host = self.push_host.clone();
-        Arc::new(move |agent, session_id| {
+        Arc::new(move |kind, agent, session_id| {
             let token = devices.lock().ok().and_then(|devs| {
                 devs.values()
                     .find(|d| d.peer_id == peer_id)
@@ -199,7 +196,7 @@ impl RemotePeerManager {
             let agent = agent.to_owned();
             let session_id = session_id.to_owned();
             tokio::spawn(async move {
-                push::send(&client, &token, &host, &agent, &session_id).await;
+                push::send(&client, &token, &host, kind, &agent, &session_id).await;
             });
         })
     }

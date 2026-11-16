@@ -3,4 +3,5 @@
     <string name="main_activity_title">"AgentDeck"</string>
     <string name="notification_channel_responses">Agent responses</string>
     <string name="notification_response_complete">Your agent has finished responding.</string>
+    <string name="notification_input_request">Your agent is waiting for your approval or answer.</string>
 </resources>
