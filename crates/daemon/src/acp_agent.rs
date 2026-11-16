@@ -99,6 +99,9 @@ pub struct SessionContext {
     pub skills: SkillSelection,
     /// The device creating or loading the session; see `SessionActor::notifier`.
     pub notifier: Option<Notifier>,
+    /// Permission requests and questions unanswered for this long are refused
+    /// (unattended runs); without it they wait until the turn ends.
+    pub input_timeout: Option<std::time::Duration>,
 }
 
 /// Snapshot returned after an ACP session actor is ready.

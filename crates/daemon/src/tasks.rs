@@ -32,13 +32,10 @@ const TICK: Duration = Duration::from_secs(30);
 /// A run missed by up to this long (computer asleep, daemon stopped) runs once
 /// when the daemon notices; older ones are skipped.
 const MISSED_WINDOW: chrono::Duration = chrono::Duration::hours(6);
-/// An unanswered permission request or question is rejected after this long.
-const APPROVAL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 /// A turn without any update for this long is cancelled (`prompt`'s idle timeout).
-/// A waiting request sends no updates, so this outlasts `APPROVAL_TIMEOUT`: the
-/// request is rejected and the run carries on instead of being cancelled.
-const IDLE_TIMEOUT_SECS: u64 = APPROVAL_TIMEOUT.as_secs() + 5 * 60;
-const APPROVAL_CHECK: Duration = Duration::from_secs(15);
+const IDLE_TIMEOUT_SECS: u64 = 10 * 60;
+/// An unanswered permission request or question is refused after this long.
+const APPROVAL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const DEFAULT_TIMEOUT_MINUTES: u32 = 60;
 /// Successful runs kept per task; their sessions are deleted with them.
 const KEPT_SUCCESSES: usize = 20;
@@ -366,6 +363,7 @@ impl Tasks {
             )),
             skills: host.skills(),
             notifier: Some(host.notifier(&task.id)),
+            input_timeout: Some(APPROVAL_TIMEOUT),
         };
         let created = self
             .sessions
@@ -405,7 +403,6 @@ impl Tasks {
 
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
         tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-        let approvals = self.reject_unanswered(&task.agent, &session_id);
         let prompt = self.sessions.prompt(
             &task.agent,
             &session_id,
@@ -424,13 +421,11 @@ impl Tasks {
                 let _ = prompt.await;
                 run.status = RunStatus::Timeout;
                 run.summary = format!("Timed out after {} minutes", task.timeout_minutes);
-                approvals.abort();
                 self.finish(task, &session_id, host.as_ref(), &mut run)
                     .await;
                 return run;
             }
         };
-        approvals.abort();
         match result {
             Ok(answer) => {
                 run.status = RunStatus::Success;
@@ -447,39 +442,6 @@ impl Tasks {
         run.ended_at = Utc::now();
         self.sessions.close_session(&task.agent, session_id).await;
         host.push(PushKind::ResponseComplete, &task.agent, session_id);
-    }
-
-    /// Rejects the run's permission requests and questions nobody answered in
-    /// `APPROVAL_TIMEOUT`, so the turn carries on instead of waiting forever.
-    fn reject_unanswered(&self, agent: &str, session_id: &str) -> tokio::task::JoinHandle<()> {
-        let sessions = self.sessions.clone();
-        let agent = agent.to_string();
-        let session_id = session_id.to_string();
-        tokio::spawn(async move {
-            let mut seen: HashMap<String, tokio::time::Instant> = HashMap::new();
-            loop {
-                tokio::time::sleep(APPROVAL_CHECK).await;
-                let now = tokio::time::Instant::now();
-                for input in sessions.pending_user_inputs().await {
-                    let params = input.params();
-                    if params.get("sessionId").and_then(Value::as_str) != Some(session_id.as_str())
-                    {
-                        continue;
-                    }
-                    let Some(request_id) = params.get("requestId").and_then(Value::as_str) else {
-                        continue;
-                    };
-                    let since = *seen.entry(request_id.to_string()).or_insert(now);
-                    if now - since < APPROVAL_TIMEOUT {
-                        continue;
-                    }
-                    tracing::info!("Rejecting unanswered request {request_id} of {session_id}");
-                    sessions
-                        .answer_user_input(&agent, &session_id, request_id, rejection(params))
-                        .await;
-                }
-            }
-        })
     }
 
     /// Appends a run, prunes old ones (deleting their sessions) and tells devices.
@@ -709,25 +671,6 @@ impl Tasks {
     }
 }
 
-/// The answer refusing a user input request: the permission request's own
-/// reject option, so the agent reads a refusal and carries on (a bare cancel
-/// reads as a failed request in claude-agent-acp). Questions have no options;
-/// an empty response cancels them.
-fn rejection(params: &Value) -> Value {
-    params
-        .get("options")
-        .and_then(Value::as_array)
-        .and_then(|options| {
-            ["reject_once", "reject_always"].iter().find_map(|kind| {
-                options
-                    .iter()
-                    .find(|option| option.get("kind").and_then(Value::as_str) == Some(kind))
-            })
-        })
-        .and_then(|option| option.get("optionId"))
-        .map_or_else(|| json!({}), |id| json!({ "optionId": id }))
-}
-
 /// Tasks whose latest scheduled time passed since they last fired, with that
 /// time. Each scheduled time fires at most once, and one missed by more than
 /// `MISSED_WINDOW` is skipped. Updates `fired`.
@@ -945,20 +888,6 @@ mod tests {
         let mut disabled = tasks.clone();
         disabled[0].enabled = false;
         assert!(due_runs(&disabled, &mut fired, local(2026, 11, 17, 9, 1)).is_empty());
-    }
-
-    #[test]
-    fn unanswered_requests_are_refused_with_their_reject_option() {
-        let permission = json!({ "options": [
-            { "optionId": "allow-once", "kind": "allow_once" },
-            { "optionId": "reject", "kind": "reject_once" },
-        ]});
-        assert_eq!(rejection(&permission), json!({ "optionId": "reject" }));
-        assert_eq!(
-            rejection(&json!({ "options": [{ "optionId": "a", "kind": "allow_once" }] })),
-            json!({})
-        );
-        assert_eq!(rejection(&json!({ "mode": "form" })), json!({}));
     }
 
     #[test]

@@ -727,6 +727,7 @@ async fn session_context(
         system_prompt: message_panel_system_prompt(params).await?,
         skills: skills.lock().expect("lock poisoned").clone(),
         notifier: Some(notifier),
+        input_timeout: None,
     })
 }
 
