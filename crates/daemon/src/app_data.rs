@@ -62,6 +62,16 @@ impl AppPaths {
         self.root.join("custom_agents.json")
     }
 
+    /// Scheduled tasks (`tasks.rs`).
+    pub fn tasks_file(&self) -> PathBuf {
+        self.root.join("tasks.json")
+    }
+
+    /// Run history of one scheduled task, one JSON object per line.
+    pub fn task_runs_file(&self, task_id: &str) -> PathBuf {
+        self.root.join("task_runs").join(format!("{task_id}.jsonl"))
+    }
+
     fn agents_dir(&self) -> PathBuf {
         self.root.join("agents")
     }

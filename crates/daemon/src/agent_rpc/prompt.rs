@@ -24,6 +24,11 @@ const REMOTE_APP_SYSTEM_PROMPT: &str = "You are running inside AgentDeck's mobil
      hidden from the transcript, so write it for listening: no Markdown, code, paths, URLs \
      or lists, and never `-->` inside it.";
 
+/// The system prompt of sessions shown in the mobile app.
+pub(crate) fn remote_app_system_prompt() -> &'static str {
+    REMOTE_APP_SYSTEM_PROMPT
+}
+
 pub(super) async fn message_panel_system_prompt(params: &Value) -> Result<Option<String>, String> {
     let Some(context) = params.get("panelContext") else {
         return Ok(None);
