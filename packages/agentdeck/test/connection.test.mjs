@@ -328,6 +328,27 @@ test('RPC timeout restarts on each streamed event', async () => {
   await rejected;
 });
 
+test('a failing event handler fails its call instead of the transport', async () => {
+  const fixture = documentFixture();
+  const { RpcPeer } = fixture.rpc;
+  const sent = [];
+  const peer = new RpcPeer((message) => {
+    sent.push(message);
+  });
+  const asyncCall = peer.call('test', {}, async () => {
+    throw new Error('async handler');
+  });
+  const asyncRejected = assert.rejects(asyncCall, /async handler/);
+  await peer.dispatch({ id: sent[0].id, event: 1 });
+  await asyncRejected;
+  const syncCall = peer.call('test', {}, () => {
+    throw new Error('sync handler');
+  });
+  const syncRejected = assert.rejects(syncCall, /sync handler/);
+  await peer.dispatch({ id: sent[1].id, event: 1 });
+  await syncRejected;
+});
+
 test('new attach may update peer ID and late replies cannot overwrite it', async () => {
   const fixture = documentFixture();
   await fixture.connect();

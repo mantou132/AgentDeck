@@ -149,11 +149,15 @@ export class RpcPeer {
       if (!pending) return;
       if ('event' in message) {
         pending.startTimer?.();
-        try {
-          return pending.onEvent?.(message.event);
-        } catch (error) {
+        // A failing handler fails its call, sync or async: thrown at the transport, the Relay would replay the frame.
+        const failed = (error: unknown) => {
           this.#takePending(id);
           pending.reject(error instanceof Error ? error : new Error(String(error)));
+        };
+        try {
+          return Promise.resolve(pending.onEvent?.(message.event)).catch(failed);
+        } catch (error) {
+          failed(error);
         }
         return;
       }

@@ -484,11 +484,11 @@ class AgentTransport {
       },
       onPayload: async (payload) => {
         if (this.#relayClient !== client) return;
-        await this.#receive(codec.decode(payload));
+        await this.#receiveEncoded(() => codec.decode(payload));
       },
       onBinary: async (data) => {
         if (this.#relayClient !== client) return;
-        await this.#receive(codec.decodeBinary(data));
+        await this.#receiveEncoded(() => codec.decodeBinary(data));
       },
       // Endpoint 1 only ever holds the host, so any peer is the host. Peers already online are
       // reported before `connected` and handled there.
@@ -548,6 +548,18 @@ class AgentTransport {
 
     this.#relayClient = client;
     client.connect({ ackHead: options?.ackHead });
+  }
+
+  /** A frame that cannot be decoded is dropped: failing the receive would make the Relay replay it on every reconnect. */
+  async #receiveEncoded(decode: () => RpcMessage) {
+    let message: RpcMessage;
+    try {
+      message = decode();
+    } catch (error) {
+      this.dispatchMessage({ type: 'delivery_error', error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    await this.#receive(message);
   }
 
   async #receive(message: RpcMessage) {

@@ -109,6 +109,23 @@ test('encrypted app handshake, prompt, streaming and retry keep plaintext off th
   assert.equal(fixture.app.runningSessionIds().length, 0);
 });
 
+test('a frame that cannot be decrypted is dropped and acknowledged, keeping the connection', async () => {
+  const fixture = documentFixture(undefined, { pairingId: vector.id });
+  await fixture.connect();
+  const socket = fixture.sockets.at(-1);
+  socket.frame({
+    type: 'message',
+    message_id: 'bad',
+    sequence: 1000,
+    payload: { e2ee: 1, sender: 'host', nonce: 'AAAA', ciphertext: 'AAAA' },
+  });
+  await tick();
+  assert.equal(fixture.sockets.at(-1), socket);
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+  assert.ok(socket.sent.some((frame) => frame.type === 'ack' && frame.sequence === 1000));
+  assert.match(fixture.app.agentdeckStore.connectionError, /verification failed/i);
+});
+
 test('encrypted request expiry and Relay rejection still correlate with the RPC', async () => {
   const fixture = documentFixture(undefined, { pairingId: vector.id });
   fixture.heldMethods.add('peer_attach');
