@@ -114,6 +114,19 @@ test('Relay handshake watchdog recovers a socket stuck before ready', async () =
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 });
 
+test('ack_head requested at start survives a first connection that never opens', async () => {
+  const fixture = documentFixture();
+  fixture.app.startApp();
+  assert.equal(new URL(fixture.sockets[0].url).searchParams.get('ack_head'), 'true');
+  await fixture.advance(13_000);
+  assert.equal(new URL(fixture.sockets[1].url).searchParams.get('ack_head'), 'true');
+  fixture.sockets[1].open();
+  await fixture.settleHost();
+  fixture.transport.reconnectTransport(true);
+  await tick();
+  assert.equal(new URL(fixture.sockets[2].url).searchParams.has('ack_head'), false);
+});
+
 const attaches = (fixture) => fixture.requests.filter((request) => request.payload.method === 'peer_attach').length;
 
 test('with Relay presence an offline host shows at once and attaches when it comes online', async () => {
@@ -427,4 +440,23 @@ test('a failed skills install still connects', async () => {
   await tick();
   console.error = error;
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+});
+
+test('skills changed while an attach is on its way are declared again', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  const declared = () =>
+    fixture.requests.filter((request) => request.payload.method === 'peer_attach').map((r) => r.payload.params.skills);
+  fixture.heldMethods.add('peer_attach');
+  fixture.app.setSkillEnabled('chart', false);
+  await tick();
+  fixture.app.setSkillEnabled('map', false);
+  await tick();
+  const held = fixture.requests.at(-1);
+  assert.ok(held.payload.params.skills.enabled.includes('map'));
+  fixture.heldMethods.clear();
+  fixture.reply(held, { peerId: 1 });
+  await fixture.settleHost();
+  assert.ok(!declared().at(-1).enabled.includes('map'));
+  assert.ok(!declared().at(-1).enabled.includes('chart'));
 });

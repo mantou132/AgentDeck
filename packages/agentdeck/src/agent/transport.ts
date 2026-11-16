@@ -423,16 +423,17 @@ class AgentTransport {
   syncHostConnection(metadataOnly = false): Promise<void> {
     if (!this.#relayConnected) return Promise.resolve();
     if (this.hostSession.attaching) return this.hostSession.attaching;
+    const skills = this.#currentOptions?.skills;
     return this.hostSession.sync({
       metadataOnly: metadataOnly && this.#connectionState === 'connected',
       deviceId: this.getDeviceId(),
-      skills: this.#currentOptions?.skills,
+      skills,
       agentApi: this.agentApi,
       onStateChange: (state, error) => this.#emitConnection(state, error),
+      // The token or the skills may have changed while this attach was on its way.
       onSynced: (sentToken) => {
-        if (this.#connectionState === 'connected' && this.hostSession.fcmToken !== sentToken) {
-          this.syncHostConnection(true);
-        }
+        const changed = this.hostSession.fcmToken !== sentToken || this.#currentOptions?.skills !== skills;
+        if (this.#connectionState === 'connected' && changed) this.syncHostConnection(true);
       },
     });
   }
@@ -579,7 +580,7 @@ class AgentTransport {
     clearTimeout(this.#retryTimer);
     if (!this.#relayClient || this.#currentRelayId !== relayId) return;
     this.#retryTimer = setTimeout(() => {
-      if (this.#relayClient === client) client.connect({ ackHead: false });
+      if (this.#relayClient === client) client.connect();
     }, 3000);
   }
 
@@ -589,7 +590,8 @@ class AgentTransport {
       return;
     }
     if (force) this.#relayClient.close();
-    this.#relayClient.connect({ ackHead: false });
+    // No `ackHead`: one requested at start stays until a connection opens, where the client clears it.
+    this.#relayClient.connect();
   }
 
   close() {

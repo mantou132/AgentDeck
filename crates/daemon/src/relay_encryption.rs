@@ -1,4 +1,7 @@
-//! Optional PSK encryption above the unchanged Relay protocol. See docs/relay-encryption.md.
+//! Optional PSK encryption above the unchanged Relay protocol: the pairing ID
+//! is the shared secret, from which the Relay route ID and one key per
+//! direction are derived. Stateless, so frames carry no replay protection.
+//! The App's counterpart is `packages/agentdeck/src/agent/encryption.ts`.
 
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
