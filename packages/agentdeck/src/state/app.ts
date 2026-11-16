@@ -35,6 +35,7 @@ import {
   showUserInput,
 } from './sessions';
 import { agentdeckStore, isSkillEnabled, isTurnRunning, sessionsStore, updateRuntime } from './store';
+import { refreshTasks, resetTasks } from './tasks';
 
 /** Older daemon versions that do not report a version are also considered outdated; prerelease suffixes are ignored in comparison */
 const isDaemonOutdated = (version?: string) => {
@@ -98,6 +99,7 @@ const handleTransportMessage = (message: TransportMessage) => {
         agentdeckStore({ hostVersion: hostVersion || '' });
         recordPairing({ hostname, home, customAgents, restrictedFeatures });
         refreshSessions();
+        refreshTasks();
         // Older daemon has no reconciliation endpoint; stay waiting if it fails
         settleLostTurns().catch(console.error);
         if (!daemonVersionChecked) {
@@ -198,8 +200,10 @@ export const saveSettings = (settings: AppSettings) => {
       ),
     );
   }
-  if (relayChanged) resetRemoteState();
-  else if (agentChanged) resetSessionList();
+  if (relayChanged) {
+    resetRemoteState();
+    resetTasks();
+  } else if (agentChanged) resetSessionList();
   const { relayUrl } = next;
   if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, skills: clientSkills() });
   else if (notConnected) startTransport(next.relayId, { relayUrl, skills: clientSkills() });

@@ -2,9 +2,11 @@ mod files;
 mod git;
 mod prompt;
 
+pub(crate) use prompt::remote_app_system_prompt;
+
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 
@@ -21,10 +23,12 @@ use self::{
 };
 use crate::{
     acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
+    app_data::AppPaths,
     peer::{CallCtx, Peer, RpcError},
     push::PushKind,
     render_skills::{self, SkillSelection},
     screen_capture,
+    tasks::Tasks,
 };
 
 /// Stream agent events as `{ id, event }` frames while a request runs.
@@ -65,7 +69,10 @@ pub type PeerPush = Arc<dyn Fn(PushKind, &str, &str) + Send + Sync>;
 
 /// The `(agent, sessionId)` a notification asks the user about, if it is a
 /// permission request or a question.
-fn input_request_session<'a>(method: &str, params: &'a Value) -> Option<(&'a str, &'a str)> {
+pub(crate) fn input_request_session<'a>(
+    method: &str,
+    params: &'a Value,
+) -> Option<(&'a str, &'a str)> {
     if !matches!(
         method,
         "agent_permission_request" | "agent_elicitation_request"
@@ -86,6 +93,8 @@ pub type PeerSkills = Arc<Mutex<SkillSelection>>;
 pub struct AgentService {
     sessions: Arc<AgentSessionManager>,
     end_listeners: Arc<Mutex<Vec<SessionEndCallback>>>,
+    /// Scheduled tasks, set once by `init_tasks` when the daemon runs.
+    tasks: Arc<OnceLock<Arc<Tasks>>>,
 }
 
 impl Default for AgentService {
@@ -107,7 +116,99 @@ impl AgentService {
         Self {
             sessions: Arc::new(AgentSessionManager::new(Some(on_end))),
             end_listeners: listeners,
+            tasks: Arc::default(),
         }
+    }
+
+    /// Loads the scheduled tasks; they run once `Tasks::start` gets the devices.
+    pub fn init_tasks(&self, paths: AppPaths) -> Arc<Tasks> {
+        self.tasks
+            .get_or_init(|| Tasks::load(paths, self.sessions.clone()))
+            .clone()
+    }
+
+    /// Scheduled task RPCs; they fail until `init_tasks` ran.
+    fn attach_tasks(&self, peer: &Peer) {
+        fn tasks_of(tasks: &OnceLock<Arc<Tasks>>) -> Result<Arc<Tasks>, String> {
+            tasks
+                .get()
+                .cloned()
+                .ok_or_else(|| "Scheduled tasks are not available".to_string())
+        }
+        fn task_id<'a>(params: &'a Value, method: &str) -> Result<&'a str, String> {
+            required_str(params, "id", method)
+        }
+
+        let tasks = self.tasks.clone();
+        peer.handle("task_list", move |_params, _ctx| {
+            let tasks = tasks.clone();
+            async move { Ok(tasks_of(&tasks)?.list()) }
+        });
+
+        let tasks = self.tasks.clone();
+        peer.handle("task_runs", move |params, _ctx| {
+            let tasks = tasks.clone();
+            async move {
+                let id = task_id(&params, "task_runs")?;
+                Ok(json!({ "runs": tasks_of(&tasks)?.runs(id) }))
+            }
+        });
+
+        let tasks = self.tasks.clone();
+        peer.handle("task_upsert", move |params, _ctx| {
+            let tasks = tasks.clone();
+            async move {
+                let task = params
+                    .get("task")
+                    .cloned()
+                    .ok_or_else(|| "task_upsert requires task".to_string())?;
+                let task = tasks_of(&tasks)?
+                    .upsert(task)
+                    .map_err(|err| format!("{err:#}"))?;
+                Ok(json!({ "task": task }))
+            }
+        });
+
+        let tasks = self.tasks.clone();
+        peer.handle("task_set_enabled", move |params, _ctx| {
+            let tasks = tasks.clone();
+            async move {
+                let id = task_id(&params, "task_set_enabled")?;
+                let enabled = params
+                    .get("enabled")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| "task_set_enabled requires enabled".to_string())?;
+                tasks_of(&tasks)?
+                    .set_enabled(id, enabled)
+                    .map_err(|err| format!("{err:#}"))?;
+                Ok(json!({}))
+            }
+        });
+
+        let tasks = self.tasks.clone();
+        peer.handle("task_run_now", move |params, _ctx| {
+            let tasks = tasks.clone();
+            async move {
+                let id = task_id(&params, "task_run_now")?;
+                let started = tasks_of(&tasks)?
+                    .run_now(id)
+                    .map_err(|err| format!("{err:#}"))?;
+                Ok(json!({ "started": started }))
+            }
+        });
+
+        let tasks = self.tasks.clone();
+        peer.handle("task_delete", move |params, _ctx| {
+            let tasks = tasks.clone();
+            async move {
+                let id = task_id(&params, "task_delete")?;
+                tasks_of(&tasks)?
+                    .delete(id)
+                    .await
+                    .map_err(|err| format!("{err:#}"))?;
+                Ok(json!({}))
+            }
+        });
     }
 
     /// Attach this service's RPC handlers to a duplex Peer endpoint.
@@ -340,8 +441,10 @@ impl AgentService {
         });
 
         let list_sessions = sessions.clone();
+        let list_tasks = self.tasks.clone();
         peer.handle("agent_session_list", move |params, _ctx| {
             let sessions = list_sessions.clone();
+            let tasks = list_tasks.get().cloned();
             async move {
                 let agent = required_agent(&params, "agent_session_list")?;
                 let cwd = message_cwd(&params);
@@ -357,9 +460,15 @@ impl AgentService {
                 )
                 .await
                 {
-                    Ok(Ok(list)) => tokio::task::spawn_blocking(move || annotate_worktrees(list))
-                        .await
-                        .map_err(|err| err.to_string()),
+                    Ok(Ok(list)) => tokio::task::spawn_blocking(move || {
+                        let list = annotate_worktrees(list);
+                        match tasks {
+                            Some(tasks) => tasks.annotate_sessions(list),
+                            None => list,
+                        }
+                    })
+                    .await
+                    .map_err(|err| err.to_string()),
                     Ok(Err(err)) => Err(err.to_string()),
                     Err(_) => Err("Timeout listing ACP agent sessions".to_string()),
                 }
@@ -528,6 +637,8 @@ impl AgentService {
                 .map_err(agent_error)
             }
         });
+
+        self.attach_tasks(peer);
 
         let mode_sessions = sessions.clone();
         peer.handle("agent_session_set_mode", move |params, _ctx| {

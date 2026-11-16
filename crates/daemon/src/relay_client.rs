@@ -98,6 +98,62 @@ fn take_ephemeral_reply(calls: &EphemeralCalls, peer_id: u64, message: &Value) -
 
 /// Manages multiple remote peers multiplexed over a single relay connection.
 /// Allocates auto-increment `peerId` to connected devices and tags/filters messages.
+/// Reaches every device, for sessions no device started (scheduled runs).
+#[derive(Clone)]
+struct Broadcaster {
+    devices: Arc<Mutex<HashMap<String, RemoteDevice>>>,
+    peers: Arc<Mutex<HashMap<u64, (Peer, PeerSkills)>>>,
+    push_client: reqwest::Client,
+    push_host: String,
+}
+
+impl Broadcaster {
+    /// Pushes to every device that registered a push token; `task_id` marks
+    /// the run of a scheduled task.
+    fn push(&self, kind: push::PushKind, agent: &str, session_id: &str, task_id: Option<&str>) {
+        let tokens: Vec<String> = self
+            .devices
+            .lock()
+            .expect("lock poisoned")
+            .values()
+            .filter_map(|device| device.fcm_token.clone())
+            .collect();
+        for token in tokens {
+            let client = self.push_client.clone();
+            let host = self.push_host.clone();
+            let agent = agent.to_owned();
+            let session_id = session_id.to_owned();
+            let task_id = task_id.map(str::to_owned);
+            tokio::spawn(async move {
+                push::send(
+                    &client,
+                    &token,
+                    &host,
+                    kind,
+                    &agent,
+                    &session_id,
+                    task_id.as_deref(),
+                )
+                .await;
+            });
+        }
+    }
+
+    /// Notifies every device that attached since the daemon started.
+    fn notify(&self, method: &str, params: &Value) {
+        let peers: Vec<Peer> = self
+            .peers
+            .lock()
+            .expect("lock poisoned")
+            .values()
+            .map(|(peer, _)| peer.clone())
+            .collect();
+        for peer in peers {
+            peer.notify(method, params.clone());
+        }
+    }
+}
+
 pub struct RemotePeerManager {
     service: AgentService,
     outbound_tx: OutboundSender,
@@ -108,6 +164,8 @@ pub struct RemotePeerManager {
     push_client: reqwest::Client,
     /// `push::host_key` of the pairing ID, sent with every push.
     push_host: String,
+    /// Skills of the latest attach, for sessions no device started (scheduled runs).
+    latest_skills: Arc<Mutex<SkillSelection>>,
 }
 
 impl RemotePeerManager {
@@ -137,6 +195,7 @@ impl RemotePeerManager {
             next_peer_id: Arc::new(AtomicU64::new(max_id + 1)),
             push_client: reqwest::Client::new(),
             push_host: String::new(),
+            latest_skills: Arc::default(),
         }
     }
 
@@ -180,6 +239,15 @@ impl RemotePeerManager {
         (peer, skills)
     }
 
+    fn broadcaster(&self) -> Broadcaster {
+        Broadcaster {
+            devices: self.devices.clone(),
+            peers: self.peers.clone(),
+            push_client: self.push_client.clone(),
+            push_host: self.push_host.clone(),
+        }
+    }
+
     fn push_handler(&self, peer_id: u64) -> crate::agent_rpc::PeerPush {
         let devices = self.devices.clone();
         let client = self.push_client.clone();
@@ -196,7 +264,7 @@ impl RemotePeerManager {
             let agent = agent.to_owned();
             let session_id = session_id.to_owned();
             tokio::spawn(async move {
-                push::send(&client, &token, &host, kind, &agent, &session_id).await;
+                push::send(&client, &token, &host, kind, &agent, &session_id, None).await;
             });
         })
     }
@@ -294,6 +362,7 @@ impl RemotePeerManager {
         let restricted_features = features::restricted(&declared.groups);
         // The client sends this version through `skills_install` before using the host.
         let skills_missing = !render_skills::select(&mut declared);
+        *self.latest_skills.lock().expect("lock poisoned") = declared.clone();
         *skills.lock().expect("lock poisoned") = declared;
 
         // Clients compare it against their minimum supported host version.
@@ -453,6 +522,40 @@ pub fn start(
     Ok(manager)
 }
 
+/// Scheduled runs have no device: their notifications go to every device, and
+/// permission requests and questions also push to every device.
+impl crate::tasks::TaskHost for RemotePeerManager {
+    fn notifier(&self, task_id: &str) -> crate::acp_agent::Notifier {
+        let broadcaster = self.broadcaster();
+        let task_id = task_id.to_owned();
+        Arc::new(move |method, params| {
+            if let Some((agent, session_id)) =
+                crate::agent_rpc::input_request_session(method, &params)
+            {
+                broadcaster.push(
+                    push::PushKind::InputRequest,
+                    agent,
+                    session_id,
+                    Some(&task_id),
+                );
+            }
+            broadcaster.notify(method, &params);
+        })
+    }
+
+    fn push(&self, kind: push::PushKind, agent: &str, session_id: &str) {
+        self.broadcaster().push(kind, agent, session_id, None);
+    }
+
+    fn broadcast(&self, method: &str, params: Value) {
+        self.broadcaster().notify(method, &params);
+    }
+
+    fn skills(&self) -> SkillSelection {
+        self.latest_skills.lock().expect("lock poisoned").clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -548,6 +651,7 @@ mod tests {
             next_peer_id: Arc::new(AtomicU64::new(2)),
             push_client: reqwest::Client::new(),
             push_host: String::new(),
+            latest_skills: Arc::default(),
         });
         let handler = Handler {
             manager,

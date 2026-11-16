@@ -20,6 +20,7 @@ mod relay_codec;
 mod relay_encryption;
 mod render_skills;
 mod screen_capture;
+mod tasks;
 mod ui;
 
 use agent_rpc::AgentService;
@@ -244,8 +245,10 @@ async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
 
     tracing::info!("Connecting to Relay");
 
-    let _remote_manager = relay_client::start(config.relay_url(), relay_id, &service)
+    let tasks = service.init_tasks(AppPaths::new(paths.root().to_path_buf()));
+    let remote_manager = relay_client::start(config.relay_url(), relay_id, &service)
         .context("failed to start Relay remote peer manager")?;
+    tasks.start(remote_manager);
 
     print_daemon_info(&config, None);
 
