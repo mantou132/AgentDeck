@@ -115,7 +115,53 @@ export type RemoteSession = {
   additionalDirectories?: string[];
   /** Set by the host when `cwd` lies in a linked git worktree; the session is listed with `mainCwd`. */
   worktree?: { mainCwd: string; name: string };
+  /** Set by the host on sessions of scheduled task runs, which the list leaves out. */
+  task?: { id: string; name: string };
 };
+
+/** When a scheduled task runs, in the host's local time; weekdays are 1 (Monday) to 7, empty means every day. */
+export type TaskSchedule =
+  | { type: 'daily'; times: string[]; weekdays?: number[] }
+  | { type: 'interval'; minutes: number };
+
+/** A scheduled task as the daemon stores it (`crates/daemon/src/tasks.rs`). */
+export type Task = {
+  id: string;
+  name: string;
+  agent: string;
+  cwd: string;
+  prompt: string;
+  schedule: TaskSchedule;
+  configOptions: Record<string, string>;
+  timeoutMinutes: number;
+  retries: number;
+  enabled: boolean;
+  /** The session the task was made in; changes are asked for there. */
+  originSessionId?: string;
+  createdAt: string;
+};
+
+export type TaskRun = {
+  sessionId?: string | null;
+  /** Missing for "run now". */
+  scheduledFor?: string | null;
+  startedAt: string;
+  endedAt: string;
+  status: 'success' | 'failed' | 'timeout';
+  summary: string;
+  attempt: number;
+};
+
+export type TaskListItem = Task & {
+  nextRunAt?: string | null;
+  lastRun?: TaskRun | null;
+  running: boolean;
+  /** Session of the running attempt, once created; its permission requests are answered from the task. */
+  runningSessionId?: string | null;
+};
+
+/** A task to create or replace; the host sets `createdAt`. */
+export type TaskInput = Omit<Task, 'id' | 'createdAt'> & { id?: string };
 
 /** ACP slash command; the prompt `/name args` runs it. */
 export type AvailableCommand = { name: string; description: string; input?: { hint: string } | null };
@@ -305,6 +351,10 @@ export class AgentApi {
 
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());
+
+  /** A scheduled task changed, or one of its runs started or ended. */
+  setTaskUpdatedHandler = (handler?: ((params: { id: string }) => void) | null) =>
+    this.#peer.onNotify('task_updated', (params) => handler?.(params as { id: string }));
 
   attachPeer = async (deviceId: string, fcmToken?: string | null, skills?: ClientSkills) => {
     const declared = skills && { hash: skills.hash, enabled: skills.enabled, groups: skills.groups };
@@ -580,4 +630,24 @@ export class AgentApi {
       undefined,
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.deleteSessionTimeout') },
     );
+
+  #taskCall = <T>(method: string, params: Record<string, unknown>) =>
+    this.#peer.call<T>(method, params, undefined, {
+      timeoutMs: 15_000,
+      timeoutMessage: i18n.get('error.taskTimeout'),
+    });
+
+  listTasks = () => this.#taskCall<{ tasks: TaskListItem[] }>('task_list', {}).then(({ tasks }) => tasks);
+
+  /** Oldest first. */
+  taskRuns = (id: string) => this.#taskCall<{ runs: TaskRun[] }>('task_runs', { id }).then(({ runs }) => runs);
+
+  upsertTask = (task: TaskInput) => this.#taskCall<{ task: Task }>('task_upsert', { task }).then((r) => r.task);
+
+  setTaskEnabled = (id: string, enabled: boolean) => this.#taskCall('task_set_enabled', { id, enabled });
+
+  /** `started` is false while a run of the task is still going. */
+  runTaskNow = (id: string) => this.#taskCall<{ started: boolean }>('task_run_now', { id });
+
+  deleteTask = (id: string) => this.#taskCall('task_delete', { id });
 }

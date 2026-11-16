@@ -139,3 +139,16 @@ test('getSortedSessionGroups: Claude desktop scratch workspaces share one group'
   );
   assert.equal(exports.scratchWorkspacesRoot('/Users/me/Claude/projects'), undefined);
 });
+
+test('getSortedSessionGroups: runs of scheduled tasks stay out of the list', () => {
+  const sessions = [
+    { sessionId: '1', cwd: '/project-a', updatedAt: '2026-01-01T10:00:00.000Z' },
+    { sessionId: '2', cwd: '/project-a', updatedAt: '2026-01-01T12:00:00.000Z', task: { id: 't', name: 'Mail' } },
+    { sessionId: '3', cwd: '/project-b', updatedAt: '2026-01-01T11:00:00.000Z', task: { id: 't', name: 'Mail' } },
+  ];
+  const groups = getSortedSessionGroups(sessions);
+  assert.deepEqual(
+    groups.map((group) => [group.cwd, group.sessions.map((session) => session.sessionId)]),
+    [['/project-a', ['1']]],
+  );
+});

@@ -35,6 +35,7 @@ import {
   updateRuntime,
   updateSessionOptions,
 } from './store';
+import { showTaskPermission } from './tasks';
 import { settleUserInput, showElicitation, showPermission } from './user-input';
 
 /** Banner text for a failed prompt; an agent whose login expired gets a sign-in hint. */
@@ -97,6 +98,7 @@ export const cancelSubagent = async (sessionId: string, childSessionId: string) 
 
 /** Permission requests and questions are shown only for the running turn of the device that started it. */
 export const showUserInput = ({ method, params }: UserInput) => {
+  if (method === 'agent_permission_request' && showTaskPermission(params)) return;
   if (getSession(params.sessionId)?.agent !== params.agent) return;
   if (method === 'agent_permission_request') showPermission(params);
   else showElicitation(params);

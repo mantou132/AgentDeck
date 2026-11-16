@@ -55,6 +55,7 @@ export const DISPLAY_SKILLS = [
   ...(previewSupported ? ['preview', 'app'] : []),
   'screen',
   'session',
+  'task',
   ...(calendarSupported ? ['event'] : []),
 ];
 
