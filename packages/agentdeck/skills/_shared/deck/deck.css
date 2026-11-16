@@ -1,0 +1,884 @@
+/* Deck base styles shared by courseware and presentation templates: a 1920×1080 stage scaled to the screen,
+   slides, steps, choices, dragging, toolbar, overlays, print and scan-to-answer. Colors can be changed in :root. */
+:root {
+  --bg: #f6f4ee;
+  --paper: #fffdf8;
+  --ink: #23303b;
+  --muted: #6b7680;
+  --line: #d9d4c7;
+  --primary: #2f6fb3;
+  --accent: #e07a3a;
+  --good: #2e9d62;
+  --bad: #d2463c;
+  --soft-primary: #e3eef9;
+  --soft-accent: #fbeadd;
+  --soft-good: #e1f3e8;
+  --c1: #4c8fd6;
+  --c2: #e9893e;
+  --c3: #52b07c;
+  --c4: #d9584c;
+  --c5: #9a6fd0;
+  --c6: #e6b93c;
+  --font:
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif;
+  --num: "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1d232a;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#cw-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  transform: var(--cw-fit);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Slides */
+.slide {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: 80px 110px 90px;
+  font-size: 40px;
+  line-height: 1.5;
+}
+
+.slide.cw-current {
+  display: flex;
+}
+
+.slide > h2 {
+  margin: 0 0 40px;
+  font-size: 60px;
+  line-height: 1.25;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.slide h3 {
+  margin: 0 0 16px;
+  font-size: 46px;
+}
+
+.slide p {
+  margin: 0 0 24px;
+}
+
+.slide ul,
+.slide ol {
+  margin: 0 0 24px;
+  padding-left: 1.4em;
+}
+
+.slide li {
+  margin-bottom: 12px;
+}
+
+/* Title slide */
+.slide.title {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(160deg, var(--soft-primary), var(--paper) 55%, var(--soft-accent));
+}
+
+.slide.title h1 {
+  margin: 0 0 32px;
+  font-size: 110px;
+  line-height: 1.2;
+  letter-spacing: 4px;
+}
+
+.slide.title .subtitle {
+  font-size: 44px;
+  color: var(--muted);
+}
+
+/* Layout helpers */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 32px;
+}
+
+.cols {
+  flex: 1;
+  display: flex;
+  gap: 60px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.cols > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card {
+  background: var(--paper);
+  border: 3px solid var(--line);
+  border-radius: 28px;
+  padding: 36px 44px;
+}
+
+.card.primary {
+  background: var(--soft-primary);
+  border-color: var(--primary);
+}
+
+.card.accent {
+  background: var(--soft-accent);
+  border-color: var(--accent);
+}
+
+.card.good {
+  background: var(--soft-good);
+  border-color: var(--good);
+}
+
+.big {
+  font-size: 72px;
+  line-height: 1.3;
+}
+
+.huge {
+  font-size: 120px;
+  line-height: 1.2;
+  font-family: var(--num);
+  font-weight: 700;
+}
+
+.small {
+  font-size: 32px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.primary-text {
+  color: var(--primary);
+}
+
+.accent-text {
+  color: var(--accent);
+}
+
+.good-text {
+  color: var(--good);
+}
+
+.bad-text {
+  color: var(--bad);
+}
+
+.tag {
+  display: inline-block;
+  padding: 4px 22px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: middle;
+}
+
+.slide > h2 .tag {
+  font-size: 32px;
+}
+
+.tag.accent {
+  background: var(--accent);
+}
+
+.tag.good {
+  background: var(--good);
+}
+
+.blank {
+  display: inline-block;
+  min-width: 2.4em;
+  border-bottom: 4px solid currentColor;
+  text-align: center;
+}
+
+.mark {
+  background: linear-gradient(transparent 55%, var(--soft-accent) 55%);
+  padding: 0 4px;
+}
+
+.slide img,
+.slide svg {
+  max-width: 100%;
+}
+
+/* Steps: elements with data-step appear one by one before the slide advances. */
+[data-step] {
+  transition:
+    opacity 0.35s,
+    transform 0.35s;
+}
+
+[data-step].cw-hidden {
+  opacity: 0;
+  transform: translateY(16px);
+  pointer-events: none;
+}
+
+/* Multiple choice: <ol class="choices"><li data-correct>…</li><li>…</li></ol> */
+.slide .choices {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+  counter-reset: choice;
+}
+
+.choices.one-col {
+  grid-template-columns: 1fr;
+}
+
+.choices > li {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 120px;
+  counter-increment: choice;
+  position: relative;
+  margin: 0;
+  padding: 24px 36px 24px 110px;
+  background: var(--paper);
+  border: 4px solid var(--line);
+  border-radius: 24px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.choices > li::before {
+  content: counter(choice, upper-alpha);
+  position: absolute;
+  left: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--soft-primary);
+  color: var(--primary);
+  font-weight: 700;
+  text-align: center;
+  line-height: 56px;
+}
+
+.choices > li.cw-right {
+  background: var(--soft-good);
+  border-color: var(--good);
+}
+
+.choices > li.cw-right::after {
+  content: "✓";
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--good);
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+.choices > li.cw-wrong {
+  background: #fbe6e4;
+  border-color: var(--bad);
+  animation: cw-shake 0.4s;
+}
+
+.choices > li.cw-wrong::after {
+  content: "✗";
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--bad);
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+@keyframes cw-shake {
+  25% {
+    transform: translateX(-10px);
+  }
+  50% {
+    transform: translateX(10px);
+  }
+  75% {
+    transform: translateX(-6px);
+  }
+}
+
+/* Free dragging: any element with data-drag inside a slide */
+[data-drag] {
+  cursor: grab;
+  touch-action: none;
+  position: relative;
+}
+
+[data-drag].cw-dragging {
+  cursor: grabbing;
+  z-index: 10;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.2));
+}
+
+/* Formulas: LaTeX typeset by KaTeX when online (deck.js); the source shows until then. */
+.tex.display {
+  display: block;
+  text-align: center;
+  margin: 12px 0;
+}
+
+.tex:not(.cw-typeset) {
+  font-family: var(--num);
+  color: var(--muted);
+}
+
+.cw-controls {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cw-btn {
+  font: inherit;
+  font-size: 32px;
+  line-height: 1;
+  padding: 18px 32px;
+  min-width: 80px;
+  border-radius: 18px;
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cw-btn:active {
+  background: var(--soft-primary);
+}
+
+.cw-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Teacher toolbar */
+#cw-toolbar {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(29, 35, 42, 0.72);
+  color: #fff;
+  font: 15px / 1 var(--font);
+  z-index: 1000;
+  opacity: 0.25;
+  transition: opacity 0.3s;
+}
+
+#cw-toolbar:hover,
+#cw-toolbar.cw-active {
+  opacity: 1;
+}
+
+#cw-toolbar button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+#cw-toolbar button:hover,
+#cw-toolbar button.cw-on {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+#cw-toolbar .cw-page {
+  min-width: 64px;
+  text-align: center;
+  font-family: var(--num);
+}
+
+#cw-toolbar .cw-pen-colors {
+  display: none;
+  gap: 4px;
+}
+
+#cw-toolbar.cw-pen .cw-pen-colors {
+  display: flex;
+}
+
+#cw-toolbar .cw-swatch {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+
+#cw-toolbar .cw-swatch.cw-on {
+  border-color: #fff;
+}
+
+#cw-ink {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  touch-action: none;
+}
+
+#cw-ink.cw-on {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+#cw-blackout {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 2000;
+  display: none;
+}
+
+#cw-blackout.cw-on {
+  display: block;
+}
+
+/* Overlays (timer, picker) live on the stage so they scale with it. */
+.cw-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(29, 35, 42, 0.45);
+}
+
+.cw-overlay.cw-on {
+  display: flex;
+}
+
+.cw-panel {
+  position: relative;
+  min-width: 900px;
+  padding: 60px 80px;
+  border-radius: 40px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+}
+
+.cw-panel .cw-close {
+  position: absolute;
+  right: 24px;
+  top: 24px;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  font-size: 36px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.cw-timer-display {
+  font-family: var(--num);
+  font-size: 260px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cw-timer-display.cw-done {
+  color: var(--bad);
+  animation: cw-pulse 0.8s infinite alternate;
+}
+
+@keyframes cw-pulse {
+  to {
+    transform: scale(1.06);
+  }
+}
+
+.cw-picker-name {
+  font-size: 180px;
+  font-weight: 700;
+  line-height: 1.1;
+  min-width: 4em;
+  color: var(--primary);
+}
+
+.cw-panel textarea {
+  width: 1100px;
+  height: 260px;
+  font: 32px / 1.5 var(--font);
+  padding: 20px;
+  border-radius: 18px;
+  border: 3px solid var(--line);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.cw-panel input[type="number"] {
+  width: 200px;
+  font: 40px var(--num);
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 3px solid var(--line);
+  text-align: center;
+}
+
+/* Print / PDF: every slide on its own page with all steps shown. */
+@media print {
+  @page {
+    size: 16in 9in;
+    margin: 0;
+  }
+
+  html,
+  body {
+    overflow: visible;
+    height: auto;
+    background: none;
+  }
+
+  #cw-stage {
+    position: static;
+    transform: none;
+    width: auto;
+    height: auto;
+    background: none;
+    overflow: visible;
+  }
+
+  .slide {
+    position: relative;
+    display: flex;
+    width: 1920px;
+    height: 1080px;
+    zoom: 0.8;
+    background: var(--bg);
+    break-after: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-step].cw-hidden {
+    opacity: 1;
+    transform: none;
+  }
+
+  #cw-toolbar,
+  #cw-ink,
+  #cw-reactions,
+  .cw-overlay,
+  .cw-controls {
+    display: none;
+  }
+}
+
+/* Scan-to-answer (live.js) */
+.cw-live {
+  display: flex;
+  gap: 60px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.cw-live-qr svg {
+  display: block;
+  border-radius: 16px;
+}
+
+.cw-live-info p {
+  margin: 0 0 12px;
+}
+
+.cw-live-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cw-live-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 16px;
+  border-radius: 16px;
+}
+
+.cw-live-bar.cw-right {
+  background: var(--soft-good);
+}
+
+.cw-live-label {
+  width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cw-live-track {
+  flex: 1;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  overflow: hidden;
+}
+
+.cw-live-track span {
+  display: block;
+  height: 100%;
+  background: var(--c1);
+  transition: width 0.4s;
+}
+
+.cw-live-bar.cw-right .cw-live-track span {
+  background: var(--good);
+}
+
+.cw-live-count {
+  width: 180px;
+  font-family: var(--num);
+  font-weight: 700;
+}
+
+.cw-live-count small,
+.cw-live-chip small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+.cw-live-wall {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  max-height: 520px;
+  overflow: hidden;
+  align-content: flex-start;
+}
+
+.cw-live-chip,
+.cw-live-card {
+  padding: 12px 26px;
+  border-radius: 18px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  font-size: 40px;
+}
+
+.cw-live-chip {
+  font-family: var(--num);
+  font-weight: 700;
+}
+
+.cw-live-chip.cw-right {
+  border-color: var(--good);
+  background: var(--soft-good);
+}
+
+.cw-live-card {
+  cursor: pointer;
+}
+
+/* Word cloud, rating and questions fill the rest of their slide. */
+cw-wordcloud.cw-live,
+cw-questions.cw-live {
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+cw-wordcloud .cw-live-qr,
+cw-questions .cw-live-qr {
+  align-self: center;
+}
+
+.cw-cloud {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+}
+
+.cw-cloud span {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.cw-rating-score {
+  text-align: center;
+}
+
+.cw-rating-score p {
+  margin: 0;
+}
+
+.cw-rating-star,
+.cw-rating-label {
+  color: #f2b01e;
+}
+
+.cw-rating-label {
+  width: 30%;
+  letter-spacing: 4px;
+}
+
+.cw-q-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 18px;
+}
+
+.cw-q-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 24px;
+  border-radius: 20px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  font-size: 34px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.cw-q-card.cw-done {
+  opacity: 0.55;
+}
+
+.cw-q-card.cw-on {
+  padding: 32px 44px;
+  border-color: var(--primary);
+  background: var(--soft-primary);
+  font-size: 56px;
+}
+
+.cw-q-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cw-q-votes {
+  white-space: nowrap;
+  font-family: var(--num);
+  color: var(--muted);
+}
+
+.cw-q-hide {
+  border: 0;
+  background: none;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Reactions float up the right side of the stage over any slide. */
+#cw-reactions {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#cw-reactions span {
+  position: absolute;
+  bottom: -100px;
+  font-size: 80px;
+  animation: cw-float 3s ease-out forwards;
+}
+
+@keyframes cw-float {
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--cw-drift), -760px) scale(1.3);
+  }
+}

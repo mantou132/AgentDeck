@@ -5,7 +5,7 @@
 ## 结构
 
 - `src/pages/index.ts`：落地页，含导航、各区块与页脚；`title` / `meta` 按语言输出。
-- `src/pages/live/`：扫码互动的观众页 `/live`（不进导航、noindex）。只负责按链接 `#<room>.<key>` 加入房间，显示主讲人发来的 HTML（`_frame.ts`：sandbox iframe + `live` 桥），显示编号与弹出提示；内容、二维码与编号分配都在主讲人端，目前是 courseware skill 模板的 `assets/live.js`（协议与原理见该模板的 `README.md`）。`_protocol.ts` 的消息类型要与它同步。Relay 用同域的 `/ws`。Gemkit 跳过 `_` 开头的文件和目录，页面专用模块以 `_` 开头放在页面目录里。
+- `src/pages/live/`：扫码互动的观众页 `/live`（不进导航、noindex）。只负责按链接 `#<room>.<key>` 加入房间，显示主讲人发来的 HTML（`_frame.ts`：sandbox iframe + `live` 桥），显示编号与弹出提示；内容、二维码与编号分配都在主讲人端，即课件与演讲 skill 模板共用的 `packages/agentdeck/skills/_shared/deck/live.js`（协议与原理见同目录 `README.md`）。`_protocol.ts` 的消息类型要与它同步。Relay 用同域的 `/ws`。Gemkit 跳过 `_` 开头的文件和目录，页面专用模块以 `_` 开头放在页面目录里。
 - `src/elements/`：`app-*` 元素自动导入；`stores`（商店徽章）、`cmd`（可复制的命令）、`video`（点击后才加载 YouTube 播放器）。
 - `src/locales/`：`en.json` 为默认语言（`/`），`zh.json` 为 `/zh/`；导航中的语言链接用 `localizePath` 切换。富文本用 Gem i18n 的 `$1<文字>` 占位，在模板中传入渲染函数。
 - `src/index.html`：HTML 模板与全站 `<meta>`；`src/global.css`：CSS 变量与 body 样式；`public/`：原样拷贝的静态资源。

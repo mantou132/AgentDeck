@@ -1,0 +1,288 @@
+/* Talk theme and layouts over deck.css: few words, big type, high contrast for projectors. Colors in :root. */
+:root {
+  --bg: #fbfaf7;
+  --paper: #ffffff;
+  --ink: #16181d;
+  --muted: #6a6f7a;
+  --line: #e2e0da;
+  --primary: #3346d3;
+  --accent: #ff6a3d;
+  --good: #1f9d6a;
+  --bad: #d63c3c;
+  --soft-primary: #e8ebfb;
+  --soft-accent: #ffece5;
+  --soft-good: #e2f4ec;
+  --dark: #14161c;
+  --c1: #3346d3;
+  --c2: #ff6a3d;
+  --c3: #1f9d6a;
+  --c4: #c23a8a;
+  --c5: #e0a21b;
+  --c6: #2a9bc4;
+}
+
+.slide {
+  padding: 96px 128px 104px;
+  font-size: 44px;
+}
+
+.slide > h2 {
+  margin-bottom: 48px;
+  font-size: 68px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+/* Side-by-side blocks keep their own height, centred in the space left. */
+.slide .cols {
+  flex: none;
+  margin: auto 0;
+}
+
+/* A small label above a heading: <p class="kicker">第一部分</p> */
+.kicker {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
+.slide .kicker {
+  margin: 0 0 16px;
+}
+
+.slide.dark,
+.slide.title,
+.slide.section {
+  background: var(--dark);
+  color: #fff;
+}
+
+.slide.dark .muted,
+.slide.title .muted,
+.slide.section .muted {
+  color: rgb(255 255 255 / 0.6);
+}
+
+.slide.dark .card {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.18);
+}
+
+/* Cover and closing slide */
+.slide.title {
+  align-items: flex-start;
+  text-align: left;
+  padding-left: 160px;
+}
+
+.slide.title::before {
+  content: "";
+  width: 120px;
+  height: 12px;
+  margin-bottom: 48px;
+  border-radius: 6px;
+  background: var(--accent);
+}
+
+.slide.title h1 {
+  margin: 0 0 36px;
+  max-width: 1500px;
+  font-size: 120px;
+  line-height: 1.12;
+  letter-spacing: -1px;
+}
+
+.slide.title .subtitle {
+  max-width: 1400px;
+  font-size: 48px;
+  color: rgb(255 255 255 / 0.75);
+}
+
+.slide.title .byline {
+  margin-top: 72px;
+  font-size: 34px;
+  color: rgb(255 255 255 / 0.6);
+}
+
+/* Section divider: <section class="slide section"><span class="num">01</span><h2>…</h2></section> */
+.slide.section {
+  justify-content: center;
+  padding-left: 160px;
+}
+
+.slide.section .num {
+  font-family: var(--num);
+  font-size: 200px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.slide.section > h2 {
+  margin: 24px 0 0;
+  font-size: 96px;
+}
+
+/* One sentence the audience should remember: <section class="slide statement"><p>… <em>…</em></p></section> */
+.slide.statement {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.slide.statement p {
+  margin: 0;
+  max-width: 1500px;
+  font-size: 96px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.slide.statement em,
+.slide.title em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+/* Quote: <blockquote>…<cite>— 谁，出处</cite></blockquote> */
+.slide blockquote {
+  position: relative;
+  margin: auto 0;
+  padding-left: 180px;
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.slide blockquote::before {
+  content: "“";
+  position: absolute;
+  left: 0;
+  top: -40px;
+  font-size: 260px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.slide blockquote cite {
+  display: block;
+  margin-top: 40px;
+  font-size: 38px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Big numbers: <div class="stats"><div class="stat"><b>3 倍</b><span>说明</span></div>…</div> */
+.stats {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 60px;
+  text-align: center;
+}
+
+.stat b {
+  display: block;
+  font-family: var(--num);
+  font-size: 150px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--primary);
+}
+
+.stat:nth-child(2) b {
+  color: var(--accent);
+}
+
+.stat:nth-child(3) b {
+  color: var(--good);
+}
+
+.stat span {
+  display: block;
+  margin-top: 16px;
+  font-size: 36px;
+  color: var(--muted);
+}
+
+/* Agenda: <ol class="agenda"><li>…</li></ol> */
+.slide .agenda {
+  list-style: none;
+  padding: 0;
+  margin: auto 0;
+  counter-reset: agenda;
+}
+
+.agenda > li {
+  display: flex;
+  align-items: baseline;
+  gap: 40px;
+  margin: 0;
+  padding: 26px 0;
+  border-bottom: 2px solid var(--line);
+  font-size: 54px;
+  font-weight: 700;
+  counter-increment: agenda;
+}
+
+.agenda > li::before {
+  content: counter(agenda, decimal-leading-zero);
+  font-family: var(--num);
+  font-size: 40px;
+  color: var(--accent);
+}
+
+/* Full-bleed picture: <section class="slide image"><img class="cover" src="…"><p class="caption">…</p></section> */
+.slide.image {
+  padding: 0;
+  justify-content: flex-end;
+}
+
+.slide.image img.cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+.slide.image .caption {
+  position: relative;
+  margin: 0;
+  padding: 200px 128px 88px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.7));
+  color: #fff;
+  font-size: 56px;
+  font-weight: 700;
+}
+
+/* Scan-to-answer on a talk deck */
+.slide.dark .cw-live-track,
+.slide.title .cw-live-track {
+  background: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.2);
+}
+
+.slide.dark .cw-q-card,
+.slide.dark .cw-btn {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.2);
+  color: #fff;
+}
+
+.slide.dark .cw-q-card.cw-on {
+  border-color: var(--accent);
+  background: rgb(255 106 61 / 0.16);
+}
+
+@media print {
+  .slide.dark,
+  .slide.title,
+  .slide.section {
+    background: var(--dark);
+  }
+}

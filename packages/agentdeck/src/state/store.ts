@@ -1,13 +1,13 @@
 import type { PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
 import {
-  DEFAULT_OFF_SKILLS,
   defaultAgents,
   readPairingHistory,
   readSavedCommands,
   readSettings,
   readSkillToggles,
   SKILL_REQUIRES,
+  WORKFLOW_SKILLS,
 } from '../config';
 import type { Elicitation } from '../session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
@@ -91,7 +91,7 @@ export const isSkillRestricted = (skill: string): boolean =>
 /** Turned on (in settings, else by default), and so is the skill it requires. */
 export const isSkillEnabled = (skill: string): boolean => {
   const required = SKILL_REQUIRES[skill];
-  const enabled = agentdeckStore.skillToggles[skill] ?? !DEFAULT_OFF_SKILLS.includes(skill);
+  const enabled = agentdeckStore.skillToggles[skill] ?? !WORKFLOW_SKILLS.includes(skill);
   return enabled && (!required || isSkillEnabled(required));
 };
 

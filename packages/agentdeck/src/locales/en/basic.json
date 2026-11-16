@@ -197,6 +197,8 @@
   "skill.travelDesc": "Plan routes, sights, lodging, meals, fuel stops and packing within your budget",
   "skill.courseware": "Math Courseware",
   "skill.coursewareDesc": "Plan math lessons and build interactive classroom slides and lesson plans",
+  "skill.presentation": "Talks",
+  "skill.presentationDesc": "Write a timed speech and build slides the audience can interact with",
   "relayGuide.step1Title": "Install agentdeckd",
   "relayGuide.step1Desc": "Install $1<agentdeckd> on your computer via npm, Homebrew, or Scoop.",
   "relayGuide.step2Title": "Start & Pair",

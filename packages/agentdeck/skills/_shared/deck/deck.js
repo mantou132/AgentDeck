@@ -1,6 +1,7 @@
 /*
- * Courseware engine: stage scaling, navigation (keys, clickers, swipe, toolbar), steps, multiple choice,
- * dragging, pen, timer, random picker. Plain script (no modules) so it runs from file:// in older browsers.
+ * Deck engine shared by the courseware and presentation templates: stage scaling, navigation (keys, clickers,
+ * swipe, toolbar), steps, multiple choice, dragging, pen, timer, random picker. Plain script (no modules) so it
+ * runs from file:// in older browsers. `data-picker="抽奖"` on #cw-stage renames the toolbar's 点名 button.
  */
 (() => {
   const W = 1920;
@@ -467,7 +468,7 @@
     let rolling = false;
     /** Set by live.js: draws among the audience's numbers while anyone has scanned in. */
     let source = null;
-    const listInput = el('textarea', { placeholder: '粘贴名单，每行一个；留空则按学号抽' });
+    const listInput = el('textarea', { placeholder: '粘贴名单，每行一个；留空则按编号抽' });
     const countInput = el('input', { type: 'number', min: '2', max: '99', value: '40' });
     const settings = el('div', { style: 'display:none;flex-direction:column;align-items:center;gap:20px' }, [
       listInput,
@@ -626,8 +627,8 @@
     ),
     timerBtn,
     el('button', {
-      text: '点名',
-      title: '随机点名 (R)',
+      text: stage.getAttribute('data-picker') || '点名',
+      title: '随机抽取 (R)',
       onclick: () => {
         picker.open();
       },

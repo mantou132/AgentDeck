@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>让会议少一半</title>
+    <link rel="stylesheet" href="assets/deck.css">
+    <link rel="stylesheet" href="assets/presentation.css">
+  </head>
+  <body>
+    <main id="cw-stage" data-picker="抽奖">
+      <section class="slide title">
+        <h1>让会议<em>少一半</em></h1>
+        <div class="subtitle">一个团队把例会砍掉 50% 之后发生了什么</div>
+        <div class="byline">张三 · 2026 年度分享会</div>
+        <cw-reactions emoji="👏,❤️,😂,😮,🤔"></cw-reactions>
+      </section>
+
+      <section class="slide">
+        <h2>扫码一起参与</h2>
+        <div class="fill"><cw-live-join></cw-live-join></div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">先问大家</p>
+        <h2>你上周花在会议上的时间大约是？</h2>
+        <div class="fill"><cw-poll options="不到 2 小时,2 到 5 小时,5 到 10 小时,超过 10 小时" qr></cw-poll></div>
+      </section>
+
+      <section class="slide">
+        <h2>今天讲三件事</h2>
+        <ol class="agenda">
+          <li>我们为什么开了这么多会</li>
+          <li>砍掉一半的三条规则</li>
+          <li>半年后的数据</li>
+        </ol>
+      </section>
+
+      <section class="slide section">
+        <span class="num">01</span>
+        <h2>我们为什么开了这么多会</h2>
+      </section>
+
+      <section class="slide">
+        <h2>一句话形容你们团队的会议</h2>
+        <cw-wordcloud max="2" placeholder="一两个词，比如：拖堂" qr></cw-wordcloud>
+      </section>
+
+      <section class="slide statement">
+        <p>大多数会议，<br>其实是一封<em>没写好的邮件</em>。</p>
+      </section>
+
+      <section class="slide section">
+        <span class="num">02</span>
+        <h2>砍掉一半的三条规则</h2>
+      </section>
+
+      <section class="slide">
+        <h2>三条规则</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="accent-text">没有议程，不开</h3>
+            <p class="small muted">提前一天发出，写清要做的决定。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">默认 25 分钟</h3>
+            <p class="small muted">日历默认时长改短，留出走路和喝水的时间。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">同步改成文档</h3>
+            <p class="small muted">只读进度的会，换成一页周报。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide quote">
+        <blockquote>
+          会议的价值不在于开了多久，而在于散会后谁去做什么。
+          <cite>— 示例引语，替换成真实出处</cite>
+        </blockquote>
+      </section>
+
+      <section class="slide section">
+        <span class="num">03</span>
+        <h2>半年后的数据</h2>
+      </section>
+
+      <section class="slide">
+        <h2>半年后</h2>
+        <div class="stats">
+          <div class="stat" data-step><b>−48%</b><span>每周会议时长</span></div>
+          <div class="stat" data-step><b>+2.5 h</b><span>每人每周专注时间</span></div>
+          <div class="stat" data-step><b>0</b><span>因此延期的项目</span></div>
+        </div>
+        <p class="small muted">示例数据，替换成真实数据并注明来源。</p>
+      </section>
+
+      <section class="slide">
+        <h2>你最想先试哪一条？</h2>
+        <div class="fill"><cw-poll options="没有议程不开,默认 25 分钟,同步改成文档"></cw-poll></div>
+      </section>
+
+      <section class="slide dark">
+        <h2>你问我答</h2>
+        <cw-questions qr></cw-questions>
+      </section>
+
+      <section class="slide">
+        <h2>给今天的分享打个分</h2>
+        <div class="fill"><cw-rating max="5" qr></cw-rating></div>
+      </section>
+
+      <section class="slide title">
+        <h1>谢谢</h1>
+        <div class="subtitle">从下周的第一个会开始，先写议程。</div>
+        <div class="byline">张三 · zhangsan@example.com</div>
+      </section>
+    </main>
+
+    <script src="assets/deck.js"></script>
+    <script src="assets/live.js"></script>
+  </body>
+</html>

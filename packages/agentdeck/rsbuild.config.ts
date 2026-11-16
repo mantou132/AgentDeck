@@ -6,19 +6,21 @@ import unpluginGem from 'unplugin-gem/rspack';
 
 /**
  * `skills/<group>/<skill>/` files keyed by `<skill>/<path>`, with a content hash the host stores each version under,
- * and each skill's group, which hosts offer by name (`agentdeckd --features`).
+ * and each skill's group, which hosts offer by name (`agentdeckd --features`). `skills/_shared/` is not a group: it
+ * holds files several skills use through symlinks, which are read as the files they point to.
  */
 const readSkills = () => {
   const root = path.resolve(import.meta.dirname, 'skills');
   const groups: Record<string, string> = {};
   const files = Object.fromEntries(
     readdirSync(root, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name !== '.DS_Store')
-      .map((entry) => {
+      .filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && entry.name !== '.DS_Store')
+      .flatMap((entry) => {
         const file = path.join(entry.parentPath, entry.name);
         const [group, skill, ...rest] = path.relative(root, file).split(path.sep);
+        if (group === '_shared') return [];
         groups[skill] = group;
-        return [[skill, ...rest].join('/'), readFileSync(file, 'utf8')];
+        return [[[skill, ...rest].join('/'), readFileSync(file, 'utf8')]];
       })
       .sort(([a], [b]) => (a < b ? -1 : 1)),
   );

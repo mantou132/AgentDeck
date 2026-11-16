@@ -197,6 +197,8 @@
   "skill.travelDesc": "按时间和预算安排路线、景点、住宿、吃饭、加油与衣物",
   "skill.courseware": "数学课件",
   "skill.coursewareDesc": "按年级与课题设计教学流程，制作可在课堂投屏互动的课件与教案",
+  "skill.presentation": "演讲稿",
+  "skill.presentationDesc": "按场合与时长写演讲稿，制作可扫码互动的演讲幻灯片",
   "relayGuide.step1Title": "安装 agentdeckd",
   "relayGuide.step1Desc": "在电脑上通过 npm、Homebrew 或 Scoop 安装 $1<agentdeckd>。",
   "relayGuide.step2Title": "启动并配对",

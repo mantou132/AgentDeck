@@ -1,6 +1,7 @@
 /**
  * AgentDeck Live, audience side: relay frames, AES-GCM sealing and the messages inside them. The presenter side is
- * `assets/live.js` in the courseware skill template (packages/agentdeck/skills/basic/courseware); keep both in step.
+ * `live.js` shared by the courseware and presentation skill templates (packages/agentdeck/skills/_shared/deck); keep
+ * both in step.
  */
 
 export type Sealed = { iv: string; c: string };

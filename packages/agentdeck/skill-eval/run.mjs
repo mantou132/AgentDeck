@@ -18,11 +18,13 @@ const nudge = '继续，按你的判断做完并交付，不用再问我。';
 const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
 const runDir = path.join(homedir(), 'SkillEval', stamp);
 
-/** `<skill>` → `skills/<group>/<skill>` */
+/** `<skill>` → `skills/<group>/<skill>`; `_shared` holds files skills link to, not a group. */
 const skillSources = Object.fromEntries(
-  readdirSync(skillsDir).flatMap((group) =>
-    readdirSync(path.join(skillsDir, group)).map((skill) => [skill, path.join(skillsDir, group, skill)]),
-  ),
+  readdirSync(skillsDir)
+    .filter((group) => group !== '_shared')
+    .flatMap((group) =>
+      readdirSync(path.join(skillsDir, group)).map((skill) => [skill, path.join(skillsDir, group, skill)]),
+    ),
 );
 
 const git = (...args) => execFileSync('git', args, { cwd: pkgDir, encoding: 'utf8' }).trim();
@@ -54,7 +56,7 @@ const renderSkills = () => {
   const root = path.join(runDir, 'skills');
   return Object.entries(skillSources).map(([skill, source]) => {
     const target = path.join(root, skill, '.agents/skills', skill);
-    cpSync(source, target, { recursive: true });
+    cpSync(source, target, { recursive: true, dereference: true });
     const learned = path.join(appData, 'skills/learned', skill, 'learned.md');
     const fill = (dir) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

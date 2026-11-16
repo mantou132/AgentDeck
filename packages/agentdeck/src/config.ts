@@ -43,9 +43,10 @@ export const MIN_DAEMON_VERSION = '0.8.0';
 /**
  * Skills in `skills/` this client can use, in settings order; the enabled ones are declared to the host, which mounts
  * them into agent sessions. Workflow skills guide a kind of task; display skills teach a block the client renders
- * (e.g. `agentdeck-chart`). Settings lists them as two groups, workflows first.
+ * (e.g. `agentdeck-chart`). Settings lists them as two groups, workflows first; workflows stay off until turned on,
+ * as most users never need them.
  */
-export const WORKFLOW_SKILLS = ['job', 'travel', 'courseware'];
+export const WORKFLOW_SKILLS = ['job', 'travel', 'courseware', 'presentation'];
 
 export const DISPLAY_SKILLS = [
   'widget',
@@ -61,9 +62,6 @@ export const SUPPORTED_SKILLS = [...WORKFLOW_SKILLS, ...DISPLAY_SKILLS];
 
 /** Skills that only work with another one, e.g. built apps open through `agentdeck-preview`; off with it. */
 export const SKILL_REQUIRES: Record<string, string> = { app: 'preview' };
-
-/** Off until turned on in settings, e.g. workflows most users never need. */
-export const DEFAULT_OFF_SKILLS = ['job', 'travel', 'courseware'];
 
 export type AgentInfo = { id: string; name: string };
 
@@ -137,7 +135,7 @@ export const readPairingHistory = (): PairingRecord[] => {
   }
 };
 
-/** Skills the user switched in settings; the others follow `DEFAULT_OFF_SKILLS`. */
+/** Skills the user switched in settings; for the others workflows are off and display skills on. */
 export const readSkillToggles = (): Record<string, boolean> => {
   try {
     const value = JSON.parse(localStorage.getItem(SKILL_TOGGLES_KEY) || '{}');
