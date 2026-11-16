@@ -1,4 +1,4 @@
-Your coding agents, in your pocket.
+Your agents, in your pocket.
 
 AgentDeck lets you run Claude Code, Codex, Cursor or any ACP (Agent Client Protocol) agent on your own computer, then start, steer and approve it from your phone. A free agent is built in, so you can try it without logging in to anything.
 

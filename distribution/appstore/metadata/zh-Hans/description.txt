@@ -1,4 +1,4 @@
-把你的编程 Agent 装进口袋。
+你的 Agent，装进口袋。
 
 AgentDeck 让你在自己的电脑上运行 Claude Code、Codex、Cursor 或任意 ACP（Agent Client Protocol）Agent，并在手机上启动、引导和审批它们。内置免费 Agent，无需登录任何账号即可体验。
 

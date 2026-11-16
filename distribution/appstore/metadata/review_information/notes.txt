@@ -1,5 +1,5 @@
 PURPOSE AND AUDIENCE
-AgentDeck is a remote client for AI coding agents (Claude Code, Codex, Cursor, OpenCode and other ACP agents) that run on the user's own computer, connected through our open-source agentdeckd daemon. It is for software developers who want to start, monitor and approve agent tasks from their phone while away from the keyboard. Agents and code stay on the user's computer; the app only displays and controls them.
+AgentDeck is a remote client for AI agents (Claude Code, Codex, Cursor, OpenCode and other ACP agents) that run on the user's own computer, connected through our open-source agentdeckd daemon. It is for people who want to start, monitor and approve agent tasks from their phone while away from the keyboard. Agents and code stay on the user's computer; the app only displays and controls them.
 
 HOW TO TEST
 No account or login is required. We keep a demo computer online for review:

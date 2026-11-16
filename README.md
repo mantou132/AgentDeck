@@ -1,6 +1,6 @@
 # AgentDeck
 
-**Your coding agents, in your pocket.** Run Claude Code, Codex, Cursor or any ACP agent on your own computer, and start, steer and approve it from your phone. End-to-end encrypted, with a free agent built in so you can try it without logging in to anything.
+**Your agents, in your pocket.** Run Claude Code, Codex, Cursor or any ACP agent on your own computer, and start, steer and approve it from your phone. End-to-end encrypted, with a free agent built in so you can try it without logging in to anything.
 
 [![AgentDeck Demo](https://img.youtube.com/vi/XVVrMgwf2YA/maxresdefault.jpg)](https://www.youtube.com/watch?v=XVVrMgwf2YA)
 
