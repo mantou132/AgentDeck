@@ -47,7 +47,8 @@ const UNATTENDED_SYSTEM_PROMPT: &str = "This turn is a scheduled task running un
      nobody is watching the session. Don't ask the user questions, and don't wait for \
      confirmation. Permission requests are sent to the user's phone and rejected if not \
      answered in time; if an action is rejected, carry on with the rest. If you can't \
-     finish, say why. End with one short line stating the result.";
+     finish, say why. End your final reply with an `agentdeck-speech` comment as described \
+     above, holding one plain sentence that states the result: it becomes the run's summary.";
 
 /// When a task runs, in the host's local time.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -731,16 +732,37 @@ fn new_id() -> String {
     format!("t{}", Utc::now().timestamp_millis())
 }
 
-/// The last non-empty line of the agent's answer, shortened.
+/// The agent's last `agentdeck-speech` comment, else the last non-empty line
+/// outside HTML comments (agents that don't read the system prompt), shortened.
 fn summary_of(answer: &str) -> String {
-    let line = answer
-        .lines()
-        .map(str::trim)
-        .rfind(|line| !line.is_empty())
-        .unwrap_or_default();
+    let mut outside = String::new();
+    let mut speech = None;
+    let mut rest = answer;
+    while let Some(start) = rest.find("<!--") {
+        outside.push_str(&rest[..start]);
+        let comment = &rest[start + "<!--".len()..];
+        let Some(end) = comment.find("-->") else {
+            rest = "";
+            break;
+        };
+        if let Some(text) = comment[..end].trim_start().strip_prefix("agentdeck-speech") {
+            speech = Some(text);
+        }
+        rest = &comment[end + "-->".len()..];
+    }
+    outside.push_str(rest);
+    let line = match speech.map(|text| text.split_whitespace().collect::<Vec<_>>().join(" ")) {
+        Some(text) if !text.is_empty() => text,
+        _ => outside
+            .lines()
+            .map(str::trim)
+            .rfind(|line| !line.is_empty())
+            .unwrap_or_default()
+            .to_string(),
+    };
     match line.char_indices().nth(SUMMARY_CHARS) {
         Some((end, _)) => format!("{}…", &line[..end]),
-        None => line.to_string(),
+        None => line,
     }
 }
 
@@ -833,9 +855,19 @@ mod tests {
     }
 
     #[test]
-    fn summary_is_the_last_line() {
+    fn summary_is_the_speech_comment_else_the_last_line() {
         assert_eq!(
             summary_of("Checked 3 inboxes.\n\nDone: 2 drafts.\n"),
+            "Done: 2 drafts."
+        );
+        assert_eq!(
+            summary_of(
+                "Sorted the inbox.\n\n<!-- agentdeck-speech\nSorted 12 mails.\nTwo need a reply.\n-->\n"
+            ),
+            "Sorted 12 mails. Two need a reply."
+        );
+        assert_eq!(
+            summary_of("Done: 2 drafts.\n<!-- note -->\n<!-- agentdeck-speech\n-->\n<!-- cut"),
             "Done: 2 drafts."
         );
         assert_eq!(
