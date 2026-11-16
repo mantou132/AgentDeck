@@ -47,7 +47,9 @@ const UNATTENDED_SYSTEM_PROMPT: &str = "This turn is a scheduled task running un
      nobody is watching the session. Don't ask the user questions, and don't wait for \
      confirmation. Permission requests are sent to the user's phone and rejected if not \
      answered in time; if an action is rejected, carry on with the rest. If you can't \
-     finish, say why. End with one short line stating the result.";
+     finish, say why. End your final reply with an HTML comment holding one plain \
+     sentence on the result in the user's language, shown in the task's run list: \
+     `<!-- agentdeck-speech` on its own line, the sentence, then `-->`.";
 
 /// When a task runs, in the host's local time.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -733,10 +735,17 @@ fn new_id() -> String {
     format!("t{}", Utc::now().timestamp_millis())
 }
 
-/// The last non-empty line of the agent's answer, shortened. HTML comments
-/// are left out: the client hides them, e.g. the spoken summary
-/// `<!-- agentdeck-speech … -->` the remote app asks for.
+/// The summary the run was asked for (`<!-- agentdeck-speech … -->`), or else
+/// the answer's last non-empty line outside comments; shortened.
 fn summary_of(answer: &str) -> String {
+    const SPEECH: &str = "<!-- agentdeck-speech";
+    let speech = answer.rfind(SPEECH).map(|start| {
+        let body = &answer[start + SPEECH.len()..];
+        body[..body.find("-->").unwrap_or(body.len())]
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    });
     let mut text = String::new();
     let mut rest = answer;
     while let Some(start) = rest.find("<!--") {
@@ -746,11 +755,15 @@ fn summary_of(answer: &str) -> String {
             .map_or("", |end| &rest[start + end + 3..]);
     }
     text.push_str(rest);
-    let line = text
-        .lines()
-        .map(str::trim)
-        .rfind(|line| !line.is_empty())
-        .unwrap_or_default();
+    let line = match speech.filter(|speech| !speech.is_empty()) {
+        Some(speech) => speech,
+        None => text
+            .lines()
+            .map(str::trim)
+            .rfind(|line| !line.is_empty())
+            .unwrap_or_default()
+            .to_string(),
+    };
     match line.char_indices().nth(SUMMARY_CHARS) {
         Some((end, _)) => format!("{}…", &line[..end]),
         None => line.to_string(),
@@ -856,7 +869,13 @@ mod tests {
             SUMMARY_CHARS + 1
         );
         assert_eq!(
-            summary_of("今天需要跟进 3 条\n\n<!-- agentdeck-speech\n有 3 条要跟进。\n-->\n"),
+            summary_of(
+                "今天需要跟进 3 条\n\n<!-- agentdeck-speech\n有 3 条要跟进，\n最急的是复星。\n-->\n"
+            ),
+            "有 3 条要跟进， 最急的是复星。"
+        );
+        assert_eq!(
+            summary_of("今天需要跟进 3 条\n<!-- a note -->\n"),
             "今天需要跟进 3 条"
         );
     }

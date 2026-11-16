@@ -21,7 +21,7 @@ The AgentDeck client renders a fenced code block with the `agentdeck-task` langu
 
 - The body is one strict JSON object.
 - `name`: a few words naming the task, shown in the task list.
-- `prompt`: the full brief for each run. A run sees none of this conversation: name the files, accounts, pages or tools to use, what you already found works, what not to touch, and what done looks like. Ask for a last line stating the result; it becomes the run's summary on the phone.
+- `prompt`: the full brief for each run. A run sees none of this conversation: name the files, accounts, pages or tools to use, what you already found works, what not to touch, and what done looks like. Each run is asked for a one-sentence result, shown as its summary on the phone.
 - `schedule`, in this computer's local time, one of:
   - `{ "type": "daily", "times": ["HH:MM", …], "weekdays": [1, …] }`: at each time (24-hour, two-digit `HH:MM`) on the listed weekdays, 1 = Monday … 7 = Sunday; leave `weekdays` out for every day.
   - `{ "type": "interval", "minutes": N }`: every N minutes (at least 5), counted from when the task is saved.

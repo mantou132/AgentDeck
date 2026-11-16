@@ -153,6 +153,16 @@ const weekdayName = (day: number) =>
   // 2024-01-01 is a Monday.
   new Intl.DateTimeFormat(i18n.currentLanguage, { weekday: 'short' }).format(new Date(2024, 0, day));
 
+const pad = (value: number) => String(value).padStart(2, '0');
+
+const formatDays = (days: number[]) =>
+  !days.length || days.length === 7
+    ? i18n.get('task.everyDay')
+    : days.join() === '1,2,3,4,5'
+      ? i18n.get('task.workdays')
+      : days.map(weekdayName).join(' ');
+
+/** In the phone's time: schedules are in the host's local time, which may be another zone. */
 export const formatSchedule = (schedule: TaskSchedule) => {
   if (schedule.type === 'interval') {
     const { minutes } = schedule;
@@ -160,17 +170,24 @@ export const formatSchedule = (schedule: TaskSchedule) => {
       minutes % 60 ? i18n.get('task.everyMinutes', String(minutes)) : i18n.get('task.everyHours', String(minutes / 60)),
     );
   }
-  const days = [...new Set(schedule.weekdays ?? [])].sort();
-  const daysText =
-    !days.length || days.length === 7
-      ? i18n.get('task.everyDay')
-      : days.join() === '1,2,3,4,5'
-        ? i18n.get('task.workdays')
-        : days.map(weekdayName).join(' ');
-  // Times are the computer's; say so when the phone is in another time zone.
   const { hostUtcOffset } = tasksStore;
-  const elsewhere = hostUtcOffset !== undefined && hostUtcOffset !== -new Date().getTimezoneOffset();
-  return `${daysText} ${schedule.times.join(' ')}${elsewhere ? ` ${i18n.get('task.hostTime')}` : ''}`;
+  const shift = hostUtcOffset === undefined ? 0 : -new Date().getTimezoneOffset() - hostUtcOffset;
+  // A time moved past midnight falls on the next (or previous) weekday.
+  const byDayShift = Map.groupBy(
+    schedule.times.map((time) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      const total = hours * 60 + minutes + shift;
+      const minute = ((total % 1440) + 1440) % 1440;
+      return { dayShift: Math.floor(total / 1440), time: `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}` };
+    }),
+    ({ dayShift }) => dayShift,
+  );
+  return [...byDayShift]
+    .map(([dayShift, entries]) => {
+      const days = [...new Set(schedule.weekdays ?? [])].map((day) => ((day - 1 + dayShift + 7) % 7) + 1).sort();
+      return `${formatDays(days)} ${entries.map(({ time }) => time).join(' ')}`;
+    })
+    .join(', ');
 };
 
 export const formatTaskTime = (time: string) =>
