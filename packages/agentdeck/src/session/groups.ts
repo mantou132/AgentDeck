@@ -16,8 +16,9 @@ export const getSortedSessionGroups = (
   sessions: DeckSession[],
   prevGroups: readonly SessionGroup[] = [],
 ): SessionGroup[] => {
+  // Runs of scheduled tasks are reached from their task.
   const groupsMap = Map.groupBy(
-    sessions,
+    sessions.filter((session) => !session.task),
     (session) => session.worktree?.mainCwd ?? scratchWorkspacesRoot(session.cwd) ?? session.cwd,
   );
   const groups: SessionGroup[] = [];

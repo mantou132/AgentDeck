@@ -43,6 +43,7 @@ import {
   sessionsStore,
   updateRuntime,
 } from '../state/store';
+import { saveTaskFromSession, type TaskDraft } from '../state/tasks';
 import { resolvePermission } from '../state/user-input';
 import { icons } from '../styles/icons';
 
@@ -254,6 +255,23 @@ export class AgentDeckSessionPageElement extends GemElement {
     openSession(createPendingSession({ agent: session.agent, cwd: target }).sessionId, { prompt });
   };
 
+  // An `agentdeck-task` card saves this session's task, with its agent, directory and config options.
+  #saveTask = async ({ detail }: CustomEvent<TaskDraft>) => {
+    const session = getSession(this.sessionId);
+    if (!session || session.pendingCreation) return;
+    const { connection } = agentdeckStore;
+    if (connection !== 'connected') {
+      Toast.open('warning', getConnectionLabel(connection));
+      return;
+    }
+    try {
+      const result = await saveTaskFromSession(session, detail);
+      Toast.open('success', i18n.get(result === 'created' ? 'task.created' : 'task.updated'));
+    } catch (error) {
+      Toast.open('error', error instanceof Error ? error.message : i18n.get('task.actionFailed'));
+    }
+  };
+
   #previewAttachment = (event: CustomEvent<Attachment>) =>
     openAttachment(event.detail, getSession(this.sessionId)?.cwd ?? '');
 
@@ -390,6 +408,7 @@ export class AgentDeckSessionPageElement extends GemElement {
                 @fork=${this.#onFork}
                 @widget-send=${this.#sendFromWidget}
                 @new-session=${this.#startNewSession}
+                @save-task=${this.#saveTask}
               ></deck-session-timeline>
               <section
                 v-if=${!loading && loaded && !messages.length}

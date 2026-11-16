@@ -17,6 +17,7 @@ import {
   sessionsStore,
   updateRuntime,
 } from '../state/store';
+import { tasksStore } from '../state/tasks';
 import { icons } from '../styles/icons';
 
 const style = css`
@@ -38,6 +39,7 @@ const style = css`
 @connectStore(agentdeckStore)
 @connectStore(sessionsStore)
 @connectStore(shareStore)
+@connectStore(tasksStore)
 export class AgentDeckSessionListPageElement extends GemElement {
   /** Highlighted in the split view */
   @property activeSessionId?: string;
@@ -206,6 +208,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
           </div>
 
           <div v-if=${hasGroups} class="flex flex-col gap-5 pt-2">
+            <deck-task-group v-if=${!!tasksStore.tasks.length}></deck-task-group>
             ${repeat(
               sessionGroups,
               (group) => group.cwd,

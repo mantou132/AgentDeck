@@ -10,7 +10,7 @@ import {
   takeOpenedNotification,
 } from '@mantou/tauri-plugin-fcm';
 import { isTauri } from '@tauri-apps/api/core';
-import { getOpenSessionId, selectSession } from '../navigation';
+import { getOpenSessionId, openTask, selectSession } from '../navigation';
 import { saveSettings } from '../state/app';
 import { getSession, refreshSessions } from '../state/sessions';
 import { agentdeckStore, sessionsStore } from '../state/store';
@@ -18,7 +18,7 @@ import { pushHostKey } from './encryption';
 import { updateFcmToken } from './transport';
 
 /** `data` of the push sent by the daemon's `push::send`. */
-type PushData = { type?: string; host?: string; agent?: string; sessionId?: string };
+type PushData = { type?: string; host?: string; agent?: string; sessionId?: string; taskId?: string };
 
 /** Pushes that open their session: a finished response, or a permission request or question waiting in it. */
 const sessionPushTypes = new Set(['response_complete', 'input_request']);
@@ -27,9 +27,14 @@ const sessionPushTypes = new Set(['response_complete', 'input_request']);
  * Opens the session of a tapped push. Taps on another host's pushes only bring the App forward; for another agent of
  * this host the App switches to it first. The session page waits for the list to have the session before loading it.
  */
-const openPushedSession = ({ type, host, agent, sessionId }: PushData) => {
+const openPushedSession = ({ type, host, agent, sessionId, taskId }: PushData) => {
   const { settings } = agentdeckStore;
   if (!type || !sessionPushTypes.has(type) || !agent || !sessionId || host !== pushHostKey(settings.relayId)) return;
+  // A running task's session can't be loaded; its requests are answered on the task page.
+  if (type === 'input_request' && taskId) {
+    openTask(taskId);
+    return;
+  }
   if (agent !== settings.agent) {
     saveSettings({ ...settings, agent });
   } else if (!getSession(sessionId) && sessionsStore.sessionsLoaded) {

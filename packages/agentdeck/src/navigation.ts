@@ -249,6 +249,15 @@ export const selectSession = (sessionId: string) => {
   Stack.replace({ animated: false, content: sessionPage(sessionId), gesture: true }, { keep: 1 });
 };
 
+/** A scheduled task: its runs, a run's permission request, and actions. */
+export const openTask = (taskId: string) => {
+  Stack.push({
+    animated: true,
+    content: html`<deck-task-page class="block h-full" .taskId=${taskId}></deck-task-page>`,
+    gesture: true,
+  });
+};
+
 /** Read-only view of subagent `subagentId` of session `sessionId`: it can only be watched and, when allowed, stopped. */
 export const openSubagent = (sessionId: string, subagentId: string) => {
   Stack.push({

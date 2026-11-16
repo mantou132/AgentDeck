@@ -291,6 +291,7 @@ export function documentFixture(previous, options = {}) {
           agent_session_close: { closed: true },
           agent_session_load: { sessionId: 's1', agent: 'codex' },
           agent_session_create: { sessionId: 'created', agent: 'codex' },
+          task_list: { tasks: [] },
         };
         if (!(method in results)) continue;
         processed.add(request.message_id);
