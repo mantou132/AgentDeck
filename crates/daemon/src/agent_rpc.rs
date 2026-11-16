@@ -31,37 +31,37 @@ use crate::{
     tasks::Tasks,
 };
 
-/// Stream agent events as `{ id, event }` frames while a request runs.
-fn event_forwarder(
-    ctx: &CallCtx,
-) -> (
+/// Forwards a request's agent events; resolves to whether the turn stopped
+/// because it was cancelled.
+type EventForwarder = (
     mpsc::UnboundedSender<AgentEvent>,
-    tokio::task::JoinHandle<()>,
-) {
+    tokio::task::JoinHandle<bool>,
+);
+
+/// Stream agent events as `{ id, event }` frames while a request runs.
+fn event_forwarder(ctx: &CallCtx) -> EventForwarder {
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
     let ctx = ctx.clone();
     let done = tokio::spawn(async move {
+        let mut cancelled = false;
         while let Some(event) = event_rx.recv().await {
+            if let AgentEvent::Stop { stop_reason } = &event {
+                cancelled = stop_reason == "cancelled";
+            }
             let event = serde_json::to_value(&event).unwrap_or(Value::Null);
             ctx.emit(event);
         }
+        cancelled
     });
     (event_tx, done)
 }
 
 /// Drop the event sender and wait for the forwarder to drain so streamed
-/// events never overtake the final result.
-async fn settle_forwarder(
-    (tx, done): (
-        mpsc::UnboundedSender<AgentEvent>,
-        tokio::task::JoinHandle<()>,
-    ),
-    ok: bool,
-) {
+/// events never overtake the final result. Returns whether the turn completed:
+/// it succeeded and was not cancelled.
+async fn settle_forwarder((tx, done): EventForwarder, ok: bool) -> bool {
     drop(tx);
-    if ok {
-        let _ = done.await;
-    }
+    ok && !done.await.unwrap_or(false)
 }
 
 /// Pushes a notification to the peer's device: `(kind, agent, session_id)`.
@@ -625,11 +625,11 @@ impl AgentService {
                     )
                     .await;
 
-                settle_forwarder(forwarder, result.is_ok()).await;
-                if result.is_ok() {
-                    if let Some(push) = push {
-                        push(PushKind::ResponseComplete, agent, session_id);
-                    }
+                // A turn the user cancelled is not announced as complete.
+                if settle_forwarder(forwarder, result.is_ok()).await
+                    && let Some(push) = push
+                {
+                    push(PushKind::ResponseComplete, agent, session_id);
                 }
 
                 result
