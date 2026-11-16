@@ -260,9 +260,13 @@ export type CreatedSession = {
 
 export type PanelContext =
   | { surface: 'devtools' | 'side_panel'; tabId?: number; url?: string }
-  | { surface: 'remote_app' };
+  | { surface: 'remote_app'; timeZone?: string };
 
-export const REMOTE_APP_PANEL_CONTEXT: PanelContext = { surface: 'remote_app' };
+/** The phone's time zone lets the agent read the times the user mentions, e.g. for scheduled tasks. */
+export const REMOTE_APP_PANEL_CONTEXT: PanelContext = {
+  surface: 'remote_app',
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+};
 
 /** Skill files keyed by `<skill>/<path>`; the host stores each version under its content hash. */
 export type SkillBundle = { hash: string; files: Record<string, string> };

@@ -38,7 +38,17 @@ pub(super) async fn message_panel_system_prompt(params: &Value) -> Result<Option
         .and_then(Value::as_str)
         .ok_or_else(|| "panelContext.surface must be a string".to_string())?;
     match surface {
-        "remote_app" => return Ok(Some(REMOTE_APP_SYSTEM_PROMPT.to_string())),
+        "remote_app" => {
+            let time_zone = context.get("timeZone").and_then(Value::as_str);
+            return Ok(Some(match time_zone {
+                Some(zone) => format!(
+                    "{REMOTE_APP_SYSTEM_PROMPT}\n\nThe user's phone is in the {zone} time zone. \
+                     Times the user mentions are in that zone unless they say otherwise; this \
+                     machine's local time zone may differ."
+                ),
+                None => REMOTE_APP_SYSTEM_PROMPT.to_string(),
+            }));
+        }
         "devtools" | "side_panel" => {}
         _ => return Err(format!("unknown panelContext.surface: {surface}")),
     }
@@ -237,6 +247,14 @@ mod tests {
         assert!(prompt.contains("mobile app"));
         assert!(prompt.contains(VOICE_CHAT_MARKER));
         assert!(prompt.contains("<!-- agentdeck-speech"));
+        assert!(!prompt.contains("time zone"));
+        let prompt = message_panel_system_prompt(&serde_json::json!({
+            "panelContext": { "surface": "remote_app", "timeZone": "Asia/Shanghai" }
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(prompt.contains("phone is in the Asia/Shanghai time zone"));
     }
 
     #[test]

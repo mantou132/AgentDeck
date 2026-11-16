@@ -159,7 +159,10 @@ test('createSession and loadSession pass remote_app panelContext', async () => {
   await f.openSession();
   const loadReq = f.requests.find((r) => r.payload.method === 'agent_session_load');
   assert.ok(loadReq);
-  assert.deepEqual(loadReq.payload.params.panelContext, { surface: 'remote_app' });
+  assert.deepEqual(loadReq.payload.params.panelContext, {
+    surface: 'remote_app',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
 
   const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
   const creating = f.app.promotePendingSession(pendingSession, 'First task');
@@ -167,7 +170,10 @@ test('createSession and loadSession pass remote_app panelContext', async () => {
   await creating;
   const createReq = f.requests.find((r) => r.payload.method === 'agent_session_create');
   assert.ok(createReq);
-  assert.deepEqual(createReq.payload.params.panelContext, { surface: 'remote_app' });
+  assert.deepEqual(createReq.payload.params.panelContext, {
+    surface: 'remote_app',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
 });
 
 test('pending sessions are independent, so discarding one keeps the next', async () => {
