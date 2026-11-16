@@ -27,6 +27,17 @@ use crate::{
 
 const HOST_DEVICE_ID: &str = "host";
 
+/// Devices that haven't attached for this long no longer get the pushes of
+/// scheduled runs: they were likely replaced, uninstalled or paired elsewhere.
+const BROADCAST_PUSH_MAX_IDLE_SECS: u64 = 30 * 24 * 60 * 60;
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 fn endpoint_url(relay_url: &str, relay_id: &str) -> String {
     relay_client::transport::endpoint_url(relay_url, relay_id, Endpoint::One, HOST_DEVICE_ID)
 }
@@ -37,6 +48,9 @@ pub(crate) struct RemoteDevice {
     pub(crate) peer_id: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) fcm_token: Option<String>,
+    /// Unix seconds of the latest `peer_attach`.
+    #[serde(default)]
+    pub(crate) attached_at: Option<u64>,
 }
 
 fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
@@ -46,7 +60,20 @@ fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
     let Ok(content) = std::fs::read_to_string(&path) else {
         return HashMap::new();
     };
-    serde_json::from_str(&content).unwrap_or_default()
+    let mut peers: HashMap<String, RemoteDevice> =
+        serde_json::from_str(&content).unwrap_or_default();
+    // Devices saved before `attachedAt` existed count from now, so an upgrade
+    // doesn't stop their pushes at once.
+    let now = unix_now();
+    let mut filled = false;
+    for device in peers.values_mut().filter(|d| d.attached_at.is_none()) {
+        device.attached_at = Some(now);
+        filled = true;
+    }
+    if filled {
+        save_persisted_peers(&peers);
+    }
+    peers
 }
 
 fn save_persisted_peers(map: &HashMap<String, RemoteDevice>) {
@@ -96,6 +123,16 @@ fn take_ephemeral_reply(calls: &EphemeralCalls, peer_id: u64, message: &Value) -
     }
 }
 
+/// Push tokens of the devices that attached within `BROADCAST_PUSH_MAX_IDLE_SECS`.
+fn recent_tokens(devices: &HashMap<String, RemoteDevice>, now: u64) -> Vec<String> {
+    let since = now.saturating_sub(BROADCAST_PUSH_MAX_IDLE_SECS);
+    devices
+        .values()
+        .filter(|device| device.attached_at.is_some_and(|at| at >= since))
+        .filter_map(|device| device.fcm_token.clone())
+        .collect()
+}
+
 /// Manages multiple remote peers multiplexed over a single relay connection.
 /// Allocates auto-increment `peerId` to connected devices and tags/filters messages.
 /// Reaches every device, for sessions no device started (scheduled runs).
@@ -108,16 +145,11 @@ struct Broadcaster {
 }
 
 impl Broadcaster {
-    /// Pushes to every device that registered a push token; `task_id` marks
+    /// Pushes to every device that registered a push token and attached
+    /// recently (`BROADCAST_PUSH_MAX_IDLE_SECS`); `task_id` marks
     /// the run of a scheduled task.
     fn push(&self, kind: push::PushKind, agent: &str, session_id: &str, task_id: Option<&str>) {
-        let tokens: Vec<String> = self
-            .devices
-            .lock()
-            .expect("lock poisoned")
-            .values()
-            .filter_map(|device| device.fcm_token.clone())
-            .collect();
+        let tokens = recent_tokens(&self.devices.lock().expect("lock poisoned"), unix_now());
         for token in tokens {
             let client = self.push_client.clone();
             let host = self.push_host.clone();
@@ -276,6 +308,7 @@ impl RemotePeerManager {
         token: Option<&Value>,
     ) -> u64 {
         let mut dev_map = self.devices.lock().expect("lock poisoned");
+        let now = unix_now();
         if !device_id.is_empty() {
             if let Some(existing) = dev_map.get_mut(device_id) {
                 let peer_id = existing.peer_id;
@@ -284,10 +317,9 @@ impl RemotePeerManager {
                     Some(Value::Null) => None,
                     _ => existing.fcm_token.clone(),
                 };
-                if existing.fcm_token != new_token {
-                    existing.fcm_token = new_token;
-                    save_persisted_peers(&dev_map);
-                }
+                existing.fcm_token = new_token;
+                existing.attached_at = Some(now);
+                save_persisted_peers(&dev_map);
                 return peer_id;
             }
         }
@@ -311,6 +343,7 @@ impl RemotePeerManager {
                 RemoteDevice {
                     peer_id: assigned,
                     fcm_token,
+                    attached_at: Some(now),
                 },
             );
             save_persisted_peers(&dev_map);
@@ -610,6 +643,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn broadcast_pushes_skip_devices_idle_for_long() {
+        let now = 100 * 24 * 60 * 60;
+        let device = |token: &str, attached_at| RemoteDevice {
+            peer_id: 1,
+            fcm_token: Some(token.into()),
+            attached_at,
+        };
+        let devices = HashMap::from([
+            ("recent".into(), device("recent", Some(now - 60))),
+            (
+                "edge".into(),
+                device("edge", Some(now - BROADCAST_PUSH_MAX_IDLE_SECS)),
+            ),
+            (
+                "stale".into(),
+                device("stale", Some(now - BROADCAST_PUSH_MAX_IDLE_SECS - 1)),
+            ),
+        ]);
+        let mut tokens = recent_tokens(&devices, now);
+        tokens.sort();
+        assert_eq!(tokens, ["edge", "recent"]);
+    }
+
     #[tokio::test]
     async fn host_reconnected_is_an_ephemeral_broadcast() {
         let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -644,6 +701,7 @@ mod tests {
                 RemoteDevice {
                     peer_id: 1,
                     fcm_token: None,
+                    attached_at: None,
                 },
             )]))),
             peers: Arc::default(),
