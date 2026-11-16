@@ -184,6 +184,10 @@ pub struct Task {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin_session_id: Option<String>,
     pub created_at: DateTime<Utc>,
+    /// When the task was last saved or re-enabled: scheduled times up to here
+    /// don't run. Set by the daemon and stored, so a restart doesn't catch up on them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_from: Option<DateTime<Utc>>,
 }
 
 fn default_timeout_minutes() -> u32 {
@@ -273,7 +277,7 @@ impl Tasks {
             .filter_map(|run| run.scheduled_for)
             .max()
             .unwrap_or(task.created_at)
-            .max(task.created_at);
+            .max(task.scheduled_from.unwrap_or(task.created_at));
         self.fired
             .lock()
             .expect("lock poisoned")
@@ -324,6 +328,13 @@ impl Tasks {
         tokio::spawn(async move {
             for attempt in 0..=task.retries {
                 let run = this.run_once(&task, scheduled_for, attempt).await;
+                if !this.has_task(&task.id) {
+                    // Deleted while running: its history is gone, so this run goes too.
+                    if let Some(session_id) = run.session_id {
+                        this.delete_run_session(&task.agent, &session_id).await;
+                    }
+                    break;
+                }
                 let done = run.status == RunStatus::Success || attempt == task.retries;
                 this.record(&task, run);
                 if done {
@@ -441,7 +452,10 @@ impl Tasks {
     async fn finish(&self, task: &Task, session_id: &str, host: &dyn TaskHost, run: &mut Run) {
         run.ended_at = Utc::now();
         self.sessions.close_session(&task.agent, session_id).await;
-        host.push(PushKind::ResponseComplete, &task.agent, session_id);
+        // A task deleted while running ends silently.
+        if self.has_task(&task.id) {
+            host.push(PushKind::ResponseComplete, &task.agent, session_id);
+        }
     }
 
     /// Appends a run, prunes old ones (deleting their sessions) and tells devices.
@@ -457,17 +471,27 @@ impl Tasks {
             let agent = task.agent.clone();
             tokio::spawn(async move {
                 for session_id in dropped.into_iter().filter_map(|run| run.session_id) {
-                    this.run_sessions
-                        .lock()
-                        .expect("lock poisoned")
-                        .remove(&session_id);
-                    let _ = this.sessions.delete_session(&agent, &session_id).await;
+                    this.delete_run_session(&agent, &session_id).await;
                 }
             });
         }
         if let Some(host) = self.host.get() {
             host.broadcast("task_updated", json!({ "id": task.id }));
         }
+    }
+
+    fn has_task(&self, id: &str) -> bool {
+        let tasks = self.tasks.lock().expect("lock poisoned");
+        tasks.iter().any(|task| task.id == id)
+    }
+
+    /// Deletes the session of a run whose record is dropped.
+    async fn delete_run_session(&self, agent: &str, session_id: &str) {
+        self.run_sessions
+            .lock()
+            .expect("lock poisoned")
+            .remove(session_id);
+        let _ = self.sessions.delete_session(agent, session_id).await;
     }
 
     pub fn runs(&self, task_id: &str) -> Vec<Run> {
@@ -542,6 +566,9 @@ impl Tasks {
         let created_at = existing.map_or_else(Utc::now, |index| tasks[index].created_at);
         value["id"] = json!(id.unwrap_or_else(new_id));
         value["createdAt"] = json!(created_at);
+        // A new or rescheduled task waits for its next time instead of catching up.
+        let now = Utc::now();
+        value["scheduledFrom"] = json!(now);
         let task: Task = serde_json::from_value(value).context("invalid task")?;
         if task.name.trim().is_empty() || task.prompt.trim().is_empty() || task.agent.is_empty() {
             bail!("name, agent and prompt must not be empty");
@@ -558,22 +585,28 @@ impl Tasks {
         self.save(&next)?;
         *tasks = next;
         drop(tasks);
-        // A new or rescheduled task waits for its next time instead of catching up.
         self.fired
             .lock()
             .expect("lock poisoned")
-            .insert(task.id.clone(), Local::now());
+            .insert(task.id.clone(), now.with_timezone(&Local));
         self.broadcast_update(&task.id);
         Ok(task)
     }
 
     pub fn set_enabled(&self, id: &str, enabled: bool) -> Result<()> {
-        self.update(id, |task| task.enabled = enabled)?;
+        // A re-enabled task waits for its next time, like a rescheduled one.
+        let now = Utc::now();
+        self.update(id, |task| {
+            task.enabled = enabled;
+            if enabled {
+                task.scheduled_from = Some(now);
+            }
+        })?;
         if enabled {
             self.fired
                 .lock()
                 .expect("lock poisoned")
-                .insert(id.to_string(), Local::now());
+                .insert(id.to_string(), now.with_timezone(&Local));
         }
         Ok(())
     }
@@ -592,7 +625,8 @@ impl Tasks {
         Ok(())
     }
 
-    /// Deletes a task, its run history and the sessions of its runs.
+    /// Deletes a task, its run history and the sessions of its runs; a run
+    /// in progress is stopped and dropped (see `spawn_run`).
     pub async fn delete(&self, id: &str) -> Result<()> {
         let removed = {
             let mut tasks = self.tasks.lock().expect("lock poisoned");
@@ -605,15 +639,14 @@ impl Tasks {
             *tasks = next;
             removed
         };
-        for session_id in self.runs(id).into_iter().filter_map(|run| run.session_id) {
-            self.run_sessions
-                .lock()
-                .expect("lock poisoned")
-                .remove(&session_id);
-            let _ = self
-                .sessions
-                .delete_session(&removed.agent, &session_id)
+        let running = self.running.lock().expect("lock poisoned").get(id).cloned();
+        if let Some(Some(session_id)) = running {
+            self.sessions
+                .close_session(&removed.agent, &session_id)
                 .await;
+        }
+        for session_id in self.runs(id).into_iter().filter_map(|run| run.session_id) {
+            self.delete_run_session(&removed.agent, &session_id).await;
         }
         let _ = fs::remove_file(self.paths.task_runs_file(id));
         self.fired.lock().expect("lock poisoned").remove(id);
@@ -865,6 +898,7 @@ mod tests {
             enabled: true,
             origin_session_id: None,
             created_at,
+            scheduled_from: None,
         }
     }
 
@@ -888,6 +922,37 @@ mod tests {
         let mut disabled = tasks.clone();
         disabled[0].enabled = false;
         assert!(due_runs(&disabled, &mut fired, local(2026, 11, 17, 9, 1)).is_empty());
+    }
+
+    #[test]
+    fn saved_and_re_enabled_tasks_do_not_catch_up_after_a_restart() {
+        let root = std::env::temp_dir().join(format!("agentdeck-tasks-{}", new_id()));
+        let load = || {
+            Tasks::load(
+                AppPaths::new(root.clone()),
+                Arc::new(AgentSessionManager::new(None)),
+            )
+        };
+        let fired = |tasks: &Tasks, id: &str| tasks.fired.lock().unwrap()[id].with_timezone(&Utc);
+
+        let tasks = load();
+        let id = tasks
+            .upsert(json!({
+                "name": "Inbox", "agent": "claude-acp", "cwd": "/", "prompt": "Sort",
+                "schedule": { "type": "daily", "times": ["09:00"] },
+            }))
+            .unwrap()
+            .id;
+        let saved = fired(&tasks, &id);
+        assert_eq!(fired(&load(), &id), saved);
+
+        tasks.set_enabled(&id, false).unwrap();
+        assert_eq!(fired(&load(), &id), saved);
+        tasks.set_enabled(&id, true).unwrap();
+        let enabled = fired(&tasks, &id);
+        assert!(enabled > saved);
+        assert_eq!(fired(&load(), &id), enabled);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
