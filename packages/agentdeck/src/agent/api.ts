@@ -119,9 +119,12 @@ export type RemoteSession = {
   task?: { id: string; name: string };
 };
 
-/** When a scheduled task runs, in the host's local time; weekdays are 1 (Monday) to 7, empty means every day. */
+/**
+ * When a scheduled task runs; daily times are in `timeZone` (IANA name, the saving device's), weekdays are 1 (Monday)
+ * to 7, empty means every day.
+ */
 export type TaskSchedule =
-  | { type: 'daily'; times: string[]; weekdays?: number[] }
+  | { type: 'daily'; times: string[]; weekdays?: number[]; timeZone: string }
   | { type: 'interval'; minutes: number };
 
 /** A scheduled task as the daemon stores it (`crates/daemon/src/tasks.rs`). */

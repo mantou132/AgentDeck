@@ -92,6 +92,8 @@ export const resolveTaskPermission = async (request: PermissionRequest, optionId
   }
 };
 
+export const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 /** Whether the task already has what the card proposes. */
 export const isDraftSaved = (draft: TaskDraft) =>
   tasksStore.tasks.some(
@@ -145,6 +147,7 @@ const weekdayName = (day: number) =>
   // 2024-01-01 is a Monday.
   new Intl.DateTimeFormat(i18n.currentLanguage, { weekday: 'short' }).format(new Date(2024, 0, day));
 
+/** Daily times are shown as set, named with their time zone when it isn't this device's (e.g. `每天 09:00 纽约时间`). */
 export const formatSchedule = (schedule: TaskSchedule) => {
   if (schedule.type === 'interval') {
     const { minutes } = schedule;
@@ -159,7 +162,14 @@ export const formatSchedule = (schedule: TaskSchedule) => {
       : days.join() === '1,2,3,4,5'
         ? i18n.get('task.workdays')
         : days.map(weekdayName).join(' ');
-  return `${daysText} ${schedule.times.join(' ')}`;
+  const { timeZone } = schedule;
+  const zoneText =
+    timeZone !== deviceTimeZone()
+      ? new Intl.DateTimeFormat(i18n.currentLanguage, { timeZone, timeZoneName: 'shortGeneric' })
+          .formatToParts()
+          .find((part) => part.type === 'timeZoneName')?.value
+      : undefined;
+  return [daysText, ...schedule.times, zoneText].filter(Boolean).join(' ');
 };
 
 export const formatTaskTime = (time: string) =>

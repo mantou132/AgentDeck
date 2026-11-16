@@ -1,12 +1,21 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { TaskSchedule } from '../agent/api';
 import { i18n } from '../i18n';
-import { formatSchedule, isDraftSaved, type TaskDraft, tasksStore } from '../state/tasks';
+import { deviceTimeZone, formatSchedule, isDraftSaved, type TaskDraft, tasksStore } from '../state/tasks';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
 const isTime = (value: unknown) => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
+const isTimeZone = (value: unknown) => {
+  try {
+    return typeof value === 'string' && !!new Intl.DateTimeFormat('en', { timeZone: value });
+  } catch {
+    return false;
+  }
+};
+
+/** A daily schedule without a time zone is in the user's, this device's. */
 const parseSchedule = (value: unknown): TaskSchedule | undefined => {
   const schedule = value as Partial<Record<string, unknown>> | undefined;
   if (schedule?.type === 'interval' && Number.isInteger(schedule.minutes) && (schedule.minutes as number) >= 5)
@@ -15,7 +24,9 @@ const parseSchedule = (value: unknown): TaskSchedule | undefined => {
   if (!schedule.times.every(isTime)) return;
   const weekdays = Array.isArray(schedule.weekdays) ? schedule.weekdays : [];
   if (!weekdays.every((day) => Number.isInteger(day) && day >= 1 && day <= 7)) return;
-  return { type: 'daily', times: schedule.times, weekdays };
+  const timeZone = schedule.timeZone ?? deviceTimeZone();
+  if (!isTimeZone(timeZone)) return;
+  return { type: 'daily', times: schedule.times, weekdays, timeZone: timeZone as string };
 };
 
 const positive = (value: unknown) => (Number.isInteger(value) && (value as number) > 0 ? (value as number) : undefined);

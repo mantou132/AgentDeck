@@ -13,7 +13,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use chrono::{DateTime, Datelike, Local, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveTime, TimeZone, Utc};
+use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
@@ -49,16 +50,18 @@ const UNATTENDED_SYSTEM_PROMPT: &str = "This turn is a scheduled task running un
      answered in time; if an action is rejected, carry on with the rest. If you can't \
      finish, say why. End with one short line stating the result.";
 
-/// When a task runs, in the host's local time.
+/// When a task runs.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Schedule {
     /// At each `HH:MM` of `times`, on `weekdays` (1 = Monday … 7 = Sunday; empty
-    /// means every day).
+    /// means every day), in `time_zone`: the user's, set by the device that saves it.
+    #[serde(rename_all = "camelCase")]
     Daily {
         times: Vec<String>,
         #[serde(default)]
         weekdays: Vec<u32>,
+        time_zone: Tz,
     },
     /// Every `minutes`, counted from the task's creation.
     Interval { minutes: u32 },
@@ -67,7 +70,9 @@ pub enum Schedule {
 impl Schedule {
     fn validate(&self) -> Result<()> {
         match self {
-            Self::Daily { times, weekdays } => {
+            Self::Daily {
+                times, weekdays, ..
+            } => {
                 if times.is_empty() {
                     bail!("schedule.times must not be empty");
                 }
@@ -87,29 +92,43 @@ impl Schedule {
         Ok(())
     }
 
+    /// Scheduled times of a daily schedule on the dates `now` plus `days`
+    /// (in its time zone); a time skipped by a daylight saving change doesn't run.
+    fn daily_times(&self, now: DateTime<Utc>, days: i64) -> Vec<DateTime<Utc>> {
+        let Self::Daily {
+            times,
+            weekdays,
+            time_zone,
+        } = self
+        else {
+            return Vec::new();
+        };
+        let date = now.with_timezone(time_zone).date_naive() + chrono::Duration::days(days);
+        if !weekdays.is_empty() && !weekdays.contains(&date.weekday().number_from_monday()) {
+            return Vec::new();
+        }
+        times
+            .iter()
+            .filter_map(|time| parse_time(time).ok())
+            .filter_map(|time| {
+                time_zone
+                    .from_local_datetime(&date.and_time(time))
+                    .earliest()
+            })
+            .map(|at| at.with_timezone(&Utc))
+            .collect()
+    }
+
     /// The latest scheduled time at or before `now`.
-    fn previous(&self, now: DateTime<Local>, created: DateTime<Utc>) -> Option<DateTime<Local>> {
+    fn previous(&self, now: DateTime<Utc>, created: DateTime<Utc>) -> Option<DateTime<Utc>> {
         match self {
-            Self::Daily { times, weekdays } => {
-                let times: Vec<NaiveTime> =
-                    times.iter().filter_map(|t| parse_time(t).ok()).collect();
-                (0..8).find_map(|days_back| {
-                    let date = now.date_naive() - chrono::Days::new(days_back);
-                    let weekday = date.weekday().number_from_monday();
-                    if !weekdays.is_empty() && !weekdays.contains(&weekday) {
-                        return None;
-                    }
-                    times
-                        .iter()
-                        .filter_map(|time| {
-                            Local.from_local_datetime(&date.and_time(*time)).earliest()
-                        })
-                        .filter(|at| *at <= now)
-                        .max()
-                })
-            }
+            Self::Daily { .. } => (0..8).find_map(|days_back| {
+                self.daily_times(now, -days_back)
+                    .into_iter()
+                    .filter(|at| *at <= now)
+                    .max()
+            }),
             Self::Interval { minutes } => {
-                let created = created.with_timezone(&Local);
                 if now < created {
                     return None;
                 }
@@ -121,28 +140,15 @@ impl Schedule {
     }
 
     /// The first scheduled time after `now`.
-    fn next(&self, now: DateTime<Local>, created: DateTime<Utc>) -> Option<DateTime<Local>> {
+    fn next(&self, now: DateTime<Utc>, created: DateTime<Utc>) -> Option<DateTime<Utc>> {
         match self {
-            Self::Daily { times, weekdays } => {
-                let times: Vec<NaiveTime> =
-                    times.iter().filter_map(|t| parse_time(t).ok()).collect();
-                (0..8).find_map(|days_ahead| {
-                    let date = now.date_naive() + chrono::Days::new(days_ahead);
-                    let weekday = date.weekday().number_from_monday();
-                    if !weekdays.is_empty() && !weekdays.contains(&weekday) {
-                        return None;
-                    }
-                    times
-                        .iter()
-                        .filter_map(|time| {
-                            Local.from_local_datetime(&date.and_time(*time)).earliest()
-                        })
-                        .filter(|at| *at > now)
-                        .min()
-                })
-            }
+            Self::Daily { .. } => (0..8).find_map(|days_ahead| {
+                self.daily_times(now, days_ahead)
+                    .into_iter()
+                    .filter(|at| *at > now)
+                    .min()
+            }),
             Self::Interval { minutes } => {
-                let created = created.with_timezone(&Local);
                 let step = i64::from(*minutes) * 60;
                 if now < created {
                     return Some(created + chrono::Duration::seconds(step));
@@ -240,7 +246,7 @@ pub struct Tasks {
     host: OnceLock<Arc<dyn TaskHost>>,
     tasks: Mutex<Vec<Task>>,
     /// The scheduled time each task last fired for.
-    fired: Mutex<HashMap<String, DateTime<Local>>>,
+    fired: Mutex<HashMap<String, DateTime<Utc>>>,
     /// Running tasks, with the session of the current attempt once created.
     running: Mutex<HashMap<String, Option<String>>>,
     /// Sessions created by runs, for `agent_session_list`.
@@ -281,7 +287,7 @@ impl Tasks {
         self.fired
             .lock()
             .expect("lock poisoned")
-            .insert(task.id.clone(), fired.with_timezone(&Local));
+            .insert(task.id.clone(), fired);
         let mut sessions = self.run_sessions.lock().expect("lock poisoned");
         for session_id in runs.into_iter().filter_map(|run| run.session_id) {
             sessions.insert(session_id, task.id.clone());
@@ -296,20 +302,20 @@ impl Tasks {
         let this = self.clone();
         tokio::spawn(async move {
             loop {
-                this.tick(Local::now());
+                this.tick(Utc::now());
                 tokio::time::sleep(TICK).await;
             }
         });
     }
 
-    fn tick(self: &Arc<Self>, now: DateTime<Local>) {
+    fn tick(self: &Arc<Self>, now: DateTime<Utc>) {
         let due = {
             let tasks = self.tasks.lock().expect("lock poisoned");
             let mut fired = self.fired.lock().expect("lock poisoned");
             due_runs(&tasks, &mut fired, now)
         };
         for (task, scheduled_for) in due {
-            self.spawn_run(task, Some(scheduled_for.with_timezone(&Utc)));
+            self.spawn_run(task, Some(scheduled_for));
         }
     }
 
@@ -530,7 +536,7 @@ impl Tasks {
 
     /// Tasks with their next run and latest run, for clients.
     pub fn list(&self) -> Value {
-        let now = Local::now();
+        let now = Utc::now();
         let running = self.running.lock().expect("lock poisoned").clone();
         let tasks = self.tasks.lock().expect("lock poisoned").clone();
         let list: Vec<Value> = tasks
@@ -539,8 +545,7 @@ impl Tasks {
                 let next = task
                     .enabled
                     .then(|| task.schedule.next(now, task.created_at))
-                    .flatten()
-                    .map(|at| at.with_timezone(&Utc));
+                    .flatten();
                 let last = self.runs(&task.id).pop();
                 let mut value = serde_json::to_value(&task).unwrap_or_default();
                 value["nextRunAt"] = json!(next);
@@ -588,7 +593,7 @@ impl Tasks {
         self.fired
             .lock()
             .expect("lock poisoned")
-            .insert(task.id.clone(), now.with_timezone(&Local));
+            .insert(task.id.clone(), now);
         self.broadcast_update(&task.id);
         Ok(task)
     }
@@ -606,7 +611,7 @@ impl Tasks {
             self.fired
                 .lock()
                 .expect("lock poisoned")
-                .insert(id.to_string(), now.with_timezone(&Local));
+                .insert(id.to_string(), now);
         }
         Ok(())
     }
@@ -709,9 +714,9 @@ impl Tasks {
 /// `MISSED_WINDOW` is skipped. Updates `fired`.
 fn due_runs(
     tasks: &[Task],
-    fired: &mut HashMap<String, DateTime<Local>>,
-    now: DateTime<Local>,
-) -> Vec<(Task, DateTime<Local>)> {
+    fired: &mut HashMap<String, DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> Vec<(Task, DateTime<Utc>)> {
     tasks
         .iter()
         .filter(|task| task.enabled)
@@ -770,14 +775,29 @@ fn prune(runs: Vec<Run>, now: DateTime<Utc>) -> (Vec<Run>, Vec<Run>) {
 mod tests {
     use super::*;
 
-    fn local(y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Local> {
-        Local.with_ymd_and_hms(y, m, d, h, min, 0).unwrap()
+    const SHANGHAI: Tz = chrono_tz::Asia::Shanghai;
+    const NEW_YORK: Tz = chrono_tz::America::New_York;
+
+    /// A time in Shanghai, where the tests' schedules are.
+    fn local(y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Utc> {
+        in_zone(SHANGHAI, y, m, d, h, min)
+    }
+
+    fn in_zone(zone: Tz, y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Utc> {
+        zone.with_ymd_and_hms(y, m, d, h, min, 0)
+            .unwrap()
+            .with_timezone(&Utc)
     }
 
     fn daily(times: &[&str], weekdays: &[u32]) -> Schedule {
+        daily_in(SHANGHAI, times, weekdays)
+    }
+
+    fn daily_in(time_zone: Tz, times: &[&str], weekdays: &[u32]) -> Schedule {
         Schedule::Daily {
             times: times.iter().map(|t| t.to_string()).collect(),
             weekdays: weekdays.to_vec(),
+            time_zone,
         }
     }
 
@@ -809,8 +829,46 @@ mod tests {
     }
 
     #[test]
+    fn daily_runs_in_its_time_zone() {
+        let created = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        // Monday 09:00 in Shanghai is still Sunday evening in New York.
+        let monday = daily(&["09:00"], &[1]);
+        let sunday_evening = in_zone(NEW_YORK, 2026, 11, 15, 19, 0);
+        assert_eq!(
+            monday.next(sunday_evening, created),
+            Some(in_zone(NEW_YORK, 2026, 11, 15, 20, 0))
+        );
+        assert_eq!(
+            monday.next(sunday_evening, created),
+            Some(local(2026, 11, 16, 9, 0))
+        );
+    }
+
+    #[test]
+    fn daily_follows_daylight_saving() {
+        let created = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let schedule = daily_in(NEW_YORK, &["09:00", "02:30"], &[]);
+        // 09:00 stays 09:00 in New York across the change on 2026-03-08 (UTC-5 to UTC-4).
+        let before = in_zone(NEW_YORK, 2026, 3, 7, 10, 0);
+        let after = in_zone(NEW_YORK, 2026, 3, 8, 10, 0);
+        assert_eq!(
+            schedule.previous(before, created),
+            Some(Utc.with_ymd_and_hms(2026, 3, 7, 14, 0, 0).unwrap())
+        );
+        assert_eq!(
+            schedule.previous(after, created),
+            Some(Utc.with_ymd_and_hms(2026, 3, 8, 13, 0, 0).unwrap())
+        );
+        // 02:30 doesn't exist that day, so the next run after 09:00 on 03-07 is 09:00 on 03-08.
+        assert_eq!(
+            schedule.next(in_zone(NEW_YORK, 2026, 3, 7, 9, 30), created),
+            Some(in_zone(NEW_YORK, 2026, 3, 8, 9, 0))
+        );
+    }
+
+    #[test]
     fn interval_counts_from_creation() {
-        let created = local(2026, 11, 16, 8, 0).with_timezone(&Utc);
+        let created = local(2026, 11, 16, 8, 0);
         let schedule = Schedule::Interval { minutes: 120 };
         assert_eq!(schedule.previous(local(2026, 11, 16, 9, 0), created), None);
         assert_eq!(
@@ -826,6 +884,8 @@ mod tests {
     #[test]
     fn schedules_are_validated() {
         assert!(daily(&["9:00"], &[]).validate().is_ok());
+        let unknown_zone = json!({ "type": "daily", "times": ["09:00"], "timeZone": "Mars/Base" });
+        assert!(serde_json::from_value::<Schedule>(unknown_zone).is_err());
         assert!(daily(&["25:00"], &[]).validate().is_err());
         assert!(daily(&[], &[]).validate().is_err());
         assert!(daily(&["09:00"], &[0]).validate().is_err());
@@ -933,13 +993,13 @@ mod tests {
                 Arc::new(AgentSessionManager::new(None)),
             )
         };
-        let fired = |tasks: &Tasks, id: &str| tasks.fired.lock().unwrap()[id].with_timezone(&Utc);
+        let fired = |tasks: &Tasks, id: &str| tasks.fired.lock().unwrap()[id];
 
         let tasks = load();
         let id = tasks
             .upsert(json!({
                 "name": "Inbox", "agent": "claude-acp", "cwd": "/", "prompt": "Sort",
-                "schedule": { "type": "daily", "times": ["09:00"] },
+                "schedule": { "type": "daily", "times": ["09:00"], "timeZone": "Asia/Shanghai" },
             }))
             .unwrap()
             .id;
@@ -959,7 +1019,7 @@ mod tests {
     fn tasks_round_trip_with_defaults() {
         let value = json!({
             "id": "t1", "name": "Inbox", "agent": "claude-acp", "cwd": "/", "prompt": "Sort",
-            "schedule": { "type": "daily", "times": ["09:00"] },
+            "schedule": { "type": "daily", "times": ["09:00"], "timeZone": "Asia/Shanghai" },
             "createdAt": "2026-11-16T00:00:00Z"
         });
         let parsed: Task = serde_json::from_value(value).unwrap();
@@ -969,6 +1029,7 @@ mod tests {
         let created = Utc.with_ymd_and_hms(2026, 11, 16, 0, 0, 0).unwrap();
         let back = serde_json::to_value(task(daily(&["09:00"], &[]), created)).unwrap();
         assert_eq!(back["schedule"]["type"], "daily");
+        assert_eq!(back["schedule"]["timeZone"], "Asia/Shanghai");
         assert_eq!(back["createdAt"], "2026-11-16T00:00:00Z");
     }
 }

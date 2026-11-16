@@ -258,6 +258,7 @@ export function documentFixture(previous, options = {}) {
       'session/voice-chat',
       'session/elicitation',
       'state/user-input',
+      'state/tasks',
       'agent/transport',
     ].map((name) => load(path.join(root, `src/${name}.ts`))),
   );
