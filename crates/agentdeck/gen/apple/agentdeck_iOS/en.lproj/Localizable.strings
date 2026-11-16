@@ -1,1 +1,2 @@
 "notification_response_complete" = "Your agent has finished responding.";
+"notification_input_request" = "Your agent is waiting for your approval or answer.";

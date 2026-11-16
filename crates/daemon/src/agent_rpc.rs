@@ -22,6 +22,7 @@ use self::{
 use crate::{
     acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
     peer::{CallCtx, Peer, RpcError},
+    push::PushKind,
     render_skills::{self, SkillSelection},
     screen_capture,
 };
@@ -59,7 +60,23 @@ async fn settle_forwarder(
     }
 }
 
-pub type PromptCompletion = Arc<dyn Fn(&str, &str) + Send + Sync>;
+/// Pushes a notification to the peer's device: `(kind, agent, session_id)`.
+pub type PeerPush = Arc<dyn Fn(PushKind, &str, &str) + Send + Sync>;
+
+/// The `(agent, sessionId)` a notification asks the user about, if it is a
+/// permission request or a question.
+fn input_request_session<'a>(method: &str, params: &'a Value) -> Option<(&'a str, &'a str)> {
+    if !matches!(
+        method,
+        "agent_permission_request" | "agent_elicitation_request"
+    ) {
+        return None;
+    }
+    Some((
+        params.get("agent")?.as_str()?,
+        params.get("sessionId")?.as_str()?,
+    ))
+}
 
 /// Skills the peer declared in its latest `peer_attach`.
 pub type PeerSkills = Arc<Mutex<SkillSelection>>;
@@ -96,19 +113,24 @@ impl AgentService {
     /// Attach this service's RPC handlers to a duplex Peer endpoint.
     #[allow(dead_code)]
     pub fn attach(&self, peer: &Peer) {
-        self.attach_with_completion(peer, None, PeerSkills::default());
+        self.attach_with_push(peer, None, PeerSkills::default());
     }
 
-    pub fn attach_with_completion(
-        &self,
-        peer: &Peer,
-        on_complete: Option<PromptCompletion>,
-        skills: PeerSkills,
-    ) {
+    pub fn attach_with_push(&self, peer: &Peer, push: Option<PeerPush>, skills: PeerSkills) {
         // The device each session's notifications go to; see `SessionActor::notifier`.
+        // A permission request or question also reaches it as a push, since the turn
+        // waits on it while the App may be in the background.
         let notifier: acp_agent::Notifier = {
             let peer = peer.clone();
-            Arc::new(move |method, params| peer.notify(method, params))
+            let push = push.clone();
+            Arc::new(move |method, params| {
+                if let Some(push) = &push
+                    && let Some((agent, session_id)) = input_request_session(method, &params)
+                {
+                    push(PushKind::InputRequest, agent, session_id);
+                }
+                peer.notify(method, params)
+            })
         };
         let notify_peer = peer.clone();
         self.end_listeners
@@ -449,7 +471,7 @@ impl AgentService {
 
         let prompt_sessions = sessions.clone();
         peer.handle_rpc("agent_prompt", move |params, ctx| {
-            let on_complete = on_complete.clone();
+            let push = push.clone();
             let sessions = prompt_sessions.clone();
             let notifier = notifier.clone();
             async move {
@@ -496,8 +518,8 @@ impl AgentService {
 
                 settle_forwarder(forwarder, result.is_ok()).await;
                 if result.is_ok() {
-                    if let Some(on_complete) = on_complete {
-                        on_complete(agent, session_id);
+                    if let Some(push) = push {
+                        push(PushKind::ResponseComplete, agent, session_id);
                     }
                 }
 
@@ -595,4 +617,28 @@ async fn session_context(
         skills: skills.lock().expect("lock poisoned").clone(),
         notifier: Some(notifier),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_requests_name_their_session() {
+        let params = json!({ "agent": "claude-acp", "sessionId": "s1", "requestId": "1" });
+        for method in ["agent_permission_request", "agent_elicitation_request"] {
+            assert_eq!(
+                input_request_session(method, &params),
+                Some(("claude-acp", "s1"))
+            );
+        }
+        assert_eq!(input_request_session("agent_session_update", &params), None);
+        assert_eq!(
+            input_request_session(
+                "agent_permission_request",
+                &json!({ "agent": "claude-acp" })
+            ),
+            None
+        );
+    }
 }

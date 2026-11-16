@@ -46,7 +46,7 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 - **页面布局**：内容交给 `tap-page` 自己滚动，不另包滚动容器，这样内容能从 header / footer 下方滚过；需要滚动元素时用 `tap-page` 的 `scrollElement`（会话页跟随到底部）。slot 进 header / footer 的自定义栏用半透明背景加 `backdrop-blur-lg`（`tap-navbar` 自带）。地图、实时画面、文件浏览为固定内容，不滚动。
 - **宽屏双栏**（`state/layout.ts`、`app.ts`）：宽 ≥ 800 且高 ≥ 500，或双屏横跨铰链时分栏，会话列表在左、全局 Stack 在右。所有页面推入同一个全局 Stack，宽窄切换时已开页面保留；双栏中选会话以 `Stack.replace(…, { keep: 1 })` 替换。双栏时 Sheet 不用多档 snap。
 - **弹层**：Sheet 灰底，其中卡片用 `lightBackgroundColor`。`Sheet.open` 的 body 由 patch 改为渲染到 light DOM 再经 slot 投影：WebKit 27 不把 shadow root 中的 `@scope` 规则应用到被 slot 进内层 shadow host 的元素（[Bug 327165](https://bugs.webkit.org/show_bug.cgi?id=327165)），Gem light DOM 元素样式会失效。
-- **点击推送**（`agent/push.ts`）：fork 的 `@mantou/tauri-plugin-fcm` 暂存点击通知的 `data`，前端经 `takeOpenedNotification` 取走；`host` 与当前配对的 `pushHostKey` 不同则只打开 App，Agent 不同先切换。
+- **点击推送**（`agent/push.ts`）：`response_complete` 与 `input_request`（等待批准或回答）两种都打开对应会话，未作答的请求由 `agent_prompts_running` 补回；fork 的 `@mantou/tauri-plugin-fcm` 暂存点击通知的 `data`，前端经 `takeOpenedNotification` 取走；`host` 与当前配对的 `pushHostKey` 不同则只打开 App，Agent 不同先切换。
 - **Android**：`crates/agentdeck/gen/android/app/google-services.json` 禁止放入服务账号私钥。identifier / namespace / applicationId / MainActivity package 统一为 `com.mantou.agentdeck`（`tauri.conf.json`、`build.gradle.kts`、`MainActivity.kt`）。FCM token 经 `peer_attach` 同步，更新 token 不切换连接状态。
 - **iOS**：原生资源在 `crates/agentdeck/`；更新应用图标时同步更新 `LaunchIcon`。tauri 会改写 `project.pbxproj`，它已与 `project.yml` 不一致，不能直接用 xcodegen 重新生成覆盖：改 target 时同步 `project.yml`，在临时目录生成后把增量合并进 pbxproj。tauri 只给名字含 `_iOS` 的 App target 设签名团队、bundle ID 与版本，Share Extension 的团队写死为同一团队，版本由其构建前脚本从 App 的 Info.plist 拷贝。
 
