@@ -637,7 +637,8 @@ export class AgentApi {
       timeoutMessage: i18n.get('error.taskTimeout'),
     });
 
-  listTasks = () => this.#taskCall<{ tasks: TaskListItem[] }>('task_list', {}).then(({ tasks }) => tasks);
+  /** `utcOffsetMinutes` is the host's, whose local time schedules are in. */
+  listTasks = () => this.#taskCall<{ tasks: TaskListItem[]; utcOffsetMinutes?: number }>('task_list', {});
 
   /** Oldest first. */
   taskRuns = (id: string) => this.#taskCall<{ runs: TaskRun[] }>('task_runs', { id }).then(({ runs }) => runs);

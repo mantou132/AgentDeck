@@ -372,6 +372,7 @@
   "task.workdays": "Weekdays",
   "task.everyMinutes": "Every $1 min",
   "task.everyHours": "Every $1 h",
+  "task.hostTime": "(computer time)",
   "task.minutes": "$1 min",
   "task.paused": "Paused",
   "task.success": "Done",

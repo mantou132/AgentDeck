@@ -372,6 +372,7 @@
   "task.workdays": "工作日",
   "task.everyMinutes": "每 $1 分钟",
   "task.everyHours": "每 $1 小时",
+  "task.hostTime": "（电脑时间）",
   "task.minutes": "$1 分钟",
   "task.paused": "已暂停",
   "task.success": "完成",

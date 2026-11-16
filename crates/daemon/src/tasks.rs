@@ -550,7 +550,9 @@ impl Tasks {
                 value
             })
             .collect();
-        json!({ "tasks": list })
+        // Schedules are in the host's local time, which the phone may not share.
+        let utc_offset_minutes = now.offset().local_minus_utc() / 60;
+        json!({ "tasks": list, "utcOffsetMinutes": utc_offset_minutes })
     }
 
     /// Creates a task (without `id`) or replaces one; returns it.
@@ -731,9 +733,20 @@ fn new_id() -> String {
     format!("t{}", Utc::now().timestamp_millis())
 }
 
-/// The last non-empty line of the agent's answer, shortened.
+/// The last non-empty line of the agent's answer, shortened. HTML comments
+/// are left out: the client hides them, e.g. the spoken summary
+/// `<!-- agentdeck-speech … -->` the remote app asks for.
 fn summary_of(answer: &str) -> String {
-    let line = answer
+    let mut text = String::new();
+    let mut rest = answer;
+    while let Some(start) = rest.find("<!--") {
+        text.push_str(&rest[..start]);
+        rest = rest[start..]
+            .find("-->")
+            .map_or("", |end| &rest[start + end + 3..]);
+    }
+    text.push_str(rest);
+    let line = text
         .lines()
         .map(str::trim)
         .rfind(|line| !line.is_empty())
@@ -841,6 +854,10 @@ mod tests {
         assert_eq!(
             summary_of(&"x".repeat(300)).chars().count(),
             SUMMARY_CHARS + 1
+        );
+        assert_eq!(
+            summary_of("今天需要跟进 3 条\n\n<!-- agentdeck-speech\n有 3 条要跟进。\n-->\n"),
+            "今天需要跟进 3 条"
         );
     }
 

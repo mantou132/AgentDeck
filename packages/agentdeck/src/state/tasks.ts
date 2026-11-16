@@ -16,6 +16,8 @@ export const tasksStore = createStore({
   tasks: [] as TaskListItem[],
   permissions: [] as PermissionRequest[],
   loaded: false,
+  /** The host's UTC offset; schedules are in its local time. */
+  hostUtcOffset: undefined as number | undefined,
 });
 
 const runningSessionIds = (tasks: TaskListItem[]) =>
@@ -44,9 +46,15 @@ export const refreshTasks = async () => {
   if (agentdeckStore.connection !== 'connected') return;
   const request = ++tasksRequest;
   try {
-    const tasks = await agentApi.listTasks();
+    const { tasks, utcOffsetMinutes } = await agentApi.listTasks();
     const { userInputs = [] } = runningSessionIds(tasks).size ? await agentApi.listRunningPrompts() : {};
-    if (request === tasksRequest) tasksStore({ tasks, permissions: runPermissions(userInputs, tasks), loaded: true });
+    if (request === tasksRequest)
+      tasksStore({
+        tasks,
+        permissions: runPermissions(userInputs, tasks),
+        loaded: true,
+        hostUtcOffset: utcOffsetMinutes,
+      });
   } catch (error) {
     console.error('Failed to list tasks:', error);
   }
@@ -54,7 +62,7 @@ export const refreshTasks = async () => {
 
 export const resetTasks = () => {
   tasksRequest++;
-  tasksStore({ tasks: [], permissions: [], loaded: false });
+  tasksStore({ tasks: [], permissions: [], loaded: false, hostUtcOffset: undefined });
 };
 
 // Run sessions are left out of the list, but a running one is opened from its task, and a push opens it.
@@ -159,7 +167,10 @@ export const formatSchedule = (schedule: TaskSchedule) => {
       : days.join() === '1,2,3,4,5'
         ? i18n.get('task.workdays')
         : days.map(weekdayName).join(' ');
-  return `${daysText} ${schedule.times.join(' ')}`;
+  // Times are the computer's; say so when the phone is in another time zone.
+  const { hostUtcOffset } = tasksStore;
+  const elsewhere = hostUtcOffset !== undefined && hostUtcOffset !== -new Date().getTimezoneOffset();
+  return `${daysText} ${schedule.times.join(' ')}${elsewhere ? ` ${i18n.get('task.hostTime')}` : ''}`;
 };
 
 export const formatTaskTime = (time: string) =>
