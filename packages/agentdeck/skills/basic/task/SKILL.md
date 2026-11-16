@@ -22,8 +22,8 @@ The AgentDeck client renders a fenced code block with the `agentdeck-task` langu
 - The body is one strict JSON object.
 - `name`: a few words naming the task, shown in the task list.
 - `prompt`: the full brief for each run. A run sees none of this conversation: name the files, accounts, pages or tools to use, what you already found works, what not to touch, and what done looks like. Ask for a last line stating the result; it becomes the run's summary on the phone.
-- `schedule`, in this computer's local time, one of:
-  - `{ "type": "daily", "times": ["HH:MM", …], "weekdays": [1, …] }`: at each time (24-hour, two-digit `HH:MM`) on the listed weekdays, 1 = Monday … 7 = Sunday; leave `weekdays` out for every day.
+- `schedule`, one of:
+  - `{ "type": "daily", "times": ["HH:MM", …], "weekdays": [1, …] }`: at each time (24-hour, two-digit `HH:MM`) on the listed weekdays, 1 = Monday … 7 = Sunday; leave `weekdays` out for every day. Times and weekdays are the user's own, in the time zone of the device they chat from, which may differ from this computer's: write them as the user says them, without converting. The client saves that time zone with the task. Only when the user asks for another zone (e.g. this computer's time), add `"timeZone"` with its IANA name, such as `"America/New_York"`.
   - `{ "type": "interval", "minutes": N }`: every N minutes (at least 5), counted from when the task is saved.
 - `timeoutMinutes` (optional, default 60): a run still going after this long is stopped.
 - `retries` (optional, default 0): extra attempts after a failed or timed-out run.
