@@ -408,6 +408,18 @@ class AgentTransport {
     if (this.#connectionState === 'connected') this.syncHostConnection(true);
   }
 
+  /** Whether the Relay reports host presence, which makes `host_reconnected` redundant. */
+  get hasPresence(): boolean {
+    return this.#relayClient?.peers !== undefined;
+  }
+
+  /** The host left the Relay: requests sent to it now get no reply, so fail them instead of waiting. */
+  #hostOffline() {
+    this.hostSession.invalidate();
+    this.#emitConnection('unavailable', i18n.get('error.hostOffline'));
+    this.agentApi.rejectTimed(new Error(i18n.get('error.hostOffline')));
+  }
+
   syncHostConnection(metadataOnly = false): Promise<void> {
     if (!this.#relayConnected) return Promise.resolve();
     if (this.hostSession.attaching) return this.hostSession.attaching;
@@ -478,12 +490,26 @@ class AgentTransport {
         if (this.#relayClient !== client) return;
         await this.#receive(codec.decodeBinary(data));
       },
+      // Endpoint 1 only ever holds the host, so any peer is the host. Peers already online are
+      // reported before `connected` and handled there.
+      onPeerConnected: () => {
+        if (this.#relayClient !== client || !this.#relayConnected) return;
+        // A new host connection, also one replacing a stale socket, may have dropped an earlier attach.
+        this.hostSession.invalidate();
+        this.syncHostConnection();
+      },
+      onPeerDisconnected: () => {
+        if (this.#relayClient !== client || !this.#relayConnected) return;
+        this.#hostOffline();
+      },
       onStateChange: (connection, error = '') => {
         if (this.#relayClient !== client) return;
         clearTimeout(this.#connectTimer);
         if (connection === 'connected') {
           this.#relayConnected = true;
-          this.syncHostConnection();
+          // Without presence (`peers` undefined) the attach itself finds out whether the host is online.
+          if (client.peers?.size === 0) this.#hostOffline();
+          else this.syncHostConnection();
           return;
         }
         this.#relayConnected = false;
@@ -607,7 +633,10 @@ export const initTransport = (options: InitTransportOptions) => {
       event: { event: 'session_update', update, childSessionId },
     }),
   );
-  agentApi.setHostReconnectedHandler(() => syncHostConnection());
+  // With presence, `peer_connected` already re-attaches.
+  agentApi.setHostReconnectedHandler(() => {
+    if (!transport.hasPresence) syncHostConnection();
+  });
   if (isPairingId(options.initialRelayId))
     startTransport(options.initialRelayId, {
       ackHead: options.ackHead,

@@ -90,10 +90,11 @@ export function documentFixture(previous, options = {}) {
     binary(bytes) {
       this.dispatchEvent(new MessageEvent('message', { data: bytes.slice().buffer }));
     }
-    open() {
+    /** `peers` simulates a Relay with presence; without it the Relay predates presence. */
+    open(peers) {
       this.readyState = 1;
       this.dispatchEvent(new Event('open'));
-      this.frame({ type: 'ready', endpoint: '2' });
+      this.frame({ type: 'ready', endpoint: '2', ...(peers && { peers }) });
     }
   }
 

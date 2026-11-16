@@ -370,6 +370,9 @@ impl ClientHandler for Handler {
 
     fn on_connected(&self) {
         tracing::info!("Connected to relay WebSocket");
+        // Ephemeral: only devices online now need to re-attach; a stored copy
+        // would reach phones that reconnect later and already attach on connect.
+        // Kept for Apps and Relays without presence.
         let _ = self.manager.outbound_tx.send(Outbound {
             message: json!({
                 "method": "host_reconnected",
@@ -377,7 +380,7 @@ impl ClientHandler for Handler {
             }),
             bytes: None,
             target_device_id: None,
-            ephemeral: false,
+            ephemeral: true,
         });
     }
 
@@ -505,6 +508,24 @@ mod tests {
                 .fcm_token
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn host_reconnected_is_an_ephemeral_broadcast() {
+        let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel();
+        let handler = Handler {
+            manager: Arc::new(RemotePeerManager::with_devices(
+                AgentService::new(),
+                outbound_tx,
+                HashMap::new(),
+            )),
+            codec: Arc::new(RelayCodec::new("00000000-0000-4000-8000-000000000000").unwrap()),
+        };
+        handler.on_connected();
+        let outbound = outbound_rx.recv().await.unwrap();
+        assert_eq!(outbound.message["method"], "host_reconnected");
+        assert!(outbound.ephemeral);
+        assert!(outbound.target_device_id.is_none());
     }
 
     #[tokio::test]

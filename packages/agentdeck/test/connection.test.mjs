@@ -114,6 +114,66 @@ test('Relay handshake watchdog recovers a socket stuck before ready', async () =
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 });
 
+const attaches = (fixture) => fixture.requests.filter((request) => request.payload.method === 'peer_attach').length;
+
+test('with Relay presence an offline host shows at once and attaches when it comes online', async () => {
+  const fixture = documentFixture();
+  await fixture.app.startApp();
+  const socket = fixture.sockets.at(-1);
+  assert.equal(new URL(socket.url).searchParams.get('presence'), 'true');
+  socket.open([]);
+  await fixture.settleHost();
+  assert.equal(fixture.app.agentdeckStore.connection, 'unavailable');
+  assert.match(fixture.app.agentdeckStore.connectionError, /Host is offline/);
+  assert.equal(attaches(fixture), 0, 'no attach waits for an offline host');
+  socket.frame({ type: 'peer_connected', device_id: 'host' });
+  await fixture.settleHost();
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+  assert.equal(attaches(fixture), 1);
+});
+
+test('with Relay presence a leaving host fails timed calls at once and keeps prompts waiting', async () => {
+  const fixture = documentFixture();
+  await fixture.app.startApp();
+  fixture.sockets.at(-1).open(['host']);
+  await fixture.settleHost();
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+  await fixture.openSession();
+  fixture.app.sendPrompt('s1', 'long task');
+  const browse = fixture.transport.agentApi.browseFiles('/tmp');
+  await tick();
+  fixture.sockets.at(-1).frame({ type: 'peer_disconnected', device_id: 'host' });
+  await assert.rejects(browse, /Host is offline/);
+  assert.equal(fixture.app.agentdeckStore.connection, 'unavailable');
+  assert.equal(fixture.app.isTurnRunning('s1'), true);
+});
+
+test('with Relay presence a replacing host connection re-attaches and host_reconnected is ignored', async () => {
+  const fixture = documentFixture();
+  await fixture.app.startApp();
+  fixture.sockets.at(-1).open(['host']);
+  await fixture.settleHost();
+  assert.equal(attaches(fixture), 1);
+  fixture.deliver({ method: 'host_reconnected', params: {} });
+  await fixture.settleHost();
+  assert.equal(attaches(fixture), 1);
+  // A host restarted before the Relay dropped its stale socket: an earlier attach may be lost.
+  fixture.sockets.at(-1).frame({ type: 'peer_connected', device_id: 'host', replaced: true });
+  await fixture.settleHost();
+  assert.equal(attaches(fixture), 2);
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+});
+
+test('without Relay presence host_reconnected re-attaches', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  assert.equal(attaches(fixture), 1);
+  fixture.deliver({ method: 'host_reconnected', params: {} });
+  await fixture.settleHost();
+  assert.equal(attaches(fixture), 2);
+  assert.equal(fixture.app.agentdeckStore.connection, 'connected');
+});
+
 test('a session opened while reconnecting stays idle without an error and loads once connected', async () => {
   const fixture = documentFixture();
   await fixture.connect();

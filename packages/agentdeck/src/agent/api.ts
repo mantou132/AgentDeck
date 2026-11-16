@@ -281,6 +281,8 @@ export class AgentApi {
 
   rejectEphemeral = (error: Error) => this.#peer.rejectEphemeral(error);
 
+  rejectTimed = (error: Error) => this.#peer.rejectTimed(error);
+
   touch = (id: RpcId) => this.#peer.touch(id);
 
   /** Requests waiting for the user arrive as notifications; answers go through `respondUserInput`. */

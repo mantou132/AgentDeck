@@ -180,6 +180,17 @@ export class RpcPeer {
     for (const id of this.#pending.keys()) this.#takePending(id)?.reject(error);
   };
 
+  /** Fails calls that have a timeout at once, as if it had elapsed; calls without one (e.g. prompts) keep waiting. */
+  rejectTimed = (error: Error) => {
+    for (const [id, pending] of this.#pending) {
+      if (!pending.startTimer) continue;
+      this.#takePending(id)?.reject(error);
+      Promise.resolve()
+        .then(() => this.#onTimeout?.(id))
+        .catch(console.error);
+    }
+  };
+
   /** Fails ephemeral calls at once: a reply lost with the connection is never replayed. */
   rejectEphemeral = (error: Error) => {
     for (const [id, pending] of this.#pending) if (pending.ephemeral) this.#takePending(id)?.reject(error);

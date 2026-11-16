@@ -4591,7 +4591,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 [[package]]
 name = "relay-client"
 version = "0.1.0"
-source = "git+https://github.com/mantou132/relay.git#17dd70061cb01b67490084deec6a484feef28316"
+source = "git+https://github.com/mantou132/relay.git#b7a15121f3baed150037370ce4fd11e3210b177d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6112,7 +6112,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.59.0",
