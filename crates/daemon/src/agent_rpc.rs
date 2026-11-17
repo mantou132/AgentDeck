@@ -366,7 +366,7 @@ impl AgentService {
         let create_sessions = sessions.clone();
         let create_skills = skills.clone();
         let create_notifier = notifier.clone();
-        peer.handle("agent_session_create", move |params, _ctx| {
+        peer.handle("agent_session_create", move |params, ctx| {
             let sessions = create_sessions.clone();
             let skills = create_skills.clone();
             let notifier = create_notifier.clone();
@@ -375,6 +375,7 @@ impl AgentService {
                 let cwd = message_cwd(&params);
                 let context = session_context(&params, &skills, notifier).await?;
                 let timeout_secs = message_timeout_secs(&params);
+                prepare_agent(&sessions, agent, &ctx).await?;
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
                     sessions.create_session(agent, cwd, context),
@@ -406,6 +407,7 @@ impl AgentService {
                 let cwd = message_cwd(&params);
                 let context = session_context(&params, &skills, notifier).await?;
                 let timeout_secs = message_timeout_secs(&params);
+                prepare_agent(&sessions, agent, &ctx).await?;
 
                 // The actor drains the load-time history replay into this channel
                 // while the load runs; afterwards the buffered frames are emitted
@@ -442,7 +444,7 @@ impl AgentService {
 
         let list_sessions = sessions.clone();
         let list_tasks = self.tasks.clone();
-        peer.handle("agent_session_list", move |params, _ctx| {
+        peer.handle("agent_session_list", move |params, ctx| {
             let sessions = list_sessions.clone();
             let tasks = list_tasks.get().cloned();
             async move {
@@ -454,6 +456,7 @@ impl AgentService {
                     .filter(|value| !value.is_empty())
                     .map(str::to_string);
                 let timeout_secs = message_timeout_secs(&params);
+                prepare_agent(&sessions, agent, &ctx).await?;
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
                     sessions.list_sessions(agent, cwd, cursor),
@@ -693,6 +696,44 @@ pub(crate) fn agent_error(err: anyhow::Error) -> RpcError {
     RpcError {
         message: err.to_string(),
         code: auth_required.then_some("auth_required"),
+    }
+}
+
+/// First `agent_status` frame, so agents that start quickly show nothing.
+const AGENT_STATUS_DELAY: Duration = Duration::from_secs(2);
+/// Repeated while the agent starts; each frame restarts the client's timeout.
+const AGENT_STATUS_INTERVAL: Duration = Duration::from_secs(5);
+/// Upper bound for installing and starting an agent, which `timeoutSeconds` doesn't cover.
+const AGENT_PREPARE_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// Starts `agent` before a call that needs it, streaming `agent_status`
+/// frames while it installs or starts.
+async fn prepare_agent(
+    sessions: &AgentSessionManager,
+    agent: &str,
+    ctx: &CallCtx,
+) -> Result<(), String> {
+    let status = sessions.agent_status(agent);
+    let prepare = tokio::time::timeout(AGENT_PREPARE_TIMEOUT, sessions.prepare(agent));
+    tokio::pin!(prepare);
+    let mut ticks = tokio::time::interval_at(
+        tokio::time::Instant::now() + AGENT_STATUS_DELAY,
+        AGENT_STATUS_INTERVAL,
+    );
+    loop {
+        tokio::select! {
+            result = &mut prepare => {
+                return match result {
+                    Ok(result) => result.map_err(|err| err.to_string()),
+                    Err(_) => Err("Timeout starting ACP agent".to_string()),
+                };
+            }
+            _ = ticks.tick() => {
+                if let Some(status) = *status.borrow() {
+                    ctx.emit(json!({ "event": "agent_status", "status": status }));
+                }
+            }
+        }
     }
 }
 

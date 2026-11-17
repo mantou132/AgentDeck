@@ -23,6 +23,8 @@
   "connection.disconnected": "Disconnected",
   "connection.preempted": "Connection preempted",
   "sessionList.loading": "Loading sessions",
+  "agentStatus.installing": "Installing $1…",
+  "agentStatus.starting": "Starting $1, first run downloads it…",
   "sessionList.thisComputer": "This computer",
   "sessionList.emptyTitle": "No sessions for this agent yet",
   "sessionList.emptyDesc": "Sessions are managed by the remote ACP agent and will appear here grouped by working directory.",

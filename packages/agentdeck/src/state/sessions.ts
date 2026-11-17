@@ -24,6 +24,7 @@ import {
   agentdeckStore,
   getMessages,
   getRuntime,
+  hostAgents,
   isConnecting,
   isTurnRunning,
   messagesStore,
@@ -182,6 +183,19 @@ export const isPlaceholderTitle = (title?: string) => {
   }
 
   return false;
+};
+
+agentApi.setAgentStatusHandler((agent, status) => {
+  const { [agent]: _, ...rest } = sessionsStore.agentStatus;
+  sessionsStore({ agentStatus: status ? { ...rest, [agent]: status } : rest });
+});
+
+/** What the host is doing with `agent` before a session call can run, or `''`. */
+export const getAgentStatusText = (agent: string) => {
+  const status = sessionsStore.agentStatus[agent];
+  if (!status) return '';
+  const name = hostAgents().find((item) => item.id === agent)?.name || agent;
+  return i18n.get(status === 'installing' ? 'agentStatus.installing' : 'agentStatus.starting', name);
 };
 
 /** Manual retry: restarts a stalled connection, but only hurries an automatic reconnect instead of restarting it. */

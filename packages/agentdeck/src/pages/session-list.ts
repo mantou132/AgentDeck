@@ -6,7 +6,7 @@ import { appendDraftAttachments, draftKey, setDraftQuote } from '../composer/dra
 import { getConnectionLabel, i18n } from '../i18n';
 import { openSettings, selectSession } from '../navigation';
 import { hasPendingElicitation } from '../session/elicitation';
-import { createPendingSession, deleteSession, refreshSessions } from '../state/sessions';
+import { createPendingSession, deleteSession, getAgentStatusText, refreshSessions } from '../state/sessions';
 import { clearShare, shareStore } from '../state/share';
 import {
   agentdeckStore,
@@ -126,6 +126,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const hasGroups = Boolean(sessionGroups.length);
     const showSkeleton = !hasGroups && (sessionsLoading || !sessionsLoaded || reconnecting) && !hasError;
     const showErrorState = !showSkeleton && !hasGroups && hasError;
+    const agentStatusText = getAgentStatusText(settings.agent);
 
     const runtimeEntries = Object.entries(runtimes);
     const sessionSet = (has: (runtime: SessionRuntime) => unknown) =>
@@ -157,12 +158,14 @@ export class AgentDeckSessionListPageElement extends GemElement {
                 <span
                   class=${classMap({
                     'size-[7px] shrink-0 rounded-full bg-disabled': true,
-                    'bg-positive ring-4 ring-positive/10': isConnected,
+                    'bg-positive ring-4 ring-positive/10': isConnected && !agentStatusText,
                     'bg-negative ring-4 ring-negative/10': connection === 'preempted',
-                    'animate-pulse bg-informative': reconnecting,
+                    'animate-pulse bg-informative': reconnecting || !!agentStatusText,
                   })}
                 ></span>
-                <span class="truncate">${getConnectionLabel(connection)} · ${selectedAgent?.name || settings.agent}</span>
+                <span class="truncate">
+                  ${agentStatusText || `${getConnectionLabel(connection)} · ${selectedAgent?.name || settings.agent}`}
+                </span>
               </div>
             </div>
           </div>

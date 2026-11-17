@@ -23,6 +23,8 @@
   "connection.disconnected": "尚未连接",
   "connection.preempted": "连接已被取代",
   "sessionList.loading": "正在加载会话",
+  "agentStatus.installing": "正在安装 $1…",
+  "agentStatus.starting": "正在启动 $1，首次需下载…",
   "sessionList.thisComputer": "这台电脑",
   "sessionList.emptyTitle": "这个 Agent 还没有会话",
   "sessionList.emptyDesc": "会话由远端 ACP Agent 管理，出现后会按工作目录归到这里。",

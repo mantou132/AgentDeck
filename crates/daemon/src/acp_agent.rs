@@ -118,6 +118,16 @@ pub struct SessionReady {
     pub config_options: Option<serde_json::Value>,
 }
 
+/// What a starting agent is doing, reported to clients waiting on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentStatus {
+    /// Downloading the managed binary.
+    Installing,
+    /// Launching the process and initializing ACP; `npx` / `uvx` download in this step.
+    Starting,
+}
+
 /// An initialized ACP connection and the capabilities the agent advertised.
 #[derive(Clone)]
 struct AgentConnection {
@@ -153,11 +163,14 @@ struct AcpRuntime {
     /// any child traffic is routed.
     children: Arc<std::sync::Mutex<HashMap<String, String>>>,
     disconnects: watch::Sender<u64>,
+    /// `None` once connected or stopped.
+    status: watch::Sender<Option<AgentStatus>>,
 }
 
 impl AcpRuntime {
     fn new(agent: String, sessions: SessionMap) -> Self {
         let (disconnects, _) = watch::channel(0);
+        let (status, _) = watch::channel(None);
         Self {
             agent,
             state: Arc::new(Mutex::new(RuntimeState {
@@ -169,6 +182,7 @@ impl AcpRuntime {
             sessions,
             children: Arc::default(),
             disconnects,
+            status,
         }
     }
 
@@ -212,13 +226,18 @@ impl AcpRuntime {
     }
 
     async fn serve_connection(&self, generation: u64) -> Result<()> {
+        self.status.send_replace(Some(AgentStatus::Starting));
         catalog::refresh_registry();
         let agent = self.agent.clone();
+        let status = self.status.clone();
         let command = tokio::task::spawn_blocking(move || {
-            prepare_agent_command(catalog::agent_candidate(&agent)?)
+            prepare_agent_command(catalog::agent_candidate(&agent)?, &|| {
+                status.send_replace(Some(AgentStatus::Installing));
+            })
         })
         .await
         .context("ACP runtime preparation task failed")??;
+        self.status.send_replace(Some(AgentStatus::Starting));
         tracing::info!("Starting {} ACP agent: {}", self.agent, command.join(" "));
         // `from_args` treats leading `NAME=value` args as env overrides for the
         // spawned subprocess.
@@ -372,6 +391,7 @@ impl AcpRuntime {
                 return;
             }
             state.connection = Some(connection.clone());
+            self.status.send_replace(None);
             std::mem::take(&mut state.waiters)
         };
         for waiter in waiters {
@@ -387,6 +407,7 @@ impl AcpRuntime {
             }
             state.connection = None;
             state.connecting = false;
+            self.status.send_replace(None);
             std::mem::take(&mut state.waiters)
         };
         for waiter in waiters {
@@ -781,6 +802,15 @@ impl AgentSessionManager {
             .entry(agent.to_string())
             .or_insert_with(|| AcpRuntime::new(agent.to_string(), self.sessions.clone()))
             .clone()
+    }
+
+    /// Start `agent` if it isn't running; `status` reports the progress meanwhile.
+    pub async fn prepare(&self, agent: &str) -> Result<()> {
+        self.runtime(agent).connection().await.map(drop)
+    }
+
+    pub fn agent_status(&self, agent: &str) -> watch::Receiver<Option<AgentStatus>> {
+        self.runtime(agent).status.subscribe()
     }
 
     pub async fn create_session(

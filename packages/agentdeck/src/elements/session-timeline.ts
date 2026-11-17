@@ -35,6 +35,8 @@ export class DeckSessionTimelineElement extends GemElement {
   @property messages: ChatMessage[] = [];
   @property elicitations: Elicitation[] = [];
   @boolattribute pending: boolean;
+  /** Shown while pending instead of "Thinking…", e.g. while the host installs the agent. */
+  @attribute status: string;
   /** The agent can fork at a given message. */
   @boolattribute forkable: boolean;
   @emitter preview: Emitter<Attachment>;
@@ -267,7 +269,7 @@ export class DeckSessionTimelineElement extends GemElement {
         class="mb-2 flex min-h-10 items-center gap-2 text-sm text-describe"
       >
         <tap-use class="size-4 shrink-0 text-primary-strong" .element=${icons.loading}></tap-use>
-        ${i18n.get('timeline.thinking')}
+        ${this.status || i18n.get('timeline.thinking')}
       </div>
     `;
   };

@@ -263,6 +263,7 @@ fn install_registry_binary(
     registry_id: &str,
     version: &str,
     binary: &RegistryBinaryTarget,
+    on_install: &dyn Fn(),
 ) -> Result<PreparedProgram> {
     let _guard = AGENT_INSTALL_LOCK
         .lock()
@@ -272,6 +273,7 @@ fn install_registry_binary(
         tracing::info!("Reusing cached managed {registry_id} binary");
         return Ok(program);
     }
+    on_install();
 
     let archive_url = reqwest::Url::parse(&binary.archive)
         .context("ACP registry returned an invalid agent archive URL")?;
@@ -410,6 +412,7 @@ fn prepare_native_command(
     user_cli: Option<PathBuf>,
     version: &str,
     binary: &RegistryBinaryTarget,
+    on_install: &dyn Fn(),
 ) -> Result<Vec<String>> {
     let program = if let Some(executable) = user_cli {
         tracing::info!(
@@ -429,7 +432,7 @@ fn prepare_native_command(
             candidate.name,
             runtime.root().display()
         );
-        install_registry_binary(&runtime, owner, version, binary)?
+        install_registry_binary(&runtime, owner, version, binary, on_install)?
     };
 
     let path_entries = user_path_entries();
@@ -523,11 +526,15 @@ fn prepare_custom_command(
     Ok(command)
 }
 
-pub(super) fn prepare_agent_command(candidate: AgentCandidate) -> Result<Vec<String>> {
+/// `on_install` runs before a managed binary is downloaded.
+pub(super) fn prepare_agent_command(
+    candidate: AgentCandidate,
+    on_install: &dyn Fn(),
+) -> Result<Vec<String>> {
     let user_cli = candidate.cli.as_deref().and_then(find_working_command);
     match &candidate.launch {
         AgentLaunch::Binary { version, target } => {
-            prepare_native_command(&candidate, user_cli, version, target)
+            prepare_native_command(&candidate, user_cli, version, target, on_install)
         }
         AgentLaunch::Npx { package, args, env } => {
             prepare_npx_command(&candidate, package, args, env)

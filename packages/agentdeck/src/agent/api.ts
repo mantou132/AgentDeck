@@ -1,6 +1,6 @@
 import type { AgentInfo } from '../config';
 import { i18n } from '../i18n';
-import type { RpcId, RpcMessage } from './rpc';
+import type { CallOptions, RpcId, RpcMessage } from './rpc';
 import { RpcPeer } from './rpc';
 
 type CreateSessionOptions = {
@@ -298,6 +298,9 @@ export type SessionUpdateNotification = {
 
 export type PromptSuggestion = { agent: string; sessionId: string; suggestion: string };
 
+/** What the host's agent does before a call can run: downloading it, or launching it (`npx` / `uvx` download then). */
+export type AgentStatus = 'installing' | 'starting';
+
 type ListResponse = { sessions?: RemoteSession[]; nextCursor?: string };
 
 // Allow ACP startup/history work more time than the lightweight host handshake.
@@ -319,6 +322,7 @@ type PeerAttachResult = {
 
 export class AgentApi {
   #peer: RpcPeer;
+  #onAgentStatus?: (agent: string, status?: AgentStatus) => void;
 
   constructor(send: (message: RpcMessage) => void | Promise<void>, onTimeout?: (id: RpcId) => void | Promise<void>) {
     this.#peer = new RpcPeer(send, onTimeout);
@@ -351,6 +355,36 @@ export class AgentApi {
   /** Session updates the agent sends between turns (e.g. available commands), to the device that created or loaded it. */
   setSessionUpdateHandler = (handler?: ((params: SessionUpdateNotification) => void) | null) =>
     this.#peer.onNotify('agent_session_update', (params) => handler?.(params as SessionUpdateNotification));
+
+  /** The host reports `status` while starting `agent` for a session call; `undefined` once that call settles. */
+  setAgentStatusHandler = (handler?: ((agent: string, status?: AgentStatus) => void) | null) => {
+    this.#onAgentStatus = handler ?? undefined;
+  };
+
+  /** A session call that starts `agent` first; its `agent_status` frames go to the status handler. */
+  #agentCall = async <T>(
+    agent: string,
+    method: string,
+    params: Record<string, unknown>,
+    options: CallOptions,
+    onEvent?: (event: unknown) => void | Promise<void>,
+  ) => {
+    let reported = false;
+    try {
+      return await this.#peer.call<T>(
+        method,
+        { agent, ...params },
+        (event) => {
+          if ((event as { event?: string }).event !== 'agent_status') return onEvent?.(event);
+          reported = true;
+          this.#onAgentStatus?.(agent, (event as { status: AgentStatus }).status);
+        },
+        options,
+      );
+    } finally {
+      if (reported) this.#onAgentStatus?.(agent);
+    }
+  };
 
   setHostReconnectedHandler = (handler?: (() => void) | null) =>
     this.#peer.onNotify('host_reconnected', () => handler?.());
@@ -485,10 +519,10 @@ export class AgentApi {
     });
 
   createSession = ({ agent, cwd, panelContext }: CreateSessionOptions) =>
-    this.#peer.call<CreatedSession>(
+    this.#agentCall<CreatedSession>(
+      agent,
       'agent_session_create',
-      { agent, cwd, ...(panelContext ? { panelContext } : {}), timeoutSeconds: sessionTimeoutSeconds },
-      undefined,
+      { cwd, ...(panelContext ? { panelContext } : {}), timeoutSeconds: sessionTimeoutSeconds },
       {
         timeoutMs: 65_000,
         timeoutMessage: i18n.get('error.createSessionTimeout'),
@@ -500,14 +534,13 @@ export class AgentApi {
     const cursors = new Set<string>();
     let cursor: string | undefined;
     do {
-      const result = await this.#peer.call<ListResponse>(
+      const result = await this.#agentCall<ListResponse>(
+        agent,
         'agent_session_list',
         {
-          agent,
           timeoutSeconds: sessionTimeoutSeconds,
           ...(cursor ? { cursor } : {}),
         },
-        undefined,
         { timeoutMs: 65_000, timeoutMessage: i18n.get('error.readSessionListTimeout') },
       );
       if (Array.isArray(result.sessions)) sessions.push(...result.sessions);
@@ -519,18 +552,18 @@ export class AgentApi {
   };
 
   loadSession = ({ agent, sessionId, cwd, onEvent, panelContext }: LoadSessionOptions) =>
-    this.#peer.call<LoadedSession>(
+    this.#agentCall<LoadedSession>(
+      agent,
       'agent_session_load',
       {
-        agent,
         sessionId,
         ...(cwd ? { cwd } : {}),
         stream: true,
         timeoutSeconds: sessionTimeoutSeconds,
         ...(panelContext ? { panelContext } : {}),
       },
-      onEvent ? (event) => onEvent(event as SessionEvent) : undefined,
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
+      onEvent ? (event) => onEvent(event as SessionEvent) : undefined,
     );
 
   /** Fork up to and including the agent message `messageId`; the new session is loaded like any other. */

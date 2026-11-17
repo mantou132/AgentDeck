@@ -1,4 +1,4 @@
-import type { PermissionRequest } from '../agent/api';
+import type { AgentStatus, PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
 import {
   defaultAgents,
@@ -61,6 +61,8 @@ export const sessionsStore = createStore({
   sessionsLoading: false,
   sessionsLoaded: false,
   sessionsError: '',
+  /** Agents the host is installing or starting for a session call. */
+  agentStatus: {} as Record<string, AgentStatus>,
   runtimes: unreadRuntimes() as Record<string, SessionRuntime>,
 });
 

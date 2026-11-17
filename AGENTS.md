@@ -29,7 +29,7 @@
 - **Relay 连接约定**：App 经 `relay-client-ts` 连接 Relay endpoint 2，agentdeckd 使用 endpoint 1；地址见 `packages/agentdeck/src/config.ts`。官网 `/live` 扫码互动也用同一个 Relay（relayId `live_*`，只发 ephemeral），与配对无关。
 - **端到端加密（E2EE）**：普通 UUID 保持明文；`adk1_` 配对 ID 只留在两端，Relay 使用派生路由 ID。加密层只负责消息加解密，不保存消息状态；不允许自动退回明文。
 - **会话状态机制**：新会话先建本地待创建会话（App 中称 pending session），首次发送才向远端 create；打开已有会话保留 close → load，手机端与扩展端不能依赖页面卸载时 close。
-- **连接与重试**：host 握手成功才算 connected，普通重连保留 SDK 消息状态。短请求有超时，prompt 不套固定短时限；load 等事件流调用与 `peer_attach` 从收到 host 的最后一帧起计时（重连后 Relay 先补发积压消息）。权限请求与问题由 daemon 保存，App 每次连上经 `agent_prompts_running` 补回，不依赖请求重投。App 订阅 Relay presence（endpoint 1 只有 host）：连上时 host 不在线直接进入 `unavailable`、不发 attach；host 上线或替换旧连接（`replaced`）时重新 attach；host 下线时进入 `unavailable`，带超时的调用立即失败，prompt 继续等待。不支持 presence 的 Relay（`peers` 为 undefined）沿用 daemon 每次连上广播的 `host_reconnected`。
+- **连接与重试**：host 握手成功才算 connected，普通重连保留 SDK 消息状态。短请求有超时，prompt 不套固定短时限；load 等事件流调用与 `peer_attach` 从收到 host 的最后一帧起计时（重连后 Relay 先补发积压消息）；会话 list / create / load 遇到 Agent 未启动时，daemon 先安装或启动，期间定时发 `agent_status` 帧（App 显示状态并续期），`timeoutSeconds` 从就绪后起算。权限请求与问题由 daemon 保存，App 每次连上经 `agent_prompts_running` 补回，不依赖请求重投。App 订阅 Relay presence（endpoint 1 只有 host）：连上时 host 不在线直接进入 `unavailable`、不发 attach；host 上线或替换旧连接（`replaced`）时重新 attach；host 下线时进入 `unavailable`，带超时的调用立即失败，prompt 继续等待。不支持 presence 的 Relay（`peers` 为 undefined）沿用 daemon 每次连上广播的 `host_reconnected`。
 - **投递方式**：只有 `file_read` 与 `screen_capture` 经 `CallOptions.ephemeral` 走 Relay ephemeral（不落库、不 ack，host 离线或断线即失败，回复同样 ephemeral，字节回复为二进制帧），以及 daemon 的 `host_reconnected` 通知（只需在线设备重新 attach），其余一律可靠投递。
 - **重置与清理**：异常必须保留重试或 settings 重置入口。重置重载文档并清理本地 Relay 消息状态，保留配对和设备标识；不删除远端历史，也不保证停止远端任务。
 
