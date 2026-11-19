@@ -6,7 +6,7 @@ use std::{
     io,
     path::{Component, Path, PathBuf},
     process::Command,
-    sync::Mutex as StdMutex,
+    sync::{Arc, Mutex as StdMutex, OnceLock},
     time::Duration,
 };
 
@@ -16,7 +16,16 @@ use serde::{Deserialize, Serialize};
 use super::catalog::{AgentCandidate, AgentLaunch, RegistryBinaryTarget, managed_binary_agent};
 use crate::app_data;
 
-static AGENT_INSTALL_LOCK: StdMutex<()> = StdMutex::new(());
+static AGENT_INSTALL_LOCKS: OnceLock<StdMutex<HashMap<PathBuf, Arc<StdMutex<()>>>>> =
+    OnceLock::new();
+
+fn agent_install_lock(root: &Path) -> Arc<StdMutex<()>> {
+    let locks = AGENT_INSTALL_LOCKS.get_or_init(|| StdMutex::new(HashMap::new()));
+    let mut map = locks.lock().expect("agent install lock table poisoned");
+    map.entry(root.to_path_buf())
+        .or_insert_with(|| Arc::new(StdMutex::new(())))
+        .clone()
+}
 
 /// Browsers launched from Finder/Dock only inherit macOS' minimal PATH, which
 /// hides CLIs installed under Homebrew or user-local tool managers. Extend the
@@ -265,9 +274,8 @@ fn install_registry_binary(
     binary: &RegistryBinaryTarget,
     on_install: &dyn Fn(),
 ) -> Result<PreparedProgram> {
-    let _guard = AGENT_INSTALL_LOCK
-        .lock()
-        .expect("agent install lock poisoned");
+    let install_lock = agent_install_lock(runtime.root());
+    let _guard = install_lock.lock().expect("agent install lock poisoned");
 
     if let Some(program) = cached_managed_binary(runtime, version) {
         tracing::info!("Reusing cached managed {registry_id} binary");
@@ -685,5 +693,133 @@ mod tests {
 
         assert_eq!(cached.executable, executable);
         assert_eq!(cached.args, vec!["acp".to_string()]);
+    }
+
+    fn write_cached_stub(
+        runtime: &crate::app_data::AgentPaths,
+        version: &str,
+    ) -> std::path::PathBuf {
+        let binary_dir = runtime.version_dir(version);
+        std::fs::create_dir_all(&binary_dir).expect("create binary directory");
+        let executable = binary_dir.join(if cfg!(windows) { "agent.cmd" } else { "agent" });
+        std::fs::write(&executable, "").expect("write stub executable");
+        let manifest = serde_json::json!({
+            "version": version,
+            "command": executable.strip_prefix(runtime.root()).unwrap().to_string_lossy(),
+            "args": ["acp"]
+        });
+        std::fs::write(
+            runtime.manifest_file(),
+            serde_json::to_vec_pretty(&manifest).unwrap(),
+        )
+        .expect("write binary manifest");
+        executable
+    }
+
+    #[test]
+    fn different_agent_installs_do_not_block_each_other() {
+        use std::{
+            collections::HashMap,
+            sync::atomic::{AtomicBool, Ordering},
+        };
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("agentdeck-install-parallel-{unique}"));
+        let runtime_a = crate::app_data::AgentPaths::new(root.join("agent-a"));
+        let runtime_b = crate::app_data::AgentPaths::new(root.join("agent-b"));
+        let executable_b = write_cached_stub(&runtime_b, "1.0.0");
+
+        let lock_a = super::agent_install_lock(runtime_a.root());
+        let _guard_a = lock_a.lock().expect("lock agent-a");
+
+        // Another uncached agent can acquire its own install lock concurrently.
+        let lock_b = super::agent_install_lock(runtime_b.root());
+        assert!(lock_b.try_lock().is_ok());
+
+        // And a cached agent is not blocked while agent-a is installing.
+        let on_install_called = AtomicBool::new(false);
+        let dummy_target = super::RegistryBinaryTarget {
+            archive: "https://example.invalid/agent.tar.gz".to_string(),
+            cmd: "agent".to_string(),
+            args: vec!["acp".to_string()],
+            env: HashMap::new(),
+            sha256: None,
+        };
+        let program =
+            super::install_registry_binary(&runtime_b, "agent-b", "1.0.0", &dummy_target, &|| {
+                on_install_called.store(true, Ordering::SeqCst)
+            })
+            .expect("agent-b should resolve without waiting on agent-a");
+
+        assert_eq!(program.executable, executable_b);
+        assert!(!on_install_called.load(Ordering::SeqCst));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn same_agent_runtime_install_serializes_and_reuses_cache() {
+        use std::{
+            collections::HashMap,
+            sync::{
+                Arc,
+                atomic::{AtomicBool, Ordering},
+                mpsc,
+            },
+            time::Duration,
+        };
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("agentdeck-install-serial-{unique}"));
+        let runtime = crate::app_data::AgentPaths::new(root.join("opencode"));
+
+        let lock = super::agent_install_lock(runtime.root());
+        let guard = lock.lock().expect("lock shared runtime");
+
+        let (done_tx, done_rx) = mpsc::channel();
+        let on_install_called = Arc::new(AtomicBool::new(false));
+        let on_install_flag = on_install_called.clone();
+        let worker_root = runtime.root().to_path_buf();
+        let handle = std::thread::spawn(move || {
+            let worker_runtime = crate::app_data::AgentPaths::new(worker_root);
+            let dummy_target = super::RegistryBinaryTarget {
+                archive: "https://example.invalid/opencode.tar.gz".to_string(),
+                cmd: "agent".to_string(),
+                args: vec!["acp".to_string()],
+                env: HashMap::new(),
+                sha256: None,
+            };
+            let result = super::install_registry_binary(
+                &worker_runtime,
+                "opencode",
+                "1.0.0",
+                &dummy_target,
+                &|| on_install_flag.store(true, Ordering::SeqCst),
+            );
+            let _ = done_tx.send(result.map(|program| program.executable));
+        });
+
+        assert!(
+            done_rx.recv_timeout(Duration::from_millis(50)).is_err(),
+            "second install for the same runtime should wait for the first"
+        );
+
+        let executable = write_cached_stub(&runtime, "1.0.0");
+        drop(guard);
+
+        let resolved = done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("second install should unblock after lock release")
+            .expect("second install should reuse cached binary");
+        handle.join().expect("worker thread should exit cleanly");
+
+        assert_eq!(resolved, executable);
+        assert!(!on_install_called.load(Ordering::SeqCst));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
