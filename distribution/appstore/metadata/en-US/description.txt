@@ -21,7 +21,7 @@ BUILT FOR BEING AWAY FROM THE KEYBOARD
 REVIEW REAL WORK, NOT JUST CHAT
 • Browse files, Git changes, diffs and history.
 • Preview the HTML pages, charts and maps your agent produces.
-• Watch a live view of the iOS Simulator, Android emulator or browser tab your agent is driving.
+• Watch a live view of the iOS Simulator or browser tab your agent is driving.
 • Attach any file to a prompt.
 
 BUILT TO KEEP RUNNING

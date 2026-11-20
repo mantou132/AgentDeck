@@ -21,7 +21,7 @@ AgentDeck 让你在自己的电脑上运行 Claude Code、Codex、Cursor 或任�
 审阅真实成果，而不只是聊天
 • 浏览文件、Git 变更、diff 和历史。
 • 预览 Agent 生成的 HTML 页面、图表和地图。
-• 实时查看 Agent 正在操作的 iOS 模拟器、Android 模拟器或浏览器标签页。
+• 实时查看 Agent 正在操作的 iOS 模拟器或浏览器标签页。
 • 提示可附加任意文件。
 
 持续稳定运行
