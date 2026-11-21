@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 90
     env:
       APP_IDENTIFIER: com.mantou.agentdeck
