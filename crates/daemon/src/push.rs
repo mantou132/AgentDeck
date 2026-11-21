@@ -41,19 +41,29 @@ pub fn host_key(relay_id: &str) -> String {
         .collect()
 }
 
-pub async fn send(
-    client: &reqwest::Client,
+fn build_payload(
     token: &str,
     host: &str,
     kind: PushKind,
     agent: &str,
     session_id: &str,
     task_id: Option<&str>,
-) {
+) -> serde_json::Value {
     // A newer notification of the same session replaces the older one.
     let tag = format!("{agent}:{session_id}");
     let loc_key = kind.body_loc_key();
-    let payload = json!({
+    let mut data = json!({
+        "type": kind.data_type(),
+        "host": host,
+        "agent": agent,
+        "sessionId": session_id,
+    });
+    // FCM/APNs data values are stringified by the push gateway; a null taskId
+    // becomes a truthy string and routes normal session taps to the task page.
+    if let Some(task_id) = task_id {
+        data["taskId"] = json!(task_id);
+    }
+    json!({
         "notifications": [{
             "tokens": [token],
             "platform": 2,
@@ -75,9 +85,21 @@ pub async fn send(
                     }
                 }
             },
-            "data": { "type": kind.data_type(), "host": host, "agent": agent, "sessionId": session_id, "taskId": task_id }
+            "data": data
         }]
-    });
+    })
+}
+
+pub async fn send(
+    client: &reqwest::Client,
+    token: &str,
+    host: &str,
+    kind: PushKind,
+    agent: &str,
+    session_id: &str,
+    task_id: Option<&str>,
+) {
+    let payload = build_payload(token, host, kind, agent, session_id, task_id);
     let _ = client
         .post(PUSH_URL)
         .timeout(Duration::from_secs(10))
@@ -97,5 +119,41 @@ mod tests {
             host_key("123e4567-e89b-12d3-a456-426614174000"),
             "986c0dc956dc822b"
         );
+    }
+
+    #[test]
+    fn payload_omits_task_id_for_normal_sessions() {
+        let payload = build_payload(
+            "tok",
+            "host",
+            PushKind::InputRequest,
+            "antigravity",
+            "sess-1",
+            None,
+        );
+        let data = &payload["notifications"][0]["data"];
+        assert_eq!(
+            data,
+            &json!({
+                "type": "input_request",
+                "host": "host",
+                "agent": "antigravity",
+                "sessionId": "sess-1",
+            })
+        );
+        assert!(data.get("taskId").is_none());
+    }
+
+    #[test]
+    fn payload_includes_task_id_for_task_runs() {
+        let payload = build_payload(
+            "tok",
+            "host",
+            PushKind::InputRequest,
+            "antigravity",
+            "sess-1",
+            Some("task-1"),
+        );
+        assert_eq!(payload["notifications"][0]["data"]["taskId"], "task-1");
     }
 }
