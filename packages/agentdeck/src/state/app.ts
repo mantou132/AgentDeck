@@ -12,7 +12,9 @@ import {
 } from '../agent/transport';
 import { clearDrafts } from '../composer/drafts';
 import {
+  type AppLanguage,
   type AppSettings,
+  LANGUAGE_KEY,
   MIN_DAEMON_VERSION,
   PAIRING_HISTORY_KEY,
   type PairingRecord,
@@ -181,6 +183,13 @@ export const setSkillEnabled = (skill: string, enabled: boolean) => {
   localStorage.setItem(SKILL_TOGGLES_KEY, JSON.stringify(skillToggles));
   agentdeckStore({ skillToggles });
   updateTransportSkills(clientSkills());
+};
+
+export const setLanguage = async (language: AppLanguage) => {
+  if (language) localStorage.setItem(LANGUAGE_KEY, language);
+  else localStorage.removeItem(LANGUAGE_KEY);
+  agentdeckStore({ language });
+  await (language ? i18n.setLanguage(language) : i18n.resetLanguage());
 };
 
 export const saveSettings = (settings: AppSettings) => {

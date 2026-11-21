@@ -1,25 +1,22 @@
 import { I18n } from '@mantou/gem/helper/i18n';
 import { loadLocale } from '@mantou/tap-ui/lib/locale';
 import type { ConnectionState } from './agent/transport';
-import en from './locales/en/basic.json';
+import { type AppLanguage, readLanguage } from './config';
+import enUS from './locales/en-US/basic.json';
 import zhCN from './locales/zh-CN/basic.json';
 import type { ToolStatus } from './session/timeline';
 
-export const fallbackLanguage = 'en';
+export const fallbackLanguage = 'en-US';
 
-export const langNames: Record<string, string> = {
-  en: 'English',
-  'zh-CN': '简体中文',
-};
-
-export type Locale = typeof en;
+export type Locale = typeof enUS;
 export type LocaleKey = keyof Locale;
 
-export const i18n = new I18n<typeof en>({
+export const i18n = new I18n<typeof enUS>({
   fallbackLanguage,
-  cache: true,
+  currentLanguage: readLanguage() || undefined,
   resources: {
-    en,
+    'en-US': enUS,
+    en: enUS,
     'zh-CN': zhCN,
     zh: zhCN,
   },
@@ -33,6 +30,8 @@ export const i18n = new I18n<typeof en>({
     }
   },
 });
+
+export const speechLanguage = (language: AppLanguage = readLanguage()): string => language || navigator.language;
 
 export const getConnectionLabel = (state: ConnectionState): string => {
   return i18n.get(`connection.${state}` as LocaleKey);

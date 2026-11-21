@@ -7,6 +7,7 @@ import {
   startListening,
   stopListening,
 } from 'tauri-plugin-stt-api';
+import { speechLanguage } from '../i18n';
 
 // Mobile OS engines only (SFSpeechRecognizer / SpeechRecognizer); desktop has no plugin registered.
 export const speechSupported = isTauri() && /Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -70,7 +71,7 @@ export const startRecognitionSession = async ({
     return stopping;
   };
   try {
-    await startListening({ language: navigator.language, interimResults: true });
+    await startListening({ language: speechLanguage(), interimResults: true });
   } catch (error) {
     unlisten();
     throw error;

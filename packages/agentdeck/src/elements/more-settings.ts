@@ -3,9 +3,9 @@ import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
-import { DISPLAY_SKILLS, SKILL_REQUIRES, WORKFLOW_SKILLS } from '../config';
+import { type AppLanguage, DISPLAY_SKILLS, langNames, SKILL_REQUIRES, WORKFLOW_SKILLS } from '../config';
 import { i18n, type LocaleKey } from '../i18n';
-import { setSkillEnabled } from '../state/app';
+import { setLanguage, setSkillEnabled } from '../state/app';
 import {
   type AppManifest,
   openSavedApp,
@@ -67,6 +67,19 @@ export class DeckMoreSettingsElement extends GemElement {
     if (isTauri()) this.#state({ version: await getVersion() });
   };
 
+  #selectLanguage = async () => {
+    const action = await ActionSheet.open<AppLanguage>({
+      title: i18n.get('settings.language'),
+      actions: [
+        { label: i18n.get('settings.languageSystem'), value: '' },
+        ...Object.entries(langNames).map(([value, label]) => ({ label, value: value as AppLanguage })),
+      ],
+      cancelText: i18n.get('global.cancel'),
+    });
+    if (!action || action.value === undefined) return;
+    await setLanguage(action.value);
+  };
+
   #manageApp = async ({ id, name }: AppManifest) => {
     const action = await ActionSheet.open({
       title: name,
@@ -119,6 +132,16 @@ export class DeckMoreSettingsElement extends GemElement {
         label: html`<div class="app"><img alt="" src=${savedAppIconUrl(app.id)} /><span>${app.name}</span></div>`,
         onClick: () => this.#manageApp(app),
       }))}
+    ></tap-cell-group>
+    <tap-cell-group
+      footer=${i18n.get('settings.languageDesc')}
+      .items=${[
+        {
+          label: i18n.get('settings.language'),
+          extra: agentdeckStore.language ? langNames[agentdeckStore.language] : i18n.get('settings.languageSystem'),
+          onClick: this.#selectLanguage,
+        },
+      ]}
     ></tap-cell-group>
     <tap-cell-group
       heading=${i18n.get('settings.workflowSkillsTitle')}

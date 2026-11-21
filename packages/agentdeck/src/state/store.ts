@@ -2,6 +2,7 @@ import type { AgentStatus, PermissionRequest } from '../agent/api';
 import type { ConnectionState } from '../agent/transport';
 import {
   defaultAgents,
+  readLanguage,
   readPairingHistory,
   readSavedCommands,
   readSettings,
@@ -22,6 +23,7 @@ export const agentdeckStore = createStore({
   pairingHistory: readPairingHistory(),
   /** Skills switched in settings; enabled ones (`isSkillEnabled`) are declared to the host. */
   skillToggles: readSkillToggles(),
+  language: readLanguage(),
   connection: (initialSettings.relayId ? 'connecting' : 'disconnected') as ConnectionState,
   connectionError: '',
   /** Daemon version of the connected host; old hosts omit it. */

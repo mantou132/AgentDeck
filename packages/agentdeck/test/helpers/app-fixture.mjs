@@ -56,6 +56,8 @@ export function documentFixture(previous, options = {}) {
   const heldMethods = new Set();
   const timers = new Map();
   const haptics = [];
+  const sttCalls = [];
+  const ttsCalls = [];
   let timerId = 0;
   let now = 0;
   let reloads = 0;
@@ -127,6 +129,7 @@ export function documentFixture(previous, options = {}) {
     WebSocket: Socket,
     window,
     document,
+    navigator: options.navigator ?? { language: 'en-US' },
     process: { env: { NODE_ENV: 'development' } },
     setTimeout: (fn, delay) => {
       timers.set(++timerId, { fn, delay, at: now + delay });
@@ -139,15 +142,25 @@ export function documentFixture(previous, options = {}) {
     },
   });
   class MockI18n {
+    #detectLanguage() {
+      const lang = context.navigator?.language || '';
+      return (
+        Object.keys(this.resources).find((code) => code === lang || lang.startsWith(`${code}-`)) ||
+        this.fallbackLanguage
+      );
+    }
     constructor(options) {
       this.fallbackLanguage = options.fallbackLanguage || 'en';
       this.resources = options.resources || {};
-      this.currentLanguage = options.currentLanguage || 'en';
+      this.currentLanguage = options.currentLanguage || this.#detectLanguage();
       this.onChange = options.onChange;
     }
     setLanguage(lang) {
       this.currentLanguage = lang;
       this.onChange?.(lang);
+    }
+    resetLanguage() {
+      this.setLanguage(this.#detectLanguage());
     }
     get(key, ...rest) {
       const pack = this.resources[this.currentLanguage] || this.resources[this.fallbackLanguage] || {};
@@ -203,6 +216,22 @@ export function documentFixture(previous, options = {}) {
             },
           };
         }
+        if (name === 'tauri-plugin-stt-api') {
+          return {
+            checkPermission: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
+            requestPermission: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
+            onResult: async () => () => {},
+            onError: async () => () => {},
+            startListening: async (opts) => sttCalls.push(opts),
+            stopListening: async () => {},
+          };
+        }
+        if (name === 'tauri-plugin-tts-api') {
+          return {
+            speak: async (opts) => ttsCalls.push(opts),
+            stop: async () => {},
+          };
+        }
         if (name === '@tauri-apps/api/core') return { isTauri: () => false };
         if (name === '@mantou/tap-ui/lib/encode') {
           return load(path.join(root, 'node_modules/@mantou/tap-ui/lib/encode.js'));
@@ -220,6 +249,9 @@ export function documentFixture(previous, options = {}) {
         }
         if (name === '@mantou/tap-ui/lib/locale') {
           return { loadLocale: () => Promise.resolve() };
+        }
+        if (name.startsWith('@mantou/tap-ui/locales/')) {
+          return {};
         }
         if (name === '@mantou/tap-ui/elements/toast') {
           return { Toast: { open: () => {} } };
@@ -247,6 +279,8 @@ export function documentFixture(previous, options = {}) {
   const app = Object.assign(
     {},
     ...[
+      'config',
+      'i18n',
       'state/store',
       'state/sessions',
       'state/config-options',
@@ -260,6 +294,8 @@ export function documentFixture(previous, options = {}) {
       'state/user-input',
       'state/tasks',
       'agent/transport',
+      'lib/speech-recognition',
+      'lib/speech-synthesis',
     ].map((name) => load(path.join(root, `src/${name}.ts`))),
   );
   const remoteSession = { sessionId: 's1', cwd: '/tmp', agent: 'codex', title: 'Reset test' };
@@ -352,6 +388,8 @@ export function documentFixture(previous, options = {}) {
     requests,
     heldMethods,
     haptics,
+    sttCalls,
+    ttsCalls,
     deliver,
     reply,
     connect,

@@ -30,3 +30,47 @@ test('reply speech prefers the agentdeck-speech comment and falls back to plain 
   );
   assert.equal(replySpeech('a'.repeat(300)).length, 201);
 });
+
+test('language setting persists, updates i18n, and drives speech recognition and synthesis', async () => {
+  const fixture = documentFixture(undefined, { navigator: { language: 'en-GB' } });
+  const { app, localStorage, sttCalls, ttsCalls } = fixture;
+
+  // Defaults to follow system.
+  assert.equal(app.agentdeckStore.language, '');
+  assert.equal(app.i18n.currentLanguage, 'en');
+  assert.equal(app.speechLanguage(), 'en-GB');
+
+  // Switch to Simplified Chinese while OS language is English.
+  await app.setLanguage('zh-CN');
+  assert.equal(localStorage.getItem(app.LANGUAGE_KEY), 'zh-CN');
+  assert.equal(app.agentdeckStore.language, 'zh-CN');
+  assert.equal(app.i18n.currentLanguage, 'zh-CN');
+  assert.equal(app.speechLanguage(), 'zh-CN');
+
+  const stop = await app.startRecognitionSession({ onTranscript: () => {}, onError: () => {} });
+  await stop();
+  await app.speakText('你好');
+  assert.deepEqual({ ...sttCalls.at(-1) }, { language: 'zh-CN', interimResults: true });
+  assert.deepEqual({ ...ttsCalls.at(-1) }, { text: '你好', language: 'zh-CN', queueMode: 'flush' });
+
+  // Persists across reload.
+  const reloaded = documentFixture(fixture, { navigator: { language: 'en-GB' } });
+  assert.equal(reloaded.app.readLanguage(), 'zh-CN');
+  assert.equal(reloaded.app.agentdeckStore.language, 'zh-CN');
+  assert.equal(reloaded.app.i18n.currentLanguage, 'zh-CN');
+  assert.equal(reloaded.app.speechLanguage(), 'zh-CN');
+
+  // Switch to English explicitly: uses en-US regardless of OS language.
+  await reloaded.app.setLanguage('en-US');
+  assert.equal(reloaded.app.i18n.currentLanguage, 'en-US');
+  assert.equal(reloaded.app.speechLanguage(), 'en-US');
+  const zhOs = documentFixture(reloaded, { navigator: { language: 'zh-CN' } });
+  assert.equal(zhOs.app.speechLanguage(), 'en-US');
+
+  // Reset to follow system.
+  await zhOs.app.setLanguage('');
+  assert.equal(localStorage.getItem(zhOs.app.LANGUAGE_KEY), null);
+  assert.equal(zhOs.app.agentdeckStore.language, '');
+  assert.equal(zhOs.app.i18n.currentLanguage, 'zh-CN');
+  assert.equal(zhOs.app.speechLanguage(), 'zh-CN');
+});

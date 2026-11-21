@@ -25,6 +25,14 @@ export const EVENTS_ADDED_KEY = 'agentdeck.events_added.v1';
 /** sessionStorage: the link that started the App was handled; AgentDeck reloads each time a saved app exits. */
 export const LAUNCH_LINK_TAKEN_KEY = 'agentdeck.launch_link_taken.v1';
 export const SKILL_TOGGLES_KEY = 'agentdeck.skill_toggles.v1';
+export const LANGUAGE_KEY = 'agentdeck.language.v1';
+
+export const langNames = {
+  'en-US': 'English',
+  'zh-CN': '简体中文',
+} as const;
+
+export type AppLanguage = '' | keyof typeof langNames;
 
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.
@@ -143,6 +151,15 @@ export const readSkillToggles = (): Record<string, boolean> => {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch {
     return {};
+  }
+};
+
+export const readLanguage = (): AppLanguage => {
+  try {
+    const value = localStorage.getItem(LANGUAGE_KEY);
+    return value && Object.hasOwn(langNames, value) ? (value as AppLanguage) : '';
+  } catch {
+    return '';
   }
 };
 
