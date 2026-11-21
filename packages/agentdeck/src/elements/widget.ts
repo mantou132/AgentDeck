@@ -18,7 +18,7 @@ const kitStyle = css`
     --radius: 12px;
     --hairline: ${agentDeckTheme.borderWidth};
     display: flow-root;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     -webkit-tap-highlight-color: transparent;
   }
   .root > :first-child { margin-top: 0; }
@@ -42,6 +42,10 @@ const kitStyle = css`
   button, input, select, textarea { font: inherit; color: inherit; }
   /* Matches the app's own controls: secondary buttons like the session page's, fields and primary buttons like settings. */
   button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
     min-height: 2.75rem;
     padding: .5rem 1rem;
     border: 0;
@@ -51,6 +55,7 @@ const kitStyle = css`
     font-size: var(--text-sm);
     font-weight: 600;
     line-height: 1.3;
+    text-align: center;
     cursor: pointer;
     touch-action: manipulation;
     transition: transform .15s, opacity .15s;
@@ -91,10 +96,11 @@ const kitStyle = css`
   textarea { min-height: 5rem; resize: vertical; }
   :is(input, select, textarea):focus-visible { border-color: var(--color-focus); box-shadow: 0 0 0 3px var(--color-primary-soft); }
   input, progress, meter { accent-color: var(--color-primary); }
+  input[type=checkbox], input[type=radio] { flex-shrink: 0; }
   input[type=range], progress, meter { width: 100%; }
   label { cursor: pointer; }
-  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .9em; }
-  th, td { padding: .55rem .7rem; text-align: left; vertical-align: top; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .9em; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  th, td { padding: .5rem .55rem; text-align: left; vertical-align: top; }
   th { background: var(--color-bg-hover); color: var(--color-highlight); }
   tbody td, tr + tr td { border-top: var(--hairline) solid var(--color-border); }
   details { margin: .5rem 0; }
@@ -108,12 +114,23 @@ const kitStyle = css`
     background: var(--color-bg-light);
   }
   .row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+  /* Key-value rows (with .spacer) and checkbox/radio labels wrap text inside the label instead of dropping the control. */
+  label.row, .row:has(> .spacer) { flex-wrap: nowrap; }
+  :is(.row, .list > *) > :is(input:not([type=checkbox], [type=radio], [type=color]), select, progress, meter) {
+    flex: 1 1 8rem;
+    width: auto;
+    min-width: 0;
+  }
   .stack { display: grid; gap: .75rem; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; }
-  .spacer { flex: 1; }
+  :is(.stack, .grid) > * { min-width: 0; }
+  .spacer { flex: 1; min-width: 0; }
+  .spacer ~ * { flex-shrink: 0; }
   .badge {
     display: inline-flex;
     align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
     padding: .05rem .55rem;
     border-radius: 999px;
     background: var(--color-primary-soft);
@@ -127,7 +144,7 @@ const kitStyle = css`
   .notice { color: var(--color-notice); }
   .negative { color: var(--color-negative); }
   .stat { display: grid; gap: .1rem; }
-  .stat .value { color: var(--color-highlight); font: 720 1.6em/1.2 var(--font-display); }
+  .stat .value { color: var(--color-highlight); font: 720 1.6em/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
   .stat .label { color: var(--color-describe); font-size: var(--text-xs); }
   .list {
     margin: .7rem 0;
@@ -138,13 +155,11 @@ const kitStyle = css`
     list-style: none;
     overflow: hidden;
   }
-  /* Wraps so a long description drops below instead of squeezing the row. */
-  .list > * { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; min-height: 3rem; padding: .6rem 1rem; }
+  .list > * { display: flex; align-items: center; gap: .5rem .75rem; min-height: 3rem; padding: .6rem 1rem; }
   .list > * + * { border-top: var(--hairline) solid var(--color-border); }
   input[type=checkbox].switch {
     appearance: none;
     position: relative;
-    flex-shrink: 0;
     width: 51px;
     height: 31px;
     margin: 0;
@@ -170,12 +185,18 @@ const kitStyle = css`
   .segmented { display: flex; padding: 2px; border-radius: 10px; background: var(--color-bg-hover); }
   .segmented > label {
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex: 1;
-    padding: .3rem .5rem;
+    min-width: 0;
+    min-height: 2.25rem;
+    padding: .3rem .4rem;
     border-radius: 8px;
     color: var(--color-describe);
     font-size: var(--text-sm);
     font-weight: 600;
+    line-height: 1.25;
     text-align: center;
     transition: background-color .15s;
   }

@@ -5,7 +5,7 @@ description: Embed a small interactive widget in your reply in the AgentDeck cli
 
 # AgentDeck widgets
 
-The user reads your replies in the AgentDeck app, usually on a phone about 390px wide. The client renders a fenced code block with the `agentdeck-widget` language in place, inside your reply, with no border of its own: it reads as part of the reply. The block body is an HTML fragment; the client provides the runtime and styles.
+The user reads your replies in the AgentDeck app, usually on a phone (~350px reply width, ~320px inside a `.card`). The client renders a fenced code block with the `agentdeck-widget` language in place, inside your reply, with no border of its own: it reads as part of the reply. The block body is an HTML fragment; the client provides the runtime and styles.
 
 ````markdown
 ```agentdeck-widget
@@ -48,21 +48,30 @@ Native elements are already styled like the rest of the reply and follow light a
 | Class | Use |
 | --- | --- |
 | `card` | Surface with border and radius for a group of content |
-| `row` / `stack` / `grid` | Horizontal wrap / vertical stack / responsive columns, all with gaps; `spacer` fills a `row` |
-| `list` | Bordered list; each child is one row (`<ul class="list"><li>…</li></ul>`) |
-| `badge` | Pill label; add `positive`, `notice` or `negative` for status colors |
+| `row` / `stack` / `grid` | Horizontal row (wraps unless it has a `spacer` or is a `<label>`) / vertical stack / 2-column phone grid (`minmax(9rem, 1fr)`), all with gaps; `spacer` pushes short trailing items to the right |
+| `list` | Bordered list; each child is one horizontal row (`<ul class="list"><li>…</li></ul>`); group a left title + subtitle in one `<div>` |
+| `badge` | Single-line pill label (1–3 short words); add `positive`, `notice` or `negative` for status colors |
 | `positive` / `notice` / `negative` / `muted` | Status and secondary text colors |
 | `stat` with `value` and `label` children | Large number with a caption |
 | `primary` on `button` | Main action |
 | `switch` on `input type="checkbox"` | iOS-style toggle |
-| `segmented` | Segmented control: `<div class="segmented"><label><input type="radio" name="period" checked>Month</label><label><input type="radio" name="period">Year</label></div>` |
+| `segmented` | Segmented control for 2–4 very short options: `<div class="segmented"><label><input type="radio" name="period" checked>Month</label><label><input type="radio" name="period">Year</label></div>` |
 
 If you need custom CSS, use a `<style>` element (it only applies to this block) and the theme variables: `--color-primary`, `--color-primary-soft`, `--color-highlight` (titles), `--color-text`, `--color-describe` (secondary), `--color-bg-light` (surfaces), `--color-bg-hover`, `--color-border`, `--color-positive`, `--color-notice`, `--color-negative`, `--radius`, `--font-mono`. Never hard-code colors, so dark mode keeps working.
+
+## Mobile layout
+
+Design every block for a ~320px inner column first — awkward wrapping is the main way widgets break on phones:
+
+- **Default to vertical (`.stack`)**: put form labels above inputs (`<label class="stack"><span>Label</span><input /></label>`), stack full-width action buttons, and avoid side-by-side layouts when labels or values are longer than a few words. Never write fixed pixel widths wider than the screen or 3+ column custom grids (`repeat(3, 1fr)`).
+- **Keep `.row` and `.list` rows clean**: use `.row` with `.spacer` (or `.list`) for a left label + short right value, `.badge` or `.switch` — wrap a left title and subtitle in one `<div>` so they stay together on the left, and keep trailing items brief so they do not crowd the label. Do not cram 3+ medium buttons into one `.row` where the last wraps as a lonely orphan; use `.stack` or an even-count `.grid`.
+- **Size `.grid` for ~145px columns**: inside a `.card`, `.grid` is at most 2 columns on a phone (1 on narrow phones). Use it for pairs (2 or 4, not 3) of short stats or short buttons; switch to `.stack` or `.list` if values or labels would wrap awkwardly.
+- **Keep controls single-line**: `.segmented` only fits 2–4 very short labels (1 short word or 2–4 CJK characters each) — use `<select>` or a vertical `.list` for more or longer choices. Keep `.badge` and button labels concise so they stay on one line.
+- **Avoid narrow multi-column tables**: a `<table>` fits at most 2–3 short columns on a phone. For wider comparisons, render stacked `.card`s or a `.list` of key-value rows. Format numbers with units compactly (`$12/mo`, `24h`, `12.5%`) and add `white-space: nowrap` on short numeric cells when needed.
+- **Touch and flow**: keep tap targets at least 44px tall, use no hover-only behavior, and do not use `position: fixed`, full-viewport heights or inner scrolling areas.
 
 ## Rules
 
 - Keep it focused: one small tool per block, usually under 150 lines. A full page or multi-file app belongs in the project with `agentdeck-preview`.
-- Design for a narrow touch screen: vertical layouts, tap targets at least 44px tall, no hover-only behavior, no fixed widths wider than the screen.
-- The block flows with the reply; do not use `position: fixed`, full-viewport heights or inner scrolling areas.
 - Write a sentence of context before the block and do not repeat its content in prose afterwards.
 - The block renders only once it is complete, so it never streams in; if a chart or a plain table answers the question, prefer those.
