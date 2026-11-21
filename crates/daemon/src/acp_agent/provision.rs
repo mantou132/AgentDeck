@@ -3,7 +3,7 @@ use std::{
     env,
     ffi::OsString,
     fs::{self, File},
-    io,
+    io::{self, Write},
     path::{Component, Path, PathBuf},
     process::Command,
     sync::{Arc, Mutex as StdMutex, OnceLock},
@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{AgentCandidate, AgentLaunch, RegistryBinaryTarget, managed_binary_agent};
 use crate::app_data;
+
+const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const DOWNLOAD_READ_TIMEOUT: Duration = Duration::from_secs(60);
+const DOWNLOAD_TOTAL_TIMEOUT: Duration = Duration::from_secs(600);
 
 static AGENT_INSTALL_LOCKS: OnceLock<StdMutex<HashMap<PathBuf, Arc<StdMutex<()>>>>> =
     OnceLock::new();
@@ -267,6 +271,65 @@ fn extract_agent_archive(archive_path: &Path, archive_url: &str, destination: &P
     Ok(())
 }
 
+fn download_archive(
+    archive_url: reqwest::Url,
+    destination: &Path,
+    connect_timeout: Duration,
+    read_timeout: Duration,
+    total_timeout: Duration,
+) -> Result<()> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("failed to initialize the managed agent downloader runtime")?;
+    runtime.block_on(download_archive_async(
+        archive_url,
+        destination,
+        connect_timeout,
+        read_timeout,
+        total_timeout,
+    ))
+}
+
+async fn download_archive_async(
+    archive_url: reqwest::Url,
+    destination: &Path,
+    connect_timeout: Duration,
+    read_timeout: Duration,
+    total_timeout: Duration,
+) -> Result<()> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(connect_timeout)
+        .read_timeout(read_timeout)
+        .timeout(total_timeout)
+        .user_agent(format!("agentdeckd/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .context("failed to create the managed agent downloader")?;
+
+    let mut response = client
+        .get(archive_url)
+        .send()
+        .await
+        .context("failed to download the managed agent binary")?
+        .error_for_status()
+        .context("the agent download returned an error")?;
+    let mut archive_file = File::create(destination)
+        .with_context(|| format!("failed to create download file: {}", destination.display()))?;
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .context("failed to save the managed agent archive")?
+    {
+        archive_file
+            .write_all(&chunk)
+            .context("failed to save the managed agent archive")?;
+    }
+    archive_file
+        .sync_all()
+        .context("failed to flush the agent archive to disk")?;
+    Ok(())
+}
+
 fn install_registry_binary(
     runtime: &app_data::AgentPaths,
     registry_id: &str,
@@ -307,30 +370,14 @@ fn install_registry_binary(
         )
     })?;
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(120))
-        .user_agent(format!("agentdeckd/{}", env!("CARGO_PKG_VERSION")))
-        .build()
-        .context("failed to create the managed agent downloader")?;
-
     let result = (|| {
-        let mut response = client
-            .get(archive_url)
-            .send()
-            .context("failed to download the managed agent binary")?
-            .error_for_status()
-            .context("the agent download returned an error")?;
-        let mut archive_file = File::create(&downloaded_archive).with_context(|| {
-            format!(
-                "failed to create download file: {}",
-                downloaded_archive.display()
-            )
-        })?;
-        io::copy(&mut response, &mut archive_file)
-            .context("failed to save the managed agent archive")?;
-        archive_file
-            .sync_all()
-            .context("failed to flush the agent archive to disk")?;
+        download_archive(
+            archive_url,
+            &downloaded_archive,
+            DOWNLOAD_CONNECT_TIMEOUT,
+            DOWNLOAD_READ_TIMEOUT,
+            DOWNLOAD_TOTAL_TIMEOUT,
+        )?;
 
         tracing::info!(
             "Extracting managed {registry_id} binary to {}",
@@ -821,5 +868,96 @@ mod tests {
         assert_eq!(resolved, executable);
         assert!(!on_install_called.load(Ordering::SeqCst));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn slow_active_download_succeeds_past_read_timeout() {
+        use std::{
+            io::{Read, Write},
+            net::TcpListener,
+            time::Duration,
+        };
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let _ = stream.set_nodelay(true);
+            let mut buf = [0u8; 512];
+            let _ = stream.read(&mut buf);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            stream.flush().unwrap();
+            for chunk in [b"abc", b"def", b"ghi", b"jkl"] {
+                std::thread::sleep(Duration::from_millis(250));
+                stream.write_all(chunk).unwrap();
+                stream.flush().unwrap();
+            }
+        });
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let dest = std::env::temp_dir().join(format!("agentdeck-dl-slow-{unique}.bin"));
+        let url = reqwest::Url::parse(&format!("http://{addr}/agent.bin")).unwrap();
+
+        // Total time (>=1000ms) exceeds read_timeout (600ms), yet every chunk arrives in time.
+        super::download_archive(
+            url,
+            &dest,
+            Duration::from_secs(2),
+            Duration::from_millis(600),
+            Duration::from_secs(5),
+        )
+        .expect("active slow download should succeed");
+
+        server.join().unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"abcdefghijkl");
+        let _ = std::fs::remove_file(&dest);
+    }
+
+    #[test]
+    fn stalled_download_aborts_after_read_timeout() {
+        use std::{
+            io::{Read, Write},
+            net::TcpListener,
+            time::Duration,
+        };
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let _ = stream.set_nodelay(true);
+            let mut buf = [0u8; 512];
+            let _ = stream.read(&mut buf);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\nabc")
+                .unwrap();
+            stream.flush().unwrap();
+            std::thread::sleep(Duration::from_millis(600));
+        });
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let dest = std::env::temp_dir().join(format!("agentdeck-dl-stall-{unique}.bin"));
+        let url = reqwest::Url::parse(&format!("http://{addr}/agent.bin")).unwrap();
+
+        let err = super::download_archive(
+            url,
+            &dest,
+            Duration::from_secs(2),
+            Duration::from_millis(100),
+            Duration::from_secs(5),
+        )
+        .expect_err("stalled download should time out");
+
+        assert!(err.to_string().contains("archive"));
+        server.join().unwrap();
+        let _ = std::fs::remove_file(&dest);
     }
 }
