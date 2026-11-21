@@ -635,10 +635,14 @@ fn session_metadata_from_meta(
 }
 
 fn system_prompt_meta(prompt: &str) -> serde_json::Map<String, serde_json::Value> {
-    serde_json::Map::from_iter([(
-        "systemPrompt".to_string(),
-        serde_json::json!({ "append": prompt }),
-    )])
+    let append = serde_json::json!({ "append": prompt });
+    serde_json::Map::from_iter([
+        ("systemPrompt".to_string(), append.clone()),
+        (
+            "antigravity".to_string(),
+            serde_json::json!({ "systemPrompt": append }),
+        ),
+    ])
 }
 
 /// Enable Claude's next-prompt suggestions and forward only those raw SDK
@@ -1381,7 +1385,20 @@ fn to_json(value: impl Serialize) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    use super::update_to_json;
+    use super::{system_prompt_meta, update_to_json};
+
+    #[test]
+    fn system_prompt_meta_targets_standard_and_antigravity_keys() {
+        let meta = system_prompt_meta("mobile context");
+        assert_eq!(
+            meta["systemPrompt"],
+            serde_json::json!({ "append": "mobile context" })
+        );
+        assert_eq!(
+            meta["antigravity"],
+            serde_json::json!({ "systemPrompt": { "append": "mobile context" } })
+        );
+    }
 
     #[test]
     fn tool_updates_omit_image_data() {
