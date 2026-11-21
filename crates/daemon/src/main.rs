@@ -228,6 +228,28 @@ fn print_daemon_info(config: &DaemonConfig, status: Option<(daemon::Status, Opti
     ui::print_security_warning();
 }
 
+async fn shutdown_signal() -> Result<()> {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut sigterm =
+            signal(SignalKind::terminate()).context("failed to install SIGTERM handler")?;
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => {
+                result.context("failed to listen for Ctrl+C")?;
+            }
+            _ = sigterm.recv() => {}
+        }
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        tokio::signal::ctrl_c()
+            .await
+            .context("failed to listen for Ctrl+C")
+    }
+}
+
 async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
     // Ensure runtime singleton
     let _instance_lock =
@@ -252,8 +274,10 @@ async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
 
     print_daemon_info(&config, None);
 
-    tokio::signal::ctrl_c().await?;
+    shutdown_signal().await?;
     println!("\n{}", ui::dim("Shutting down AgentDeck daemon..."));
+    tracing::info!("Shutting down AgentDeck daemon...");
+    service.shutdown().await;
     tracing::info!("AgentDeck daemon stopped");
 
     Ok(())

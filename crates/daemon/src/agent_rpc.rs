@@ -127,6 +127,11 @@ impl AgentService {
             .clone()
     }
 
+    /// Gracefully close active ACP sessions and terminate managed ACP agent runtimes.
+    pub async fn shutdown(&self) {
+        self.sessions.shutdown().await;
+    }
+
     /// Scheduled task RPCs; they fail until `init_tasks` ran.
     fn attach_tasks(&self, peer: &Peer) {
         fn tasks_of(tasks: &OnceLock<Arc<Tasks>>) -> Result<Arc<Tasks>, String> {

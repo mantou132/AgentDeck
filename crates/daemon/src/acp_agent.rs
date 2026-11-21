@@ -142,6 +142,7 @@ struct RuntimeState {
     connecting: bool,
     generation: u64,
     waiters: Vec<oneshot::Sender<Result<AgentConnection, String>>>,
+    task: Option<tokio::task::JoinHandle<()>>,
 }
 
 struct StartedSession {
@@ -165,10 +166,12 @@ struct AcpRuntime {
     disconnects: watch::Sender<u64>,
     /// `None` once connected or stopped.
     status: watch::Sender<Option<AgentStatus>>,
+    manager_shutting_down: CancellationToken,
+    shutdown: CancellationToken,
 }
 
 impl AcpRuntime {
-    fn new(agent: String, sessions: SessionMap) -> Self {
+    fn new(agent: String, sessions: SessionMap, manager_shutting_down: CancellationToken) -> Self {
         let (disconnects, _) = watch::channel(0);
         let (status, _) = watch::channel(None);
         Self {
@@ -178,32 +181,34 @@ impl AcpRuntime {
                 connecting: false,
                 generation: 0,
                 waiters: Vec::new(),
+                task: None,
             })),
             sessions,
             children: Arc::default(),
             disconnects,
             status,
+            manager_shutting_down,
+            shutdown: CancellationToken::new(),
         }
     }
 
     async fn connection(&self) -> Result<AgentConnection> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        let generation = {
+        {
             let mut state = self.state.lock().await;
+            if self.manager_shutting_down.is_cancelled() || self.shutdown.is_cancelled() {
+                anyhow::bail!("ACP runtime is shutting down");
+            }
             if let Some(connection) = &state.connection {
                 return Ok(connection.clone());
             }
             state.waiters.push(reply_tx);
-            if state.connecting {
-                None
-            } else {
+            if !state.connecting {
                 state.connecting = true;
                 state.generation += 1;
-                Some(state.generation)
+                let generation = state.generation;
+                state.task = Some(self.spawn_connection(generation));
             }
-        };
-        if let Some(generation) = generation {
-            self.spawn_connection(generation);
         }
         match reply_rx.await {
             Ok(Ok(connection)) => Ok(connection),
@@ -212,7 +217,7 @@ impl AcpRuntime {
         }
     }
 
-    fn spawn_connection(&self, generation: u64) {
+    fn spawn_connection(&self, generation: u64) -> tokio::task::JoinHandle<()> {
         let runtime = self.clone();
         tokio::spawn(async move {
             let result = runtime.serve_connection(generation).await;
@@ -220,9 +225,11 @@ impl AcpRuntime {
                 .err()
                 .map(|err| err.to_string())
                 .unwrap_or_else(|| "ACP agent connection stopped".to_string());
-            tracing::warn!("{error}");
+            if !runtime.shutdown.is_cancelled() && !runtime.manager_shutting_down.is_cancelled() {
+                tracing::warn!("{error}");
+            }
             runtime.connection_stopped(generation, error).await;
-        });
+        })
     }
 
     async fn serve_connection(&self, generation: u64) -> Result<()> {
@@ -237,6 +244,9 @@ impl AcpRuntime {
         })
         .await
         .context("ACP runtime preparation task failed")??;
+        if self.manager_shutting_down.is_cancelled() || self.shutdown.is_cancelled() {
+            return Ok(());
+        }
         self.status.send_replace(Some(AgentStatus::Starting));
         tracing::info!("Starting {} ACP agent: {}", self.agent, command.join(" "));
         // `from_args` treats leading `NAME=value` args as env overrides for the
@@ -361,7 +371,10 @@ impl AcpRuntime {
                         Implementation::new("agentdeck", env!("CARGO_PKG_VERSION"))
                             .title("AgentDeck"),
                     );
-                let response = connection.send_request(request).block_task().await?;
+                let response = tokio::select! {
+                    response = connection.send_request(request).block_task() => response?,
+                    _ = runtime.shutdown.cancelled() => return Ok(()),
+                };
                 if response.protocol_version != ProtocolVersion::V1 {
                     return Err(agent_client_protocol::Error::internal_error().data(format!(
                         "Unsupported ACP protocol version: {:?}",
@@ -376,9 +389,13 @@ impl AcpRuntime {
                 runtime.connection_ready(generation, agent_connection).await;
                 // The SDK can keep a connect_with foreground task alive after EOF.
                 // End ours explicitly so the runtime discards the dead connection.
-                connection.incoming_closed().await;
-                Err(agent_client_protocol::Error::internal_error()
-                    .data("ACP agent connection closed"))
+                tokio::select! {
+                    _ = connection.incoming_closed() => Err(
+                        agent_client_protocol::Error::internal_error()
+                            .data("ACP agent connection closed"),
+                    ),
+                    _ = runtime.shutdown.cancelled() => Ok(()),
+                }
             })
             .await
             .context("ACP agent connection failed")
@@ -407,6 +424,7 @@ impl AcpRuntime {
             }
             state.connection = None;
             state.connecting = false;
+            state.task = None;
             self.status.send_replace(None);
             std::mem::take(&mut state.waiters)
         };
@@ -414,6 +432,33 @@ impl AcpRuntime {
             let _ = waiter.send(Err(error.clone()));
         }
         let _ = self.disconnects.send(generation);
+    }
+
+    async fn shutdown(&self) {
+        self.shutdown.cancel();
+        let (waiters, task) = {
+            let mut state = self.state.lock().await;
+            state.connection = None;
+            state.connecting = false;
+            self.status.send_replace(None);
+            (std::mem::take(&mut state.waiters), state.task.take())
+        };
+        for waiter in waiters {
+            let _ = waiter.send(Err("ACP runtime is shutting down".to_string()));
+        }
+        if let Some(mut task) = task {
+            if tokio::time::timeout(RUNTIME_SHUTDOWN_TIMEOUT, &mut task)
+                .await
+                .is_err()
+            {
+                tracing::warn!(
+                    "Timed out shutting down {} ACP runtime; aborting",
+                    self.agent
+                );
+                task.abort();
+                let _ = task.await;
+            }
+        }
     }
 
     async fn start_session(
@@ -692,12 +737,16 @@ pub type SessionEndCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
 
 type SessionMap = Arc<Mutex<HashMap<AgentSessionKey, AgentSession>>>;
 
+const SHUTDOWN_SESSIONS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+const RUNTIME_SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
 #[derive(Clone)]
 pub struct AgentSessionManager {
     sessions: SessionMap,
     /// Created on first use so agents added by the fetched registry can launch.
     runtimes: Arc<std::sync::Mutex<HashMap<String, AcpRuntime>>>,
     on_end: Option<SessionEndCallback>,
+    shutting_down: CancellationToken,
 }
 
 /// Handle to a session actor.
@@ -792,6 +841,7 @@ impl AgentSessionManager {
             sessions: Arc::default(),
             runtimes: Arc::default(),
             on_end,
+            shutting_down: CancellationToken::new(),
         }
     }
 
@@ -800,7 +850,13 @@ impl AgentSessionManager {
             .lock()
             .expect("runtimes lock poisoned")
             .entry(agent.to_string())
-            .or_insert_with(|| AcpRuntime::new(agent.to_string(), self.sessions.clone()))
+            .or_insert_with(|| {
+                AcpRuntime::new(
+                    agent.to_string(),
+                    self.sessions.clone(),
+                    self.shutting_down.child_token(),
+                )
+            })
             .clone()
     }
 
@@ -845,6 +901,9 @@ impl AgentSessionManager {
         load: Option<SessionLoad>,
         context: SessionContext,
     ) -> Result<SessionReady> {
+        if self.shutting_down.is_cancelled() {
+            anyhow::bail!("Daemon is shutting down");
+        }
         let cwd = resolve_cwd(cwd)?;
         let (tx, rx) = mpsc::channel(8);
         let (child_tx, child_rx) = mpsc::unbounded_channel();
@@ -917,6 +976,9 @@ impl AgentSessionManager {
         if creating {
             // The agent assigned the session id.
             let mut sessions = self.sessions.lock().await;
+            if self.shutting_down.is_cancelled() {
+                anyhow::bail!("Daemon is shutting down");
+            }
             if *handle.stopped.borrow() {
                 anyhow::bail!("ACP agent session stopped before it was ready");
             }
@@ -932,6 +994,9 @@ impl AgentSessionManager {
         loop {
             let previous = {
                 let mut sessions = self.sessions.lock().await;
+                if self.shutting_down.is_cancelled() {
+                    anyhow::bail!("Daemon is shutting down");
+                }
                 match sessions.get(&key) {
                     None => {
                         sessions.insert(key, handle.clone());
@@ -1134,6 +1199,52 @@ impl AgentSessionManager {
         session.closing.cancel();
         session.wait_closed().await;
         true
+    }
+
+    /// Gracefully close all active ACP sessions and shut down agent runtimes.
+    pub async fn shutdown(&self) {
+        self.shutting_down.cancel();
+
+        let sessions: Vec<AgentSession> = {
+            let sessions = self.sessions.lock().await;
+            sessions.values().cloned().collect()
+        };
+        if !sessions.is_empty() {
+            tracing::info!("Closing {} active ACP session(s)...", sessions.len());
+            let mut closing = tokio::task::JoinSet::new();
+            for session in sessions {
+                session.closing.cancel();
+                closing.spawn(async move {
+                    session.wait_closed().await;
+                });
+            }
+            if tokio::time::timeout(SHUTDOWN_SESSIONS_TIMEOUT, async {
+                while closing.join_next().await.is_some() {}
+            })
+            .await
+            .is_err()
+            {
+                tracing::warn!("Timed out closing active ACP sessions during shutdown");
+            }
+        }
+
+        let runtimes: Vec<AcpRuntime> = {
+            self.runtimes
+                .lock()
+                .expect("runtimes lock poisoned")
+                .values()
+                .cloned()
+                .collect()
+        };
+        if !runtimes.is_empty() {
+            let mut stopping = tokio::task::JoinSet::new();
+            for runtime in runtimes {
+                stopping.spawn(async move {
+                    runtime.shutdown().await;
+                });
+            }
+            while stopping.join_next().await.is_some() {}
+        }
     }
 
     /// List sessions persisted by an ACP agent (`session/list`). This does not

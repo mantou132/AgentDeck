@@ -1058,3 +1058,62 @@ async fn an_unanswered_request_is_refused_and_does_not_count_as_idle() {
     mock.respond(&request, json!({"stopReason": "end_turn"}));
     assert!(prompt.await.unwrap().is_ok());
 }
+
+#[tokio::test]
+async fn shutdown_closes_active_sessions_and_stops_runtime() {
+    let mut mock = MockAcp::new().await;
+    mock.create("s1").await;
+    mock.create("s2").await;
+    let prompt = mock.prompt("s1");
+    let _prompt_request = mock.next("session/prompt").await;
+
+    let manager = mock.manager.clone();
+    let shutdown = tokio::spawn(async move { manager.shutdown().await });
+
+    // Both active sessions receive cancel + close; respond to close requests in any order.
+    let mut closed = std::collections::HashSet::new();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while closed.len() < 2 {
+            let msg = frame_json(mock.peer.rx.next().await.unwrap());
+            if msg["method"] == "session/close" {
+                closed.insert(msg["params"]["sessionId"].as_str().unwrap().to_string());
+                mock.respond(&msg, json!({}));
+            }
+        }
+    })
+    .await
+    .expect("expected session/close for all active sessions");
+    assert_eq!(
+        closed,
+        std::collections::HashSet::from(["s1".to_string(), "s2".to_string()])
+    );
+
+    tokio::time::timeout(Duration::from_secs(2), shutdown)
+        .await
+        .expect("shutdown should finish after sessions close")
+        .unwrap();
+    assert!(prompt.await.unwrap().is_err());
+    assert!(!mock.registered("s1").await);
+    assert!(!mock.registered("s2").await);
+
+    // Mock connection exits cleanly on shutdown without waiting for EOF.
+    tokio::time::timeout(Duration::from_secs(2), &mut mock.connection)
+        .await
+        .expect("ACP connection task should exit on shutdown")
+        .unwrap();
+
+    // New sessions and runtime connections are rejected after shutdown.
+    assert!(
+        mock.manager
+            .create_session("codex-acp", None, Default::default())
+            .await
+            .is_err()
+    );
+    assert!(
+        mock.manager
+            .load_session("codex-acp", "s1", None, Default::default(), replay_sink())
+            .await
+            .is_err()
+    );
+    assert!(mock.manager.prepare("codex-acp").await.is_err());
+}

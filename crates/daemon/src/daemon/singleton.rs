@@ -111,7 +111,7 @@ pub fn kill_process(pid: u32) {
         let _ = Command::new("kill")
             .args(["-TERM", &pid.to_string()])
             .output();
-        for _ in 0..10 {
+        for _ in 0..50 {
             std::thread::sleep(std::time::Duration::from_millis(100));
             if let Ok(None) = InstanceLock::check_running() {
                 return;
