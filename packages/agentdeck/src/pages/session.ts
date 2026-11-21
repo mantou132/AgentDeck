@@ -505,7 +505,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       </tap-page>
       <deck-sheet
         ?open=${this.#state.voiceChat}
-        .snap=${[0.7]}
+        .snap=${[0.9]}
         .heading=${i18n.get('voiceChat.heading')}
         @close=${() => this.#state({ voiceChat: false })}
         .content=${html`
