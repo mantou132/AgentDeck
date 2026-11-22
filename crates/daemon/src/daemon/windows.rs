@@ -34,6 +34,14 @@ pub fn install_daemon() -> Result<()> {
 }
 
 pub fn uninstall_daemon() -> Result<()> {
+    let query = Command::new("schtasks")
+        .args(["/query", "/tn", TASK_NAME])
+        .output()
+        .context("failed to execute schtasks /query")?;
+    if !query.status.success() {
+        return Ok(());
+    }
+
     let output = Command::new("schtasks")
         .args(["/delete", "/tn", TASK_NAME, "/f"])
         .output()
@@ -41,9 +49,7 @@ pub fn uninstall_daemon() -> Result<()> {
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
-        if !err.contains("cannot find") && !err.contains("could not find") {
-            bail!("schtasks /delete failed: {err}");
-        }
+        bail!("schtasks /delete failed: {err}");
     }
 
     Ok(())
@@ -105,7 +111,7 @@ pub fn daemon_status() -> Result<Status> {
     }
 
     let output = Command::new("schtasks")
-        .args(["/query", "/tn", TASK_NAME, "/fo", "csv", "/nh"])
+        .args(["/query", "/tn", TASK_NAME, "/xml"])
         .output();
 
     let output = match output {
@@ -117,14 +123,53 @@ pub fn daemon_status() -> Result<Status> {
         return Ok(Status::NotInstalled);
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if stdout.contains("Running") {
-        Ok(Status::Running)
-    } else if stdout.contains("Ready") {
-        Ok(Status::Stopped(None))
-    } else if stdout.contains("Disabled") {
+    if xml_task_disabled(&output.stdout) {
         Ok(Status::Stopped(Some("disabled".into())))
     } else {
         Ok(Status::Stopped(None))
+    }
+}
+
+fn decode_schtasks_xml(bytes: &[u8]) -> String {
+    if bytes.starts_with(&[0xFF, 0xFE]) || bytes.contains(&0) {
+        let content = bytes.strip_prefix(&[0xFF, 0xFE]).unwrap_or(bytes);
+        let units: Vec<u16> = content
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect();
+        String::from_utf16_lossy(&units)
+    } else {
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+}
+
+fn xml_task_disabled(bytes: &[u8]) -> bool {
+    let xml = decode_schtasks_xml(bytes);
+    let section = xml
+        .split_once("<Settings>")
+        .and_then(|(_, rest)| rest.split_once("</Settings>"))
+        .map_or(xml.as_str(), |(settings, _)| settings);
+    section
+        .split_once("<Enabled>")
+        .and_then(|(_, rest)| rest.split_once("</Enabled>"))
+        .is_some_and(|(value, _)| value.trim().eq_ignore_ascii_case("false"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_enabled_state_from_utf8_and_utf16_task_xml() {
+        let enabled = "<Task><Triggers><LogonTrigger><Enabled>false</Enabled></LogonTrigger></Triggers><Settings><Enabled>true</Enabled></Settings></Task>";
+        let disabled = "<Task><Settings><Enabled>false</Enabled></Settings></Task>";
+        assert!(!xml_task_disabled(enabled.as_bytes()));
+        assert!(xml_task_disabled(disabled.as_bytes()));
+
+        let mut utf16 = vec![0xFF, 0xFE];
+        for unit in disabled.encode_utf16() {
+            utf16.extend_from_slice(&unit.to_le_bytes());
+        }
+        assert!(xml_task_disabled(&utf16));
     }
 }
