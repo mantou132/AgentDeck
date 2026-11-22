@@ -80,12 +80,8 @@ fn save_persisted_peers(map: &HashMap<String, RemoteDevice>) {
     let Ok(paths) = AppPaths::discover() else {
         return;
     };
-    if app_data::ensure_dir(paths.root()).is_err() {
-        return;
-    }
-    let path = paths.peers_file();
     if let Ok(content) = serde_json::to_string_pretty(map) {
-        let _ = std::fs::write(&path, content);
+        let _ = app_data::write_file_atomic(&paths.peers_file(), content);
     }
 }
 

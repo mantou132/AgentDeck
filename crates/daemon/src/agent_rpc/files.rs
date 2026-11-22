@@ -154,6 +154,9 @@ fn resolve_file(path: &str, cwd: Option<&Path>, len_limit: bool) -> Result<(Path
     if metadata.is_dir() {
         return Err(format!("{} is a directory", resolved.display()));
     }
+    if !metadata.is_file() {
+        return Err(format!("{} is not a regular file", resolved.display()));
+    }
     if len_limit && metadata.len() > FILE_READ_MAX_BYTES {
         return Err(format!(
             "{} is too large ({} bytes, limit is {FILE_READ_MAX_BYTES})",
