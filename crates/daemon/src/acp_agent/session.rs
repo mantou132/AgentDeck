@@ -11,8 +11,14 @@ use agent_client_protocol::{
 };
 use anyhow::Result;
 use tokio::sync::{mpsc, oneshot, watch};
+use tokio::task::JoinSet;
 
 use super::*;
+
+#[cfg(not(test))]
+const CONTROL_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+#[cfg(test)]
+pub(super) const CONTROL_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Start a session with the agent, report ready, then serve its commands and
 /// updates until it is closed or the connection stops. Returns whether it
@@ -59,6 +65,7 @@ pub(super) async fn run_session_actor(
         turn: None,
         pending_inputs: Vec::new(),
         children: HashMap::new(),
+        control_tasks: JoinSet::new(),
     };
     let mut was_ready = false;
     let run = async {
@@ -123,6 +130,9 @@ struct SessionActor {
     /// Subagent sessions announced since the session started, and whether
     /// each currently allows `session/cancel`. Replayed grants don't count.
     children: HashMap<String, bool>,
+    /// In-flight `session/set_mode` and `session/set_config_option` requests;
+    /// dropped (and aborted) when the actor closes.
+    control_tasks: JoinSet<()>,
 }
 
 struct Turn {
@@ -153,7 +163,7 @@ struct PendingUserInput {
 
 impl SessionActor {
     /// Serve commands and session updates. Config/mode changes go out at once,
-    /// also mid-turn (see `send_set_mode`); a second prompt during a turn is
+    /// also mid-turn (see `spawn_set_mode`); a second prompt during a turn is
     /// rejected.
     async fn serve(
         &mut self,
@@ -166,6 +176,7 @@ impl SessionActor {
             Child(ChildUpdate),
             Stop(Result<PromptResponse, agent_client_protocol::Error>),
             Command(SessionCommand),
+            ControlDone,
             Idle,
             RequestExpired,
         }
@@ -181,6 +192,7 @@ impl SessionActor {
                 .filter_map(|pending| pending.expires)
                 .min();
             let turn = &mut self.turn;
+            let control_tasks = &mut self.control_tasks;
             // `biased` drains updates the agent sent before its prompt response;
             // a random pick could take Stop first and leave the final chunks
             // queued until the next turn. The parent's queue goes first, so a
@@ -199,6 +211,7 @@ impl SessionActor {
                     Some(command) => Input::Command(command),
                     None => return Ok(()),
                 },
+                _ = control_tasks.join_next(), if !control_tasks.is_empty() => Input::ControlDone,
                 _ = tokio::time::sleep_until(deadline.unwrap_or_else(tokio::time::Instant::now)),
                     if deadline.is_some() => Input::Idle,
                 _ = tokio::time::sleep_until(expires.unwrap_or_else(tokio::time::Instant::now)),
@@ -219,6 +232,7 @@ impl SessionActor {
                     self.on_update(update, Some(session_id));
                 }
                 Input::Stop(response) => self.end_turn(response),
+                Input::ControlDone => {}
                 Input::Idle => {
                     // Callers keep at most one prompt in flight per session, so a
                     // timeout means the caller abandoned its turn: cancel it so the
@@ -233,24 +247,24 @@ impl SessionActor {
                     }
                 }
                 Input::RequestExpired => self.refuse_expired_inputs(),
-                Input::Command(command) => self.on_command(session, command).await,
+                Input::Command(command) => self.on_command(session, command),
             }
         }
     }
 
-    async fn on_command(&mut self, session: &ActiveSession<'_, Agent>, command: SessionCommand) {
+    fn on_command(&mut self, session: &ActiveSession<'_, Agent>, command: SessionCommand) {
         match command {
             SessionCommand::Prompt(turn) => self.begin_turn(session, turn),
             SessionCommand::Cancel => self.cancel_turn(session),
             SessionCommand::SetMode { mode_id, reply } => {
-                send_set_mode(session, mode_id, reply).await;
+                self.spawn_set_mode(session, mode_id, reply);
             }
             SessionCommand::SetConfig {
                 config_id,
                 value,
                 reply,
             } => {
-                send_set_config_option(session, config_id, value, reply).await;
+                self.spawn_set_config_option(session, config_id, value, reply);
             }
             SessionCommand::UserInput { mut input, answer } => {
                 // Only shown while a turn runs; dropping `answer` cancels it.
@@ -479,6 +493,69 @@ impl SessionActor {
         }
     }
 
+    /// Send `session/set_mode` to the live session without blocking the actor loop.
+    /// Safe mid-turn: claude-agent-acp applies it to the running query
+    /// (`setPermissionMode`), so the in-flight turn switches immediately.
+    fn spawn_set_mode(
+        &mut self,
+        session: &ActiveSession<'_, Agent>,
+        mode_id: String,
+        reply: oneshot::Sender<Result<(), String>>,
+    ) {
+        let connection = session.connection().clone();
+        let request =
+            SetSessionModeRequest::new(session.session_id().clone(), SessionModeId::from(mode_id));
+        self.control_tasks.spawn(async move {
+            let result = match tokio::time::timeout(
+                CONTROL_REQUEST_TIMEOUT,
+                connection.send_request_to(Agent, request).block_task(),
+            )
+            .await
+            {
+                Ok(Ok(_)) => Ok(()),
+                Ok(Err(err)) => Err(err.to_string()),
+                Err(_) => Err(format!(
+                    "Timeout waiting for session/set_mode after {}s",
+                    CONTROL_REQUEST_TIMEOUT.as_secs()
+                )),
+            };
+            let _ = reply.send(result);
+        });
+    }
+
+    /// Send `session/set_config_option` to the live session without blocking the
+    /// actor loop; see `spawn_set_mode` for why this is safe mid-turn.
+    fn spawn_set_config_option(
+        &mut self,
+        session: &ActiveSession<'_, Agent>,
+        config_id: String,
+        value: String,
+        reply: oneshot::Sender<Result<serde_json::Value, String>>,
+    ) {
+        let connection = session.connection().clone();
+        let request = SetSessionConfigOptionRequest::new(
+            session.session_id().clone(),
+            SessionConfigId::from(config_id),
+            SessionConfigValueId::from(value),
+        );
+        self.control_tasks.spawn(async move {
+            let result = match tokio::time::timeout(
+                CONTROL_REQUEST_TIMEOUT,
+                connection.send_request_to(Agent, request).block_task(),
+            )
+            .await
+            {
+                Ok(Ok(response)) => Ok(to_json(response)),
+                Ok(Err(err)) => Err(err.to_string()),
+                Err(_) => Err(format!(
+                    "Timeout waiting for session/set_config_option after {}s",
+                    CONTROL_REQUEST_TIMEOUT.as_secs()
+                )),
+            };
+            let _ = reply.send(result);
+        });
+    }
+
     fn publish(&self) {
         self.status.send_replace(SessionStatus {
             busy: self.turn.is_some(),
@@ -626,49 +703,6 @@ async fn drain_replay(
         }
     }
     Ok(metadata)
-}
-
-/// Send `session/set_mode` to the live session and settle the caller's reply.
-/// Safe mid-turn: claude-agent-acp applies it to the running query
-/// (`setPermissionMode`), so the in-flight turn switches immediately.
-async fn send_set_mode(
-    session: &ActiveSession<'_, Agent>,
-    mode_id: String,
-    reply: oneshot::Sender<Result<(), String>>,
-) {
-    let request =
-        SetSessionModeRequest::new(session.session_id().clone(), SessionModeId::from(mode_id));
-    let result = session
-        .connection()
-        .send_request_to(Agent, request)
-        .block_task()
-        .await
-        .map(|_| ())
-        .map_err(|err| err.to_string());
-    let _ = reply.send(result);
-}
-
-/// Send `session/set_config_option` to the live session; see `send_set_mode`
-/// for why this is safe mid-turn.
-async fn send_set_config_option(
-    session: &ActiveSession<'_, Agent>,
-    config_id: String,
-    value: String,
-    reply: oneshot::Sender<Result<serde_json::Value, String>>,
-) {
-    let request = SetSessionConfigOptionRequest::new(
-        session.session_id().clone(),
-        SessionConfigId::from(config_id),
-        SessionConfigValueId::from(value),
-    );
-    let result = session
-        .connection()
-        .send_request_to(Agent, request)
-        .block_task()
-        .await
-        .map(to_json)
-        .map_err(|err| err.to_string());
-    let _ = reply.send(result);
 }
 
 #[cfg(test)]

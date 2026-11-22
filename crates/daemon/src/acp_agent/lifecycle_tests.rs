@@ -1117,3 +1117,140 @@ async fn shutdown_closes_active_sessions_and_stops_runtime() {
     );
     assert!(mock.manager.prepare("codex-acp").await.is_err());
 }
+
+#[tokio::test]
+async fn pending_mode_and_config_changes_do_not_block_turn_updates_or_permission_response() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+    let notifier: Notifier = Arc::new(move |_, params| notify_tx.send(params).unwrap());
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                30,
+                event_tx,
+                Some(notifier),
+            )
+            .await
+    });
+    let prompt_request = mock.next("session/prompt").await;
+
+    // Issue both set_mode and set_config_option mid-turn and leave them unanswered.
+    let manager_mode = mock.manager.clone();
+    let mode =
+        tokio::spawn(async move { manager_mode.set_mode("codex-acp", "session", "plan").await });
+    let mode_request = mock.next("session/set_mode").await;
+
+    let manager_cfg = mock.manager.clone();
+    let config = tokio::spawn(async move {
+        manager_cfg
+            .set_config_option("codex-acp", "session", "model", "sonnet")
+            .await
+    });
+    let config_request = mock.next("session/set_config_option").await;
+
+    // Agent asks for permission while set_mode/set_config are still pending: must not deadlock.
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "id": "perm-1", "method": "session/request_permission",
+            "params": {
+                "sessionId": "session",
+                "toolCall": {"toolCallId": "tool", "title": "Run command", "status": "pending"},
+                "options": [{"optionId": "allow", "name": "Allow", "kind": "allow_once"}]
+            }
+        })))
+        .unwrap();
+    let permission = tokio::time::timeout(Duration::from_secs(1), notify_rx.recv())
+        .await
+        .expect("permission request must not be blocked by pending mode/config")
+        .unwrap();
+    let request_id = permission["requestId"].as_str().unwrap().to_string();
+    assert!(
+        mock.manager
+            .answer_user_input(
+                "codex-acp",
+                "session",
+                &request_id,
+                json!({"optionId": "allow"})
+            )
+            .await
+    );
+    let perm_reply = tokio::time::timeout(Duration::from_secs(1), mock.peer.rx.next())
+        .await
+        .expect("permission response must be delivered while mode/config is pending")
+        .map(frame_json)
+        .unwrap();
+    assert_eq!(perm_reply["id"], "perm-1");
+    assert_eq!(perm_reply["result"]["outcome"]["optionId"], "allow");
+
+    // Streamed session updates and prompt completion must flow normally too.
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "method": "session/update",
+            "params": {
+                "sessionId": "session",
+                "update": {
+                    "sessionUpdate": "agent_message_chunk",
+                    "content": {"type": "text", "text": "hello"}
+                }
+            }
+        })))
+        .unwrap();
+    let event = tokio::time::timeout(Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("streamed update must not be blocked")
+        .unwrap();
+    assert!(matches!(event, AgentEvent::SessionUpdate { .. }));
+
+    mock.respond(&prompt_request, json!({"stopReason": "end_turn"}));
+    let answer = tokio::time::timeout(Duration::from_secs(1), prompt)
+        .await
+        .expect("turn must finish while mode/config is still pending")
+        .unwrap()
+        .unwrap();
+    assert_eq!(answer, "hello");
+
+    // Finally resolve the pending mode and config requests.
+    mock.respond(&mode_request, json!({}));
+    mock.respond(&config_request, json!({"configOptions": []}));
+    assert!(mode.await.unwrap().is_ok());
+    assert!(config.await.unwrap().is_ok());
+}
+
+#[tokio::test]
+async fn stuck_mode_change_times_out_without_blocking_session() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+
+    let manager = mock.manager.clone();
+    let mode = tokio::spawn(async move { manager.set_mode("codex-acp", "session", "plan").await });
+    let _mode_request = mock.next("session/set_mode").await;
+
+    let err = tokio::time::timeout(
+        session::CONTROL_REQUEST_TIMEOUT + Duration::from_secs(1),
+        mode,
+    )
+    .await
+    .expect("set_mode should time out")
+    .unwrap()
+    .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("Timeout waiting for session/set_mode"),
+        "unexpected error: {err}"
+    );
+
+    // The session stays usable after the timed-out control request.
+    let prompt = mock.prompt("session");
+    let request = mock.next("session/prompt").await;
+    mock.respond(&request, json!({"stopReason": "end_turn"}));
+    assert!(prompt.await.unwrap().is_ok());
+}
