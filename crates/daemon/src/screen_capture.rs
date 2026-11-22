@@ -14,12 +14,7 @@
 //! draws around the picture; the picture itself is a JPEG at most `maxWidth`
 //! wide. Shape geometry is in native pixels.
 
-use std::{
-    env,
-    path::PathBuf,
-    process::{Command, Output},
-    time::Duration,
-};
+use std::{env, path::PathBuf, process::Output, time::Duration};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use image::{
@@ -34,10 +29,17 @@ use rmcp::{
     transport::StreamableHttpClientTransport,
 };
 use serde_json::{Value, json};
+use tokio::process::Command;
 
 const DEFAULT_MAX_WIDTH: u32 = 800;
 const JPEG_QUALITY: u8 = 80;
+const CAPTURE_TIMEOUT: Duration = Duration::from_secs(10);
 const BROWSER4AGENT_MCP_URL: &str = "http://127.0.0.1:39271/mcp";
+
+enum Captured {
+    Ios(Vec<u8>),
+    Frame(Vec<u8>, Value),
+}
 
 pub async fn capture(
     target: &str,
@@ -51,18 +53,20 @@ pub async fn capture(
         .split_once(':')
         .filter(|(kind, id)| ["ios", "android", "browser"].contains(kind) && !id.is_empty())
         .ok_or_else(|| format!("Unsupported screen target: {target}"))?;
-    // Browser tabs arrive over async MCP; simulators and devices go through
-    // blocking CLIs, and image work is blocking for all.
-    let browser = match kind {
-        "browser" => Some(capture_browser(id).await?),
-        _ => None,
-    };
-    let (kind, id) = (kind.to_string(), id.to_string());
+    let captured = tokio::time::timeout(CAPTURE_TIMEOUT, async {
+        match kind {
+            "ios" => capture_ios(id).await,
+            "android" => capture_android(id).await,
+            "browser" => capture_browser(id).await,
+            _ => unreachable!(),
+        }
+    })
+    .await
+    .map_err(|_| format!("Timed out capturing {target}"))??;
     tokio::task::spawn_blocking(move || {
-        let (image, frame) = match browser {
-            Some((png, frame)) => (decode_png(&png)?.into_rgb8(), frame),
-            None if kind == "ios" => capture_ios(&id)?,
-            None => capture_android(&id)?,
+        let (image, frame) = match captured {
+            Captured::Ios(png) => decode_ios_png(&png)?,
+            Captured::Frame(png, frame) => (decode_png(&png)?.into_rgb8(), frame),
         };
         let (width, height) = (image.width(), image.height());
         let jpeg = encode_jpeg(image, max_width)?;
@@ -94,34 +98,8 @@ fn decode_png(bytes: &[u8]) -> Result<DynamicImage, String> {
         .map_err(|err| format!("Failed to decode screenshot: {err}"))
 }
 
-fn run(command: &mut Command, name: &str) -> Result<Output, String> {
-    let output = command
-        .output()
-        .map_err(|err| format!("Failed to run {name}: {err}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("{name} failed: {}", stderr.trim()));
-    }
-    Ok(output)
-}
-
-fn capture_ios(udid: &str) -> Result<(RgbImage, Value), String> {
-    if !cfg!(target_os = "macos") {
-        return Err("iOS Simulator is only available on macOS".into());
-    }
-    let output = run(
-        Command::new("/usr/bin/xcrun").args([
-            "simctl",
-            "io",
-            udid,
-            "screenshot",
-            "--type=png",
-            "--mask=alpha",
-            "-",
-        ]),
-        "simctl",
-    )?;
-    let image = decode_png(&output.stdout)?.into_rgba8();
+fn decode_ios_png(bytes: &[u8]) -> Result<(RgbImage, Value), String> {
+    let image = decode_png(bytes)?.into_rgba8();
     let corner_radius = alpha_corner_radius(&image);
     // simctl premultiplies the mask, so dropping alpha leaves the masked
     // corners and Dynamic Island black.
@@ -130,6 +108,37 @@ fn capture_ios(udid: &str) -> Result<(RgbImage, Value), String> {
         rgb,
         json!({ "kind": "phone", "cornerRadius": corner_radius }),
     ))
+}
+
+async fn run(command: &mut Command, name: &str) -> Result<Output, String> {
+    let output = command
+        .kill_on_drop(true)
+        .output()
+        .await
+        .map_err(|err| format!("Failed to run {name}: {err}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("{name} failed: {}", stderr.trim()));
+    }
+    Ok(output)
+}
+
+async fn capture_ios(udid: &str) -> Result<Captured, String> {
+    if !cfg!(target_os = "macos") {
+        return Err("iOS Simulator is only available on macOS".into());
+    }
+    let mut command = Command::new("/usr/bin/xcrun");
+    command.args([
+        "simctl",
+        "io",
+        udid,
+        "screenshot",
+        "--type=png",
+        "--mask=alpha",
+        "-",
+    ]);
+    let output = run(&mut command, "simctl").await?;
+    Ok(Captured::Ios(output.stdout))
 }
 
 /// Radius of the transparent top-left corner: the diagonal meets a circle of
@@ -164,33 +173,25 @@ fn adb_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(name))
 }
 
-fn capture_android(serial: &str) -> Result<(RgbImage, Value), String> {
+async fn capture_android(serial: &str) -> Result<Captured, String> {
     let adb = adb_path();
-    let (screencap, display) = std::thread::scope(|scope| {
-        let display = scope.spawn(|| {
-            run(
-                Command::new(&adb).args(["-s", serial, "shell", "dumpsys", "display"]),
-                "adb",
-            )
-        });
-        let screencap = run(
-            Command::new(&adb).args(["-s", serial, "exec-out", "screencap", "-p"]),
-            "adb",
-        );
-        (screencap, display.join())
-    });
-    let image = decode_png(&screencap?.stdout)?.into_rgb8();
+    let mut screencap_cmd = Command::new(&adb);
+    screencap_cmd.args(["-s", serial, "exec-out", "screencap", "-p"]);
+    let mut display_cmd = Command::new(&adb);
+    display_cmd.args(["-s", serial, "shell", "dumpsys", "display"]);
+    let (screencap, display) =
+        tokio::join!(run(&mut screencap_cmd, "adb"), run(&mut display_cmd, "adb"),);
+    let png = screencap?.stdout;
     // The shape is decoration: a failed dumpsys still shows the screen.
     let shape = display
         .ok()
-        .and_then(Result::ok)
         .map(|output| android_shape(&String::from_utf8_lossy(&output.stdout)))
         .unwrap_or_default();
     let mut frame = json!({ "kind": "phone", "cornerRadius": shape.corner_radius });
     if !shape.cutouts.is_empty() {
         frame["cutouts"] = json!(shape.cutouts);
     }
-    Ok((image, frame))
+    Ok(Captured::Frame(png, frame))
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -322,7 +323,7 @@ pub async fn browser_has_tab(tab_id: i64, url: &str) -> bool {
 
 /// A tab's PNG and its title / URL through browser4agent's local MCP service,
 /// one short session per frame.
-async fn capture_browser(tab_id: &str) -> Result<(Vec<u8>, Value), String> {
+async fn capture_browser(tab_id: &str) -> Result<Captured, String> {
     let tab_id: i64 = tab_id
         .parse()
         .map_err(|_| format!("Invalid browser tab id: {tab_id}"))?;
@@ -346,7 +347,7 @@ async fn capture_browser(tab_id: &str) -> Result<(Vec<u8>, Value), String> {
             "url": tab.get("url").cloned().unwrap_or_default(),
             "mobile": tab_is_mobile(&client, tab_id).await,
         });
-        Ok((png, frame))
+        Ok(Captured::Frame(png, frame))
     }
     .await;
     let _ = client.cancel().await;
@@ -433,5 +434,54 @@ mod tests {
     async fn rejects_invalid_targets() {
         assert!(capture("ios:", None).await.is_err());
         assert!(capture("window:Safari", None).await.is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dropping_run_kills_the_child_process() {
+        let pid_file = std::env::temp_dir().join(format!(
+            "agentdeck-screen-capture-pid-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&pid_file);
+        let pid = {
+            let mut command = Command::new("/bin/sh");
+            command
+                .args(["-c", "echo $$ > \"$1\"; exec sleep 60", "_"])
+                .arg(&pid_file);
+            let task = run(&mut command, "sleep");
+            tokio::pin!(task);
+            tokio::select! {
+                result = &mut task => panic!("sleep exited unexpectedly: {result:?}"),
+                pid = async {
+                    loop {
+                        if let Ok(content) = std::fs::read_to_string(&pid_file) {
+                            let trimmed = content.trim();
+                            if !trimmed.is_empty() {
+                                return trimmed.to_string();
+                            }
+                        }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                } => pid,
+            }
+        };
+        let _ = std::fs::remove_file(&pid_file);
+
+        let mut alive = true;
+        for _ in 0..50 {
+            let status = Command::new("kill")
+                .args(["-0", &pid])
+                .output()
+                .await
+                .unwrap()
+                .status;
+            if !status.success() {
+                alive = false;
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(!alive, "child process {pid} survived after run was dropped");
     }
 }
