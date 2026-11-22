@@ -1,12 +1,12 @@
 use std::ffi::OsString;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use service_manager::{
     RestartPolicy, ServiceInstallCtx, ServiceLabel, ServiceLevel, ServiceManager, ServiceStartCtx,
     ServiceStatusCtx, ServiceStopCtx, ServiceUninstallCtx,
 };
 
-use super::{singleton::InstanceLock, status::Status};
+use super::{service_program, singleton::InstanceLock, status::Status};
 
 pub const SERVICE_LABEL: &str = "com.agentdeck.daemon";
 
@@ -21,7 +21,7 @@ fn get_manager() -> Result<Box<dyn ServiceManager>> {
 
 pub fn install_daemon() -> Result<()> {
     let manager = get_manager()?;
-    let program = std::env::current_exe().context("failed to get current executable path")?;
+    let program = service_program()?;
 
     // Rewriting the LaunchAgent makes macOS show a new "Background Items Added" notification.
     #[cfg(target_os = "macos")]
@@ -94,7 +94,7 @@ pub fn start_daemon() -> Result<()> {
 pub fn restart_daemon() -> Result<()> {
     #[cfg(target_os = "macos")]
     {
-        let program = std::env::current_exe().context("failed to get current executable path")?;
+        let program = service_program()?;
         if launchd::is_current(&launchd::plist(&program)) {
             return launchd::kickstart();
         }
