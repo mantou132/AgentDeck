@@ -58,6 +58,9 @@ static CURRENT: Mutex<Option<String>> = Mutex::new(None);
 /// Skill groups of the latest attaching client, which filter `CURRENT` by `--features`.
 static CURRENT_GROUPS: Mutex<Option<FeatureGroups>> = Mutex::new(None);
 
+/// Serializes bundle installation so concurrent clients don't clobber the same staging dir.
+static INSTALL_LOCK: Mutex<()> = Mutex::new(());
+
 fn skills_dir() -> Result<PathBuf> {
     Ok(AppPaths::discover()?.skills_dir())
 }
@@ -93,6 +96,7 @@ pub fn select(selection: &mut SkillSelection) -> bool {
 }
 
 fn write_bundle(root: &Path, bundle: &SkillBundle) -> Result<()> {
+    let _guard = INSTALL_LOCK.lock().expect("lock poisoned");
     let target = version_dir(root, &bundle.hash)?;
     if target.is_dir() {
         return Ok(());
@@ -138,6 +142,9 @@ fn prune(versions: &Path) -> Result<()> {
     let mut dirs = fs::read_dir(versions)?
         .filter_map(|entry| {
             let entry = entry.ok()?;
+            if entry.file_name().to_string_lossy().starts_with('.') {
+                return None;
+            }
             let modified = entry.metadata().ok()?.modified().ok()?;
             Some((modified, entry.path()))
         })
@@ -264,6 +271,58 @@ mod tests {
             files: HashMap::from([("../x".to_string(), String::new())]),
         };
         assert!(write_bundle(&root, &escape).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn concurrent_installs_of_same_version_succeed() {
+        let root = std::env::temp_dir().join(format!(
+            "agentdeck-skills-concurrent-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let files = (0..16)
+            .map(|i| (format!("skill{i}/SKILL.md"), format!("content-{i}")))
+            .collect::<HashMap<_, _>>();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(4));
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let root = root.clone();
+                let files = files.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let bundle = SkillBundle {
+                        hash: "samehash".to_string(),
+                        files,
+                    };
+                    barrier.wait();
+                    write_bundle(&root, &bundle)
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().unwrap().unwrap();
+        }
+        assert!(
+            root.join("versions/samehash/skill0/.agents/skills/skill0/SKILL.md")
+                .is_file()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn prune_ignores_hidden_staging_directories() {
+        let root =
+            std::env::temp_dir().join(format!("agentdeck-skills-prune-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let versions = root.join("versions");
+        for name in ["v1", "v2", "v3", ".staging"] {
+            fs::create_dir_all(versions.join(name)).unwrap();
+        }
+        prune(&versions).unwrap();
+        for name in ["v1", "v2", "v3", ".staging"] {
+            assert!(versions.join(name).is_dir(), "{name} should be preserved");
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }
