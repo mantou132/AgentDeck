@@ -1,4 +1,8 @@
-use crate::{app_data::AppPaths, config::DaemonConfig, power};
+use crate::{
+    app_data::{self, AppPaths},
+    config::DaemonConfig,
+    power,
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -61,8 +65,7 @@ fn now() -> u64 {
 }
 pub(crate) fn read_status(paths: &AppPaths, pid: u32, mode: Mode) -> Option<Status> {
     let status: Status = serde_json::from_slice(&fs::read(paths.awake_status_file()).ok()?).ok()?;
-    (status.pid == pid && status.mode == mode && now().saturating_sub(status.updated) <= 5)
-        .then_some(status)
+    (status.pid == pid && status.mode == mode).then_some(status)
 }
 pub(crate) struct Monitor {
     stop: mpsc::Sender<()>,
@@ -77,6 +80,7 @@ impl Monitor {
             .spawn(move || {
                 let mut inhibitor = None;
                 let mut previous_error = None;
+                let mut last_written: Option<(Mode, bool, Option<String>)> = None;
                 loop {
                     let mut mode = Mode::Never;
                     let result = (|| -> Result<()> {
@@ -112,19 +116,24 @@ impl Monitor {
                         }
                         previous_error = error.clone();
                     }
-                    let status = Status {
-                        pid: std::process::id(),
-                        mode,
-                        on: inhibitor.is_some(),
-                        error,
-                        updated: now(),
-                    };
-                    // The CLI retries partial reads; this file is runtime information, never configuration.
-                    if let Err(error) = fs::write(
-                        paths.awake_status_file(),
-                        serde_json::to_vec(&status).unwrap(),
-                    ) {
-                        tracing::debug!("Cannot write keep-awake status: {error}");
+                    let state = (mode, inhibitor.is_some(), error);
+                    if last_written.as_ref() != Some(&state) {
+                        let status = Status {
+                            pid: std::process::id(),
+                            mode: state.0,
+                            on: state.1,
+                            error: state.2.clone(),
+                            updated: now(),
+                        };
+                        match app_data::write_file_atomic(
+                            &paths.awake_status_file(),
+                            serde_json::to_vec(&status).unwrap(),
+                        ) {
+                            Ok(()) => last_written = Some(state),
+                            Err(error) => {
+                                tracing::debug!("Cannot write keep-awake status: {error:#}");
+                            }
+                        }
                     }
                     if !matches!(
                         rx.recv_timeout(Duration::from_secs(1)),
@@ -211,5 +220,62 @@ mod tests {
         state.last = Some(start + Duration::from_secs(3600));
         assert!(state.active(start + Duration::from_secs(7199)));
         assert!(!state.active(start + Duration::from_secs(7200)));
+    }
+
+    #[test]
+    fn monitor_writes_status_only_on_change_and_cleans_up() {
+        let root =
+            std::env::temp_dir().join(format!("agentdeck-awake-idle-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let paths = AppPaths::new(root.clone());
+        DaemonConfig::set_awake(&paths, Mode::Never).unwrap();
+
+        let monitor = Monitor::start(&paths).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let initial = loop {
+            if let Some(status) = read_status(&paths, std::process::id(), Mode::Never) {
+                break status;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "monitor did not write initial status"
+            );
+            thread::sleep(Duration::from_millis(20));
+        };
+        assert!(!initial.on);
+        assert!(initial.error.is_none());
+        let initial_modified = fs::metadata(paths.awake_status_file())
+            .unwrap()
+            .modified()
+            .unwrap();
+
+        // Wait past one monitor tick: unchanged state should not rewrite the status file.
+        thread::sleep(Duration::from_millis(1200));
+        let later_modified = fs::metadata(paths.awake_status_file())
+            .unwrap()
+            .modified()
+            .unwrap();
+        assert_eq!(later_modified, initial_modified);
+
+        // Status remains readable regardless of age as long as pid and mode match.
+        let stale = Status {
+            pid: std::process::id(),
+            mode: Mode::Never,
+            on: false,
+            error: None,
+            updated: 0,
+        };
+        app_data::write_file_atomic(
+            &paths.awake_status_file(),
+            serde_json::to_vec(&stale).unwrap(),
+        )
+        .unwrap();
+        assert!(read_status(&paths, std::process::id(), Mode::Never).is_some());
+        assert!(read_status(&paths, std::process::id(), Mode::Always).is_none());
+        assert!(read_status(&paths, std::process::id() + 1, Mode::Never).is_none());
+
+        drop(monitor);
+        assert!(!paths.awake_status_file().exists());
+        fs::remove_dir_all(root).unwrap();
     }
 }
