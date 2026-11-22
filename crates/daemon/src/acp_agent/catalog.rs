@@ -192,7 +192,7 @@ pub(super) fn refresh_registry() {
         match fetch_registry().await {
             Ok((registry, body)) => {
                 if let Err(err) = AppPaths::discover().and_then(|paths| {
-                    fs::write(paths.registry_file(), body)
+                    crate::app_data::write_file_atomic(&paths.registry_file(), body)
                         .context("failed to save the ACP registry")
                 }) {
                     tracing::warn!("{err:#}");

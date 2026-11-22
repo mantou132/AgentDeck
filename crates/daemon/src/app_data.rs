@@ -142,6 +142,20 @@ pub(crate) fn ensure_dir(path: &Path) -> Result<()> {
         .with_context(|| format!("failed to create directory: {}", path.display()))
 }
 
+pub(crate) fn write_file_atomic(path: &Path, bytes: impl AsRef<[u8]>) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        ensure_dir(parent)?;
+    }
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    fs::write(&temporary, bytes)
+        .with_context(|| format!("failed to write temporary file: {}", temporary.display()))?;
+    if let Err(err) = fs::rename(&temporary, path) {
+        let _ = fs::remove_file(&temporary);
+        return Err(err).with_context(|| format!("failed to replace file: {}", path.display()));
+    }
+    Ok(())
+}
+
 fn remove_if_present(path: &Path, remove: impl FnOnce(&Path) -> std::io::Result<()>) -> Result<()> {
     match remove(path) {
         Ok(()) => Ok(()),

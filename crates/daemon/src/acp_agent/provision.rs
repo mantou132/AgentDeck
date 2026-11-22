@@ -427,7 +427,7 @@ fn install_registry_binary(
             args: binary.args.clone(),
         };
         let manifest_path = runtime.manifest_file();
-        fs::write(
+        app_data::write_file_atomic(
             &manifest_path,
             serde_json::to_vec_pretty(&manifest)
                 .context("failed to serialize the managed agent manifest")?,
