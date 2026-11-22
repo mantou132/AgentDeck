@@ -38,7 +38,12 @@ export class DeckSessionGroupElement extends GemElement {
 
     return html`
       <section class="overflow-hidden rounded-[20px] border border-border bg-bg-light shadow-card">
-        <header class="flex min-w-0 items-center gap-2.5 border-b border-border bg-bg-light/80 px-4 py-3" @click=${this.#toggleExpand}>
+        <header
+          role="button"
+          aria-expanded=${expanded}
+          class="flex min-w-0 items-center gap-2.5 border-b border-border bg-bg-light/80 px-4 py-3"
+          @click=${this.#toggleExpand}
+        >
           <span class="grid size-7 shrink-0 place-items-center rounded-[9px] bg-primary-soft text-primary-strong">
             <tap-use class="size-4" .element=${icons.folder}></tap-use>
           </span>
@@ -166,6 +171,7 @@ export class DeckSessionGroupElement extends GemElement {
         <footer v-if=${sessions.length > 5} class="border-t border-border/70 bg-bg-light/40">
           <button
             type="button"
+            aria-expanded=${expanded}
             class="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 border-0 bg-transparent text-sm font-semibold text-describe transition-colors hover:text-highlight active:bg-bg-hover"
             @click=${this.#toggleExpand}
           >

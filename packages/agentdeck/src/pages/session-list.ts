@@ -349,7 +349,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                 'cursor-pointer active:scale-[0.985]': Boolean(selectedCwd) && !navigatingCwd,
                 'pointer-events-none': navigatingCwd,
               })}
-              aria-disabled=${String(!selectedCwd || navigatingCwd)}
+              ?disabled=${!selectedCwd || navigatingCwd}
               @click=${this.#confirmNewSession}
             >
               <span>${i18n.get('cwdPicker.createHere')}</span>

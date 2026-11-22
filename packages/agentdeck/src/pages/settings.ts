@@ -270,6 +270,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
               <span class="relative block">
                 <select
                   class="box-border h-12 w-full appearance-none rounded-xl border border-border-strong bg-bg pr-11 pl-3.5 text-base font-medium text-highlight outline-none"
+                  aria-label=${i18n.get('settings.agentTitle')}
                   .value=${agent}
                   @change=${(event: Event) => this.#state({ agent: (event.target as HTMLSelectElement).value })}
                 >
@@ -295,13 +296,13 @@ export class AgentDeckSettingsPageElement extends GemElement {
               class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
               @click=${this.#openFeedback}
             >${i18n.get('settings.feedback')}</button>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <button
               type="button"
               class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
               @click=${() => this.#state({ moreOpen: true })}
             >${i18n.get('settings.moreSettings')}</button>
-            <span v-if=${!!agentdeckStore.settings.relayId}>·</span>
+            <span v-if=${!!agentdeckStore.settings.relayId} aria-hidden="true">·</span>
             <button
               type="button"
               v-if=${!!agentdeckStore.settings.relayId}

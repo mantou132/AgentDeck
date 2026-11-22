@@ -114,6 +114,7 @@ export class DeckMoreSettingsElement extends GemElement {
       // Not the group's own switch rows, which cannot be disabled while the required skill is off.
       extra: html`
         <tap-switch
+          aria-label=${i18n.get(`skill.${skill}` as LocaleKey)}
           ?checked=${!restricted && isSkillEnabled(skill)}
           ?disabled=${restricted || (!!required && !isSkillEnabled(required))}
           @change=${(event: CustomEvent<boolean>) => setSkillEnabled(skill, event.detail)}
