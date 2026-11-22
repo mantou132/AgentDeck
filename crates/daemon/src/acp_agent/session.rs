@@ -86,15 +86,9 @@ pub(super) async fn run_session_actor(
     let result: Result<(), agent_client_protocol::Error> = tokio::select! {
         result = run => result,
         _ = closing.cancelled() => Ok(()),
-        _ = async {
-            loop {
-                if disconnects.changed().await.is_err()
-                    || *disconnects.borrow() >= connection_generation
-                {
-                    break;
-                }
-            }
-        } => Err(agent_client_protocol::Error::internal_error().data("ACP connection stopped")),
+        _ = disconnects.wait_for(|&g| g >= connection_generation) => Err(
+            agent_client_protocol::Error::internal_error().data("ACP connection stopped")
+        ),
     };
     // Settle the turn's caller and the pending request (cancelled) right away,
     // without waiting for the agent to close the session.
@@ -455,6 +449,9 @@ impl SessionActor {
         self.pending_inputs
             .retain(|pending| pending.input.params()["childSessionId"] != session_id);
         if self.pending_inputs.len() != before {
+            if self.pending_inputs.is_empty() {
+                self.resume_idle();
+            }
             self.publish();
         }
     }

@@ -1254,3 +1254,136 @@ async fn stuck_mode_change_times_out_without_blocking_session() {
     mock.respond(&request, json!({"stopReason": "end_turn"}));
     assert!(prompt.await.unwrap().is_ok());
 }
+
+#[tokio::test]
+async fn session_exits_when_disconnect_already_recorded_before_subscribe() {
+    let mut mock = MockAcp::new().await;
+    let runtime = mock.manager.runtime("codex-acp");
+    let generation = runtime.state.lock().await.generation;
+
+    let manager = mock.manager.clone();
+    let create = tokio::spawn(async move {
+        manager
+            .create_session("codex-acp", None, Default::default())
+            .await
+    });
+    let request = mock.next("session/new").await;
+
+    // Stop the connection before `start_session` subscribes to `disconnects`.
+    runtime
+        .connection_stopped(generation, "disconnected".into())
+        .await;
+    mock.respond(&request, json!({"sessionId": "s-race"}));
+
+    // Whether create_session succeeds right before exit or fails during startup,
+    // the actor must notice the already-recorded disconnect and clean up.
+    let _ = tokio::time::timeout(Duration::from_secs(1), create)
+        .await
+        .expect("create_session should settle");
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while mock.registered("s-race").await {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("session actor must exit instead of staying as a zombie");
+}
+
+#[tokio::test]
+async fn cancelling_child_permission_resumes_parent_idle_timeout() {
+    let mut mock = MockAcp::new().await;
+    mock.create("session").await;
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel();
+    let notifier: Notifier =
+        Arc::new(move |method, params| request_tx.send((method.to_string(), params)).unwrap());
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                1,
+                replay_sink(),
+                Some(notifier),
+            )
+            .await
+    });
+    let prompt_request = mock.next("session/prompt").await;
+
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "method": "session/update",
+            "params": {
+                "sessionId": "session",
+                "update": {
+                    "sessionUpdate": "subagent_update", "sessionId": "child", "title": "scout",
+                    "capabilities": {"cancel": {}}, "state": {"state": "running"}
+                }
+            }
+        })))
+        .unwrap();
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "id": "child-perm", "method": "session/request_permission",
+            "params": {
+                "sessionId": "child",
+                "toolCall": {"toolCallId": "tool", "title": "Check", "status": "pending"},
+                "options": [{"optionId": "allow", "name": "Allow", "kind": "allow_once"}]
+            }
+        })))
+        .unwrap();
+    let (method, _) = tokio::time::timeout(Duration::from_secs(1), request_rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(method, "agent_permission_request");
+
+    // Wait longer than the 1s parent idle timeout while the child input is pending.
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    assert!(
+        mock.manager
+            .cancel_child("codex-acp", "session", "child")
+            .await
+    );
+
+    // Drain the child cancel + permission cancellation; the parent must NOT be cancelled.
+    tokio::time::timeout(Duration::from_secs(1), async {
+        let (mut child_cancelled, mut perm_cancelled) = (false, false);
+        while !(child_cancelled && perm_cancelled) {
+            let msg = frame_json(mock.peer.rx.next().await.unwrap());
+            match msg["method"].as_str() {
+                Some("session/cancel") => {
+                    assert_eq!(msg["params"]["sessionId"], "child");
+                    child_cancelled = true;
+                }
+                None if msg["id"] == "child-perm" => {
+                    assert_eq!(msg["result"]["outcome"]["outcome"], "cancelled");
+                    perm_cancelled = true;
+                }
+                _ => panic!("Unexpected ACP message: {msg}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    // Parent turn must stay alive after child cancellation (idle timer resumed from now).
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), mock.peer.rx.next())
+            .await
+            .is_err(),
+        "parent turn must not immediately time out after child input is dropped"
+    );
+    mock.respond(&prompt_request, json!({"stopReason": "end_turn"}));
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), prompt)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_ok()
+    );
+}

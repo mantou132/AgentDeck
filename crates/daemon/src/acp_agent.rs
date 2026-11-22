@@ -133,6 +133,7 @@ pub enum AgentStatus {
 struct AgentConnection {
     connection: ConnectionTo<Agent>,
     capabilities: Arc<AgentCapabilities>,
+    generation: u64,
 }
 
 /// Lazily starts one ACP subprocess and shares its connection across sessions.
@@ -385,6 +386,7 @@ impl AcpRuntime {
                 let agent_connection = AgentConnection {
                     connection: connection.clone(),
                     capabilities: Arc::new(response.agent_capabilities),
+                    generation,
                 };
                 runtime.connection_ready(generation, agent_connection).await;
                 // The SDK can keep a connect_with foreground task alive after EOF.
@@ -431,7 +433,7 @@ impl AcpRuntime {
         for waiter in waiters {
             let _ = waiter.send(Err(error.clone()));
         }
-        let _ = self.disconnects.send(generation);
+        self.disconnects.send_replace(generation);
     }
 
     async fn shutdown(&self) {
@@ -470,8 +472,8 @@ impl AcpRuntime {
         let AgentConnection {
             connection,
             capabilities,
+            generation,
         } = self.connection().await?;
-        let generation = self.state.lock().await.generation;
         // Agents ignore `_meta` keys they don't know, so no per-agent check.
         let mut meta = context
             .system_prompt
@@ -1263,6 +1265,7 @@ impl AgentSessionManager {
         let AgentConnection {
             connection,
             capabilities,
+            ..
         } = self.runtime(agent).connection().await?;
         if capabilities.session_capabilities.list.is_none() {
             anyhow::bail!("{agent} does not support listing sessions");
@@ -1285,6 +1288,7 @@ impl AgentSessionManager {
         let AgentConnection {
             connection,
             capabilities,
+            ..
         } = self.runtime(agent).connection().await?;
         if capabilities.session_capabilities.delete.is_none() {
             anyhow::bail!("{agent} does not support deleting sessions");
@@ -1312,6 +1316,7 @@ impl AgentSessionManager {
         let AgentConnection {
             connection,
             capabilities,
+            ..
         } = self.runtime(agent).connection().await?;
         if capabilities.session_capabilities.fork.is_none() {
             anyhow::bail!("{agent} does not support forking sessions");
