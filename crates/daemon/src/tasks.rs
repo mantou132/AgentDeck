@@ -18,6 +18,7 @@ use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     acp_agent::{AgentSessionManager, Notifier, SessionContext},
@@ -241,6 +242,12 @@ pub trait TaskHost: Send + Sync {
     fn skills(&self) -> SkillSelection;
 }
 
+#[derive(Clone)]
+struct RunningTask {
+    session_id: Option<String>,
+    cancel: CancellationToken,
+}
+
 pub struct Tasks {
     paths: AppPaths,
     sessions: Arc<AgentSessionManager>,
@@ -248,10 +255,12 @@ pub struct Tasks {
     tasks: Mutex<Vec<Task>>,
     /// The scheduled time each task last fired for.
     fired: Mutex<HashMap<String, DateTime<Utc>>>,
-    /// Running tasks, with the session of the current attempt once created.
-    running: Mutex<HashMap<String, Option<String>>>,
+    /// Running tasks, with their cancellation token and current attempt session once created.
+    running: Mutex<HashMap<String, RunningTask>>,
     /// Sessions created by runs, for `agent_session_list`.
     run_sessions: Mutex<HashMap<String, String>>,
+    /// Stops the scheduler loop and cancels in-flight runs during daemon shutdown.
+    shutdown: CancellationToken,
 }
 
 impl Tasks {
@@ -268,12 +277,18 @@ impl Tasks {
             fired: Mutex::default(),
             running: Mutex::default(),
             run_sessions: Mutex::default(),
+            shutdown: CancellationToken::new(),
         });
         for task in &tasks {
             this.remember_runs(task);
         }
         *this.tasks.lock().expect("lock poisoned") = tasks;
         this
+    }
+
+    /// Stops the scheduler loop and cancels any in-flight runs silently.
+    pub fn shutdown(&self) {
+        self.shutdown.cancel();
     }
 
     /// Restores the last fired time and the run sessions of a task.
@@ -303,8 +318,14 @@ impl Tasks {
         let this = self.clone();
         tokio::spawn(async move {
             loop {
+                if this.shutdown.is_cancelled() {
+                    break;
+                }
                 this.tick(Utc::now());
-                tokio::time::sleep(TICK).await;
+                tokio::select! {
+                    _ = tokio::time::sleep(TICK) => {}
+                    _ = this.shutdown.cancelled() => break,
+                }
             }
         });
     }
@@ -322,28 +343,70 @@ impl Tasks {
 
     /// Runs a task unless it is already running; `false` if it is.
     fn spawn_run(self: &Arc<Self>, task: Task, scheduled_for: Option<DateTime<Utc>>) -> bool {
+        if self.shutdown.is_cancelled() {
+            return false;
+        }
+        let cancel = self.shutdown.child_token();
         {
             let mut running = self.running.lock().expect("lock poisoned");
             if running.contains_key(&task.id) {
                 tracing::info!("Task {} is still running; skipped a run", task.id);
                 return false;
             }
-            running.insert(task.id.clone(), None);
+            running.insert(
+                task.id.clone(),
+                RunningTask {
+                    session_id: None,
+                    cancel: cancel.clone(),
+                },
+            );
+        }
+        if self.shutdown.is_cancelled() || !self.has_task(&task.id) {
+            self.running.lock().expect("lock poisoned").remove(&task.id);
+            return false;
         }
         self.broadcast_update(&task.id);
         let this = self.clone();
         tokio::spawn(async move {
             for attempt in 0..=task.retries {
-                let run = this.run_once(&task, scheduled_for, attempt).await;
-                if !this.has_task(&task.id) {
-                    // Deleted while running: its history is gone, so this run goes too.
-                    if let Some(session_id) = run.session_id {
+                if cancel.is_cancelled() {
+                    break;
+                }
+                if let Some(entry) = this
+                    .running
+                    .lock()
+                    .expect("lock poisoned")
+                    .get_mut(&task.id)
+                {
+                    entry.session_id = None;
+                }
+                let run = this.run_once(&task, scheduled_for, attempt, &cancel).await;
+                if cancel.is_cancelled() || !this.has_task(&task.id) {
+                    // Deleted while running or daemon shutting down: drop without recording.
+                    if !this.shutdown.is_cancelled()
+                        && let Some(session_id) = run.session_id
+                    {
                         this.delete_run_session(&task.agent, &session_id).await;
                     }
                     break;
                 }
                 let done = run.status == RunStatus::Success || attempt == task.retries;
-                this.record(&task, run);
+                let session_id = run.session_id.clone();
+                let recorded = this.record(&task, run);
+                if !recorded {
+                    if !this.shutdown.is_cancelled()
+                        && let Some(session_id) = session_id
+                    {
+                        this.delete_run_session(&task.agent, &session_id).await;
+                    }
+                    break;
+                }
+                if done
+                    && let Some(session_id) = session_id
+                    && let Some(host) = this.host.get()
+                {
+                    host.push(PushKind::ResponseComplete, &task.agent, &session_id);
+                }
                 if done {
                     break;
                 }
@@ -359,6 +422,7 @@ impl Tasks {
         task: &Task,
         scheduled_for: Option<DateTime<Utc>>,
         attempt: u32,
+        cancel: &CancellationToken,
     ) -> Run {
         let started_at = Utc::now();
         let mut run = Run {
@@ -383,10 +447,10 @@ impl Tasks {
             notifier: Some(host.notifier(&task.id)),
             input_timeout: Some(APPROVAL_TIMEOUT),
         };
-        let created = self
-            .sessions
-            .create_session(&task.agent, Some(PathBuf::from(&task.cwd)), context)
-            .await;
+        let created = tokio::select! {
+            created = self.sessions.create_session(&task.agent, Some(PathBuf::from(&task.cwd)), context) => created,
+            _ = cancel.cancelled() => return run,
+        };
         let session_id = match created {
             Ok(created) => created.session_id,
             Err(err) => {
@@ -396,25 +460,36 @@ impl Tasks {
             }
         };
         run.session_id = Some(session_id.clone());
+        if cancel.is_cancelled() {
+            self.finish(task, &session_id, &mut run).await;
+            return run;
+        }
         self.run_sessions
             .lock()
             .expect("lock poisoned")
             .insert(session_id.clone(), task.id.clone());
         // Devices answer the run's permission requests from its task.
-        self.running
+        if let Some(entry) = self
+            .running
             .lock()
             .expect("lock poisoned")
-            .insert(task.id.clone(), Some(session_id.clone()));
+            .get_mut(&task.id)
+        {
+            entry.session_id = Some(session_id.clone());
+        }
         self.broadcast_update(&task.id);
 
         let mut options: Vec<_> = task.config_options.iter().collect();
         options.sort();
         for (config_id, value) in options {
-            if let Err(err) = self
-                .sessions
-                .set_config_option(&task.agent, &session_id, config_id, value)
-                .await
-            {
+            let applied = tokio::select! {
+                res = self.sessions.set_config_option(&task.agent, &session_id, config_id, value) => res,
+                _ = cancel.cancelled() => {
+                    self.finish(task, &session_id, &mut run).await;
+                    return run;
+                }
+            };
+            if let Err(err) = applied {
                 tracing::warn!("Task {}: failed to set {config_id}: {err}", task.id);
             }
         }
@@ -432,15 +507,20 @@ impl Tasks {
         );
         tokio::pin!(prompt);
         let limit = Duration::from_secs(u64::from(task.timeout_minutes.max(1)) * 60);
-        let result = match tokio::time::timeout(limit, &mut prompt).await {
-            Ok(result) => result,
-            Err(_) => {
-                self.sessions.cancel(&task.agent, &session_id).await;
-                let _ = prompt.await;
-                run.status = RunStatus::Timeout;
-                run.summary = format!("Timed out after {} minutes", task.timeout_minutes);
-                self.finish(task, &session_id, host.as_ref(), &mut run)
-                    .await;
+        let result = tokio::select! {
+            outcome = tokio::time::timeout(limit, &mut prompt) => match outcome {
+                Ok(result) => result,
+                Err(_) => {
+                    self.sessions.cancel(&task.agent, &session_id).await;
+                    let _ = prompt.await;
+                    run.status = RunStatus::Timeout;
+                    run.summary = format!("Timed out after {} minutes", task.timeout_minutes);
+                    self.finish(task, &session_id, &mut run).await;
+                    return run;
+                }
+            },
+            _ = cancel.cancelled() => {
+                self.finish(task, &session_id, &mut run).await;
                 return run;
             }
         };
@@ -451,28 +531,31 @@ impl Tasks {
             }
             Err(err) => run.summary = err.to_string(),
         }
-        self.finish(task, &session_id, host.as_ref(), &mut run)
-            .await;
+        self.finish(task, &session_id, &mut run).await;
         run
     }
 
-    async fn finish(&self, task: &Task, session_id: &str, host: &dyn TaskHost, run: &mut Run) {
+    async fn finish(&self, task: &Task, session_id: &str, run: &mut Run) {
         run.ended_at = Utc::now();
         self.sessions.close_session(&task.agent, session_id).await;
-        // A task deleted while running ends silently.
-        if self.has_task(&task.id) {
-            host.push(PushKind::ResponseComplete, &task.agent, session_id);
-        }
     }
 
     /// Appends a run, prunes old ones (deleting their sessions) and tells devices.
-    fn record(self: &Arc<Self>, task: &Task, run: Run) {
-        let mut runs = self.runs(&task.id);
-        runs.push(run);
-        let (kept, dropped) = prune(runs, Utc::now());
-        if let Err(err) = self.write_runs(&task.id, &kept) {
-            tracing::warn!("Task {}: failed to save runs: {err:#}", task.id);
-        }
+    /// Returns `false` if the task was deleted before recording.
+    fn record(self: &Arc<Self>, task: &Task, run: Run) -> bool {
+        let dropped = {
+            let tasks = self.tasks.lock().expect("lock poisoned");
+            if !tasks.iter().any(|existing| existing.id == task.id) {
+                return false;
+            }
+            let mut runs = self.runs(&task.id);
+            runs.push(run);
+            let (kept, dropped) = prune(runs, Utc::now());
+            if let Err(err) = self.write_runs(&task.id, &kept) {
+                tracing::warn!("Task {}: failed to save runs: {err:#}", task.id);
+            }
+            dropped
+        };
         if !dropped.is_empty() {
             let this = self.clone();
             let agent = task.agent.clone();
@@ -485,6 +568,7 @@ impl Tasks {
         if let Some(host) = self.host.get() {
             host.broadcast("task_updated", json!({ "id": task.id }));
         }
+        true
     }
 
     fn has_task(&self, id: &str) -> bool {
@@ -552,7 +636,8 @@ impl Tasks {
                 value["nextRunAt"] = json!(next);
                 value["lastRun"] = json!(last);
                 value["running"] = json!(running.contains_key(&task.id));
-                value["runningSessionId"] = json!(running.get(&task.id).cloned().flatten());
+                value["runningSessionId"] =
+                    json!(running.get(&task.id).and_then(|r| r.session_id.as_deref()));
                 value
             })
             .collect();
@@ -634,7 +719,7 @@ impl Tasks {
     /// Deletes a task, its run history and the sessions of its runs; a run
     /// in progress is stopped and dropped (see `spawn_run`).
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let removed = {
+        let (removed, run_session_ids) = {
             let mut tasks = self.tasks.lock().expect("lock poisoned");
             let Some(index) = tasks.iter().position(|task| task.id == id) else {
                 bail!("unknown task");
@@ -643,18 +728,26 @@ impl Tasks {
             let removed = next.remove(index);
             self.save(&next)?;
             *tasks = next;
-            removed
+            let session_ids: Vec<String> = self
+                .runs(id)
+                .into_iter()
+                .filter_map(|run| run.session_id)
+                .collect();
+            let _ = fs::remove_file(self.paths.task_runs_file(id));
+            (removed, session_ids)
         };
         let running = self.running.lock().expect("lock poisoned").get(id).cloned();
-        if let Some(Some(session_id)) = running {
-            self.sessions
-                .close_session(&removed.agent, &session_id)
-                .await;
+        if let Some(running) = running {
+            running.cancel.cancel();
+            if let Some(session_id) = running.session_id {
+                self.sessions
+                    .close_session(&removed.agent, &session_id)
+                    .await;
+            }
         }
-        for session_id in self.runs(id).into_iter().filter_map(|run| run.session_id) {
+        for session_id in run_session_ids {
             self.delete_run_session(&removed.agent, &session_id).await;
         }
-        let _ = fs::remove_file(self.paths.task_runs_file(id));
         self.fired.lock().expect("lock poisoned").remove(id);
         self.broadcast_update(id);
         Ok(())
@@ -1063,5 +1156,72 @@ mod tests {
         assert_eq!(back["schedule"]["type"], "daily");
         assert_eq!(back["schedule"]["timeZone"], "Asia/Shanghai");
         assert_eq!(back["createdAt"], "2026-11-16T00:00:00Z");
+    }
+
+    #[tokio::test]
+    async fn delete_cancels_running_task_and_blocks_late_record() {
+        let root = std::env::temp_dir().join(format!("agentdeck-tasks-delete-{}", new_id()));
+        let tasks = Tasks::load(
+            AppPaths::new(root.clone()),
+            Arc::new(AgentSessionManager::new(None)),
+        );
+        let created = tasks
+            .upsert(json!({
+                "name": "Inbox", "agent": "claude-acp", "cwd": "/", "prompt": "Sort",
+                "schedule": { "type": "daily", "times": ["09:00"], "timeZone": "Asia/Shanghai" },
+            }))
+            .unwrap();
+        let mut initial_run = run(RunStatus::Success, 0, Utc::now());
+        initial_run.session_id = None;
+        assert!(tasks.record(&created, initial_run));
+        assert!(tasks.paths.task_runs_file(&created.id).exists());
+
+        let cancel = tasks.shutdown.child_token();
+        tasks.running.lock().unwrap().insert(
+            created.id.clone(),
+            RunningTask {
+                session_id: None,
+                cancel: cancel.clone(),
+            },
+        );
+
+        tasks.delete(&created.id).await.unwrap();
+        assert!(cancel.is_cancelled());
+        assert!(!tasks.paths.task_runs_file(&created.id).exists());
+
+        assert!(!tasks.record(&created, run(RunStatus::Success, 0, Utc::now())));
+        assert!(!tasks.paths.task_runs_file(&created.id).exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn shutdown_cancels_running_tasks_and_blocks_new_runs() {
+        let root = std::env::temp_dir().join(format!("agentdeck-tasks-shutdown-{}", new_id()));
+        let tasks = Tasks::load(
+            AppPaths::new(root.clone()),
+            Arc::new(AgentSessionManager::new(None)),
+        );
+        let created = tasks
+            .upsert(json!({
+                "name": "Inbox", "agent": "claude-acp", "cwd": "/", "prompt": "Sort",
+                "schedule": { "type": "daily", "times": ["09:00"], "timeZone": "Asia/Shanghai" },
+            }))
+            .unwrap();
+        let cancel = tasks.shutdown.child_token();
+        tasks.running.lock().unwrap().insert(
+            created.id.clone(),
+            RunningTask {
+                session_id: None,
+                cancel: cancel.clone(),
+            },
+        );
+
+        tasks.shutdown();
+        assert!(cancel.is_cancelled());
+
+        tasks.running.lock().unwrap().remove(&created.id);
+        assert!(!tasks.run_now(&created.id).unwrap());
+        assert!(tasks.runs(&created.id).is_empty());
+        fs::remove_dir_all(root).unwrap();
     }
 }

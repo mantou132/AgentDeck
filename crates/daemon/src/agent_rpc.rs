@@ -129,6 +129,9 @@ impl AgentService {
 
     /// Gracefully close active ACP sessions and terminate managed ACP agent runtimes.
     pub async fn shutdown(&self) {
+        if let Some(tasks) = self.tasks.get() {
+            tasks.shutdown();
+        }
         self.sessions.shutdown().await;
     }
 
