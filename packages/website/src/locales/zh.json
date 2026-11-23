@@ -63,6 +63,14 @@
   "audienceWaiting": "已加入，等待主讲人…",
   "audienceReconnecting": "正在重连…",
   "audienceInvalid": "链接不完整，请重新扫码。",
-  "audienceUnsupported": "这个浏览器无法加入，请换一个浏览器。",
-  "audienceNumber": "% 号"
+  "audienceUnsupported": "当前浏览器不支持加密通信，请使用现代浏览器。",
+  "audienceNumber": "% 号",
+  "presenterConnected": "已连大屏",
+  "presenterConnecting": "连接大屏中…",
+  "presenterDisconnected": "大屏未连接",
+  "presenterPrev": "◀ 上一页",
+  "presenterNext": "下一页 ▶",
+  "presenterNoNotes": "（本页无逐字讲稿）",
+  "presenterTitle": "主讲人提词器",
+  "presenterWakeLock": "常亮"
 }

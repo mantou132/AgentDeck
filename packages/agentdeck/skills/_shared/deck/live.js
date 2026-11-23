@@ -88,13 +88,35 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
       this._view = null;
       this._socket = null;
       this._delay = 1000;
+      this._presenterDevices = new Set();
       this._connect();
+
+      document.addEventListener('cw-enter', (e) => {
+        if (this._presenterDevices.size === 0) return;
+        const slideElements = Array.from(document.querySelectorAll('#cw-stage .slide'));
+        const curIndex = slideElements.indexOf(e.target);
+        if (curIndex >= 0) {
+          for (const dev of this._presenterDevices) {
+            this._send({ t: 'presenter_sync', index: curIndex }, dev);
+          }
+        }
+      });
     }
 
     /** The link the audience opens. */
     get url() {
       const lang = isEn ? 'en' : 'zh';
       return `${SITE}/${lang}/live#${this._saved.room}.${this._saved.key}`;
+    }
+
+    /** The private link the presenter opens on their phone for remote control and teleprompter. */
+    get presenterUrl() {
+      const lang = isEn ? 'en' : 'zh';
+      if (!this._saved.presenterKey) {
+        this._saved.presenterKey = random(16);
+        save(this._storageKey, this._saved);
+      }
+      return `${SITE}/${lang}/live#${this._saved.room}.${this._saved.key}.${this._saved.presenterKey}`;
     }
 
     /** How many phones have joined this deck. */
@@ -130,11 +152,10 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
       this._send({ t: 'notice', text }, to);
     }
 
-    /** An SVG QR code of `url`, `size` pixels wide. */
-    async qr(size) {
+    async _buildQr(targetUrl, size) {
       const qrcode = (await import(QR_MODULE)).default;
       const code = qrcode(0, 'M');
-      code.addData(this.url);
+      code.addData(targetUrl);
       code.make();
       const count = code.getModuleCount();
       const margin = 2;
@@ -150,6 +171,16 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
         'image/svg+xml',
       ).documentElement;
       return document.importNode(svg, true);
+    }
+
+    /** An SVG QR code of `url`, `size` pixels wide. */
+    async qr(size) {
+      return this._buildQr(this.url, size);
+    }
+
+    /** An SVG QR code for the presenter remote, `size` pixels wide. */
+    async remoteQr(size) {
+      return this._buildQr(this.presenterUrl, size);
     }
 
     /** The current view with the dock under it; before any view, a waiting line with the dock. */
@@ -220,6 +251,45 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
         } else if (message.t === 'data') {
           this._number(message.from);
           this._emit('data', { from: message.from, value: message.value });
+        } else if (message.t === 'presenter_join') {
+          if (message.key === this._saved.presenterKey) {
+            this._presenterDevices.add(message.from);
+            this._emit('presenter_connect', { from: message.from, count: this._presenterDevices.size });
+            const slideElements = Array.from(document.querySelectorAll('#cw-stage .slide'));
+            const slidesData = slideElements.map((s, idx) => {
+              const h = s.querySelector('h1, h2, h3');
+              const title = h ? h.textContent.trim() : isEn ? `Slide ${idx + 1}` : `第 ${idx + 1} 页`;
+              const notesEl = s.querySelector('aside.notes');
+              return {
+                index: idx,
+                title,
+                notes: notesEl ? notesEl.innerHTML : '',
+              };
+            });
+            const curIndex = Math.max(
+              0,
+              slideElements.findIndex((s) => s.classList.contains('cw-current')),
+            );
+            this._send(
+              {
+                t: 'presenter_init',
+                current: curIndex,
+                total: slideElements.length,
+                slides: slidesData,
+              },
+              message.from,
+            );
+          }
+        } else if (message.t === 'cmd') {
+          if (this._presenterDevices.has(message.from)) {
+            if (message.op === 'next') {
+              if (window.courseware) window.courseware.next();
+            } else if (message.op === 'prev') {
+              if (window.courseware) window.courseware.prev();
+            } else if (message.op === 'go' && typeof message.index === 'number') {
+              if (window.courseware) window.courseware.go(message.index);
+            }
+          }
         }
       }
     }
@@ -273,7 +343,100 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
     return roomPromise;
   }
 
-  window.CwLive = { room };
+  window.CwLive = { room, openPresenterModal, closePresenterModal, togglePresenterModal };
+
+  /* ---------- Presenter Remote Modal (Key M) ---------- */
+
+  let presenterModal = null;
+  let presenterQrEl = null;
+  let presenterStatusEl = null;
+
+  function updatePresenterStatus(count) {
+    if (!presenterStatusEl) return;
+    if (count > 0) {
+      presenterStatusEl.textContent = isEn ? `🟢 Phone connected (${count})` : `🟢 手机已连接 (${count})`;
+      presenterStatusEl.style.color = '#56d364';
+    } else {
+      presenterStatusEl.textContent = isEn ? 'Waiting for phone scan...' : '等待手机扫码连接...';
+      presenterStatusEl.style.color = '#c9d1d9';
+    }
+  }
+
+  function setupPresenterModal() {
+    presenterModal = document.createElement('div');
+    presenterModal.className = 'cw-modal-backdrop';
+
+    const card = document.createElement('div');
+    card.className = 'cw-modal-card';
+    card.addEventListener('click', (e) => e.stopPropagation());
+
+    const title = document.createElement('div');
+    title.className = 'cw-modal-title';
+    title.textContent = isEn ? 'Presenter Remote' : '手机翻页与提词器';
+
+    const sub = document.createElement('div');
+    sub.className = 'cw-modal-sub';
+    sub.textContent = isEn ? 'Scan to connect, clean big screen' : '手机扫码连接，大屏不留痕迹';
+
+    presenterQrEl = document.createElement('div');
+    presenterQrEl.className = 'cw-modal-qr';
+
+    presenterStatusEl = document.createElement('div');
+    presenterStatusEl.className = 'cw-modal-status';
+    presenterStatusEl.textContent = isEn ? 'Waiting for phone scan...' : '等待手机扫码连接...';
+
+    const tip = document.createElement('div');
+    tip.className = 'cw-modal-tip';
+    tip.textContent = isEn ? 'Press M or Esc to close' : '按 M 或 Esc 关闭弹窗，随时按键控制';
+
+    card.append(title, sub, presenterQrEl, presenterStatusEl, tip);
+    presenterModal.appendChild(card);
+    presenterModal.addEventListener('click', closePresenterModal);
+    document.body.appendChild(presenterModal);
+  }
+
+  async function openPresenterModal() {
+    if (!presenterModal) {
+      setupPresenterModal();
+    }
+    presenterModal.classList.add('cw-on');
+    const r = await room();
+    r.on('presenter_connect', (d) => {
+      updatePresenterStatus(d.count);
+    });
+    if (!presenterQrEl.hasChildNodes()) {
+      presenterQrEl.innerHTML = '';
+      const svg = await r.remoteQr(216);
+      presenterQrEl.appendChild(svg);
+    }
+    updatePresenterStatus(r._presenterDevices.size);
+  }
+
+  function closePresenterModal() {
+    if (presenterModal) presenterModal.classList.remove('cw-on');
+  }
+
+  function togglePresenterModal() {
+    if (presenterModal?.classList.contains('cw-on')) {
+      closePresenterModal();
+    } else {
+      openPresenterModal();
+    }
+  }
+
+  document.addEventListener('keydown', (event) => {
+    const tag = event.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'm' || event.key === 'M') {
+      event.preventDefault();
+      togglePresenterModal();
+    } else if (event.key === 'Escape') {
+      if (presenterModal?.classList.contains('cw-on')) {
+        closePresenterModal();
+        event.preventDefault();
+      }
+    }
+  });
 
   function esc(text) {
     return String(text).replace(

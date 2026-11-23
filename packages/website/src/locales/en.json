@@ -63,6 +63,14 @@
   "audienceWaiting": "You're in. Waiting for the presenter…",
   "audienceReconnecting": "Reconnecting…",
   "audienceInvalid": "This link is incomplete. Scan the QR code again.",
-  "audienceUnsupported": "This browser can't join. Try another browser.",
-  "audienceNumber": "No. %"
+  "audienceUnsupported": "Your browser does not support secure cryptography. Please use a modern browser.",
+  "audienceNumber": "No. %",
+  "presenterConnected": "Connected",
+  "presenterConnecting": "Connecting...",
+  "presenterDisconnected": "Disconnected",
+  "presenterPrev": "◀ Prev",
+  "presenterNext": "Next ▶",
+  "presenterNoNotes": "(No notes for this slide)",
+  "presenterTitle": "Presenter Prompter",
+  "presenterWakeLock": "Awake"
 }

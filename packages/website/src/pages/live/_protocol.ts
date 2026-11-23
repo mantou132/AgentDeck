@@ -6,17 +6,29 @@
 
 export type Sealed = { iv: string; c: string };
 
-/** Audience → presenter. */
-export type AudienceMessage = { t: 'join'; from: string } | { t: 'data'; from: string; value: unknown };
+export type PresenterSlide = {
+  index: number;
+  title: string;
+  notes: string;
+};
 
-/** Presenter → audience. */
+/** Audience or Presenter phone → presenter host. */
+export type AudienceMessage =
+  | { t: 'join'; from: string }
+  | { t: 'data'; from: string; value: unknown }
+  | { t: 'presenter_join'; from: string; key: string }
+  | { t: 'cmd'; from: string; op: 'next' | 'prev' | 'go'; index?: number };
+
+/** Presenter host → audience or presenter phone. */
 export type PresenterMessage =
   | { t: 'view'; html: string }
   | { t: 'data'; value: unknown }
   | { t: 'hello'; n: number }
   | { t: 'notice'; text: string }
   /** The presenter (re)connected; answer with `join`. */
-  | { t: 'present' };
+  | { t: 'present' }
+  | { t: 'presenter_init'; current: number; total: number; slides: PresenterSlide[] }
+  | { t: 'presenter_sync'; index: number };
 
 export type RelayFrame =
   | { type: 'ready' }
@@ -38,10 +50,10 @@ const unb64url = (text: string) =>
 
 export const randomId = (length: number) => b64url(crypto.getRandomValues(new Uint8Array(length)));
 
-/** Reads `#<room>.<key>`; undefined when the link is incomplete. */
+/** Reads `#<room>.<key>` or `#<room>.<key>.<presenterKey>`; undefined when the link is incomplete. */
 export const parseFragment = (hash: string) => {
-  const match = /^#([\w-]{16,64})\.([\w-]{43})$/.exec(hash);
-  return match ? { room: match[1], key: match[2] } : undefined;
+  const match = /^#([\w-]{16,64})\.([\w-]{43})(?:\.([\w-]{16,64}))?$/.exec(hash);
+  return match ? { room: match[1], key: match[2], presenterKey: match[3] } : undefined;
 };
 
 export const importKey = (raw: string) =>

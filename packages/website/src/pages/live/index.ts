@@ -3,6 +3,7 @@ import {
   type AudienceMessage,
   importKey,
   type PresenterMessage,
+  type PresenterSlide,
   parseFragment,
   type RelayFrame,
   randomId,
@@ -87,6 +88,172 @@ const style = css`
       opacity: 0;
     }
   }
+
+  /* Presenter Teleprompter View */
+  .prompter-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #111418;
+    color: #e6edf3;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .prompter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    background: #161b22;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 13px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .prompter-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #56d364;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .prompter-status-badge.disconnected {
+    color: #f85149;
+  }
+  .prompter-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: #8b949e;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .prompter-page-text {
+    font-weight: 700;
+    color: #fff;
+  }
+  .prompter-timer-text {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+  }
+  .prompter-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .prompter-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .prompter-btn.wake-on {
+    color: #56d364;
+    background: rgba(86, 211, 100, 0.15);
+  }
+  .prompter-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 16px 84px;
+    line-height: 1.8;
+    word-break: break-word;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .prompter-body p {
+    margin: 0 0 1.2em;
+  }
+  .prompter-body p:last-child {
+    margin-bottom: 0;
+  }
+  .prompter-empty {
+    color: #6e7681;
+    font-style: italic;
+    text-align: center;
+    padding: 40px 0;
+  }
+  .cue {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 4px;
+    vertical-align: 1px;
+  }
+  .cue-flip {
+    background: rgba(56, 139, 253, 0.2);
+    border: 1px solid rgba(56, 139, 253, 0.5);
+    color: #79c0ff;
+  }
+  .cue-pause {
+    background: rgba(210, 153, 34, 0.2);
+    border: 1px solid rgba(210, 153, 34, 0.5);
+    color: #e3b341;
+  }
+  .cue-interact {
+    background: rgba(46, 160, 67, 0.2);
+    border: 1px solid rgba(46, 160, 67, 0.5);
+    color: #56d364;
+  }
+  .cue-default {
+    background: rgba(163, 113, 247, 0.2);
+    border: 1px solid rgba(163, 113, 247, 0.5);
+    color: #d2a8ff;
+  }
+  .prompter-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(17, 20, 24, 0.98) 70%, transparent);
+    pointer-events: auto;
+  }
+  .prompter-nav-btn {
+    flex: 1;
+    height: 50px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #1c2128;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .prompter-nav-btn.next {
+    flex: 1.6;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .prompter-nav-btn:active {
+    transform: scale(0.98);
+  }
 `;
 
 @page({
@@ -95,13 +262,30 @@ const style = css`
 })
 @adoptedStyle(style)
 export default class LivePage extends GemElement {
-  #state = createState({ status: 'connecting' as Status, view: null as string | null, number: 0, popup: '' });
+  #state = createState({
+    status: 'connecting' as Status,
+    view: null as string | null,
+    number: 0,
+    popup: '',
+    isPresenter: false,
+    presenterConnected: false,
+    currentSlide: 0,
+    totalSlides: 0,
+    slides: [] as PresenterSlide[],
+    fontSize: 21,
+    wakeLocked: false,
+    elapsedSec: 0,
+  });
   #frameRef = createRef<HTMLIFrameElement>();
+  #bodyRef = createRef<HTMLDivElement>();
   #id = '';
   /** Presenter data waiting for the current view's frame to load. */
   #pending: unknown[] = [];
   #frameReady = false;
   #sendData?: (value: unknown) => void;
+  #sendCommand?: (op: 'next' | 'prev' | 'go', index?: number) => void;
+  #timerInterval?: ReturnType<typeof setInterval>;
+  #wakeLockObj: WakeLockSentinel | null = null;
 
   @mounted()
   #start = () => {
@@ -148,11 +332,22 @@ export default class LivePage extends GemElement {
       if (!(await send({ t: 'data', from: this.#id, value }))) outbox.push(value);
     };
     this.#sendData = sendData;
+    this.#sendCommand = (op: 'next' | 'prev' | 'go', index?: number) => {
+      send({ t: 'cmd', from: this.#id, op, index });
+    };
+
+    const isPresenter = !!fragment.presenterKey;
+    this.#state({ isPresenter });
+
     const join = async () => {
-      await send({ t: 'join', from: this.#id });
-      const queued = outbox;
-      outbox = [];
-      for (const value of queued) await sendData(value);
+      if (isPresenter && fragment.presenterKey) {
+        await send({ t: 'presenter_join', from: this.#id, key: fragment.presenterKey });
+      } else {
+        await send({ t: 'join', from: this.#id });
+        const queued = outbox;
+        outbox = [];
+        for (const value of queued) await sendData(value);
+      }
     };
 
     const handle = async (frame: RelayFrame) => {
@@ -176,6 +371,20 @@ export default class LivePage extends GemElement {
         else if (message.t === 'hello') this.#state({ number: message.n });
         else if (message.t === 'notice') this.#popup(message.text);
         else if (message.t === 'present') await join();
+        else if (message.t === 'presenter_init') {
+          this.#state({
+            presenterConnected: true,
+            currentSlide: message.current,
+            totalSlides: message.total,
+            slides: message.slides,
+          });
+          this.#startTimer();
+          this.#requestWakeLock();
+          if (this.#bodyRef.value) this.#bodyRef.value.scrollTop = 0;
+        } else if (message.t === 'presenter_sync') {
+          this.#state({ presenterConnected: true, currentSlide: message.index });
+          if (this.#bodyRef.value) this.#bodyRef.value.scrollTop = 0;
+        }
       }
     };
 
@@ -241,15 +450,75 @@ export default class LivePage extends GemElement {
       document.removeEventListener('visibilitychange', onVisibility);
       removeEventListener('online', onOnline);
       removeEventListener('hashchange', onHashChange);
+      clearInterval(this.#timerInterval);
+      this.#wakeLockObj?.release().catch(() => {});
     };
   };
 
+  #startTimer = () => {
+    if (this.#timerInterval) return;
+    this.#timerInterval = setInterval(() => {
+      this.#state({ elapsedSec: this.#state.elapsedSec + 1 });
+    }, 1000);
+  };
+
+  #resetTimer = () => {
+    this.#state({ elapsedSec: 0 });
+  };
+
+  #formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  #requestWakeLock = async () => {
+    if ('wakeLock' in navigator && !this.#wakeLockObj) {
+      try {
+        this.#wakeLockObj = await navigator.wakeLock.request('screen');
+        this.#state({ wakeLocked: true });
+        this.#wakeLockObj.addEventListener('release', () => {
+          this.#wakeLockObj = null;
+          this.#state({ wakeLocked: false });
+        });
+      } catch {
+        this.#state({ wakeLocked: false });
+      }
+    }
+  };
+
+  #toggleWakeLock = async () => {
+    if (this.#wakeLockObj) {
+      await this.#wakeLockObj.release().catch(() => {});
+      this.#wakeLockObj = null;
+      this.#state({ wakeLocked: false });
+    } else {
+      await this.#requestWakeLock();
+    }
+  };
+
+  #adjustFontSize = (delta: number) => {
+    const nextSize = Math.max(14, Math.min(36, this.#state.fontSize + delta));
+    this.#state({ fontSize: nextSize });
+  };
+
+  #formatNotes = (htmlStr: string) => {
+    const parseCue = (_m: string, text: string) => {
+      let cls = 'cue-default';
+      if (/翻页|下一页|Next/i.test(text)) cls = 'cue-flip';
+      else if (/停顿|暂停|等|Pause/i.test(text)) cls = 'cue-pause';
+      else if (/扫码|互动|投票|提问|点赞|看屏幕|看大屏|大屏幕|Scan|Poll|Vote|Screen/i.test(text)) cls = 'cue-interact';
+      return `<span class="cue ${cls}">${text}</span>`;
+    };
+    return htmlStr.replace(/【(.*?)】/g, parseCue).replace(/\[(.*?)\]/g, parseCue);
+  };
+
   /** Replaces the frame only when the view changed, so a presenter reconnecting doesn't wipe half-typed answers. */
-  #showView = (html: string) => {
-    if (html === this.#state.view) return this.#state({ status: 'live' });
+  #showView = (htmlStr: string) => {
+    if (htmlStr === this.#state.view) return this.#state({ status: 'live' });
     this.#frameReady = false;
     this.#pending = [];
-    this.#state({ status: 'live', view: html });
+    this.#state({ status: 'live', view: htmlStr });
   };
 
   #popupTimer?: ReturnType<typeof setTimeout>;
@@ -274,16 +543,71 @@ export default class LivePage extends GemElement {
   };
 
   @template()
-  #content = () => html`
-    <div class="bar" v-if=${!!this.#state.number || this.#state.status === 'reconnecting'}>
-      <span>${this.#state.number ? i18n.get('audienceNumber').replace('%', String(this.#state.number)) : ''}</span>
-      <span v-if=${this.#state.status === 'reconnecting'}>${i18n.get('audienceReconnecting')}</span>
-    </div>
-    ${this.#main()}
-    <div class="popup" v-if=${!!this.#state.popup} @click=${() => this.#state({ popup: '' })}>
-      <p>${this.#state.popup}</p>
-    </div>
-  `;
+  #content = () => {
+    if (this.#state.isPresenter) {
+      return this.#presenterView();
+    }
+    return html`
+      <div class="bar" v-if=${!!this.#state.number || this.#state.status === 'reconnecting'}>
+        <span>${this.#state.number ? i18n.get('audienceNumber').replace('%', String(this.#state.number)) : ''}</span>
+        <span v-if=${this.#state.status === 'reconnecting'}>${i18n.get('audienceReconnecting')}</span>
+      </div>
+      ${this.#main()}
+      <div class="popup" v-if=${!!this.#state.popup} @click=${() => this.#state({ popup: '' })}>
+        <p>${this.#state.popup}</p>
+      </div>
+    `;
+  };
+
+  #presenterView = () => {
+    const { presenterConnected, currentSlide, totalSlides, slides, fontSize, wakeLocked, elapsedSec } = this.#state;
+    const currentNotes = slides[currentSlide]?.notes?.trim();
+
+    return html`
+      <div class="prompter-wrap">
+        <div class="prompter-header">
+          <span class="prompter-status-badge ${presenterConnected ? '' : 'disconnected'}">
+            ${presenterConnected ? `🟢 ${i18n.get('presenterConnected')}` : `🔴 ${i18n.get('presenterConnecting')}`}
+          </span>
+          <div class="prompter-meta">
+            <span class="prompter-page-text">${totalSlides > 0 ? `${currentSlide + 1} / ${totalSlides}` : '- / -'}</span>
+            <span class="prompter-timer-text" @click=${this.#resetTimer}>${this.#formatTime(elapsedSec)}</span>
+          </div>
+          <div class="prompter-actions">
+            <button class="prompter-btn" @click=${() => this.#adjustFontSize(-2)}>A-</button>
+            <button class="prompter-btn" @click=${() => this.#adjustFontSize(2)}>A+</button>
+            <button class="prompter-btn ${wakeLocked ? 'wake-on' : ''}" @click=${this.#toggleWakeLock}>
+              ${i18n.get('presenterWakeLock')}
+            </button>
+          </div>
+        </div>
+
+        <div
+          ${this.#bodyRef}
+          class="prompter-body"
+          style="font-size: ${fontSize}px;"
+          .innerHTML=${currentNotes ? this.#formatNotes(currentNotes) : `<div class="prompter-empty">${i18n.get('presenterNoNotes')}</div>`}
+        ></div>
+
+        <div class="prompter-nav">
+          <button
+            class="prompter-nav-btn"
+            ?disabled=${!presenterConnected || currentSlide <= 0}
+            @click=${() => this.#sendCommand?.('prev')}
+          >
+            ${i18n.get('presenterPrev')}
+          </button>
+          <button
+            class="prompter-nav-btn next"
+            ?disabled=${!presenterConnected || (totalSlides > 0 && currentSlide >= totalSlides - 1)}
+            @click=${() => this.#sendCommand?.('next')}
+          >
+            ${i18n.get('presenterNext')}
+          </button>
+        </div>
+      </div>
+    `;
+  };
 
   #main = () => {
     const { status, view } = this.#state;
