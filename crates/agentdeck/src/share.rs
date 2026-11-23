@@ -1,5 +1,6 @@
-//! Hands content shared to the app to the frontend. Android's `MainActivity.kt` copies it into the cache
-//! directory, the iOS share extension (`gen/apple/ShareExtension`) into the App Group container.
+//! Hands content shared to the app to the frontend. Android's `MainActivity.kt`
+//! copies it into the cache directory, the iOS share extension
+//! (`gen/apple/ShareExtension`) into the App Group container.
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +31,8 @@ pub fn share_take(app: tauri::AppHandle) -> Result<Vec<SharedFile>, String> {
     let Ok(manifest) = std::fs::read(dir.join("manifest.json")) else {
         return Ok(Vec::new());
     };
-    let entries: Vec<ManifestEntry> = serde_json::from_slice(&manifest).map_err(|e| e.to_string())?;
+    let entries: Vec<ManifestEntry> =
+        serde_json::from_slice(&manifest).map_err(|e| e.to_string())?;
     let files = entries
         .into_iter()
         .map(|entry| SharedFile {
@@ -50,7 +52,11 @@ pub fn share_take(app: tauri::AppHandle) -> Result<Vec<SharedFile>, String> {
 #[cfg(not(target_os = "ios"))]
 fn shared_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     use tauri::Manager;
-    Ok(app.path().app_cache_dir().map_err(|e| e.to_string())?.join("shared"))
+    Ok(app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("shared"))
 }
 
 #[cfg(target_os = "ios")]

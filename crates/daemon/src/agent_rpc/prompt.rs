@@ -9,20 +9,19 @@ use serde_json::Value;
 use super::non_empty_str;
 use crate::{acp_agent, screen_capture};
 
-const REMOTE_APP_SYSTEM_PROMPT: &str = "You are running inside AgentDeck's mobile app. The user is interacting remotely \
-     from a mobile device; the host environment is running on their remote machine. \
-     Reference files on this machine with Markdown, not HTML: the client reads them \
-     directly. A link like `[app.ts](src/app.ts:42)` opens the file (at a line via `:42` \
-     or `#L42`) or directory; an image like `![Screenshot](/abs/path/shot.png)` shows it \
-     inline, so never inline images as base64. Paths are absolute or relative to the \
-     session's working directory.\n\nWhen a user message ends with \
-     `<agentdeck-voice-chat/>`, the user is talking by voice through earphones and \
-     cannot look at the screen. Do the task as usual, then end your final reply with an \
-     HTML comment holding a short spoken summary in the user's language: \
-     `<!-- agentdeck-speech` on its own line, one to three plain sentences on what you \
-     did, the result and anything the user must decide, then `-->`. It is read aloud and \
-     hidden from the transcript, so write it for listening: no Markdown, code, paths, URLs \
-     or lists, and never `-->` inside it.";
+const REMOTE_APP_SYSTEM_PROMPT: &str =
+    "You are running inside AgentDeck's mobile app. The user is interacting remotely from a \
+     mobile device; the host environment is running on their remote machine. Reference files on \
+     this machine with Markdown, not HTML: the client reads them directly. A link like \
+     `[app.ts](src/app.ts:42)` opens the file (at a line via `:42` or `#L42`) or directory; an \
+     image like `![Screenshot](/abs/path/shot.png)` shows it inline, so never inline images as \
+     base64. Paths are absolute or relative to the session's working directory.\n\nWhen a user \
+     message ends with `<agentdeck-voice-chat/>`, the user is talking by voice through earphones \
+     and cannot look at the screen. Do the task as usual, then end your final reply with an HTML \
+     comment holding a short spoken summary in the user's language: `<!-- agentdeck-speech` on \
+     its own line, one to three plain sentences on what you did, the result and anything the user \
+     must decide, then `-->`. It is read aloud and hidden from the transcript, so write it for \
+     listening: no Markdown, code, paths, URLs or lists, and never `-->` inside it.";
 
 /// The system prompt of sessions shown in the mobile app.
 pub(crate) fn remote_app_system_prompt() -> &'static str {
@@ -56,29 +55,30 @@ pub(super) async fn message_panel_system_prompt(params: &Value) -> Result<Option
     Ok(Some(prompt))
 }
 
-const EXTENSION_SYSTEM_PROMPT: &str = "You are running inside AgentDeck's browser extension \
-     panel. The user may be on a different computer from this machine, so they cannot open \
-     files, local paths or `localhost` URLs from your reply; links open as web pages in their \
-     browser, and local images are not shown. When the user needs to see code, output or file \
-     contents, quote the relevant part in the reply instead of only pointing to a path. Replies \
-     render as Markdown, including code blocks, tables, Mermaid diagrams and LaTeX math.";
+const EXTENSION_SYSTEM_PROMPT: &str =
+    "You are running inside AgentDeck's browser extension panel. The user may be on a different \
+     computer from this machine, so they cannot open files, local paths or `localhost` URLs from \
+     your reply; links open as web pages in their browser, and local images are not shown. When \
+     the user needs to see code, output or file contents, quote the relevant part in the reply \
+     instead of only pointing to a path. Replies render as Markdown, including code blocks, \
+     tables, Mermaid diagrams and LaTeX math.";
 
 fn browser_panel_system_prompt(surface: &str, tab_id: i64) -> String {
     if surface == "devtools" {
         return format!(
-            "You are running inside AgentDeck's Agent panel in browser DevTools. This \
-             DevTools instance is attached to browser tab ID {tab_id}. Treat that inspected \
-             tab as the primary target for browser-related requests. For browser tools that \
-             accept a tabId, use {tab_id}; do not substitute the globally active tab unless \
-             the user explicitly asks you to. Read the inspected tab before acting when page \
-             context is needed, and prefer a suitable page-provided tool returned by read_tab."
+            "You are running inside AgentDeck's Agent panel in browser DevTools. This DevTools \
+             instance is attached to browser tab ID {tab_id}. Treat that inspected tab as the \
+             primary target for browser-related requests. For browser tools that accept a tabId, \
+             use {tab_id}; do not substitute the globally active tab unless the user explicitly \
+             asks you to. Read the inspected tab before acting when page context is needed, and \
+             prefer a suitable page-provided tool returned by read_tab."
         );
     }
-    "You are running inside AgentDeck's browser sidebar Agent panel. Treat the currently \
-     active browser tab as the primary target for browser-related requests. The active tab may \
-     change during this session, so resolve it with read_active_tab at the start of each \
-     browser task and use the returned tabId for related actions. Prefer a suitable \
-     page-provided tool returned by read_active_tab."
+    "You are running inside AgentDeck's browser sidebar Agent panel. Treat the currently active \
+     browser tab as the primary target for browser-related requests. The active tab may change \
+     during this session, so resolve it with read_active_tab at the start of each browser task and \
+     use the returned tabId for related actions. Prefer a suitable page-provided tool returned by \
+     read_active_tab."
         .to_string()
 }
 
@@ -154,9 +154,9 @@ pub(super) fn message_attachments(params: &Value) -> Result<Vec<acp_agent::Attac
         .collect()
 }
 
-/// Uploaded files live in the temp dir, which the system cleans up; its path also
-/// has no spaces (unlike macOS Application Support), which keeps the agent's
-/// `[@name](file://…)` links intact.
+/// Uploaded files live in the temp dir, which the system cleans up; its path
+/// also has no spaces (unlike macOS Application Support), which keeps the
+/// agent's `[@name](file://…)` links intact.
 fn attachments_root() -> PathBuf {
     std::env::temp_dir().join("agentdeck-attachments")
 }
@@ -168,7 +168,8 @@ fn save_file_attachment(root: &Path, name: &str, data: &str) -> Result<PathBuf, 
     let bytes = STANDARD
         .decode(data)
         .map_err(|err| format!("file attachment is not valid base64: {err}"))?;
-    // Markdown link delimiters and whitespace would break the agent's file link.
+    // Markdown link delimiters and whitespace would break the agent's file
+    // link.
     let file_name: String = Path::new(name)
         .file_name()
         .map(|name| name.to_string_lossy())

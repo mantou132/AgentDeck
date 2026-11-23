@@ -1,10 +1,11 @@
-use super::session::SESSION_CLOSE_TIMEOUT;
-use super::*;
+use std::time::Duration;
+
 use agent_client_protocol::{Channel, TransportFrame};
 use futures_util::StreamExt;
 use serde_json::{Value, json};
-use std::time::Duration;
 use tokio::task::JoinHandle;
+
+use super::{session::SESSION_CLOSE_TIMEOUT, *};
 
 fn frame(message: Value) -> TransportFrame {
     TransportFrame::parse_json(&message.to_string())
@@ -95,7 +96,8 @@ impl MockAcp {
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
                 let message = frame_json(self.peer.rx.next().await.unwrap());
-                // Dropping an in-flight SDK request emits this transport-level cancellation.
+                // Dropping an in-flight SDK request emits this transport-level
+                // cancellation.
                 if message["method"] == "$/cancel_request" {
                     continue;
                 }
@@ -1070,7 +1072,8 @@ async fn shutdown_closes_active_sessions_and_stops_runtime() {
     let manager = mock.manager.clone();
     let shutdown = tokio::spawn(async move { manager.shutdown().await });
 
-    // Both active sessions receive cancel + close; respond to close requests in any order.
+    // Both active sessions receive cancel + close; respond to close requests in
+    // any order.
     let mut closed = std::collections::HashSet::new();
     tokio::time::timeout(Duration::from_secs(2), async {
         while closed.len() < 2 {
@@ -1141,7 +1144,8 @@ async fn pending_mode_and_config_changes_do_not_block_turn_updates_or_permission
     });
     let prompt_request = mock.next("session/prompt").await;
 
-    // Issue both set_mode and set_config_option mid-turn and leave them unanswered.
+    // Issue both set_mode and set_config_option mid-turn and leave them
+    // unanswered.
     let manager_mode = mock.manager.clone();
     let mode =
         tokio::spawn(async move { manager_mode.set_mode("codex-acp", "session", "plan").await });
@@ -1155,7 +1159,8 @@ async fn pending_mode_and_config_changes_do_not_block_turn_updates_or_permission
     });
     let config_request = mock.next("session/set_config_option").await;
 
-    // Agent asks for permission while set_mode/set_config are still pending: must not deadlock.
+    // Agent asks for permission while set_mode/set_config are still pending:
+    // must not deadlock.
     mock.peer
         .tx
         .unbounded_send(frame(json!({
@@ -1275,8 +1280,9 @@ async fn session_exits_when_disconnect_already_recorded_before_subscribe() {
         .await;
     mock.respond(&request, json!({"sessionId": "s-race"}));
 
-    // Whether create_session succeeds right before exit or fails during startup,
-    // the actor must notice the already-recorded disconnect and clean up.
+    // Whether create_session succeeds right before exit or fails during
+    // startup, the actor must notice the already-recorded disconnect and clean
+    // up.
     let _ = tokio::time::timeout(Duration::from_secs(1), create)
         .await
         .expect("create_session should settle");
@@ -1342,7 +1348,8 @@ async fn cancelling_child_permission_resumes_parent_idle_timeout() {
         .unwrap();
     assert_eq!(method, "agent_permission_request");
 
-    // Wait longer than the 1s parent idle timeout while the child input is pending.
+    // Wait longer than the 1s parent idle timeout while the child input is
+    // pending.
     tokio::time::sleep(Duration::from_millis(1200)).await;
     assert!(
         mock.manager
@@ -1350,7 +1357,8 @@ async fn cancelling_child_permission_resumes_parent_idle_timeout() {
             .await
     );
 
-    // Drain the child cancel + permission cancellation; the parent must NOT be cancelled.
+    // Drain the child cancel + permission cancellation; the parent must NOT be
+    // cancelled.
     tokio::time::timeout(Duration::from_secs(1), async {
         let (mut child_cancelled, mut perm_cancelled) = (false, false);
         while !(child_cancelled && perm_cancelled) {
@@ -1371,7 +1379,8 @@ async fn cancelling_child_permission_resumes_parent_idle_timeout() {
     .await
     .unwrap();
 
-    // Parent turn must stay alive after child cancellation (idle timer resumed from now).
+    // Parent turn must stay alive after child cancellation (idle timer resumed
+    // from now).
     assert!(
         tokio::time::timeout(Duration::from_millis(300), mock.peer.rx.next())
             .await

@@ -18,7 +18,8 @@ pub(crate) enum Frame {
 }
 
 pub(crate) struct RelayCodec {
-    /// Relay channel id: the pairing id itself for plain UUIDs, otherwise derived.
+    /// Relay channel id: the pairing id itself for plain UUIDs, otherwise
+    /// derived.
     pub(crate) route_id: String,
     encryption: Option<RelayEncryption>,
 }
@@ -65,8 +66,9 @@ impl RelayCodec {
             None
         };
         let payload = self.seal(message)?;
-        // MemoryStore generates UUID message IDs. Count the actual Relay envelope,
-        // including targeting, without copying the potentially large payload.
+        // MemoryStore generates UUID message IDs. Count the actual Relay
+        // envelope, including targeting, without copying the potentially large
+        // payload.
         let empty_frame = relay_client::relay_frame::ClientFrame::Message {
             message_id: "00000000-0000-0000-0000-000000000000".into(),
             payload: Value::Null,

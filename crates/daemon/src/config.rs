@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::app_data::{self, AppPaths};
 
 pub(crate) const DEFAULT_RELAY_URL: &str = "wss://agentdeck.xianqiao.wang/ws";
-/// Earlier `reset` saved the default relay explicitly; treat it as unset so it follows `DEFAULT_RELAY_URL`.
+/// Earlier `reset` saved the default relay explicitly; treat it as unset so it
+/// follows `DEFAULT_RELAY_URL`.
 const LEGACY_DEFAULT_RELAY_URL: &str = "wss://agent-deck.xianqiao.wang/ws";
 
 #[derive(Default)]
@@ -98,8 +99,9 @@ impl DaemonConfig {
         Ok(config)
     }
 
-    /// Reset starts from defaults, keeping only the offered features, which describe the host rather than its pairing;
-    /// a corrupt config loses them too.
+    /// Reset starts from defaults, keeping only the offered features, which
+    /// describe the host rather than its pairing; a corrupt config loses them
+    /// too.
     pub fn reset(paths: &AppPaths, options: &ConfigOptions) -> Result<Self> {
         let features = match &options.features {
             Some(features) => features.clone(),

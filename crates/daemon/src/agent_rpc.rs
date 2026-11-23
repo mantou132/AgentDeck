@@ -2,14 +2,13 @@ mod files;
 mod git;
 mod prompt;
 
-pub(crate) use prompt::remote_app_system_prompt;
-
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 
+pub(crate) use prompt::remote_app_system_prompt;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
@@ -120,14 +119,16 @@ impl AgentService {
         }
     }
 
-    /// Loads the scheduled tasks; they run once `Tasks::start` gets the devices.
+    /// Loads the scheduled tasks; they run once `Tasks::start` gets the
+    /// devices.
     pub fn init_tasks(&self, paths: AppPaths) -> Arc<Tasks> {
         self.tasks
             .get_or_init(|| Tasks::load(paths, self.sessions.clone()))
             .clone()
     }
 
-    /// Gracefully close active ACP sessions and terminate managed ACP agent runtimes.
+    /// Gracefully close active ACP sessions and terminate managed ACP agent
+    /// runtimes.
     pub async fn shutdown(&self) {
         if let Some(tasks) = self.tasks.get() {
             tasks.shutdown();
@@ -226,9 +227,10 @@ impl AgentService {
     }
 
     pub fn attach_with_push(&self, peer: &Peer, push: Option<PeerPush>, skills: PeerSkills) {
-        // The device each session's notifications go to; see `SessionActor::notifier`.
-        // A permission request or question also reaches it as a push, since the turn
-        // waits on it while the App may be in the background.
+        // The device each session's notifications go to; see
+        // `SessionActor::notifier`. A permission request or question also
+        // reaches it as a push, since the turn waits on it while the App may be
+        // in the background.
         let notifier: acp_agent::Notifier = {
             let peer = peer.clone();
             let push = push.clone();
@@ -417,10 +419,11 @@ impl AgentService {
                 let timeout_secs = message_timeout_secs(&params);
                 prepare_agent(&sessions, agent, &ctx).await?;
 
-                // The actor drains the load-time history replay into this channel
-                // while the load runs; afterwards the buffered frames are emitted
-                // (receiver closed, so the actor's live sender can't keep it open)
-                // before the final result, so history precedes the response.
+                // The actor drains the load-time history replay into this
+                // channel while the load runs; afterwards the buffered frames
+                // are emitted (receiver closed, so the actor's live sender
+                // can't keep it open) before the final result, so history
+                // precedes the response.
                 let (replay_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
 
                 let result = match tokio::time::timeout(
@@ -596,7 +599,8 @@ impl AgentService {
             let notifier = notifier.clone();
             async move {
                 let agent = required_agent(&params, "agent_prompt")?;
-                // The prompt may be empty when the content lives in attachments.
+                // The prompt may be empty when the content lives in
+                // attachments.
                 let prompt = params
                     .get("prompt")
                     .and_then(|v| v.as_str())
@@ -616,11 +620,12 @@ impl AgentService {
                     });
                 }
 
-                // Stream agent events as `{ id, event }` frames while the prompt
-                // runs; the forwarder is drained before the final result so no
-                // event overtakes the response. Permission requests, questions and
-                // the next-prompt suggestion go to this device as notifications;
-                // any device answers with `agent_user_input_respond`.
+                // Stream agent events as `{ id, event }` frames while the
+                // prompt runs; the forwarder is drained before the final result
+                // so no event overtakes the response. Permission requests,
+                // questions and the next-prompt suggestion go to this device as
+                // notifications; any device answers with
+                // `agent_user_input_respond`.
                 let forwarder = event_forwarder(&ctx);
                 let event_tx = forwarder.0.clone();
 
@@ -711,7 +716,8 @@ pub(crate) fn agent_error(err: anyhow::Error) -> RpcError {
 const AGENT_STATUS_DELAY: Duration = Duration::from_secs(2);
 /// Repeated while the agent starts; each frame restarts the client's timeout.
 const AGENT_STATUS_INTERVAL: Duration = Duration::from_secs(5);
-/// Upper bound for installing and starting an agent, which `timeoutSeconds` doesn't cover.
+/// Upper bound for installing and starting an agent, which `timeoutSeconds`
+/// doesn't cover.
 const AGENT_PREPARE_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Starts `agent` before a call that needs it, streaming `agent_status`

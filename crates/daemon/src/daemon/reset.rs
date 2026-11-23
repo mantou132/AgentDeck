@@ -25,7 +25,8 @@ pub(crate) fn reset_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<
         reset_local_data(paths, options)
     })();
 
-    // Restore even when cleanup fails, so a filesystem error does not disable autostart.
+    // Restore even when cleanup fails, so a filesystem error does not disable
+    // autostart.
     if was_running {
         start_daemon()
             .context("failed to restore daemon service; run `agentdeckd start` to retry")?;
@@ -36,7 +37,8 @@ pub(crate) fn reset_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<
         while InstanceLock::check_running_at(&paths.lock_file())?.is_none() {
             anyhow::ensure!(
                 Instant::now() < deadline,
-                "daemon did not restart; run `agentdeckd status` to check or `agentdeckd start` to retry"
+                "daemon did not restart; run `agentdeckd status` to check or `agentdeckd start` \
+                 to retry"
             );
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -54,8 +56,9 @@ fn reset_local_data(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
+
+    use super::*;
 
     #[test]
     fn reset_requires_exclusive_lock_and_replaces_local_state() {

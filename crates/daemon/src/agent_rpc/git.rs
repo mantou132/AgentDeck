@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 
 pub(super) const GIT_LOG_LIMIT: usize = 200;
 
-/// Tag listed sessions whose cwd lies in a linked worktree with `worktree: { mainCwd, name }`,
-/// so the App lists them with the main checkout.
+/// Tag listed sessions whose cwd lies in a linked worktree with `worktree: {
+/// mainCwd, name }`, so the App lists them with the main checkout.
 pub(super) fn annotate_worktrees(mut list: Value) -> Value {
     let mut resolved = std::collections::HashMap::<String, Option<Value>>::new();
     let Some(sessions) = list.get_mut("sessions").and_then(Value::as_array_mut) else {
@@ -34,8 +34,9 @@ pub(super) fn annotate_worktrees(mut list: Value) -> Value {
     list
 }
 
-/// Main checkout path (keeping the cwd's subpath) and name of the linked worktree holding `cwd`.
-/// Removed worktrees fall back to Claude Code's `<repo>/.claude/worktrees/<name>` layout.
+/// Main checkout path (keeping the cwd's subpath) and name of the linked
+/// worktree holding `cwd`. Removed worktrees fall back to Claude Code's
+/// `<repo>/.claude/worktrees/<name>` layout.
 fn session_worktree(cwd: &Path) -> Option<(PathBuf, String)> {
     git_worktree(cwd).or_else(|| claude_worktree(cwd))
 }
@@ -86,7 +87,8 @@ fn find_commit<'r>(repo: &'r git2::Repository, rev: &str) -> Result<git2::Commit
         .map_err(|err| format!("Failed to find commit {rev}: {err}"))
 }
 
-/// Diff of HEAD against the working tree (index included), untracked files as additions.
+/// Diff of HEAD against the working tree (index included), untracked files as
+/// additions.
 fn worktree_diff(repo: &git2::Repository) -> Result<git2::Diff<'_>, String> {
     let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
     let mut opts = git2::DiffOptions::new();
@@ -114,8 +116,9 @@ fn commit_diff<'r>(
     find_renames(diff)
 }
 
-/// Pair deleted and added (including untracked) files into renames, like `git diff -M`.
-/// Runs on the whole diff; filtering by path first would hide one side of the pair.
+/// Pair deleted and added (including untracked) files into renames, like `git
+/// diff -M`. Runs on the whole diff; filtering by path first would hide one
+/// side of the pair.
 fn find_renames(mut diff: git2::Diff<'_>) -> Result<git2::Diff<'_>, String> {
     let mut opts = git2::DiffFindOptions::new();
     opts.renames(true);
@@ -207,7 +210,8 @@ pub(super) fn git_status(cwd: Option<&Path>) -> Result<Value, String> {
 
     let mut files = Vec::new();
     for entry in statuses.iter() {
-        // Renamed entries report the old path; use the final path to match the diff.
+        // Renamed entries report the old path; use the final path to match the
+        // diff.
         let path = entry
             .index_to_workdir()
             .or_else(|| entry.head_to_index())
@@ -220,7 +224,8 @@ pub(super) fn git_status(cwd: Option<&Path>) -> Result<Value, String> {
             .unwrap_or_else(|| entry.path().unwrap_or_default().to_string());
         let s = entry.status();
 
-        // Unused by the current app; kept for older clients that show a staged tag.
+        // Unused by the current app; kept for older clients that show a staged
+        // tag.
         let staged = s.is_index_new()
             || s.is_index_modified()
             || s.is_index_deleted()

@@ -31,9 +31,10 @@ impl PushKind {
     }
 }
 
-/// Identifies the host in the push data without revealing the pairing ID: the app
-/// computes the same from its own pairing ID and ignores taps on another host's
-/// notifications (`pushHostKey` in `packages/agentdeck/src/agent/encryption.ts`).
+/// Identifies the host in the push data without revealing the pairing ID: the
+/// app computes the same from its own pairing ID and ignores taps on another
+/// host's notifications (`pushHostKey` in
+/// `packages/agentdeck/src/agent/encryption.ts`).
 pub fn host_key(relay_id: &str) -> String {
     Sha256::digest(relay_id.as_bytes())[..8]
         .iter()

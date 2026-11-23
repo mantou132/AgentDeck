@@ -1,9 +1,11 @@
 use std::process::Command;
 
 use anyhow::{Context, Result, anyhow, bail};
-use planif::com::ComRuntime;
-use planif::enums::TaskCreationFlags;
-use planif::schedule_builder::{Action, ScheduleBuilder};
+use planif::{
+    com::ComRuntime,
+    enums::TaskCreationFlags,
+    schedule_builder::{Action, ScheduleBuilder},
+};
 
 use super::{service_program, singleton::InstanceLock, status::Status};
 
@@ -79,7 +81,8 @@ pub fn start_daemon() -> Result<()> {
     Ok(())
 }
 
-/// Unregister autostart service and try to terminate the running daemon process.
+/// Unregister autostart service and try to terminate the running daemon
+/// process.
 pub fn stop_daemon() -> Result<()> {
     // 1. Stop scheduled task
     let _ = Command::new("schtasks")
@@ -131,8 +134,8 @@ pub fn daemon_status() -> Result<Status> {
 }
 
 fn decode_schtasks_xml(bytes: &[u8]) -> String {
-    if bytes.starts_with(&[0xFF, 0xFE]) || bytes.contains(&0) {
-        let content = bytes.strip_prefix(&[0xFF, 0xFE]).unwrap_or(bytes);
+    if bytes.starts_with(&[0xff, 0xfe]) || bytes.contains(&0) {
+        let content = bytes.strip_prefix(&[0xff, 0xfe]).unwrap_or(bytes);
         let units: Vec<u16> = content
             .chunks_exact(2)
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
@@ -161,12 +164,13 @@ mod tests {
 
     #[test]
     fn parses_enabled_state_from_utf8_and_utf16_task_xml() {
-        let enabled = "<Task><Triggers><LogonTrigger><Enabled>false</Enabled></LogonTrigger></Triggers><Settings><Enabled>true</Enabled></Settings></Task>";
+        let enabled = "<Task><Triggers><LogonTrigger><Enabled>false</Enabled></LogonTrigger></\
+                       Triggers><Settings><Enabled>true</Enabled></Settings></Task>";
         let disabled = "<Task><Settings><Enabled>false</Enabled></Settings></Task>";
         assert!(!xml_task_disabled(enabled.as_bytes()));
         assert!(xml_task_disabled(disabled.as_bytes()));
 
-        let mut utf16 = vec![0xFF, 0xFE];
+        let mut utf16 = vec![0xff, 0xfe];
         for unit in disabled.encode_utf16() {
             utf16.extend_from_slice(&unit.to_le_bytes());
         }

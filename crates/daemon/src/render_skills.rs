@@ -49,16 +49,20 @@ const SKILL_ROOTS: &[&str] = &[".agents/skills", ".claude/skills"];
 
 const LEARNED_PLACEHOLDER: &str = "{{LEARNED_PATH}}";
 
-/// Versions kept on disk, so clients on different builds don't reinstall in turn.
+/// Versions kept on disk, so clients on different builds don't reinstall in
+/// turn.
 const KEPT_VERSIONS: usize = 3;
 
-/// Version the latest attaching client uses, for agents configured once per process.
+/// Version the latest attaching client uses, for agents configured once per
+/// process.
 static CURRENT: Mutex<Option<String>> = Mutex::new(None);
 
-/// Skill groups of the latest attaching client, which filter `CURRENT` by `--features`.
+/// Skill groups of the latest attaching client, which filter `CURRENT` by
+/// `--features`.
 static CURRENT_GROUPS: Mutex<Option<FeatureGroups>> = Mutex::new(None);
 
-/// Serializes bundle installation so concurrent clients don't clobber the same staging dir.
+/// Serializes bundle installation so concurrent clients don't clobber the same
+/// staging dir.
 static INSTALL_LOCK: Mutex<()> = Mutex::new(());
 
 fn skills_dir() -> Result<PathBuf> {
@@ -76,8 +80,8 @@ fn learned_dir(root: &Path, skill: &str) -> PathBuf {
     root.join("learned").join(skill)
 }
 
-/// Whether the declared version is installed; an installed one becomes the current version.
-/// Drops the enabled skills this host doesn't offer.
+/// Whether the declared version is installed; an installed one becomes the
+/// current version. Drops the enabled skills this host doesn't offer.
 pub fn select(selection: &mut SkillSelection) -> bool {
     selection
         .enabled

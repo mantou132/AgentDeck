@@ -54,13 +54,13 @@ export const MIN_DAEMON_VERSION = '0.8.0';
  * (e.g. `agentdeck-chart`). Settings lists them as two groups, workflows first; workflows stay off until turned on,
  * as most users never need them.
  */
-export const WORKFLOW_SKILLS = ['job', 'travel', 'courseware', 'presentation'];
+export const WORKFLOW_SKILLS = ['job', 'travel', 'courseware', 'presentation', ...(previewSupported ? ['app'] : [])];
 
 export const DISPLAY_SKILLS = [
   'widget',
   'chart',
   'map',
-  ...(previewSupported ? ['preview', 'app'] : []),
+  ...(previewSupported ? ['preview'] : []),
   'screen',
   'session',
   'task',

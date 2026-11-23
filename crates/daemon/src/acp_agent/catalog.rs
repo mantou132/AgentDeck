@@ -295,14 +295,14 @@ fn candidates_for_platform(registry: Registry, platform: &str) -> Vec<AgentCandi
 /// starts.
 fn agentdeck_env(id: &str) -> Result<Vec<(String, String)>> {
     Ok(match id {
-        // Codex's bundled visualize plugin answers chart requests with `visualize{...}`
-        // references only the Codex app renders.
+        // Codex's bundled visualize plugin answers chart requests with
+        // `visualize{...}` references only the Codex app renders.
         "codex-acp" => vec![(
             "CODEX_CONFIG".to_string(),
             r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}}}"#.to_string(),
         )],
-        // The free agent: its own session database, no user login, only the free
-        // OpenCode provider, and every render skill (OpenCode takes
+        // The free agent: its own session database, no user login, only the
+        // free OpenCode provider, and every render skill (OpenCode takes
         // `additionalDirectories` only as access grants, not as skill sources).
         FREE_AGENT_ID => {
             let data_dir = AppPaths::discover()?.agent(FREE_AGENT_ID).data_dir();

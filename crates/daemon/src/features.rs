@@ -24,7 +24,8 @@ fn offers(offered: Option<&[String]>, feature: &str, groups: &FeatureGroups) -> 
     })
 }
 
-/// Whether this host offers the feature; one in no group is offered only by name.
+/// Whether this host offers the feature; one in no group is offered only by
+/// name.
 pub fn allows(feature: &str, groups: &FeatureGroups) -> bool {
     offers(OFFERED.get().cloned().flatten().as_deref(), feature, groups)
 }

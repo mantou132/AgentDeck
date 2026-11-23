@@ -94,7 +94,8 @@ fn guess_content_type(path: &str) -> String {
     }
 }
 
-/// Handler for `register_asynchronous_uri_scheme_protocol(scheme, handler(scheme))`.
+/// Handler for `register_asynchronous_uri_scheme_protocol(scheme,
+/// handler(scheme))`.
 pub fn handler<R: Runtime>(
     scheme: &'static str,
 ) -> impl Fn(UriSchemeContext<'_, R>, Request<Vec<u8>>, UriSchemeResponder) + Send + Sync + 'static

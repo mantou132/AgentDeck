@@ -903,7 +903,8 @@ mod tests {
         let dest = std::env::temp_dir().join(format!("agentdeck-dl-slow-{unique}.bin"));
         let url = reqwest::Url::parse(&format!("http://{addr}/agent.bin")).unwrap();
 
-        // Total time (>=1000ms) exceeds read_timeout (600ms), yet every chunk arrives in time.
+        // Total time (>=1000ms) exceeds read_timeout (600ms), yet every chunk
+        // arrives in time.
         super::download_archive(
             url,
             &dest,

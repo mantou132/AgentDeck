@@ -3,7 +3,8 @@ mod js_protocol;
 mod saved_apps;
 mod share;
 
-/// Serves host files to the preview browser; answered by `packages/agentdeck/src/agent/preview.ts`.
+/// Serves host files to the preview browser; answered by
+/// `packages/agentdeck/src/agent/preview.ts`.
 const PREVIEW_SCHEME: &str = "agentdeck-preview";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -35,9 +36,10 @@ pub fn run() {
             #[cfg(mobile)]
             app.handle().plugin(tauri_plugin_add_to_calendar::init())?;
             // The main window is created here so its first request already
-            // sees the frontend bundle picked for this launch. Last: registering
-            // an Android plugin holds the plugin store while it waits for the UI
-            // thread, where the first page load needs that store to navigate.
+            // sees the frontend bundle picked for this launch. Last:
+            // registering an Android plugin holds the plugin store while it
+            // waits for the UI thread, where the first page load needs that
+            // store to navigate.
             frontend_update::setup(app, &frontend_dir);
             tauri::WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
                 .build()?;

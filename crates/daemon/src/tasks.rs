@@ -34,7 +34,8 @@ const TICK: Duration = Duration::from_secs(30);
 /// A run missed by up to this long (computer asleep, daemon stopped) runs once
 /// when the daemon notices; older ones are skipped.
 const MISSED_WINDOW: chrono::Duration = chrono::Duration::hours(6);
-/// A turn without any update for this long is cancelled (`prompt`'s idle timeout).
+/// A turn without any update for this long is cancelled (`prompt`'s idle
+/// timeout).
 const IDLE_TIMEOUT_SECS: u64 = 10 * 60;
 /// An unanswered permission request or question is refused after this long.
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
@@ -45,19 +46,21 @@ const KEPT_SUCCESSES: usize = 20;
 const KEPT_FAILURE_DAYS: i64 = 90;
 const SUMMARY_CHARS: usize = 200;
 
-const UNATTENDED_SYSTEM_PROMPT: &str = "This turn is a scheduled task running unattended: \
-     nobody is watching the session. Don't ask the user questions, and don't wait for \
-     confirmation. Permission requests are sent to the user's phone and rejected if not \
-     answered in time; if an action is rejected, carry on with the rest. If you can't \
-     finish, say why. End your final reply with an `agentdeck-speech` comment as described \
-     above, holding one plain sentence that states the result: it becomes the run's summary.";
+const UNATTENDED_SYSTEM_PROMPT: &str =
+    "This turn is a scheduled task running unattended: nobody is watching the session. Don't ask \
+     the user questions, and don't wait for confirmation. Permission requests are sent to the \
+     user's phone and rejected if not answered in time; if an action is rejected, carry on with \
+     the rest. If you can't finish, say why. End your final reply with an `agentdeck-speech` \
+     comment as described above, holding one plain sentence that states the result: it becomes \
+     the run's summary.";
 
 /// When a task runs.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Schedule {
-    /// At each `HH:MM` of `times`, on `weekdays` (1 = Monday … 7 = Sunday; empty
-    /// means every day), in `time_zone`: the user's, set by the device that saves it.
+    /// At each `HH:MM` of `times`, on `weekdays` (1 = Monday … 7 = Sunday;
+    /// empty means every day), in `time_zone`: the user's, set by the device
+    /// that saves it.
     #[serde(rename_all = "camelCase")]
     Daily {
         times: Vec<String>,
@@ -95,7 +98,8 @@ impl Schedule {
     }
 
     /// Scheduled times of a daily schedule on the dates `now` plus `days`
-    /// (in its time zone); a time skipped by a daylight saving change doesn't run.
+    /// (in its time zone); a time skipped by a daylight saving change doesn't
+    /// run.
     fn daily_times(&self, now: DateTime<Utc>, days: i64) -> Vec<DateTime<Utc>> {
         let Self::Daily {
             times,
@@ -177,7 +181,8 @@ pub struct Task {
     pub cwd: String,
     pub prompt: String,
     pub schedule: Schedule,
-    /// Session config options set before prompting, e.g. `{ "model": "sonnet" }`.
+    /// Session config options set before prompting, e.g. `{ "model": "sonnet"
+    /// }`.
     #[serde(default)]
     pub config_options: HashMap<String, String>,
     /// Wall-clock limit of a run; it is cancelled after this long.
@@ -193,7 +198,8 @@ pub struct Task {
     pub origin_session_id: Option<String>,
     pub created_at: DateTime<Utc>,
     /// When the task was last saved or re-enabled: scheduled times up to here
-    /// don't run. Set by the daemon and stored, so a restart doesn't catch up on them.
+    /// don't run. Set by the daemon and stored, so a restart doesn't catch up
+    /// on them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheduled_from: Option<DateTime<Utc>>,
 }
@@ -255,11 +261,13 @@ pub struct Tasks {
     tasks: Mutex<Vec<Task>>,
     /// The scheduled time each task last fired for.
     fired: Mutex<HashMap<String, DateTime<Utc>>>,
-    /// Running tasks, with their cancellation token and current attempt session once created.
+    /// Running tasks, with their cancellation token and current attempt session
+    /// once created.
     running: Mutex<HashMap<String, RunningTask>>,
     /// Sessions created by runs, for `agent_session_list`.
     run_sessions: Mutex<HashMap<String, String>>,
-    /// Stops the scheduler loop and cancels in-flight runs during daemon shutdown.
+    /// Stops the scheduler loop and cancels in-flight runs during daemon
+    /// shutdown.
     shutdown: CancellationToken,
 }
 
@@ -382,7 +390,8 @@ impl Tasks {
                 }
                 let run = this.run_once(&task, scheduled_for, attempt, &cancel).await;
                 if cancel.is_cancelled() || !this.has_task(&task.id) {
-                    // Deleted while running or daemon shutting down: drop without recording.
+                    // Deleted while running or daemon shutting down: drop
+                    // without recording.
                     if !this.shutdown.is_cancelled()
                         && let Some(session_id) = run.session_id
                     {
@@ -540,8 +549,8 @@ impl Tasks {
         self.sessions.close_session(&task.agent, session_id).await;
     }
 
-    /// Appends a run, prunes old ones (deleting their sessions) and tells devices.
-    /// Returns `false` if the task was deleted before recording.
+    /// Appends a run, prunes old ones (deleting their sessions) and tells
+    /// devices. Returns `false` if the task was deleted before recording.
     fn record(self: &Arc<Self>, task: &Task, run: Run) -> bool {
         let dropped = {
             let tasks = self.tasks.lock().expect("lock poisoned");
@@ -657,7 +666,8 @@ impl Tasks {
         let created_at = existing.map_or_else(Utc::now, |index| tasks[index].created_at);
         value["id"] = json!(id.unwrap_or_else(new_id));
         value["createdAt"] = json!(created_at);
-        // A new or rescheduled task waits for its next time instead of catching up.
+        // A new or rescheduled task waits for its next time instead of catching
+        // up.
         let now = Utc::now();
         value["scheduledFrom"] = json!(now);
         let task: Task = serde_json::from_value(value).context("invalid task")?;
@@ -963,7 +973,8 @@ mod tests {
     fn daily_follows_daylight_saving() {
         let created = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
         let schedule = daily_in(NEW_YORK, &["09:00", "02:30"], &[]);
-        // 09:00 stays 09:00 in New York across the change on 2026-03-08 (UTC-5 to UTC-4).
+        // 09:00 stays 09:00 in New York across the change on 2026-03-08 (UTC-5
+        // to UTC-4).
         let before = in_zone(NEW_YORK, 2026, 3, 7, 10, 0);
         let after = in_zone(NEW_YORK, 2026, 3, 8, 10, 0);
         assert_eq!(
@@ -974,7 +985,8 @@ mod tests {
             schedule.previous(after, created),
             Some(Utc.with_ymd_and_hms(2026, 3, 8, 13, 0, 0).unwrap())
         );
-        // 02:30 doesn't exist that day, so the next run after 09:00 on 03-07 is 09:00 on 03-08.
+        // 02:30 doesn't exist that day, so the next run after 09:00 on 03-07 is
+        // 09:00 on 03-08.
         assert_eq!(
             schedule.next(in_zone(NEW_YORK, 2026, 3, 7, 9, 30), created),
             Some(in_zone(NEW_YORK, 2026, 3, 8, 9, 0))
@@ -1015,7 +1027,8 @@ mod tests {
         );
         assert_eq!(
             summary_of(
-                "Sorted the inbox.\n\n<!-- agentdeck-speech\nSorted 12 mails.\nTwo need a reply.\n-->\n"
+                "Sorted the inbox.\n\n<!-- agentdeck-speech\nSorted 12 mails.\nTwo need a \
+                 reply.\n-->\n"
             ),
             "Sorted 12 mails. Two need a reply."
         );
@@ -1095,7 +1108,8 @@ mod tests {
 
         // Before 09:00 nothing is due.
         assert!(due_runs(&tasks, &mut fired, local(2026, 11, 16, 8, 59)).is_empty());
-        // Woke up at 10:30: the 09:00 run is missed by less than the window, so it runs once.
+        // Woke up at 10:30: the 09:00 run is missed by less than the window, so
+        // it runs once.
         let due = due_runs(&tasks, &mut fired, local(2026, 11, 16, 10, 30));
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].1, local(2026, 11, 16, 9, 0));

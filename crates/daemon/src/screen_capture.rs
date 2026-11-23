@@ -7,8 +7,8 @@
 //!   the exact screen shape (corners, Dynamic Island).
 //! - `android:<serial>`: device or emulator via `adb`. The shape comes from
 //!   `dumpsys display` when the system reports it.
-//! - `browser:<tabId>`: browser tab via the browser4agent extension's local
-//!   MCP service; `mobile` marks a tab under DevTools device emulation.
+//! - `browser:<tabId>`: browser tab via the browser4agent extension's local MCP
+//!   service; `mobile` marks a tab under DevTools device emulation.
 //!
 //! Every result reports the native `width` / `height` and a `frame` the client
 //! draws around the picture; the picture itself is a JPEG at most `maxWidth`
@@ -403,7 +403,14 @@ mod tests {
 
     #[test]
     fn parses_android_shape() {
-        let dumpsys = "DisplayDeviceInfo{\"Built-in Screen\": roundedCorners RoundedCorners{[RoundedCorner{position=TopLeft, radius=47, center=Point(47, 47)}]} cutout DisplayCutout{cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2400 physicalDisplayWidth=1080 physicalDisplayHeight=2400 density={2.625} cutoutSpec={M 506,68 a 34,34 0 1 0 68,0 34,34 0 1 0 -68,0 Z @left} rotation={0}}}}, rotation 0\n  mBaseDisplayInfo=DisplayInfo{, rotation 0, }\n  mOverrideDisplayInfo=DisplayInfo{, real 2400 x 1080, rotation 1, }";
+        let dumpsys =
+            "DisplayDeviceInfo{\"Built-in Screen\": roundedCorners \
+             RoundedCorners{[RoundedCorner{position=TopLeft, radius=47, center=Point(47, 47)}]} \
+             cutout DisplayCutout{cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 \
+             displayHeight=2400 physicalDisplayWidth=1080 physicalDisplayHeight=2400 \
+             density={2.625} cutoutSpec={M 506,68 a 34,34 0 1 0 68,0 34,34 0 1 0 -68,0 Z @left} \
+             rotation={0}}}}, rotation 0\n  mBaseDisplayInfo=DisplayInfo{, rotation 0, }\n  \
+             mOverrideDisplayInfo=DisplayInfo{, real 2400 x 1080, rotation 1, }";
         let shape = android_shape(dumpsys);
         assert_eq!(shape.corner_radius, 47);
         assert_eq!(

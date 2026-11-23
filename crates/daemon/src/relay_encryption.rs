@@ -148,8 +148,9 @@ impl RelayEncryption {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     fn vector() -> Value {
         serde_json::from_str(include_str!(

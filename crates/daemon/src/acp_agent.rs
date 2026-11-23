@@ -10,7 +10,7 @@ use agent_client_protocol::{
             DeleteSessionRequest, ElicitationAction, ElicitationCapabilities,
             ElicitationFormCapabilities, ElicitationScope, ForkSessionRequest, IdleStopReason,
             ImageContent, Implementation, InitializeRequest, ListSessionsRequest,
-            LoadSessionRequest, NewSessionRequest, PermissionOptionId, PromptRequest,
+            LoadSessionRequest, Meta, NewSessionRequest, PermissionOptionId, PromptRequest,
             RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
             ResourceLink, SelectedPermissionOutcome, SessionId, SessionNotification, SessionUpdate,
             StateUpdate, SubagentCapabilities, TextContent,
@@ -97,7 +97,8 @@ struct ClaudeSdkMessage {
 pub struct SessionContext {
     pub system_prompt: Option<String>,
     pub skills: SkillSelection,
-    /// The device creating or loading the session; see `SessionActor::notifier`.
+    /// The device creating or loading the session; see
+    /// `SessionActor::notifier`.
     pub notifier: Option<Notifier>,
     /// Permission requests and questions unanswered for this long are refused
     /// (unattended runs); without it they wait until the turn ends.
@@ -124,7 +125,8 @@ pub struct SessionReady {
 pub enum AgentStatus {
     /// Downloading the managed binary.
     Installing,
-    /// Launching the process and initializing ACP; `npx` / `uvx` download in this step.
+    /// Launching the process and initializing ACP; `npx` / `uvx` download in
+    /// this step.
     Starting,
 }
 
@@ -303,7 +305,8 @@ impl AcpRuntime {
                 async move |request: CreateElicitationRequest, responder, connection| {
                     let runtime = elicitation_runtime.clone();
                     connection.spawn(async move {
-                        // Only form mode is advertised, and its requests are session-scoped.
+                        // Only form mode is advertised, and its requests are
+                        // session-scoped.
                         let ElicitationScope::Session(scope) = request.scope() else {
                             return responder.respond(CreateElicitationResponse::new(
                                 ElicitationAction::Cancel,
@@ -329,9 +332,9 @@ impl AcpRuntime {
             .on_receive_notification(
                 async move |notification: ClaudeSdkMessage, _connection| {
                     if let Some(suggestion) = prompt_suggestion(&notification.message) {
-                        // Never wait for the actor here: this handler runs on the
-                        // connection's dispatch loop, which the actor may be
-                        // waiting on.
+                        // Never wait for the actor here: this handler runs on
+                        // the connection's dispatch loop, which the actor may
+                        // be waiting on.
                         if let Some(tx) = suggestion_runtime
                             .session_tx(&notification.session_id)
                             .await
@@ -358,14 +361,24 @@ impl AcpRuntime {
                 agent_client_protocol::on_receive_notification!(),
             )
             .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
-                // Form elicitation lets Claude ask the user (`AskUserQuestion`);
-                // `subagents` asks for child sessions in the ACP Subagent
-                // Sessions RFD form.
+                // Form elicitation lets Claude ask the user
+                // (`AskUserQuestion`); `subagents` asks for child sessions in
+                // the ACP Subagent Sessions RFD form. OpenCode ignores the
+                // standard field and only reports child sessions when its own
+                // `_meta` key is set.
                 let capabilities = AcpClientCapabilities::new()
                     .elicitation(
                         ElicitationCapabilities::new().form(ElicitationFormCapabilities::new()),
                     )
-                    .subagents(SubagentCapabilities::new());
+                    .subagents(SubagentCapabilities::new())
+                    .meta(
+                        [(
+                            "opencode/child-session-updates".to_string(),
+                            serde_json::Value::Bool(true),
+                        )]
+                        .into_iter()
+                        .collect::<Meta>(),
+                    );
                 let request = InitializeRequest::new(ProtocolVersion::V1)
                     .client_capabilities(capabilities)
                     .client_info(
@@ -389,8 +402,9 @@ impl AcpRuntime {
                     generation,
                 };
                 runtime.connection_ready(generation, agent_connection).await;
-                // The SDK can keep a connect_with foreground task alive after EOF.
-                // End ours explicitly so the runtime discards the dead connection.
+                // The SDK can keep a connect_with foreground task alive after
+                // EOF. End ours explicitly so the runtime discards the dead
+                // connection.
                 tokio::select! {
                     _ = connection.incoming_closed() => Err(
                         agent_client_protocol::Error::internal_error()
@@ -804,7 +818,8 @@ struct PromptTurn {
     prompt: String,
     attachments: Vec<Attachment>,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
-    /// The prompting device, which gets the session's notifications from now on.
+    /// The prompting device, which gets the session's notifications from now
+    /// on.
     notifier: Option<Notifier>,
     idle_timeout: std::time::Duration,
     reply: oneshot::Sender<Result<String>>,
@@ -866,7 +881,8 @@ impl AgentSessionManager {
             .clone()
     }
 
-    /// Start `agent` if it isn't running; `status` reports the progress meanwhile.
+    /// Start `agent` if it isn't running; `status` reports the progress
+    /// meanwhile.
     pub async fn prepare(&self, agent: &str) -> Result<()> {
         self.runtime(agent).connection().await.map(drop)
     }
@@ -1201,7 +1217,8 @@ impl AgentSessionManager {
             return false;
         };
         // Keep it registered until the actor has released its ACP handle and
-        // permission state. Concurrent close/load calls wait for the same cleanup.
+        // permission state. Concurrent close/load calls wait for the same
+        // cleanup.
         session.closing.cancel();
         session.wait_closed().await;
         true
@@ -1332,7 +1349,8 @@ impl AgentSessionManager {
     }
 }
 
-/// ACP has no fork point yet; claude-agent-acp reads the one JetBrains AIR sends.
+/// ACP has no fork point yet; claude-agent-acp reads the one JetBrains AIR
+/// sends.
 fn fork_point_meta(message_id: &str) -> serde_json::Map<String, serde_json::Value> {
     serde_json::Map::from_iter([(
         "jetbrains".to_string(),
@@ -1343,7 +1361,8 @@ fn fork_point_meta(message_id: &str) -> serde_json::Map<String, serde_json::Valu
 /// Serialize a session update for the client, dropping image bytes from tool
 /// output. Tool images (e.g. screenshots the agent read) arrive twice, in
 /// `content` and `rawOutput`, at up to ~1MB each; the client does not render
-/// them, and on load they clog the ordered Relay queue so later replies time out.
+/// them, and on load they clog the ordered Relay queue so later replies time
+/// out.
 fn update_to_json(update: SessionUpdate) -> serde_json::Value {
     let mut update = to_json(update);
     if matches!(

@@ -23,7 +23,8 @@ pub fn install_daemon() -> Result<()> {
     let manager = get_manager()?;
     let program = service_program()?;
 
-    // Rewriting the LaunchAgent makes macOS show a new "Background Items Added" notification.
+    // Rewriting the LaunchAgent makes macOS show a new "Background Items Added"
+    // notification.
     #[cfg(target_os = "macos")]
     let contents = {
         let plist = launchd::plist(&program);
@@ -90,7 +91,8 @@ pub fn start_daemon() -> Result<()> {
     Ok(())
 }
 
-/// Restart through launchd when the installed service is unchanged; otherwise reinstall it.
+/// Restart through launchd when the installed service is unchanged; otherwise
+/// reinstall it.
 pub fn restart_daemon() -> Result<()> {
     #[cfg(target_os = "macos")]
     {
@@ -105,7 +107,8 @@ pub fn restart_daemon() -> Result<()> {
     start_daemon()
 }
 
-/// Unregister autostart service and try to terminate the running daemon process.
+/// Unregister autostart service and try to terminate the running daemon
+/// process.
 pub fn stop_daemon() -> Result<()> {
     let _ = uninstall_daemon();
 
@@ -142,7 +145,8 @@ mod launchd {
 
     use super::SERVICE_LABEL;
 
-    /// `launchd.plist` keeps the layout launchd leaves after `start`, so existing installs compare equal.
+    /// `launchd.plist` keeps the layout launchd leaves after `start`, so
+    /// existing installs compare equal.
     pub fn plist(program: &Path) -> String {
         let program = program
             .to_string_lossy()

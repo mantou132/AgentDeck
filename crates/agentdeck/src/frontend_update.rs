@@ -200,7 +200,8 @@ impl FrontendUpdate {
         let target = self.root.join(&name);
         let _ = fs::remove_dir_all(&target);
         fs::rename(&staging, &target)?;
-        // The previous bundle keeps serving this launch; `clean` removes it next time.
+        // The previous bundle keeps serving this launch; `clean` removes it
+        // next time.
         let _guard = self.lock.lock().expect("lock poisoned");
         let state = self.read_state();
         self.write_state(&UpdateState {

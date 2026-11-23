@@ -10,7 +10,8 @@ use fd_lock::RwLock;
 
 use crate::app_data::AppPaths;
 
-/// Ensures single instance of the daemon process at runtime using an advisory file lock.
+/// Ensures single instance of the daemon process at runtime using an advisory
+/// file lock.
 pub struct InstanceLock {
     _guard: fd_lock::RwLockWriteGuard<'static, std::fs::File>,
 }
@@ -22,8 +23,9 @@ impl fmt::Debug for InstanceLock {
 }
 
 impl InstanceLock {
-    /// Attempt to acquire exclusive single-instance lock on the default lock file.
-    /// Fails immediately if another instance of the daemon is already running.
+    /// Attempt to acquire exclusive single-instance lock on the default lock
+    /// file. Fails immediately if another instance of the daemon is already
+    /// running.
     pub fn acquire() -> Result<Self> {
         Self::acquire_at(&lock_file_path()?)
     }
@@ -66,12 +68,14 @@ impl InstanceLock {
         Ok(Self { _guard: guard })
     }
 
-    /// Check if another daemon process currently holds the lock, returning its PID if known.
+    /// Check if another daemon process currently holds the lock, returning its
+    /// PID if known.
     pub fn check_running() -> Result<Option<u32>> {
         Self::check_running_at(&lock_file_path()?)
     }
 
-    /// Check if another daemon process currently holds the lock at a specific path.
+    /// Check if another daemon process currently holds the lock at a specific
+    /// path.
     pub fn check_running_at(lock_path: &Path) -> Result<Option<u32>> {
         if !lock_path.exists() {
             return Ok(None);
@@ -85,7 +89,8 @@ impl InstanceLock {
         let mut rwlock = RwLock::new(file);
         match rwlock.try_write() {
             Ok(_) => {
-                // Lock was successfully acquired, meaning no active daemon is holding the lock.
+                // Lock was successfully acquired, meaning no active daemon is
+                // holding the lock.
                 Ok(None)
             }
             Err(_) => {

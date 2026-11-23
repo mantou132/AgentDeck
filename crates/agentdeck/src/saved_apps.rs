@@ -97,7 +97,8 @@ fn staging(root: &Path, id: &str) -> PathBuf {
     root.join(format!(".staging-{id}"))
 }
 
-/// Starts saving app `id`; its files go to a staging directory until `saved_app_commit`.
+/// Starts saving app `id`; its files go to a staging directory until
+/// `saved_app_commit`.
 #[tauri::command]
 pub fn saved_app_begin<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
     check_id(&id)?;
@@ -151,7 +152,8 @@ struct Manifest {
     name: String,
 }
 
-/// Saved apps, most recently saved first; names come from each app's `agentdeck.json`.
+/// Saved apps, most recently saved first; names come from each app's
+/// `agentdeck.json`.
 #[tauri::command]
 pub fn saved_app_list<R: Runtime>(app: AppHandle<R>) -> Result<Vec<SavedApp>, String> {
     let Ok(entries) = fs::read_dir(root(&app)?) else {
@@ -179,11 +181,13 @@ pub fn saved_app_remove<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(),
     fs::remove_dir_all(root(&app)?.join(id)).map_err(|e| e.to_string())
 }
 
-/// PNG copy of a saved app's `icon.svg`, written by the frontend, which home screen entries show.
+/// PNG copy of a saved app's `icon.svg`, written by the frontend, which home
+/// screen entries show.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 const ICON_PATH: &str = "__agentdeck/icon.png";
 
-/// Asks the Android launcher to pin a shortcut opening saved app `id`; iOS uses the widget instead.
+/// Asks the Android launcher to pin a shortcut opening saved app `id`; iOS uses
+/// the widget instead.
 #[tauri::command]
 pub fn saved_app_pin<R: Runtime>(
     app: AppHandle<R>,
@@ -331,7 +335,8 @@ fn serve<R: Runtime>(app: &AppHandle<R>, request: &Request<Vec<u8>>) -> Response
     let path = uri.path();
     if path == EXIT_PATH {
         exit(app);
-        // A navigation answered with 204 stays on the page until the webview leaves it.
+        // A navigation answered with 204 stays on the page until the webview
+        // leaves it.
         return status(StatusCode::NO_CONTENT);
     }
     let file = match (check_id(id), check_path(path), root(app)) {

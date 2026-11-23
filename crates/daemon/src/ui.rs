@@ -1,5 +1,6 @@
-use anstyle::{AnsiColor, Color, Style};
 use std::fmt;
+
+use anstyle::{AnsiColor, Color, Style};
 
 pub const BOLD: Style = Style::new().bold();
 pub const DIM: Style = Style::new().dimmed();

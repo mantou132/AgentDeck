@@ -1,6 +1,7 @@
 //! Relay transport for the remote RPC peers, built on the shared
-//! `relay-client` crate. This module manages multiple remote peers (e.g. Phone A,
-//! Phone B) communicating over endpoint 1 and demultiplexes by an auto-incrementing `peerId`.
+//! `relay-client` crate. This module manages multiple remote peers (e.g. Phone
+//! A, Phone B) communicating over endpoint 1 and demultiplexes by an
+//! auto-incrementing `peerId`.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -92,7 +93,8 @@ pub(crate) struct Outbound {
     /// Raw bytes attached to a reply, carried as a binary frame.
     bytes: Option<Vec<u8>>,
     target_device_id: Option<String>,
-    /// Replies to an ephemeral request skip Relay storage, like the request did.
+    /// Replies to an ephemeral request skip Relay storage, like the request
+    /// did.
     ephemeral: bool,
 }
 
@@ -119,7 +121,8 @@ fn take_ephemeral_reply(calls: &EphemeralCalls, peer_id: u64, message: &Value) -
     }
 }
 
-/// Push tokens of the devices that attached within `BROADCAST_PUSH_MAX_IDLE_SECS`.
+/// Push tokens of the devices that attached within
+/// `BROADCAST_PUSH_MAX_IDLE_SECS`.
 fn recent_tokens(devices: &HashMap<String, RemoteDevice>, now: u64) -> Vec<String> {
     let since = now.saturating_sub(BROADCAST_PUSH_MAX_IDLE_SECS);
     devices
@@ -130,8 +133,9 @@ fn recent_tokens(devices: &HashMap<String, RemoteDevice>, now: u64) -> Vec<Strin
 }
 
 /// Manages multiple remote peers multiplexed over a single relay connection.
-/// Allocates auto-increment `peerId` to connected devices and tags/filters messages.
-/// Reaches every device, for sessions no device started (scheduled runs).
+/// Allocates auto-increment `peerId` to connected devices and tags/filters
+/// messages. Reaches every device, for sessions no device started (scheduled
+/// runs).
 #[derive(Clone)]
 struct Broadcaster {
     devices: Arc<Mutex<HashMap<String, RemoteDevice>>>,
@@ -192,7 +196,8 @@ pub struct RemotePeerManager {
     push_client: reqwest::Client,
     /// `push::host_key` of the pairing ID, sent with every push.
     push_host: String,
-    /// Skills of the latest attach, for sessions no device started (scheduled runs).
+    /// Skills of the latest attach, for sessions no device started (scheduled
+    /// runs).
     latest_skills: Arc<Mutex<SkillSelection>>,
 }
 
@@ -381,7 +386,8 @@ impl RemotePeerManager {
 
         let peer_id = self.resolve_peer_id(&device_id, requested_peer_id, params.get("fcmToken"));
         let (_peer, skills) = self.peer_entry(peer_id);
-        // Every attach re-declares the client's skills; later sessions use them.
+        // Every attach re-declares the client's skills; later sessions use
+        // them.
         let mut declared: SkillSelection = params
             .get("skills")
             .cloned()
@@ -389,7 +395,8 @@ impl RemotePeerManager {
             .unwrap_or_default();
         // Clients disable the features this host doesn't offer.
         let restricted_features = features::restricted(&declared.groups);
-        // The client sends this version through `skills_install` before using the host.
+        // The client sends this version through `skills_install` before using
+        // the host.
         let skills_missing = !render_skills::select(&mut declared);
         *self.latest_skills.lock().expect("lock poisoned") = declared.clone();
         *skills.lock().expect("lock poisoned") = declared;
@@ -442,7 +449,8 @@ impl ClientHandler for Handler {
                 return;
             }
         };
-        // Bind the RPC peer to the authenticated sender, never the outer Relay route.
+        // Bind the RPC peer to the authenticated sender, never the outer Relay
+        // route.
         if let Some(sender) = sender {
             let attached = if message.get("method").and_then(Value::as_str) == Some("peer_attach") {
                 message.pointer("/params/deviceId").and_then(Value::as_str) == Some(sender.as_str())
@@ -466,8 +474,8 @@ impl ClientHandler for Handler {
     fn on_connected(&self) {
         tracing::info!("Connected to relay WebSocket");
         // Ephemeral: only devices online now need to re-attach; a stored copy
-        // would reach phones that reconnect later and already attach on connect.
-        // Kept for Apps and Relays without presence.
+        // would reach phones that reconnect later and already attach on
+        // connect. Kept for Apps and Relays without presence.
         let _ = self.manager.outbound_tx.send(Outbound {
             message: json!({
                 "method": "host_reconnected",
@@ -499,7 +507,8 @@ pub fn start(
     let store = Arc::new(MemoryStore::new());
 
     // `Peer`'s writer is a sync callback on arbitrary threads; bridge it to
-    // the async client through an unbounded channel drained by a dedicated task.
+    // the async client through an unbounded channel drained by a dedicated
+    // task.
     let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel::<Outbound>();
 
     let manager = Arc::new(RemotePeerManager::new(

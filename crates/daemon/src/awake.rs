@@ -1,15 +1,17 @@
-use crate::{
-    app_data::{self, AppPaths},
-    config::DaemonConfig,
-    power,
-};
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use std::{
     fs,
     sync::{Mutex, OnceLock, mpsc},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    app_data::{self, AppPaths},
+    config::DaemonConfig,
+    power,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -249,7 +251,8 @@ mod tests {
             .modified()
             .unwrap();
 
-        // Wait past one monitor tick: unchanged state should not rewrite the status file.
+        // Wait past one monitor tick: unchanged state should not rewrite the
+        // status file.
         thread::sleep(Duration::from_millis(1200));
         let later_modified = fs::metadata(paths.awake_status_file())
             .unwrap()
@@ -257,7 +260,8 @@ mod tests {
             .unwrap();
         assert_eq!(later_modified, initial_modified);
 
-        // Status remains readable regardless of age as long as pid and mode match.
+        // Status remains readable regardless of age as long as pid and mode
+        // match.
         let stale = Status {
             pid: std::process::id(),
             mode: Mode::Never,

@@ -45,7 +45,8 @@ struct Cli {
     #[arg(long, global = true, value_parser = parse_relay_url)]
     relay_url: Option<String>,
 
-    /// Comma-separated features or groups offered to clients (e.g. `basic`), or `all` (saved for subsequent starts)
+    /// Comma-separated features or groups offered to clients (e.g. `basic`), or
+    /// `all` (saved for subsequent starts)
     #[arg(long, global = true, value_parser = parse_features)]
     features: Option<FeatureList>,
 }
@@ -56,7 +57,8 @@ struct FeatureList(Option<Vec<String>>);
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Run the daemon directly in the foreground (default when no subcommand is given)
+    /// Run the daemon directly in the foreground (default when no subcommand is
+    /// given)
     Run,
     /// Register autostart service and start the daemon if not already running
     Start,
@@ -64,7 +66,8 @@ enum Commands {
     Stop,
     /// Restart the background daemon service
     Restart,
-    /// Rotate the Pairing ID, clear local state and restore the previous service state
+    /// Rotate the Pairing ID, clear local state and restore the previous
+    /// service state
     Reset,
     /// Check daemon status and display Pairing ID
     Status,
@@ -145,7 +148,8 @@ async fn awake_command(paths: &AppPaths, command: Option<AwakeCommand>) -> Resul
     println!(
         "{}",
         ui::dim(
-            "Setting saved. The running daemon has not confirmed it; restart it if it predates awake support."
+            "Setting saved. The running daemon has not confirmed it; restart it if it predates \
+             awake support."
         )
     );
     Ok(())
@@ -183,7 +187,8 @@ fn print_daemon_status(paths: &AppPaths) -> Result<()> {
     Ok(())
 }
 
-/// The QR pairing URI; `relayUrl` is only included for a non-default relay so default QR codes stay unchanged.
+/// The QR pairing URI; `relayUrl` is only included for a non-default relay so
+/// default QR codes stay unchanged.
 fn pairing_uri(relay_id: &str, relay_url: &str) -> String {
     let mut params = vec![("pairingId", relay_id)];
     if relay_url != config::DEFAULT_RELAY_URL {
@@ -304,7 +309,8 @@ async fn main() -> Result<()> {
                 && daemon::InstanceLock::check_running()?.is_some()
             {
                 anyhow::bail!(
-                    "daemon is already running; use `agentdeckd restart` with these options to change its settings"
+                    "daemon is already running; use `agentdeckd restart` with these options to \
+                     change its settings"
                 );
             }
             let config = DaemonConfig::load_or_init(&paths, &options)?;
@@ -354,7 +360,8 @@ mod tests {
         );
         assert_eq!(
             pairing_uri("adk1_abc", "wss://relay.example/ws?a=1"),
-            "agentdeck://connect?pairingId=adk1_abc&relayUrl=wss%3A%2F%2Frelay.example%2Fws%3Fa%3D1"
+            "agentdeck://connect?pairingId=adk1_abc&relayUrl=wss%3A%2F%2Frelay.example%2Fws%3Fa%\
+             3D1"
         );
     }
 

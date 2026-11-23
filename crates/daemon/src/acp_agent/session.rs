@@ -10,8 +10,10 @@ use agent_client_protocol::{
     util::MatchDispatch,
 };
 use anyhow::Result;
-use tokio::sync::{mpsc, oneshot, watch};
-use tokio::task::JoinSet;
+use tokio::{
+    sync::{mpsc, oneshot, watch},
+    task::JoinSet,
+};
 
 use super::*;
 
@@ -94,8 +96,9 @@ pub(super) async fn run_session_actor(
     // without waiting for the agent to close the session.
     drop(actor);
     if closing.is_cancelled() {
-        // This also interrupts a stuck mode/config request or a user input wait;
-        // close must not queue behind the operation the user is resetting.
+        // This also interrupts a stuck mode/config request or a user input
+        // wait; close must not queue behind the operation the user is
+        // resetting.
         send_cancel(&session);
         if close_supported {
             close_session_gracefully(&session).await;
@@ -187,10 +190,10 @@ impl SessionActor {
                 .min();
             let turn = &mut self.turn;
             let control_tasks = &mut self.control_tasks;
-            // `biased` drains updates the agent sent before its prompt response;
-            // a random pick could take Stop first and leave the final chunks
-            // queued until the next turn. The parent's queue goes first, so a
-            // subagent's announcement precedes its own updates.
+            // `biased` drains updates the agent sent before its prompt
+            // response; a random pick could take Stop first and leave the final
+            // chunks queued until the next turn. The parent's queue goes first,
+            // so a subagent's announcement precedes its own updates.
             let input = tokio::select! {
                 biased;
                 update = session.read_update() => Input::Update(update?),
@@ -228,9 +231,10 @@ impl SessionActor {
                 Input::Stop(response) => self.end_turn(response),
                 Input::ControlDone => {}
                 Input::Idle => {
-                    // Callers keep at most one prompt in flight per session, so a
-                    // timeout means the caller abandoned its turn: cancel it so the
-                    // session becomes usable again instead of finishing unobserved.
+                    // Callers keep at most one prompt in flight per session, so
+                    // a timeout means the caller abandoned its turn: cancel it
+                    // so the session becomes usable again instead of finishing
+                    // unobserved.
                     self.cancel_turn(session);
                     let turn = self.turn.as_mut().expect("deadline of a running turn");
                     if let Some(reply) = turn.reply.take() {
@@ -262,7 +266,7 @@ impl SessionActor {
             }
             SessionCommand::UserInput { mut input, answer } => {
                 // Only shown while a turn runs; dropping `answer` cancels it.
-                if !self.turn.as_ref().is_some_and(|turn| !turn.cancelled) {
+                if self.turn.as_ref().is_none_or(|turn| turn.cancelled) {
                     return;
                 }
                 let Some(notifier) = self.notifier.clone() else {
@@ -334,10 +338,11 @@ impl SessionActor {
         if turn.notifier.is_some() {
             self.notifier = turn.notifier;
         }
-        // `send_prompt` only takes text, so build the request manually to support
-        // image/resource blocks. The final stop reason then arrives as the
-        // request response instead of through the update stream. An empty prompt
-        // is fine as long as attachments carry the content (callers validate).
+        // `send_prompt` only takes text, so build the request manually to
+        // support image/resource blocks. The final stop reason then arrives as
+        // the request response instead of through the update stream. An empty
+        // prompt is fine as long as attachments carry the content (callers
+        // validate).
         let mut content: Vec<ContentBlock> = Vec::new();
         if !turn.prompt.is_empty() {
             content.push(ContentBlock::Text(TextContent::new(turn.prompt)));
@@ -490,8 +495,8 @@ impl SessionActor {
         }
     }
 
-    /// Send `session/set_mode` to the live session without blocking the actor loop.
-    /// Safe mid-turn: claude-agent-acp applies it to the running query
+    /// Send `session/set_mode` to the live session without blocking the actor
+    /// loop. Safe mid-turn: claude-agent-acp applies it to the running query
     /// (`setPermissionMode`), so the in-flight turn switches immediately.
     fn spawn_set_mode(
         &mut self,
@@ -520,8 +525,8 @@ impl SessionActor {
         });
     }
 
-    /// Send `session/set_config_option` to the live session without blocking the
-    /// actor loop; see `spawn_set_mode` for why this is safe mid-turn.
+    /// Send `session/set_config_option` to the live session without blocking
+    /// the actor loop; see `spawn_set_mode` for why this is safe mid-turn.
     fn spawn_set_config_option(
         &mut self,
         session: &ActiveSession<'_, Agent>,

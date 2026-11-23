@@ -145,7 +145,8 @@ pub(super) fn browse_files(
 }
 
 const FILE_READ_MAX_BYTES: u64 = 8 * 1024 * 1024;
-/// A regular file under the size limit, or an error naming why it can't be read.
+/// A regular file under the size limit, or an error naming why it can't be
+/// read.
 fn resolve_file(path: &str, cwd: Option<&Path>, len_limit: bool) -> Result<(PathBuf, u64), String> {
     let base_dir = resolve_base_dir(path, cwd)?;
     let resolved = resolve_directory_path(path.trim(), &base_dir);

@@ -7,7 +7,6 @@ pub mod singleton;
 pub mod status;
 
 pub(crate) use reset::reset_daemon;
-
 pub use singleton::InstanceLock;
 pub use status::Status;
 
@@ -25,7 +24,6 @@ use windows as platform;
 mod fallback;
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 use fallback as platform;
-
 pub use platform::{
     daemon_status, install_daemon, restart_daemon, start_daemon, stop_daemon, uninstall_daemon,
 };
@@ -55,7 +53,8 @@ fn stable_candidates(exe: &Path) -> Vec<PathBuf> {
         return candidates;
     };
 
-    // Homebrew: <prefix>/Cellar/<formula>/<version>/bin/<name> -> <prefix>/bin/<name>
+    // Homebrew: <prefix>/Cellar/<formula>/<version>/bin/<name> ->
+    // <prefix>/bin/<name>
     if let Some(bin_dir) = exe.parent()
         && bin_dir.file_name().and_then(|n| n.to_str()) == Some("bin")
         && let Some(cellar_dir) = bin_dir

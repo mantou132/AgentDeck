@@ -1,10 +1,11 @@
 #[cfg(target_os = "macos")]
 mod native {
-    use anyhow::{Result, bail, ensure};
     use std::{
         ffi::{c_char, c_void},
         ptr,
     };
+
+    use anyhow::{Result, bail, ensure};
     type CF = *const c_void;
     #[link(name = "CoreFoundation", kind = "framework")]
     unsafe extern "C" {
