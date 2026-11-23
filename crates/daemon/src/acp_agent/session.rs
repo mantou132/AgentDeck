@@ -40,6 +40,7 @@ pub(super) async fn run_session_actor(
     let (load, replay_tx) = load.unzip();
     let notifier = context.notifier.clone();
     let input_timeout = context.input_timeout;
+    let auto_approve = context.auto_approve;
     let started = tokio::select! {
         result = runtime.start_session(cwd, load, context) => result,
         _ = closing.cancelled() => return false,
@@ -63,6 +64,7 @@ pub(super) async fn run_session_actor(
         session_id: ready.session_id.clone(),
         notifier,
         input_timeout,
+        auto_approve,
         status,
         turn: None,
         pending_inputs: Vec::new(),
@@ -120,6 +122,8 @@ struct SessionActor {
     notifier: Option<Notifier>,
     /// See `SessionContext::input_timeout`.
     input_timeout: Option<std::time::Duration>,
+    /// See `SessionContext::auto_approve`.
+    auto_approve: bool,
     status: watch::Sender<SessionStatus>,
     turn: Option<Turn>,
     /// One at a time per session, but subagents ask alongside their parent.
@@ -267,6 +271,12 @@ impl SessionActor {
             SessionCommand::UserInput { mut input, answer } => {
                 // Only shown while a turn runs; dropping `answer` cancels it.
                 if self.turn.as_ref().is_none_or(|turn| turn.cancelled) {
+                    return;
+                }
+                if self.auto_approve
+                    && let Some(option_id) = auto_allow(input.params())
+                {
+                    let _ = answer.send(serde_json::json!({ "optionId": option_id }));
                     return;
                 }
                 let Some(notifier) = self.notifier.clone() else {
@@ -568,6 +578,33 @@ impl SessionActor {
                 .collect(),
         });
     }
+}
+
+/// Finds the option approving a permission request (unattended runs).
+fn auto_allow(params: &serde_json::Value) -> Option<String> {
+    params
+        .get("options")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|options| {
+            ["allow_once", "allow_always"]
+                .iter()
+                .find_map(|kind| {
+                    options.iter().find(|option| {
+                        option.get("kind").and_then(serde_json::Value::as_str) == Some(kind)
+                    })
+                })
+                .or_else(|| {
+                    options.iter().find(|option| {
+                        option
+                            .get("kind")
+                            .and_then(serde_json::Value::as_str)
+                            .is_some_and(|k| k.starts_with("allow"))
+                    })
+                })
+        })
+        .and_then(|option| option.get("optionId"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 /// Answer refusing a request: the permission request's reject option, so the

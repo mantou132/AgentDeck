@@ -103,6 +103,9 @@ pub struct SessionContext {
     /// Permission requests and questions unanswered for this long are refused
     /// (unattended runs); without it they wait until the turn ends.
     pub input_timeout: Option<std::time::Duration>,
+    /// Automatically approve permission requests with their allow option
+    /// (unattended runs).
+    pub auto_approve: bool,
 }
 
 /// Snapshot returned after an ACP session actor is ready.

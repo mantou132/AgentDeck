@@ -455,6 +455,7 @@ impl Tasks {
             skills: host.skills(),
             notifier: Some(host.notifier(&task.id)),
             input_timeout: Some(APPROVAL_TIMEOUT),
+            auto_approve: true,
         };
         let created = tokio::select! {
             created = self.sessions.create_session(&task.agent, Some(PathBuf::from(&task.cwd)), context) => created,

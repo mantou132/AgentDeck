@@ -783,6 +783,7 @@ async fn session_context(
         skills: skills.lock().expect("lock poisoned").clone(),
         notifier: Some(notifier),
         input_timeout: None,
+        auto_approve: false,
     })
 }
 

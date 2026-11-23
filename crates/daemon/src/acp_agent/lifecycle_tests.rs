@@ -1062,6 +1062,70 @@ async fn an_unanswered_request_is_refused_and_does_not_count_as_idle() {
 }
 
 #[tokio::test]
+async fn auto_approve_answers_permission_requests_without_notifying_or_waiting() {
+    let mut mock = MockAcp::new().await;
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel();
+    let notifier: Notifier = Arc::new(move |method, _params| {
+        let _ = request_tx.send(method.to_string());
+    });
+    let manager = mock.manager.clone();
+    let call = tokio::spawn(async move {
+        let context = SessionContext {
+            notifier: Some(notifier),
+            auto_approve: true,
+            ..Default::default()
+        };
+        manager.create_session("codex-acp", None, context).await
+    });
+    let request = mock.next("session/new").await;
+    mock.respond(&request, json!({"sessionId": "session"}));
+    call.await.unwrap().unwrap();
+
+    let manager = mock.manager.clone();
+    let prompt = tokio::spawn(async move {
+        manager
+            .prompt(
+                "codex-acp",
+                "session",
+                "test".into(),
+                vec![],
+                1,
+                replay_sink(),
+                None,
+            )
+            .await
+    });
+    let prompt_request = mock.next("session/prompt").await;
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0", "id": "permission", "method": "session/request_permission",
+            "params": {
+                "sessionId": "session",
+                "toolCall": {"toolCallId": "tool", "title": "Test permission", "status": "pending"},
+                "options": [
+                    {"optionId": "allow_id", "name": "Allow once", "kind": "allow_once"},
+                    {"optionId": "reject_id", "name": "Reject", "kind": "reject_once"}
+                ]
+            }
+        })))
+        .unwrap();
+
+    let answer = tokio::time::timeout(Duration::from_secs(1), mock.peer.rx.next())
+        .await
+        .unwrap()
+        .map(frame_json)
+        .unwrap();
+    assert_eq!(answer["id"], "permission");
+    assert_eq!(answer["result"]["outcome"]["optionId"], "allow_id");
+    assert!(request_rx.try_recv().is_err());
+    assert!(mock.manager.pending_user_inputs().await.is_empty());
+
+    mock.respond(&prompt_request, json!({"stopReason": "end_turn"}));
+    assert!(prompt.await.unwrap().is_ok());
+}
+
+#[tokio::test]
 async fn shutdown_closes_active_sessions_and_stops_runtime() {
     let mut mock = MockAcp::new().await;
     mock.create("s1").await;
