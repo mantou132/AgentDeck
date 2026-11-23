@@ -44,7 +44,31 @@ let html = fs.readFileSync(inputPath, 'utf8');
 
 const isRemote = (url) => /^(https?:|\/\/|data:)/i.test(url.trim());
 
-// 1. Inline local stylesheets: <link rel="stylesheet" href="...">
+// 1. Inline local images: <img ... src="..." ...>
+const MIME_TYPES = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+};
+
+html = html.replace(/<img\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, before, src, after) => {
+  if (isRemote(src)) return match;
+  const filePath = path.resolve(baseDir, src);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`[bundle] Warning: image file not found: ${src}`);
+    return match;
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  const mime = MIME_TYPES[ext] || 'application/octet-stream';
+  const base64 = fs.readFileSync(filePath).toString('base64');
+  return `<img ${before}src="data:${mime};base64,${base64}"${after}>`;
+});
+
+// 2. Inline local stylesheets: <link rel="stylesheet" href="...">
 html = html.replace(/<link\s+[^>]*rel=["']stylesheet["'][^>]*>/gi, (match) => {
   const hrefMatch = match.match(/href=["']([^"']+)["']/i);
   if (!hrefMatch) return match;
@@ -69,7 +93,7 @@ html = html.replace(/<link\s+[^>]*href=["']([^"']+)["'][^>]*rel=["']stylesheet["
   return `<style>\n${css}\n</style>`;
 });
 
-// 2. Inline local scripts: <script src="..."></script>
+// 3. Inline local scripts: <script src="..."></script>
 html = html.replace(/<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (match, src) => {
   if (isRemote(src)) return match;
   const filePath = path.resolve(baseDir, src);
@@ -81,30 +105,6 @@ html = html.replace(/<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, 
   // Escape inline </script> to avoid breaking enclosing script tag
   js = js.replace(/<\/script>/gi, '<\\/script>');
   return `<script>\n${js}\n</script>`;
-});
-
-// 3. Inline local images: <img ... src="..." ...>
-const MIME_TYPES = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
-};
-
-html = html.replace(/<img\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, before, src, after) => {
-  if (isRemote(src)) return match;
-  const filePath = path.resolve(baseDir, src);
-  if (!fs.existsSync(filePath)) {
-    console.warn(`[bundle] Warning: image file not found: ${src}`);
-    return match;
-  }
-  const ext = path.extname(filePath).toLowerCase();
-  const mime = MIME_TYPES[ext] || 'application/octet-stream';
-  const base64 = fs.readFileSync(filePath).toString('base64');
-  return `<img ${before}src="data:${mime};base64,${base64}"${after}>`;
 });
 
 fs.writeFileSync(outputPath, html, 'utf8');

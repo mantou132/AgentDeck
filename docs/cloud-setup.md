@@ -1,145 +1,81 @@
-# 云端无头环境部署与浏览器配置指南
+# Cloud Deployment and Environment Isolation Guide
 
-本指南介绍如何在 Linux 云服务器（无物理显示器环境）中部署 **AgentDeck Daemon (`agentdeckd`)**，并配置持久化的 **Chromium + browser4agent**，实现：
-- 随时通过手机 App 远程连接云端 Agent；
-- Agent 使用固定的常驻浏览器，保存已登录账号态与 Cookie；
-- 截取网页登录二维码并在手机上扫码登录；
-- 将浏览器实时画面推流到手机（`agentdeck-screen` 实时观察）。
+This guide provides setup and configuration recipes for running **AgentDeck Daemon (`agentdeckd`)** and persistent headless browsers (**Chromium + browser4agent**) on remote Linux cloud servers.
 
 ---
 
-## 整体架构
+## Deployment Scenarios Matrix
 
-```mermaid
-flowchart TD
-    subgraph Mobile["手机端 (AgentDeck App)"]
-        UI["聊天界面 / 审批 / 实时画面"]
-    end
+Choose the setup that best matches your target environment:
 
-    subgraph Cloud["云服务器 (Linux Headless)"]
-        subgraph Daemon["AgentDeck Daemon"]
-            D["agentdeckd"]
-        end
-        subgraph BrowserEnv["常驻浏览器服务 (Xvfb 虚拟桌面)"]
-            Chrome["Chromium / Chrome<br/>(--user-data-dir 持久化目录)"]
-            Ext["browser4agent 扩展"]
-            NativeHost["browser4agent Native Host<br/>(MCP 127.0.0.1:39271)"]
-            Chrome --- Ext
-            Ext --- NativeHost
-        end
-        subgraph Agents["ACP Agent (Claude / OpenCode / Codex...)"]
-            Agent["Agent 运行时"]
-        end
-    end
-
-    UI <-->|Relay E2EE| D
-    D <-->|ACP| Agent
-    Agent <-->|browser4agent CLI / MCP| NativeHost
-    D -.->|screen_capture 截帧| NativeHost
-```
+| Scenario | Target Audience | Isolation Level | Complexity | Key Highlights |
+| :--- | :--- | :--- | :--- | :--- |
+| **Scenario 1: Bare-Metal VPS (Direct Host)** | Individual developer running on a dedicated cloud VPS (Hetzner, DigitalOcean, etc.) | Host-level (Single tenant) | ⭐ (Minimal) | Zero virtualization overhead; managed directly via systemd and native CLI. |
+| **Scenario 2: Single-User Docker Container** | Individual developer who prefers a clean, containerized setup without polluting host packages | Container-level (Standard Docker) | ⭐⭐ (Moderate) | Clean reproducibility; all development runtimes and browser pre-packaged in one image. |
+| **Scenario 3: Multi-Tenant Secure Sandbox** | Teams, organizations, or multi-tenant SaaS cloud workspaces (Team247 / Cloud Workspaces) | **Micro-sandbox (gVisor `runsc`)** | ⭐⭐⭐ (Production) | Intercepts untrusted agent syscalls to prevent host kernel exploits; strict cgroup quotas; 10ms memory pause and fast wake-up. |
 
 ---
 
-## 步骤一：安装与配置 agentdeckd
+## Scenario 1: Bare-Metal VPS (Direct Host)
 
-### 1. 安装 Daemon
-可以通过 npm 或直接下载官方预编译二进制：
+Recommended for personal users who own a dedicated Linux VPS and want their agent and browser running 24/7.
 
+### 1. Install and Start `agentdeckd`
 ```bash
-# 方式 A：通过 npm 全局安装
+# 1. Install agentdeckd globally
 npm install -g agentdeckd
+# Or download the prebuilt binary from GitHub Releases to /usr/local/bin
 
-# 方式 B：从 GitHub Release 下载预编译二进制解压到 /usr/local/bin
+# 2. Enable systemd user session persistence (Linger)
+# Crucial: Ensures background processes stay alive after SSH disconnects and auto-start on boot
+sudo loginctl enable-linger $USER
+
+# 3. Register autostart service and start immediately
+agentdeckd start
+
+# 4. Check status and view Pairing QR code
+agentdeckd status
 ```
+Scan the terminal pairing QR code with your mobile AgentDeck app to complete pairing.
 
-### 2. 启动服务与配对
-```bash
-# 启动 daemon（初次运行会生成配对密钥和二维码）
-agentdeckd
-```
-终端会输出配对信息与二维码：
-* 打开手机上的 AgentDeck App；
-* 扫描终端上的配对二维码（或手动输入 `agentdeck://connect?pairingId=...`）；
-* 配对成功后，设备标识与密钥将持久化，后续无需重复配对。
-
-*(推荐通过 `systemd` 将其配置为开机自启系统服务，详见后文)*
-
----
-
-## 步骤二：安装 Chromium 与 Xvfb 虚拟桌面
-
-云端无物理显示器，Chromium 运行完整扩展及排版渲染需要借由 **Xvfb**（X Virtual Framebuffer）提供虚拟屏幕。
-
-### 1. 安装系统依赖与中文字体
+### 2. Install Headless Chromium and Xvfb Virtual Framebuffer
 ```bash
 sudo apt-get update && sudo apt-get install -y \
-    xvfb \
-    chromium-browser \
-    fonts-noto-cjk \
-    fonts-wqy-zenhei \
-    curl \
-    unzip
+    xvfb chromium-browser fonts-noto-cjk fonts-wqy-zenhei curl unzip
 ```
-> **提示**：安装 CJK 中文字体非常重要，可避免无头网页在截图和推流时出现方块乱码。
+> **Note**: Installing CJK fonts prevents square-box glyph fallback when rendering Asian characters in screenshots and live stream.
 
-### 2. 准备持久化用户数据目录
-为了确保登录态、Cookies、LocalStorage 永久保存，需建立固定的用户数据目录：
+### 3. Install and Configure `browser4agent` (b4a)
 ```bash
-mkdir -p /home/ubuntu/.chrome-user-data
-```
-
----
-
-## 步骤三：安装与配置 browser4agent (b4a)
-
-`browser4agent` 由两部分组成：
-1. **浏览器扩展**：注入页面、提供页面工具、捕获标签页内容。
-2. **Native Host / MCP 服务**：在本地 `127.0.0.1:39271` 暴露 MCP 接口与 CLI 工具。
-
-### 1. 下载并安装 browser4agent CLI / Native Host
-从 [browser4agent Releases](https://github.com/mantou132/browser4agent/releases/latest) 下载对应 Linux 架构的二进制包，放置到系统 PATH：
-```bash
-# 解压后将二进制移动至 /usr/local/bin
-sudo mv browser4agent /usr/local/bin/
+# Install CLI / Native Host
+sudo curl -fsSL https://github.com/mantou132/browser4agent/releases/latest/download/browser4agent-linux-x86_64.tar.gz | sudo tar -xz -C /usr/local/bin/
 sudo chmod +x /usr/local/bin/browser4agent
-
-# 执行一次初始化配置（自动配置 Skill 与 Native Host 注册表）
 browser4agent --setup skills
+
+# Download and unpack the browser extension
+mkdir -p ~/.config/browser4agent-ext
+curl -fsSL https://github.com/mantou132/browser4agent/releases/latest/download/extension-chrome.zip -o /tmp/ext.zip
+unzip /tmp/ext.zip -d ~/.config/browser4agent-ext && rm /tmp/ext.zip
 ```
 
-### 2. 下载 browser4agent 浏览器扩展
-从 Releases 下载 `extension-chrome.zip` 并解压到指定目录：
-```bash
-mkdir -p /home/ubuntu/extensions/browser4agent
-cd /home/ubuntu/extensions/browser4agent
-curl -LO https://github.com/mantou132/browser4agent/releases/latest/download/extension-chrome.zip
-unzip extension-chrome.zip
-```
-
----
-
-## 步骤四：配置为常驻 systemd 服务
-
-创建 systemd 服务，使虚拟桌面环境与 Chromium 伴随系统开机自动常驻运行。
-
-创建服务文件：`/etc/systemd/system/agentdeck-browser.service`
+### 4. Create Background Browser Service (`agentdeck-browser.service`)
+Create `/etc/systemd/system/agentdeck-browser.service`:
 ```ini
 [Unit]
-Description=Persistent Chromium with browser4agent under Xvfb
+Description=Persistent Headless Chromium under Xvfb
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 Environment="DISPLAY=:99"
-# 启动 Xvfb 并在其下运行常驻 Chromium
 ExecStart=/usr/bin/xvfb-run -n 99 --server-args="-screen 0 1920x1080x24" \
     chromium-browser \
     --no-sandbox \
     --disable-gpu \
     --remote-debugging-port=9222 \
     --user-data-dir=/home/ubuntu/.chrome-user-data \
-    --load-extension=/home/ubuntu/extensions/browser4agent \
+    --load-extension=/home/ubuntu/.config/browser4agent-ext \
     --no-first-run \
     --no-default-browser-check \
     about:blank
@@ -149,54 +85,223 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 ```
-
-启动并启用开机自启：
+Enable and start the service:
 ```bash
-sudo systemctl daemon-reload
 sudo systemctl enable --now agentdeck-browser.service
-```
-
-验证运行状态：
-```bash
-# 检查 b4a MCP 服务端口是否正常监听
-curl http://127.0.0.1:39271/mcp
-# 检查 CLI 是否能正常列出标签页
-browser4agent --tool list_tabs
 ```
 
 ---
 
-## 步骤五：AgentDeck 识别与日常使用流程
+## Scenario 2: Single-User Docker Container
 
-完成上述配置后，AgentDeck Daemon 与各 Agent 将自动协同工作：
+Packages the complete runtime (Node.js, Python, Git, Chromium, Xvfb, b4a, and `agentdeckd`) into a single container image.
 
-### 1. 网页登录与扫码
-* 当 Agent 访问需要登录的网站时，调用 `browser4agent --tool screenshot_tab` 获取登录页面截图（或二维码局部图）。
-* Agent 在回复中发送 Markdown 格式图片：
+### 1. Configuration Files
+
+Create an `agentdeck-docker` directory with the following files:
+
+**`Dockerfile`**:
+```dockerfile
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=:99
+
+RUN apt-get update && apt-get install -y \
+    curl git wget unzip procps xvfb ca-certificates \
+    chromium-browser fonts-noto-cjk fonts-wqy-zenhei \
+    python3 python3-pip \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g pnpm agentdeckd @anthropic-ai/claude-code \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install browser4agent CLI and extension
+WORKDIR /opt/browser4agent
+RUN curl -LO https://github.com/mantou132/browser4agent/releases/latest/download/browser4agent-linux-x86_64.tar.gz \
+    && tar -xvf browser4agent-linux-x86_64.tar.gz \
+    && mv browser4agent /usr/local/bin/ \
+    && rm browser4agent-linux-x86_64.tar.gz \
+    && curl -LO https://github.com/mantou132/browser4agent/releases/latest/download/extension-chrome.zip \
+    && unzip extension-chrome.zip -d /opt/browser4agent-ext \
+    && rm extension-chrome.zip
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+WORKDIR /workspace
+ENTRYPOINT ["/entrypoint.sh"]
+```
+
+**`entrypoint.sh`**:
+```bash
+#!/bin/bash
+set -e
+
+# Start Xvfb and Chromium in background
+nohup xvfb-run -n 99 --server-args="-screen 0 1920x1080x24" \
+    chromium-browser \
+    --no-sandbox \
+    --disable-gpu \
+    --remote-debugging-port=9222 \
+    --user-data-dir=/workspace/.chrome-profile \
+    --load-extension=/opt/browser4agent-ext \
+    --no-first-run \
+    --no-default-browser-check \
+    about:blank > /tmp/chromium.log 2>&1 &
+
+# Start agentdeckd (outbound WebSocket connection only, no open ingress ports required)
+exec agentdeckd run ${PAIRING_ID:+--pairing-id "$PAIRING_ID"} ${RELAY_URL:+--relay-url "$RELAY_URL"}
+```
+
+### 2. Build and Run
+```bash
+# Build the image
+docker build -t agentdeck-env:latest .
+
+# Run container in interactive mode first to scan the QR code
+docker run -it --name my-agentdeck \
+  -v ~/my-workspace:/workspace \
+  agentdeck-env:latest
+
+# Once paired, detach with Ctrl+P, Ctrl+Q or restart with `docker start my-agentdeck`
+```
+
+---
+
+## Scenario 3: Multi-Tenant Secure Sandbox (Team / SaaS Architecture)
+
+When hosting environments for multiple independent users on shared bare-metal servers (such as Hetzner instances), AI agents run untrusted shell scripts and dependency packages. **Never use standard runC Docker for untrusted multi-tenancy.**
+
+This architecture leverages **Google gVisor (`runsc`) user-space kernel sandbox + strict cgroup quotas + fast memory suspend/resume**.
+
+```mermaid
+flowchart TD
+    subgraph Host["Bare-Metal Host (Ubuntu Server)"]
+        subgraph Scheduler["Host Lifecycle Coordinator"]
+            Ctrl["Lifecycle webhook (create / pause / unpause)"]
+        end
+        subgraph Sandbox1["Tenant 1 Sandbox (gVisor runsc)"]
+            D1["agentdeckd"]
+            B1["Chromium + b4a"]
+            V1[("/data/tenants/user_01")]
+        end
+        subgraph Sandbox2["Tenant 2 Sandbox (gVisor runsc)"]
+            D2["agentdeckd"]
+            B2["Chromium + b4a"]
+            V2[("/data/tenants/user_02")]
+        end
+    end
+
+    Relay["AgentDeck Relay Server"]
+    Phone1["User 1 Mobile App"]
+    Phone2["User 2 Mobile App"]
+
+    Phone1 <-->|E2EE| Relay
+    Phone2 <-->|E2EE| Relay
+    D1 -->|Outbound WebSocket Only| Relay
+    D2 -->|Outbound WebSocket Only| Relay
+    Relay -.->|Wake-up trigger| Ctrl
+```
+
+### 1. Install gVisor Sandbox Runtime
+```bash
+# 1. Install Docker and runsc
+curl -fsSL https://get.docker.com | sh
+curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | sudo tee /etc/apt/sources.list.d/gvisor.list
+sudo apt-get update && sudo apt-get install -y runsc
+
+# 2. Register runsc with Docker daemon
+sudo runsc install
+sudo systemctl restart docker
+```
+
+### 2. Network Egress Security (Anti-Abuse Baseline)
+```bash
+# Block common abuse ports on tenant container interfaces
+sudo iptables -A FORWARD -p tcp --dport 25 -j DROP    # Block SMTP spam
+sudo iptables -A FORWARD -p tcp --dport 3333 -j DROP  # Block common cryptomining pools
+sudo iptables -A FORWARD -p tcp --dport 4444 -j DROP
+```
+
+### 3. Production Tenant Launch Template
+Launch individual user environments with strict resource limits:
+
+```bash
+USER_ID="user_1001"
+PAIRING_ID="adk1_xxxxxxxx"  # Pairing ID generated for this tenant
+USER_DIR="/data/tenants/${USER_ID}"
+
+mkdir -p "${USER_DIR}/workspace"
+
+docker run -d \
+  --name "tenant-${USER_ID}" \
+  --runtime=runsc \                     # Enforce gVisor user-space kernel isolation
+  --restart=unless-stopped \
+  --cpus="2.0" \                        # Limit CPU burst quota
+  --memory="4g" \                       # Hard memory limit 4GB
+  --memory-swap="4g" \                  # Disallow unbounded host swap consumption
+  --pids-limit=1024 \                   # Prevent fork bombs
+  -v "${USER_DIR}/workspace:/workspace" \
+  -e PAIRING_ID="${PAIRING_ID}" \
+  -e RELAY_URL="wss://relay.agentdeck.xianqiao.wang/v1" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="${USER_TOKEN}" \
+  agentdeck-env:latest
+```
+
+> **Security Note**: `agentdeckd` maintains an outbound persistent WebSocket connection to the Relay. **Never expose or map host ingress ports (`-p`)**. The sandbox is completely isolated from outside ingress.
+
+### 4. Idle Suspension and Sub-Second Wake-Up
+
+To achieve high tenant density and low operating costs:
+
+1. **Idle Freeze (10ms pause via cgroups)**:
+   When an instance has been idle for 30 minutes without RPC traffic:
+   ```bash
+   docker pause tenant-user_1001
+   ```
+   CPU usage immediately drops to 0%, preserving all memory state.
+2. **Instant Message Wake-Up (5–10ms unpause)**:
+   When the Relay server receives a new request from the user's phone for an inactive host, it triggers the host coordinator:
+   ```bash
+   docker unpause tenant-user_1001
+   ```
+   `agentdeckd` instantly reconnects to Relay, providing an imperceptible wake-up experience on mobile.
+3. **Deep Cold Storage (Memory Reclamation)**:
+   For containers paused for over 6 hours, run `docker stop` to release physical RAM; cold restart via `docker start` takes under 2 seconds.
+
+---
+
+## Universal Agent & Browser Workflows
+
+Regardless of which scenario you deploy, the interaction experience on your mobile phone is uniform:
+
+### 1. Headless Web Login via QR Code
+* When an agent navigates to a login-protected site, the QR code renders in the headless Chromium memory buffer;
+* The agent invokes `browser4agent --tool screenshot_tab` and outputs a Markdown image:
   ```markdown
-  请使用手机扫描以下二维码登录：
-  ![登录二维码](/path/to/qr.png)
+  Please scan this QR code on your phone to log in:
+  ![Login QR Code](/tmp/login-qr.png)
   ```
-* 手机端收到图片后，直接长按识别或使用对应 App 扫码。
-* 扫码成功后，登录凭据将直接保存在 `/home/ubuntu/.chrome-user-data`，后续会话长期有效。
+* The user long-presses or scans the image directly on mobile;
+* Session cookies and storage persist permanently in the mounted Chrome profile.
 
-### 2. 实时画面投屏到手机
-当 Agent 操作网页或你希望实时监视浏览器时：
-* Agent 回复中携带 `agentdeck-screen` 代码块：
-  ````markdown
-  ```agentdeck-screen
-  browser:12345
-  ```
-  ````
-* 手机 App 会显示一个屏幕卡片，点击打开 **Live View**。
-* `agentdeckd` 自动向本地 `127.0.0.1:39271/mcp` 请求画面截图，并通过 Relay ephemeral 连续推流到手机。
+### 2. Live Screen Streaming to Mobile
+The agent outputs a screen block to stream real-time browser views to the phone:
+````markdown
+```agentdeck-screen
+browser:<tabId>
+```
+````
+The mobile app renders a screen card. Tapping it opens **Live View**, where `agentdeckd` streams JPEG frames captured from local `http://127.0.0.1:39271/mcp` over Relay ephemeral frames.
 
-### 3. Agent 约定与指引
-在项目工作区根目录下配置 `AGENTS.md` 或 `CLAUDE.md`，帮助 Agent 更好地了解环境：
+### 3. Workspace Instructions
+Place an `AGENTS.md` file in the root of your workspace to instruct agents on browser usage:
 ```markdown
-## 浏览器环境
-云端已常驻运行 Chromium，并加载了 browser4agent 扩展。
-- 浏览器控制优先使用 `browser4agent` 相关工具或 CLI。
-- 遇需登录页面，截取二维码图片输出到聊天中供用户扫码。
-- 如需向用户展示页面效果，使用 `agentdeck-screen` 语法块提供实时画面。
+## Environment Conventions
+- You are running on a cloud environment with persistent Chromium and the browser4agent extension.
+- Use `browser4agent` tools or CLI for browser automation.
+- When login is required, take a screenshot of the QR code and render it in Markdown for the user.
+- To present browser output or visual verification, use the `agentdeck-screen` block.
 ```

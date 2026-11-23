@@ -283,8 +283,12 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
   }
 
   function list(value) {
-    return (value || '')
-      .split(/[,，]/)
+    if (!value) return [];
+    const str = String(value).trim();
+    if (!str) return [];
+    const delim = str.includes('|') ? '|' : str.includes(',') ? ',' : '，';
+    return str
+      .split(delim)
       .map((s) => s.trim())
       .filter(Boolean);
   }
