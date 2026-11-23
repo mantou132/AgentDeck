@@ -25,9 +25,9 @@ At the start of a session, if the user refers to a talk that has a folder, read 
 1. **Brief**: ask only what's missing, in one message: the occasion and audience (who, how many, what they already know), the length of the slot in minutes, the one thing the audience should take away, the language, and whether they want the audience to interact on phones (then: does the audience have phones and the venue internet). Use their materials for everything else; for a short speech with no slides wanted (a toast, 致辞), write only the script.
 2. **Material**: work from what the user sent. Look up facts, numbers and quotes with web search when the talk needs them, cite the source on the slide or in the script, and mark what you couldn't confirm. Never invent statistics, quotes, stories about real people or the user's own experiences: leave a clear placeholder (【这里讲一个你自己的例子：…】) for the user to fill.
 3. **Outline**: show a short outline before writing: the key message in one sentence, the sections with minutes each, the opening hook and the closing line, and where the audience interacts. Wait for the user's OK or changes.
-4. **Write** `script.md`, then **build** the deck from the template, then **check** both (below) before showing them.
+4. **Build** the deck from the template, embedding the spoken script and cues directly into `<aside class="notes">` in each slide (serving as the single source of truth for both slides and the mobile teleprompter). Run `node assets/export-script.js index.html` to generate `script.md` automatically without wasting LLM output tokens on duplicate writing. Then **check** before showing.
 5. **Show**: build the single file, show it with an `agentdeck-preview` block when that skill is available (the path of `<title>.html`), else the path; give the script's spoken length; then two or three lines on presenting it (keys, where the interactions are).
-6. **Adjust**: the user rehearses or reads; update the script, deck and notes, re-check, and only describe what changed. When they report a rehearsal time, cut or add to fit and record it in `notes.md`.
+6. **Adjust**: the user rehearses or reads; update `index.html` (and re-run `export-script.js`), re-check, and only describe what changed. When they report a rehearsal time, cut or add to fit and record it in `notes.md`.
 
 ## Writing the script
 
@@ -52,7 +52,9 @@ Copy `template/` next to this file into the talk folder with symlinks resolved (
 
 The deck is plain HTML on a 1920×1080 stage scaled to any screen. Each `<section class="slide">` inside `<main id="cw-stage">` is a slide; the script tags at the bottom stay in that order.
 
-**Built in, nothing to add**: arrow keys, PageUp / PageDown, Space and Enter (clickers / 翻页笔), swipe on touch screens, `F` or F5 for full screen, `B` or `.` for a black screen, a toolbar at the bottom right (previous / next, page number, pen / 画笔, countdown timer / 计时, random draw / 抽奖 by name list or scanned phones, reset / 重置, fullscreen / 全屏), `#3` in the URL opens slide 3.
+**Speaker notes & Teleprompter**: place `<aside class="notes">` at the bottom of each slide with the spoken speech and bracketed cues (e.g. `【翻页】`, `【停顿 2 秒】`, `【请大家扫码】` / `[Next slide]`, `[Pause]`). On mobile / touch screens or with `?mode=prompter`, the deck automatically enters Teleprompter mode with dark high-contrast large font, highlighted action badges, slide preview toggle, keep-awake (Wake Lock + video fallback), and stage timer. On desktops / projectors, presentation remains clean without any teleprompter buttons (press `N` to toggle during rehearsal).
+
+**Built in, nothing to add**: arrow keys, PageUp / PageDown, Space and Enter (clickers / 翻页笔), swipe on touch screens, `F` or F5 for full screen, `B` or `.` for a black screen, `N` for speaker teleprompter, a toolbar at the bottom right (previous / next, page number, pen / 画笔, countdown timer / 计时, random draw / 抽奖 by name list or scanned phones, reset / 重置, fullscreen / 全屏), `#3` in the URL opens slide 3.
 
 **Slide types** (classes on the `<section>`, styles in `presentation.css` over `deck.css`):
 
@@ -88,7 +90,7 @@ The deck is plain HTML on a 1920×1080 stage scaled to any screen. Each `<sectio
 ## Handing it over
 
 - The deliverable is one single file, `<title>.html`, so the user can send it or open it anywhere offline. Build it after every change using the bundled script: `node assets/bundle.js index.html -o <title>.html` (it automatically inlines local CSS, JS, and converts images to Base64 while preserving CDN imports). Check the built file, not `index.html`. Say how to present it in one line the first time.
-- The script: `script.md` as it is, or on request a `.docx` with `pandoc script.md -o script.docx` (big font for reading on stage: add `-V fontsize=14pt` for PDF) or a PDF.
+- The script: `script.md` extracted automatically from the deck via `node assets/export-script.js index.html -o script.md`, or on request a `.docx` with `pandoc script.md -o script.docx` (big font for reading on stage: add `-V fontsize=14pt` for PDF) or a PDF.
 - Other formats on request: a PDF of the slides using `node assets/export-pdf.js index.html slides.pdf --landscape --wait=3000`; a PPTX by putting the slide screenshots one per page with `python-pptx` when it's installed (say that interactions become pictures, and offer to install it if missing).
 
 ## Rules

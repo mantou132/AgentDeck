@@ -385,7 +385,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 
   const POLL_VIEW = `
 <h2 id="q"></h2><div id="opts"></div><button class="primary" id="submit" hidden>提交</button><p class="muted center" id="note"></p>
-<script>
+\x3cscript>
 (() => {
   const cfg = __CFG__;
   let picked = [];
@@ -433,7 +433,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
     }
   };
 })();
-${'</'}script>`;
+\x3c/script>`;
 
   class Poll extends HTMLElement {
     connectedCallback() {
@@ -527,7 +527,7 @@ ${'</'}script>`;
 
   const RESPONSE_VIEW = `
 <h2 id="q"></h2><input id="v" autocomplete="off"><button class="primary" id="go">提交</button><p class="muted center" id="note"></p>
-<script>
+\x3cscript>
 (() => {
   const cfg = __CFG__;
   const input = document.getElementById('v');
@@ -551,7 +551,7 @@ ${'</'}script>`;
     if (m.reset) { input.value = ''; note.textContent = ''; }
   };
 })();
-${'</'}script>`;
+\x3c/script>`;
 
   class Responses extends HTMLElement {
     connectedCallback() {
@@ -677,7 +677,7 @@ ${'</'}script>`;
   const WORDCLOUD_VIEW = `
 <h2 id="q"></h2><input id="v" autocomplete="off" maxlength="16"><button class="primary" id="go">提交</button><p class="muted center" id="note"></p><div id="mine"></div>
 <style>#mine { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; } #mine span { padding: 6px 14px; border-radius: 999px; background: #eef0fb; }</style>
-<script>
+\x3cscript>
 (() => {
   const cfg = __CFG__;
   const input = document.getElementById('v');
@@ -703,7 +703,7 @@ ${'</'}script>`;
   input.onkeydown = (e) => { if (e.key === 'Enter') go(); };
   live.onmessage = (m) => { if (m && m.id === cfg.id && m.reset) { words = []; paint(); } };
 })();
-${'</'}script>`;
+\x3c/script>`;
 
   class WordCloud extends HTMLElement {
     connectedCallback() {
@@ -838,7 +838,7 @@ ${'</'}script>`;
 #opts.stars button { border: 0; background: transparent; padding: 4px; font-size: 52px; line-height: 1; color: #d6d8e0; }
 #opts.stars button.selected { color: #f2b01e; background: transparent; }
 </style>
-<script>
+\x3cscript>
 (() => {
   const cfg = __CFG__;
   const opts = document.getElementById('opts');
@@ -861,7 +861,7 @@ ${'</'}script>`;
   };
   live.onmessage = (m) => { if (m && m.id === cfg.id && m.reset) { score = 0; paint(); } };
 })();
-${'</'}script>`;
+\x3c/script>`;
 
   class Rating extends HTMLElement {
     connectedCallback() {
@@ -931,7 +931,7 @@ ${'</'}script>`;
   }
 
   const REACTIONS_DOCK = `
-<script>
+\x3cscript>
 (() => {
   const cfg = __CFG__;
   const dock = document.getElementById('dock');
@@ -949,7 +949,7 @@ ${'</'}script>`;
     dock.appendChild(b);
   });
 })();
-${'</'}script>`;
+\x3c/script>`;
 
   /** Registers the reaction bar on every phone and floats each tap up over the right side of the stage. */
   class Reactions extends HTMLElement {
@@ -999,7 +999,7 @@ ${'</'}script>`;
   <p class="muted center" id="q-note"></p>
   <div id="q-list"></div>
 </div>
-<script>
+\x3cscript>
 (() => {
   const cfg = __CFG__;
   const sheet = document.getElementById('q-sheet');
@@ -1060,7 +1060,7 @@ ${'</'}script>`;
   paint();
   live.send({ id: cfg.id, sync: true });
 })();
-${'</'}script>`;
+\x3c/script>`;
 
   /**
    * Questions the audience asks from the 提问 button on any slide and upvotes; this element shows them on its slide
@@ -1122,7 +1122,7 @@ ${'</'}script>`;
             }
           });
           // Phones open the question list on this slide.
-          onSlideEnter(this, () => r.show('<script>window.liveOpenQuestions = true;</' + 'script>'));
+          onSlideEnter(this, () => r.show('\x3cscript>window.liveOpenQuestions = true;\x3c/script>'));
           if (this.hasAttribute('qr')) addQr(this, 260);
         },
         () => offline(this.querySelector('.cw-live-total')),

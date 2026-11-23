@@ -88,6 +88,7 @@
     applySteps();
     ink.show(index);
     pageLabel.textContent = `${index + 1} / ${slides.length}`;
+    if (typeof updatePrompterContent === 'function') updatePrompterContent();
     if (history.replaceState) history.replaceState(null, '', `${location.search}#${index + 1}`);
     slide.dispatchEvent(new CustomEvent('cw-enter', { bubbles: true }));
   }
@@ -686,6 +687,7 @@
     else if (key === 'p' || key === 'P') setPen(!ink.active);
     else if (key === 't' || key === 'T') timer.open();
     else if (key === 'r' || key === 'R') picker.open();
+    else if (key === 'n' || key === 'N') setPrompterActive(!prompterActive);
     else if (key === 'Escape') {
       if (!closeOverlays() && ink.active) setPen(false);
       handled = false;
@@ -717,6 +719,283 @@
     document.head.appendChild(script);
   }
 
+  /* ---------- Teleprompter Mode ---------- */
+
+  let prompterActive = false;
+  let prompterEl = null;
+  let prompterToggleBtn = null;
+  let prompterBody = null;
+  let prompterPage = null;
+  let prompterTimer = null;
+  let prompterWakeBtn = null;
+  let prompterFontSize = 21;
+  let prompterTimerInterval = null;
+  let prompterElapsedSec = 0;
+  let prompterTimerRunning = false;
+  let wakeLockObj = null;
+  let noSleepVid = null;
+
+  function isMobileEnv() {
+    if (params.get('mode') === 'prompter') return true;
+    if (params.get('mode') === 'slide') return false;
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    const isNarrow = window.innerWidth <= 768;
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|MicroMessenger/i.test(
+      navigator.userAgent,
+    );
+    return isNarrow || isMobileUA || (isTouch && window.innerWidth < 1024);
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  function startPrompterTimer() {
+    if (prompterTimerRunning) return;
+    prompterTimerRunning = true;
+    prompterTimerInterval = setInterval(() => {
+      prompterElapsedSec++;
+      if (prompterTimer) {
+        prompterTimer.textContent = formatTime(prompterElapsedSec);
+      }
+    }, 1000);
+  }
+
+  function resetPrompterTimer() {
+    clearInterval(prompterTimerInterval);
+    prompterTimerRunning = false;
+    prompterElapsedSec = 0;
+    if (prompterTimer) prompterTimer.textContent = '00:00';
+  }
+
+  function updateWakeLockUI(active) {
+    if (!prompterWakeBtn) return;
+    prompterWakeBtn.classList.toggle('cw-on', active);
+    prompterWakeBtn.textContent = active ? (isEn ? '🟢 Awake' : '🟢 常亮') : isEn ? '⚪ Sleep' : '⚪ 常亮';
+  }
+
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockObj = await navigator.wakeLock.request('screen');
+        wakeLockObj.addEventListener('release', () => {
+          wakeLockObj = null;
+          updateWakeLockUI(false);
+        });
+        updateWakeLockUI(true);
+        return true;
+      } catch (err) {
+        // Fallback below
+      }
+    }
+    try {
+      if (!noSleepVid) {
+        noSleepVid = document.createElement('video');
+        noSleepVid.setAttribute('playsinline', '');
+        noSleepVid.setAttribute('muted', '');
+        noSleepVid.setAttribute('loop', '');
+        noSleepVid.muted = true;
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.fillRect(0, 0, 1, 1);
+        if (canvas.captureStream) {
+          noSleepVid.srcObject = canvas.captureStream(1);
+          await noSleepVid.play();
+          updateWakeLockUI(true);
+          return true;
+        }
+      } else {
+        await noSleepVid.play();
+        updateWakeLockUI(true);
+        return true;
+      }
+    } catch (e) {
+      // ignore
+    }
+    updateWakeLockUI(false);
+    return false;
+  }
+
+  function releaseWakeLock() {
+    if (wakeLockObj) {
+      wakeLockObj.release().catch(() => {});
+      wakeLockObj = null;
+    }
+    if (noSleepVid) {
+      noSleepVid.pause();
+    }
+    updateWakeLockUI(false);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && prompterActive && !wakeLockObj) {
+      requestWakeLock();
+    }
+  });
+
+  function parseCue(_match, text) {
+    let cls = 'cw-cue-default';
+    if (/翻页|下一页|Next/i.test(text)) cls = 'cw-cue-flip';
+    else if (/停顿|暂停|等|Pause/i.test(text)) cls = 'cw-cue-pause';
+    else if (/扫码|互动|投票|提问|点赞|看屏幕|看大屏|大屏幕|Scan|Poll|Vote|Screen/i.test(text)) cls = 'cw-cue-interact';
+    return `<span class="cw-cue ${cls}">${text}</span>`;
+  }
+
+  function formatNotesHTML(html) {
+    return html.replace(/【(.*?)】/g, parseCue).replace(/\[(.*?)\]/g, parseCue);
+  }
+
+  function updatePrompterContent() {
+    if (!prompterEl) return;
+    const slide = slides[index];
+    if (prompterPage) {
+      prompterPage.textContent = `${index + 1} / ${slides.length}`;
+    }
+    const notesNode = slide.querySelector('.notes, aside.notes');
+    if (notesNode?.innerHTML.trim()) {
+      prompterBody.innerHTML = formatNotesHTML(notesNode.innerHTML);
+    } else {
+      prompterBody.innerHTML = `<div class="cw-prompter-empty">${isEn ? '(No speaker notes for this slide)' : '（本页无讲稿）'}</div>`;
+    }
+    prompterBody.scrollTop = 0;
+  }
+
+  function setPrompterActive(active) {
+    if (!prompterEl) return;
+    prompterActive = active;
+    document.body.classList.toggle('cw-prompter-active', active);
+    if (active) {
+      updatePrompterContent();
+      startPrompterTimer();
+      requestWakeLock();
+    }
+  }
+
+  function initPrompter() {
+    const hasNotes = slides.some((slide) => slide.querySelector('.notes, aside.notes'));
+    if (!hasNotes && !location.search.includes('mode=prompter')) {
+      return;
+    }
+
+    prompterToggleBtn = el('button', {
+      id: 'cw-prompter-toggle',
+      onclick: () => setPrompterActive(true),
+    });
+    prompterToggleBtn.textContent = `🎙️ ${isEn ? 'Prompter' : '提词器'}`;
+    prompterToggleBtn.addEventListener('click', () => setPrompterActive(true));
+    document.body.appendChild(prompterToggleBtn);
+
+    prompterPage = el('span', { class: 'cw-prompter-page', text: `${index + 1} / ${slides.length}` });
+    prompterTimer = el('span', {
+      class: 'cw-prompter-timer',
+      text: '00:00',
+      title: isEn ? 'Click to reset timer' : '点击重置计时',
+      onclick: () => {
+        if (confirm(isEn ? 'Reset timer?' : '重置计时器？')) resetPrompterTimer();
+      },
+    });
+    prompterWakeBtn = el('button', {
+      class: 'cw-prompter-wake',
+      text: isEn ? '⚪ Sleep' : '⚪ 常亮',
+      title: isEn ? 'Toggle screen keep-awake' : '保持屏幕常亮',
+      onclick: (e) => {
+        e.stopPropagation();
+        if (wakeLockObj || (noSleepVid && !noSleepVid.paused)) releaseWakeLock();
+        else requestWakeLock();
+      },
+    });
+
+    const fontSmaller = el('button', {
+      class: 'cw-prompter-btn',
+      text: 'A-',
+      title: isEn ? 'Smaller font' : '缩小字号',
+      onclick: (e) => {
+        e.stopPropagation();
+        prompterFontSize = Math.max(16, prompterFontSize - 2);
+        document.documentElement.style.setProperty('--prompter-fs', `${prompterFontSize}px`);
+      },
+    });
+    const fontLarger = el('button', {
+      class: 'cw-prompter-btn',
+      text: 'A+',
+      title: isEn ? 'Larger font' : '放大字号',
+      onclick: (e) => {
+        e.stopPropagation();
+        prompterFontSize = Math.min(36, prompterFontSize + 2);
+        document.documentElement.style.setProperty('--prompter-fs', `${prompterFontSize}px`);
+      },
+    });
+
+    const slideViewBtn = el('button', {
+      class: 'cw-prompter-btn cw-prompter-slide-btn',
+      text: isEn ? 'Slide ↗' : '幻灯片 ↗',
+      onclick: () => setPrompterActive(false),
+    });
+
+    const header = el('div', { class: 'cw-prompter-header' }, [
+      el('div', { class: 'cw-prompter-header-left' }, [slideViewBtn]),
+      el('div', { class: 'cw-prompter-meta' }, [prompterPage, prompterTimer]),
+      el('div', { class: 'cw-prompter-header-right' }, [fontSmaller, fontLarger, prompterWakeBtn]),
+    ]);
+
+    prompterBody = el('div', { class: 'cw-prompter-body' });
+    prompterBody.addEventListener('click', () => {
+      if (!wakeLockObj) requestWakeLock();
+      if (!prompterTimerRunning) startPrompterTimer();
+    });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    prompterBody.addEventListener(
+      'touchstart',
+      (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      },
+      { passive: true },
+    );
+
+    prompterBody.addEventListener(
+      'touchend',
+      (e) => {
+        if (e.changedTouches.length === 1) {
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0) next();
+            else prev();
+          }
+        }
+      },
+      { passive: true },
+    );
+
+    const btnPrev = el('button', {
+      class: 'cw-prompter-nav-btn',
+      text: isEn ? '◀ Prev' : '◀ 上一页',
+      onclick: prev,
+    });
+    const btnNext = el('button', {
+      class: 'cw-prompter-nav-btn cw-next',
+      text: isEn ? 'Next ▶' : '下一页 ▶',
+      onclick: next,
+    });
+    const nav = el('div', { class: 'cw-prompter-nav' }, [btnPrev, btnNext]);
+
+    prompterEl = el('div', { id: 'cw-prompter' }, [header, prompterBody, nav]);
+    document.body.appendChild(prompterEl);
+
+    if (isMobileEnv()) {
+      setPrompterActive(true);
+    }
+  }
+
   /* ---------- Start ---------- */
 
   window.addEventListener('resize', fit);
@@ -728,6 +1007,7 @@
   const start = parseInt(location.hash.slice(1), 10);
   go(Number.isNaN(start) ? 0 : start - 1);
   timer.render();
+  initPrompter();
 
   window.courseware = { next: next, prev: prev, go: go, reset: resetSlide, setPickerSource: picker.setSource };
 })();
