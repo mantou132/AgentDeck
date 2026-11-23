@@ -395,5 +395,6 @@
   "task.nextRun": "下次运行：",
   "task.runs": "运行记录",
   "task.runsFailed": "读取运行记录失败",
-  "task.noRuns": "还没有运行过"
+  "task.noRuns": "还没有运行过",
+  "task.prompt": "提示词"
 }

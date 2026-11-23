@@ -395,5 +395,6 @@
   "task.nextRun": "Next run:",
   "task.runs": "Runs",
   "task.runsFailed": "Couldn't load runs",
-  "task.noRuns": "No runs yet"
+  "task.noRuns": "No runs yet",
+  "task.prompt": "Prompt"
 }
