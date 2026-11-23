@@ -15,7 +15,7 @@
 - `packages/website/`：官网落地页（`https://agentdeck.xianqiao.wang`），Gemkit 应用，中英双语，部署在 Vercel。详情参见 [`packages/website/CLAUDE.md`](file:///Users/mantou/agent-deck/packages/website/CLAUDE.md)。
 - `crates/daemon/`：独立后台守护服务 `agentdeckd`，含 CLI、统一存储布局、Relay 配置、防自动睡眠与本地状态重置。详情参见 [`crates/daemon/CLAUDE.md`](file:///Users/mantou/agent-deck/crates/daemon/CLAUDE.md)。
 - `crates/agentdeck/`：Tauri 2 原生入口、配置和 Android / iOS 原生工程；`src/frontend_update.rs` 为前端热更新（见下方发布）。
-- `docs/`：内部资料，如竞品对比 `comparison.md`。
+- `docs/`：内部资料，如竞品对比 `comparison.md`、云端无头环境部署与浏览器配置 `cloud-setup.md`。
 - `.github/workflows/`：
   - `ci.yml`：push 到 main 与 PR 时运行全局检查（Biome、tsc、前端与扩展测试和构建、`cargo check` 与 Daemon 测试）；Tauri crate 编译需要前端构建产物与系统 WebView，所以 Rust 检查跑在 macOS。
   - `release.yml`：Daemon 多平台构建、npm OIDC 分发、扩展打包与 GitHub Release / 商店发布流水线（支持 tag 推送触发与 `workflow_dispatch` 手动测试）；npm 实现见 `crates/daemon/CLAUDE.md`。
