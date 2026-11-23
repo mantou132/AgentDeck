@@ -1,6 +1,6 @@
 ---
 name: event
-description: Offer an event the user can add to their phone's calendar in the AgentDeck client. Use when your reply produces something with a date and time worth remembering (a flight, appointment, deadline, booking, launch or a recurring habit such as a daily check-in); answer with an `agentdeck-event` fenced block holding the event, instead of .ics files or calendar tools on this machine.
+description: Offer an event the user can add to their phone's calendar in the AgentDeck client. Use when your reply produces something with a date and time worth remembering (a flight, appointment, deadline, booking, launch or a recurring habit such as a daily check-in / 日程 / 日历 / 提醒 / 会议 / 待办); answer with an `agentdeck-event` fenced block holding the event, instead of .ics files or calendar tools on this machine.
 ---
 
 # AgentDeck calendar events

@@ -127,8 +127,8 @@ Fix and re-check until clean. Delete the screenshots afterwards.
 
 ## Handing it over
 
-- The deliverable is one file, `<topic>.html`, so the teacher can send it on WeChat or copy it to a USB drive and open it by double-clicking. Build it from `index.html` after every change: replace each `<link rel="stylesheet" href="assets/….css">` with a `<style>` holding that file's contents, and each `<script src="assets/….js"></script>` with a `<script>` holding that file's contents, in the same order; keep CDN imports as they are (`assets/live.js` is inlined like the others; it loads its QR code library from esm.sh itself). Check the built file, not `index.html`. Say how to use it in one line the first time.
-- Other formats on request: a PDF of the slides by printing with headless Chromium (`--headless --no-pdf-header-footer --print-to-pdf=lesson.pdf index.html`; every slide one 16:9 page with all steps shown, manipulatives as still pictures); a PPTX by putting the slide screenshots one per page with `python-pptx` when it's installed (say that interactives become pictures, and offer to install it if missing); the lesson plan as `.docx` with `pandoc plan.md -o plan.docx` or as a PDF.
+- The deliverable is one single file, `<topic>.html`, so the teacher can send it on WeChat or copy it to a USB drive and open it by double-clicking. Build it from `index.html` after every change using the bundled script: `node assets/bundle.js index.html -o <topic>.html` (it automatically inlines local CSS, JS, and converts images to Base64 while preserving CDN imports). Check the built file, not `index.html`. Say how to use it in one line the first time.
+- Other formats on request: a PDF of the slides using `node assets/export-pdf.js index.html lesson.pdf --landscape --wait=3000`; a PPTX by putting the slide screenshots one per page with `python-pptx` when it's installed (say that interactives become pictures, and offer to install it if missing); the lesson plan as `.docx` with `pandoc plan.md -o plan.docx` or as a PDF.
 
 ## The lesson plan
 

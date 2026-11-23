@@ -1,6 +1,6 @@
 ---
 name: widget
-description: Embed a small interactive widget in your reply in the AgentDeck client. Use when the answer is better explored than read — calculators, configurators, what-if sliders, sortable or filterable comparisons, checklists, quizzes, step-by-step walkthroughs, or a few clickable options that send the user's choice back to you; answer with an `agentdeck-widget` fenced block holding an HTML fragment with an optional Preact + htm script. Not for plain charts (use `agentdeck-chart`), maps (`agentdeck-map`) or web pages you built in the project (`agentdeck-preview`).
+description: Embed a small interactive widget in your reply in the AgentDeck client. Use when the answer is better explored than read — calculators, configurators, what-if sliders, sortable or filterable comparisons, checklists, quizzes, step-by-step walkthroughs, or a few clickable options that send the user's choice back to you (小组件 / 交互卡片 / 计算器 / 对比工具 / 选项卡); answer with an `agentdeck-widget` fenced block holding an HTML fragment with an optional Preact + htm script. Not for plain charts (use `agentdeck-chart`), maps (`agentdeck-map`) or web pages you built in the project (`agentdeck-preview`).
 ---
 
 # AgentDeck widgets

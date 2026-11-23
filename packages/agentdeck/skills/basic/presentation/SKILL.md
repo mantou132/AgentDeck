@@ -87,9 +87,9 @@ The deck is plain HTML on a 1920×1080 stage scaled to any screen. Each `<sectio
 
 ## Handing it over
 
-- The deck is one file, `<title>.html`, so the user can send it, copy it to a USB drive and open it by double-clicking. Build it from `index.html` after every change: replace each `<link rel="stylesheet" href="assets/….css">` with a `<style>` holding that file's contents, each `<script src="assets/….js"></script>` with a `<script>` holding that file's contents, in the same order, and each `src="assets/img/…"` with a `data:` URL of that image (base64); `assets/live.js` is inlined like the others and loads its QR code library from esm.sh itself. Check the built file, not `index.html`. Say how to present it in one line the first time.
+- The deliverable is one single file, `<title>.html`, so the user can send it or open it anywhere offline. Build it after every change using the bundled script: `node assets/bundle.js index.html -o <title>.html` (it automatically inlines local CSS, JS, and converts images to Base64 while preserving CDN imports). Check the built file, not `index.html`. Say how to present it in one line the first time.
 - The script: `script.md` as it is, or on request a `.docx` with `pandoc script.md -o script.docx` (big font for reading on stage: add `-V fontsize=14pt` for PDF) or a PDF.
-- Other formats on request: a PDF of the slides by printing with headless Chromium (`--headless --no-pdf-header-footer --print-to-pdf=slides.pdf index.html`; every slide one 16:9 page with all steps shown); a PPTX by putting the slide screenshots one per page with `python-pptx` when it's installed (say that interactions become pictures, and offer to install it if missing).
+- Other formats on request: a PDF of the slides using `node assets/export-pdf.js index.html slides.pdf --landscape --wait=3000`; a PPTX by putting the slide screenshots one per page with `python-pptx` when it's installed (say that interactions become pictures, and offer to install it if missing).
 
 ## Rules
 

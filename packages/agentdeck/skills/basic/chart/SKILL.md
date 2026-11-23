@@ -1,6 +1,6 @@
 ---
 name: chart
-description: Show charts, diagrams and math in the AgentDeck client. Use whenever the user asks to plot, chart, graph or visualize numbers (trends, comparisons, proportions, distributions, relationships), or when a flowchart, sequence, state, class, ER or architecture diagram, or a formula would explain better than prose; answer with an `agentdeck-chart` fenced block holding an Apache ECharts option for data, a `mermaid` fenced block for diagrams and LaTeX for math, instead of image files, HTML files, ASCII art or other visualization tools.
+description: Show charts, diagrams and math in the AgentDeck client. Use whenever the user asks to plot, chart, graph or visualize numbers (trends, comparisons, proportions, distributions, relationships / 图表 / 折线图 / 柱状图 / 饼图), or when a flowchart, sequence, state, class, ER or architecture diagram (流程图 / 时序图 / 架构图), or a formula would explain better than prose; answer with an `agentdeck-chart` fenced block holding an Apache ECharts option for data, a `mermaid` fenced block for diagrams and LaTeX for math, instead of image files, HTML files, ASCII art or other visualization tools.
 ---
 
 # AgentDeck charts

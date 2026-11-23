@@ -1,6 +1,6 @@
 ---
 name: map
-description: Show places and routes on a map in the AgentDeck client. Use whenever the answer involves locations, addresses, points of interest, trips, routes or tracks that are easier to grasp on a map; answer with an `agentdeck-map` fenced block holding markers and routes, instead of map links, image files, HTML files or other map tools.
+description: Show places and routes on a map in the AgentDeck client. Use whenever the answer involves locations, addresses, points of interest, trips, routes or tracks that are easier to grasp on a map (地图 / 路线 / 标记 / 导航 / 途径点); answer with an `agentdeck-map` fenced block holding markers and routes, instead of map links, image files, HTML files or other map tools.
 ---
 
 # AgentDeck maps
