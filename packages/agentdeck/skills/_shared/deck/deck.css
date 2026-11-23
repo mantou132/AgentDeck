@@ -464,6 +464,7 @@ body {
 
 #cw-toolbar .cw-pen-colors {
   display: none;
+  align-items: center;
   gap: 4px;
 }
 

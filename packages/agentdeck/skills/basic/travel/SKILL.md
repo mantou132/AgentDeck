@@ -1,6 +1,6 @@
 ---
 name: travel
-description: Plan a trip for the user from the AgentDeck client — from their dates, budget and the places or region they most want to see, work out the route, sights, lodging, meals, fuel or charging stops for road trips, what to pack, and the costs, and keep the plan up to date as the trip changes. Use whenever the user wants to plan, change or check a trip, holiday, road trip or day out.
+description: Plan a trip for the user from the AgentDeck client — from their dates, budget and the places or region they most want to see, work out the route, sights, lodging, meals, fuel or charging stops for road trips, what to pack, and the costs, and keep the plan up to date as the trip changes. Use whenever the user wants to plan, change or check a trip, holiday, road trip or day out (旅游 / 行程 / 出行 / 攻略 / 自驾 / 路书 / 景点 / 游玩).
 ---
 
 # Trip planning
@@ -20,12 +20,13 @@ At the start of a session, if the user refers to a trip that has a folder, read 
 
 ## Flow
 
-1. **Brief**: the user usually gives dates, a budget and the places or region they want most. Ask only what's missing and changes the plan, in one message: departure city, how many people (kids, elderly, pets), how to get around (own car, rental car, train / flight + local transport), and whether the budget includes getting there. Use sensible defaults for the rest (a moderate pace, mid-range lodging that fits the budget) and say what you assumed.
+1. **Brief**: the user usually gives dates, a budget and the places or region they want most. Ask only what's missing and changes the plan, in one message: departure city, how many people (kids, elderly, pets), how to get around (own car, rental car, train / flight + local transport), whether it is domestic or international, and whether the budget includes getting there. Use sensible defaults for the rest (a moderate pace, mid-range lodging that fits the budget) and say what you assumed.
 2. **Research**: use web search and fetch tools for current facts; never plan from memory alone. Check, for the actual dates:
    - Opening days and hours, closures, ticket prices, and whether tickets or time slots must be booked ahead (and how far ahead they sell out).
    - The weather forecast, or the climate for those dates when it's further out than the forecast; sunrise and sunset.
    - Holidays and peak days that mean crowds, higher prices or full hotels; local events worth catching.
-   - Roads: drive times between stops, mountain passes, seasonal closures, chains or snow tyres, tolls, and traffic restrictions (e.g. licence-plate rules in Chinese cities, low-emission zones in Europe).
+   - Roads and transit regulations: drive times between stops, mountain passes, seasonal closures, chains or snow tyres, tolls, traffic restrictions (licence-plate rules in Chinese cities, low-emission zones in Europe), driving side (left-hand driving in UK, Japan, Australia, Thailand, etc.), and driving permit rules (IDP or certified translation for rental cars).
+   - Cross-border readiness (for international trips): passport validity (≥6 months), visa / eVisa / visa-free rules, local eSIM / roaming, and payment customs (credit card chip/PIN, Apple Pay, transit IC cards like Suica, or cash requirements).
    - Lodging and food prices in each area, from booking and review sites.
    When a fact can't be confirmed, mark it in the plan instead of guessing.
 3. **Plan**: write `plan.md` and present it. Show the whole trip first (days, route, total cost vs budget), then the days.
@@ -39,16 +40,16 @@ Route first: group sights by area so no day backtracks, put the must-see places 
 For each day:
 
 - **Route**: start, stops and end with times; distance and drive or transit time for each leg.
-- **Sights**: what to see, how long it takes, ticket price, booking link and how early to book, and the best time of day.
-- **Meals**: a breakfast, lunch and dinner suggestion near where the user will be at that time, with the local dish worth trying, price per person and a backup. On long drives, say where to eat on the way.
-- **Lodging**: one recommendation near the next morning's start (area, why, price per night, link) and one cheaper or nicer alternative. Note parking for road trips, and when it should be booked.
-- **Fuel or charging** (driving days only): the car's range from the brief (ask the model or range if it's a road trip and you don't know), the stations to fill up at, and warnings where stations are far apart, close at night, or are the last ones before a mountain road, desert or border. Plan to refuel at about a quarter tank, not empty. For EVs, plan charging stops with the charger type and expected wait, and prefer lodging with charging.
+- **Sights**: what to see, how long it takes, ticket price, booking link and how early to book, and best time of day. **For overseas / international trips, always include the local language original or official English name alongside the translation** (e.g. `Senso-ji (浅草寺)`, `Musée du Louvre (卢浮宫)`) so the user can easily search on maps, take taxis, or ask locals.
+- **Meals**: breakfast, lunch and dinner suggestions near where the user will be at that time, with the local specialty worth trying, price per person and a backup. On long drives, say where to eat on the way.
+- **Lodging**: one recommendation near next morning's start (area, why, price per night, link) and one cheaper or nicer alternative. Note parking for road trips, and when it should be booked.
+- **Fuel or charging** (driving days only): the car's range from the brief (ask model or range if it's a road trip and you don't know), stations to fill up at, and warnings where stations are far apart, close at night, or are the last ones before mountain roads or deserts. For EVs, note charging standard (CCS, Tesla, Type 2, GB/T) and expected wait; prefer lodging with charging.
 - **Weather**: forecast or expected range, and what it changes.
 
 For the whole trip:
 
-- **Packing**: clothing for the temperature range and conditions (layers for cold mornings, rain gear, sun protection, shoes for the walking or hiking planned), plus what the plan specifically needs: ID or passport, visas or permits, driver's licence or international permit, power adapters, snow chains, medication, and kids' things. Make it a checklist.
-- **Budget**: transport, fuel and tolls, lodging, food, tickets and a buffer of about 10%, against the user's budget. When it doesn't fit, say by how much and offer the one or two changes that save the most.
+- **Packing**: clothing for the temperature range and conditions, plus specific trip needs: passport (with ≥6 mo validity), visas, driver's licence & international permit (IDP), power adapters, eSIM/SIM, snow chains, medication, payment cards/cash, and kids' items. Make it a checklist.
+- **Budget**: transport, fuel and tolls, lodging, food, tickets and a buffer of about 10%, against the user's budget. For international trips, specify both the destination currency and the user's home currency. When it doesn't fit, say by how much and offer the one or two changes that save the most.
 - **Book ahead**: everything that sells out or gets more expensive, in order of urgency with deadlines.
 
 ## Showing it
@@ -65,7 +66,7 @@ Without them, use tables and Markdown links to map searches.
 
 ## Costs
 
-`costs.json` keeps the estimate and, during the trip, what was actually spent when the user tells you:
+`costs.json` keeps the estimate and, during the trip, what was actually spent when the user tells you. Use the relevant ISO currency code (CNY, JPY, EUR, USD, etc.); for cross-border trips, record in the destination's currency or the user's primary billing currency:
 
 ```json
 {
@@ -85,7 +86,8 @@ Without them, use tables and Markdown links to map searches.
 - Never book, pay or sign up for anything yourself. Give the links; the user books. Record what they booked in `notes.md`.
 - Prices and opening hours change: say when you checked them, and link the source for anything the user must book or pay.
 - Safety first: flag altitude sickness, extreme weather, closed roads, night driving on mountain roads, and areas that need permits, and plan around them rather than just warning.
-- Talk to the user in their language, use the local currency and units, and keep replies short.
+- For international or cross-border trips, always include the original local or official English names for sights, transit stops, and hotels to ensure seamless map search, taxi rides, and offline navigation.
+- Talk to the user in their language, use the local currency and units (clarifying conversions where helpful), and keep replies short.
 
 ## Learned notes
 

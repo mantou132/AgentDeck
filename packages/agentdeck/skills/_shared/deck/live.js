@@ -13,6 +13,7 @@
  * them. `CwLive.room()` gives the room for custom interactives. Protocol and internals: README.md.
  */
 (() => {
+  const isEn = (document.documentElement.lang || '').toLowerCase().startsWith('en');
   const SITE = 'https://agentdeck.xianqiao.wang';
   const RELAY_URL = 'wss://agentdeck.xianqiao.wang/ws';
   const QR_MODULE = 'https://esm.sh/qrcode-generator@2.0.4';
@@ -55,7 +56,9 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 </style>
 <div id="dock"></div>`;
 
-  const WAITING = '<p class="muted center" style="margin-top:30vh">已加入，请看大屏幕</p>';
+  const WAITING = isEn
+    ? '<p class="muted center" style="margin-top:30vh">Joined! Look at the big screen</p>'
+    : '<p class="muted center" style="margin-top:30vh">已加入，请看大屏幕</p>';
 
   const load = (storageKey) => {
     try {
@@ -90,7 +93,8 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 
     /** The link the audience opens. */
     get url() {
-      return `${SITE}/zh/live#${this._saved.room}.${this._saved.key}`;
+      const lang = isEn ? 'en' : 'zh';
+      return `${SITE}/${lang}/live#${this._saved.room}.${this._saved.key}`;
     }
 
     /** How many phones have joined this deck. */
@@ -255,11 +259,11 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
               Object.keys(saved.numbers)
                 .map((id) => saved.numbers[id])
                 .sort((a, b) => a - b)
-                .map((n) => `${n} 号`),
+                .map((n) => (isEn ? `#${n}` : `${n} 号`)),
             picked: (name) => {
-              const n = parseInt(name, 10);
+              const n = parseInt(name.replace(/^#/, ''), 10);
               const id = Object.keys(saved.numbers).filter((key) => saved.numbers[key] === n)[0];
-              if (id) r.notice('你被抽到了！', id);
+              if (id) r.notice(isEn ? 'You won!' : '你被抽到了！', id);
             },
           });
         }
@@ -352,8 +356,13 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
         async (r) => {
           const info = this.querySelector('.cw-live-info');
           const render = () => {
-            const state = { connecting: '连接中…', connected: '', reconnecting: '网络断开，正在重连…' }[r.status];
-            info.innerHTML = `<p class="big">扫码加入</p><p class="huge primary-text">${r.count} <span class="small muted">人已加入</span></p><p class="small muted">${state || '用手机扫码，不需要安装应用'}</p>`;
+            const state = isEn
+              ? { connecting: 'Connecting…', connected: '', reconnecting: 'Disconnected, reconnecting…' }[r.status]
+              : { connecting: '连接中…', connected: '', reconnecting: '网络断开，正在重连…' }[r.status];
+            const title = isEn ? 'Scan to Join' : '扫码加入';
+            const joinedText = isEn ? 'joined' : '人已加入';
+            const hint = isEn ? 'Scan with your phone, no app required' : '用手机扫码，不需要安装应用';
+            info.innerHTML = `<p class="big">${title}</p><p class="huge primary-text">${r.count} <span class="small muted">${joinedText}</span></p><p class="small muted">${state || hint}</p>`;
           };
           r.on('join', render);
           r.on('data', render);
@@ -433,8 +442,9 @@ ${'</'}script>`;
       this.innerHTML =
         '<div class="cw-live-body"><div class="cw-live-bars"></div><p class="cw-live-total small muted"></p><div class="cw-controls"></div></div>';
       const controls = this.querySelector('.cw-controls');
-      if (this.getAttribute('correct')) button(controls, '公布答案', () => this._reveal(), 'primary');
-      button(controls, '重新作答', () => this.cwReset());
+      if (this.getAttribute('correct'))
+        button(controls, isEn ? 'Reveal Answer' : '公布答案', () => this._reveal(), 'primary');
+      button(controls, isEn ? 'Restart Poll' : '重新作答', () => this.cwReset());
       this._render();
       room().then(
         (r) => {
@@ -551,8 +561,9 @@ ${'</'}script>`;
       this.innerHTML =
         '<div class="cw-live-body"><div class="cw-live-stats"></div><div class="cw-live-wall"></div><div class="cw-controls"></div></div>';
       const controls = this.querySelector('.cw-controls');
-      if (this.getAttribute('answer')) button(controls, '公布答案', () => this._reveal(), 'primary');
-      button(controls, '重新作答', () => this.cwReset());
+      if (this.getAttribute('answer'))
+        button(controls, isEn ? 'Reveal Answer' : '公布答案', () => this._reveal(), 'primary');
+      button(controls, isEn ? 'Restart' : '重新作答', () => this.cwReset());
       this.querySelector('.cw-live-wall').addEventListener('click', (e) => {
         const card = e.target.closest('[data-from]');
         if (!card) return;
@@ -700,7 +711,7 @@ ${'</'}script>`;
       this._hidden = new Set();
       this.innerHTML =
         '<div class="cw-live-body"><div class="cw-cloud"></div><p class="cw-live-total small muted"></p><div class="cw-controls"></div></div>';
-      button(this.querySelector('.cw-controls'), '重新收集', () => this.cwReset());
+      button(this.querySelector('.cw-controls'), isEn ? 'Collect Again' : '重新收集', () => this.cwReset());
       this.querySelector('.cw-cloud').addEventListener('click', (e) => {
         const word = e.target.closest('[data-key]');
         if (!word) return;
@@ -857,7 +868,7 @@ ${'</'}script>`;
       this._answers = new Map();
       this.innerHTML =
         '<div class="cw-rating-score"></div><div class="cw-live-body"><div class="cw-live-bars"></div><div class="cw-controls"></div></div>';
-      button(this.querySelector('.cw-controls'), '重新评分', () => this.cwReset());
+      button(this.querySelector('.cw-controls'), isEn ? 'Reset Rating' : '重新评分', () => this.cwReset());
       this._render();
       room().then(
         (r) => {
@@ -1068,7 +1079,7 @@ ${'</'}script>`;
       docks.push(QUESTIONS_DOCK.replace('__CFG__', json({ id: this._id })));
       this.innerHTML =
         '<div class="cw-live-body"><div class="cw-q-now"></div><p class="cw-live-total small muted"></p><div class="cw-q-list"></div><div class="cw-controls"></div></div>';
-      button(this.querySelector('.cw-controls'), '清空问题', () => this.cwReset());
+      button(this.querySelector('.cw-controls'), isEn ? 'Clear Questions' : '清空问题', () => this.cwReset());
       this.addEventListener('click', (e) => {
         const card = e.target.closest('[data-k]');
         if (!card) return;

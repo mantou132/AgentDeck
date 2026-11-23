@@ -10,6 +10,7 @@
   const slides = [].slice.call(stage.children).filter((el) => el.classList.contains('slide'));
   const params = new URLSearchParams(location.search);
   const showAllSteps = params.get('steps') === 'all';
+  const isEn = (document.documentElement.lang || '').toLowerCase().startsWith('en');
   let scale = 1;
   let index = 0;
   let stepIndex = 0;
@@ -468,13 +469,20 @@
     let rolling = false;
     /** Set by live.js: draws among the audience's numbers while anyone has scanned in. */
     let source = null;
-    const listInput = el('textarea', { placeholder: '粘贴名单，每行一个；留空则按编号抽' });
+    const listInput = el('textarea', {
+      placeholder: isEn
+        ? 'Paste name list, one per line; leave empty for numbers'
+        : '粘贴名单，每行一个；留空则按编号抽',
+    });
     const countInput = el('input', { type: 'number', min: '2', max: '99', value: '40' });
     const settings = el('div', { style: 'display:none;flex-direction:column;align-items:center;gap:20px' }, [
       listInput,
-      el('div', { class: 'row small' }, [el('span', { text: '没有名单时的人数' }), countInput]),
+      el('div', { class: 'row small' }, [
+        el('span', { text: isEn ? 'Default count without list' : '没有名单时的人数' }),
+        countInput,
+      ]),
     ]);
-    const drawBtn = el('button', { class: 'cw-btn primary', text: '抽一个' });
+    const drawBtn = el('button', { class: 'cw-btn primary', text: isEn ? 'Pick One' : '抽一个' });
     const layer = overlay([
       name,
       info,
@@ -482,7 +490,7 @@
         drawBtn,
         el('button', {
           class: 'cw-btn',
-          text: '重新开始',
+          text: isEn ? 'Restart' : '重新开始',
           onclick: () => {
             drawn = [];
             name.textContent = '?';
@@ -491,7 +499,7 @@
         }),
         el('button', {
           class: 'cw-btn',
-          text: '名单',
+          text: isEn ? 'List' : '名单',
           onclick: () => {
             settings.style.display = settings.style.display === 'none' ? 'flex' : 'none';
           },
@@ -533,14 +541,16 @@
       if (names.length) return names;
       const n = Math.max(2, Math.min(99, parseInt(countInput.value, 10) || 40));
       const numbers = [];
-      for (let i = 1; i <= n; i++) numbers.push(`${i} 号`);
+      for (let i = 1; i <= n; i++) numbers.push(isEn ? `#${i}` : `${i} 号`);
       return numbers;
     }
 
     function renderInfo() {
       const all = pool();
-      const scanned = fromAudience().length ? '扫码观众，' : '';
-      info.textContent = `${scanned}已抽 ${drawn.length} / ${all.length}，不重复`;
+      const scanned = fromAudience().length ? (isEn ? 'Audience, ' : '扫码观众，') : '';
+      info.textContent = isEn
+        ? `${scanned}Picked ${drawn.length} / ${all.length}, no repeats`
+        : `${scanned}已抽 ${drawn.length} / ${all.length}，不重复`;
     }
 
     drawBtn.addEventListener('click', () => {
@@ -589,12 +599,12 @@
   });
 
   const pageLabel = el('span', { class: 'cw-page' });
-  const penBtn = el('button', { text: '画笔', title: '画笔 (P)' });
-  const timerBtn = el('button', { text: '计时', title: '计时器 (T)' });
+  const penBtn = el('button', { text: isEn ? 'Pen' : '画笔', title: isEn ? 'Pen (P)' : '画笔 (P)' });
+  const timerBtn = el('button', { text: isEn ? 'Timer' : '计时', title: isEn ? 'Timer (T)' : '计时器 (T)' });
   const swatches = ['#d2463c', '#2f6fb3', '#2e9d62', '#23303b', 'erase'].map((c, i) => {
     const b = el('button', {
       class: `cw-swatch${i === 0 ? ' cw-on' : ''}`,
-      title: c === 'erase' ? '橡皮' : '颜色',
+      title: c === 'erase' ? (isEn ? 'Eraser' : '橡皮') : isEn ? 'Color' : '颜色',
       text: c === 'erase' ? '⌫' : '',
     });
     if (c !== 'erase') b.style.background = c;
@@ -609,16 +619,16 @@
     return b;
   });
   const toolbar = el('div', { id: 'cw-toolbar' }, [
-    el('button', { text: '‹', title: '上一步', onclick: prev }),
+    el('button', { text: '‹', title: isEn ? 'Previous' : '上一步', onclick: prev }),
     pageLabel,
-    el('button', { text: '›', title: '下一步', onclick: next }),
+    el('button', { text: '›', title: isEn ? 'Next' : '下一步', onclick: next }),
     penBtn,
     el(
       'span',
       { class: 'cw-pen-colors' },
       swatches.concat([
         el('button', {
-          text: '清除',
+          text: isEn ? 'Clear' : '清除',
           onclick: () => {
             ink.clear();
           },
@@ -627,14 +637,18 @@
     ),
     timerBtn,
     el('button', {
-      text: stage.getAttribute('data-picker') || '点名',
-      title: '随机抽取 (R)',
+      text: stage.getAttribute('data-picker') || (isEn ? 'Picker' : '点名'),
+      title: isEn ? 'Random pick (R)' : '随机抽取 (R)',
       onclick: () => {
         picker.open();
       },
     }),
-    el('button', { text: '重置', title: '重置本页', onclick: resetSlide }),
-    el('button', { text: '全屏', title: '全屏 (F)', onclick: toggleFullscreen }),
+    el('button', { text: isEn ? 'Reset' : '重置', title: isEn ? 'Reset this slide' : '重置本页', onclick: resetSlide }),
+    el('button', {
+      text: isEn ? 'Fullscreen' : '全屏',
+      title: isEn ? 'Fullscreen (F)' : '全屏 (F)',
+      onclick: toggleFullscreen,
+    }),
   ]);
   if (params.get('toolbar') !== '0') document.body.appendChild(toolbar);
 
