@@ -6,10 +6,9 @@ import type { TaskListItem, TaskRun } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
-import { selectSession } from '../navigation';
-import { saveSettings } from '../state/app';
-import { getSession, refreshSessions } from '../state/sessions';
-import { agentdeckStore, hostAgents, hostHome } from '../state/store';
+import { openSession } from '../navigation';
+import { getSession } from '../state/sessions';
+import { agentdeckStore, hostAgents, hostHome, updateRuntime } from '../state/store';
 import {
   formatSchedule,
   formatTaskTime,
@@ -34,12 +33,15 @@ const pageStyle = css`
   }
 `;
 
-/** Opens a session of `agent`, switching the App to that agent first as pushes do. */
-const openAgentSession = (agent: string, sessionId: string) => {
-  const { settings } = agentdeckStore;
-  if (agent !== settings.agent) saveSettings({ ...settings, agent });
-  else if (!getSession(sessionId)) refreshSessions();
-  selectSession(sessionId);
+/** Opens a session of `agent` without switching the App's global agent setting. */
+const openAgentSession = (agent: string, sessionId: string, cwd = '') => {
+  const existing = getSession(sessionId);
+  if (!existing) {
+    updateRuntime(sessionId, { session: { sessionId, agent, cwd } });
+  } else if (!existing.agent || !existing.cwd) {
+    updateRuntime(sessionId, { session: { ...existing, agent: existing.agent || agent, cwd: existing.cwd || cwd } });
+  }
+  openSession(sessionId);
 };
 
 const runStatusBadge: Record<TaskRun['status'], string> = {
@@ -95,7 +97,7 @@ export class DeckTaskPageElement extends GemElement {
       case 'run':
         return runTaskAction(() => agentApi.runTaskNow(task.id), i18n.get('task.started'));
       case 'change':
-        if (task.originSessionId) openAgentSession(task.agent, task.originSessionId);
+        if (task.originSessionId) openAgentSession(task.agent, task.originSessionId, task.cwd);
         return;
       case 'toggle':
         return runTaskAction(() => agentApi.setTaskEnabled(task.id, !task.enabled));
@@ -105,14 +107,14 @@ export class DeckTaskPageElement extends GemElement {
     }
   };
 
-  #renderRun = (run: TaskRun, agent: string) => {
+  #renderRun = (run: TaskRun, agent: string, cwd: string) => {
     const { sessionId } = run;
     return html`
       <button
         type="button"
         class="flex w-full items-start gap-3 border-0 border-b border-solid border-border/70 bg-bg-light p-4 text-left last:border-b-0 enabled:cursor-pointer enabled:active:bg-bg-hover disabled:cursor-default"
         ?disabled=${!sessionId}
-        @click=${() => sessionId && openAgentSession(agent, sessionId)}
+        @click=${() => sessionId && openAgentSession(agent, sessionId, cwd)}
       >
         <span class="min-w-0 flex-1">
           <span class="flex flex-wrap items-center gap-2">
@@ -210,7 +212,7 @@ export class DeckTaskPageElement extends GemElement {
             ${i18n.get('task.noRuns')}
           </div>
           <div v-else-if=${entered}>
-            ${runs.map((run) => this.#renderRun(run, task.agent))}
+            ${runs.map((run) => this.#renderRun(run, task.agent, task.cwd))}
           </div>
         </section>
       </div>
