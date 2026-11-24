@@ -1,10 +1,9 @@
 import { repeat } from '@mantou/gem/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { Time } from '@mantou/tap-ui/lib/time';
 import type { TaskListItem } from '../agent/api';
 import { i18n } from '../i18n';
 import { openTask } from '../navigation';
-import { formatSchedule, getTaskPermission, tasksStore } from '../state/tasks';
+import { formatSchedule, formatTaskTime, getTaskPermission, tasksStore } from '../state/tasks';
 import { icons } from '../styles/icons';
 
 const badge = 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold';
@@ -40,7 +39,7 @@ export class DeckTaskGroupElement extends GemElement {
           <span class="grid size-7 shrink-0 place-items-center rounded-[9px] bg-primary-soft text-primary-strong">
             <tap-use class="size-4" .element=${icons.schedule}></tap-use>
           </span>
-          <span class="min-w-0 flex-1 truncate text-sm font-semibold text-highlight">${i18n.get('task.group')}</span>
+          <span class="min-w-0 flex-1 truncate font-mono text-sm font-medium text-highlight">${i18n.get('task.group')}</span>
           <span class="rounded-lg bg-bg px-2 py-1 font-mono text-xs font-bold text-describe">${tasks.length}</span>
         </header>
         ${repeat(
@@ -49,22 +48,21 @@ export class DeckTaskGroupElement extends GemElement {
           (task) => html`
             <button
               type="button"
-              class="grid min-h-[64px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 border-b border-solid border-border/70 bg-bg-light px-4 py-3 text-left text-text last:border-b-0 active:bg-bg-hover"
+              class="grid min-h-[72px] w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 border-b border-solid border-border/70 bg-bg-light px-4 py-3 text-left text-text last:border-b-0 active:bg-bg-hover"
               @click=${() => openTask(task.id)}
             >
               <span class="min-w-0">
-                <span class="flex min-w-0 items-center gap-2">
-                  <span class="truncate text-base leading-snug font-semibold text-highlight">${task.name}</span>
+                <span class="flex min-w-0 items-center gap-2 text-xs text-describe">
                   ${renderTaskStatus(task)}
+                  <span class="truncate">
+                    ${[formatSchedule(task.schedule), task.nextRunAt ? formatTaskTime(task.nextRunAt) : ''].filter(Boolean).join(' · ')}
+                  </span>
                 </span>
-                <span class="mt-1 block truncate text-xs text-describe">${formatSchedule(task.schedule)}</span>
-              </span>
-              <span class="flex shrink-0 items-center gap-1.5 text-xs text-describe">
-                <span v-if=${!!task.nextRunAt}>
-                  ${task.nextRunAt && new Time().relativeTimeFormat(new Time(task.nextRunAt), { lang: i18n.currentLanguage })}
+                <span class="mt-1.5 block truncate text-base leading-snug font-semibold text-highlight">
+                  ${task.name}
                 </span>
-                <tap-use class="size-[15px]" .element=${icons.right}></tap-use>
               </span>
+              <tap-use class="size-[15px] shrink-0 text-describe" .element=${icons.right}></tap-use>
             </button>
           `,
         )}

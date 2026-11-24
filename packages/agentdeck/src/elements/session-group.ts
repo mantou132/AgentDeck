@@ -1,13 +1,23 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { repeat } from '@mantou/gem/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { Time } from '@mantou/tap-ui/lib/time';
 import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import { scratchWorkspacesRoot } from '../session/groups';
 import type { DeckSession } from '../session/types';
 import { hostHome } from '../state/store';
 import { icons } from '../styles/icons';
+
+const formatSessionTime = (updatedAt?: string) => {
+  if (!updatedAt) return '—';
+  try {
+    return new Intl.DateTimeFormat(i18n.currentLanguage, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(updatedAt),
+    );
+  } catch {
+    return '—';
+  }
+};
 
 @customElement('deck-session-group')
 @adoptedStyle(blockContainer)
@@ -94,13 +104,18 @@ export class DeckSessionGroupElement extends GemElement {
                     }}
                   >
                     <span class="min-w-0">
-                      <span class="flex min-w-0 items-center gap-2">
-                        <span class="truncate text-base leading-snug font-semibold text-highlight">
-                          ${session.title || i18n.get('session.untitled')}
+                      <span class="flex min-w-0 items-center gap-2 text-xs text-describe">
+                        <span
+                          v-if=${!!session.worktree}
+                          class="inline-flex max-w-[50%] shrink-0 items-center gap-1 rounded-md bg-primary-soft px-1.5 py-0.5 font-medium text-primary-strong"
+                          title=${session.cwd}
+                        >
+                          <tap-use class="size-3 shrink-0" .element=${icons.gitBranch}></tap-use>
+                          <span class="truncate">${session.worktree?.name}</span>
                         </span>
                         <span
                           v-if=${isPermission}
-                          class="inline-flex shrink-0 items-center gap-1 rounded-full bg-notice/10 px-2 py-0.5 text-xs font-semibold text-notice"
+                          class="inline-flex shrink-0 items-center gap-1 rounded-full bg-notice/10 px-2 py-0.5 font-semibold text-notice"
                           title=${i18n.get('session.permissionTip')}
                         >
                           <span class="size-1.5 animate-pulse rounded-full bg-notice"></span>
@@ -108,7 +123,7 @@ export class DeckSessionGroupElement extends GemElement {
                         </span>
                         <span
                           v-else-if=${isPending}
-                          class="inline-flex shrink-0 items-center gap-1 rounded-full bg-informative/10 px-2 py-0.5 text-xs font-semibold text-informative"
+                          class="inline-flex shrink-0 items-center gap-1 rounded-full bg-informative/10 px-2 py-0.5 font-semibold text-informative"
                           title=${i18n.get('session.runningTip')}
                         >
                           <span class="size-1.5 animate-pulse rounded-full bg-informative"></span>
@@ -116,38 +131,22 @@ export class DeckSessionGroupElement extends GemElement {
                         </span>
                         <span
                           v-if=${isUnread}
-                          class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 text-xs font-semibold text-positive"
+                          class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 font-semibold text-positive"
                           title=${i18n.get('session.completedUnreadTip')}
                         >
                           <span class="size-1.5 rounded-full bg-positive"></span>
                           ${i18n.get('session.completed')}
                         </span>
+                        <span class="truncate">${formatSessionTime(session.updatedAt)}</span>
                       </span>
-                      <span class="mt-1.5 flex min-w-0 items-center gap-2 font-mono text-xs text-describe">
-                        <span
-                          v-if=${!!session.worktree}
-                          class="inline-flex max-w-[50%] shrink-0 items-center gap-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-primary-strong"
-                          title=${session.cwd}
-                        >
-                          <tap-use class="size-3 shrink-0" .element=${icons.gitBranch}></tap-use>
-                          <span class="truncate">${session.worktree?.name}</span>
-                        </span>
-                        <span class="truncate">${session.sessionId}</span>
+                      <span class="mt-1.5 block truncate text-base leading-snug font-semibold text-highlight">
+                        ${session.title || i18n.get('session.untitled')}
                       </span>
                     </span>
-                    <span class="flex shrink-0 items-center gap-1.5 text-xs text-describe">
-                      <span>
-                        ${
-                          session.updatedAt
-                            ? new Time().relativeTimeFormat(new Time(session.updatedAt), { lang: i18n.currentLanguage })
-                            : '—'
-                        }
-                      </span>
-                      <tap-use
-                        class="size-[15px]"
-                        .element=${isDeleting ? icons.loading : icons.right}
-                      ></tap-use>
-                    </span>
+                    <tap-use
+                      class="size-[15px] shrink-0 text-describe"
+                      .element=${isDeleting ? icons.loading : icons.right}
+                    ></tap-use>
                   </button>
                   <button
                     slot="danger"
