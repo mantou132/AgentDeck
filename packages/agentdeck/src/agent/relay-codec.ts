@@ -63,10 +63,13 @@ export class RelayCodec {
       }
     }
     const headerEnd = 4 + new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
-    const message = JSON.parse(new TextDecoder().decode(bytes.subarray(4, headerEnd))) as RpcMessage & {
-      result: Record<string, unknown>;
-    };
-    message.result.data = bytes.slice(headerEnd);
+    const message = JSON.parse(new TextDecoder().decode(bytes.subarray(4, headerEnd))) as RpcMessage;
+    const binaryData = bytes.slice(headerEnd);
+    if ('event' in message && message.event && typeof message.event === 'object') {
+      (message.event as Record<string, unknown>).data = binaryData;
+    } else if (message.result && typeof message.result === 'object') {
+      (message.result as Record<string, unknown>).data = binaryData;
+    }
     return message;
   }
 }

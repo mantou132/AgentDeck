@@ -331,6 +331,27 @@ impl AgentService {
             screen_capture::capture(target, max_width).await
         });
 
+        let stream_manager = screen_capture::ScreenStreamManager::default();
+        let stream_mgr = stream_manager.clone();
+        peer.handle("screen_stream", move |params, ctx| {
+            let mgr = stream_mgr.clone();
+            async move {
+                let target = required_str(&params, "target", "screen_stream")?;
+                let max_width = params.get("maxWidth").and_then(Value::as_u64);
+                mgr.start_stream(target, max_width, ctx).await
+            }
+        });
+
+        let stop_mgr = stream_manager.clone();
+        peer.handle("screen_stream_stop", move |params, _ctx| {
+            let mgr = stop_mgr.clone();
+            async move {
+                let target = required_str(&params, "target", "screen_stream_stop")?;
+                mgr.stop_stream(target);
+                Ok(json!({ "stopped": true }))
+            }
+        });
+
         peer.handle("git_status", move |params, _ctx| async move {
             let cwd = message_cwd(&params).or_else(|| {
                 params

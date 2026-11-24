@@ -16,11 +16,16 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 #[derive(Clone)]
 pub struct CallCtx {
     emit: Arc<dyn Fn(Value) + Send + Sync>,
+    emit_bytes: Arc<dyn Fn(Value, Vec<u8>) + Send + Sync>,
 }
 
 impl CallCtx {
     pub fn emit(&self, event: Value) {
         (self.emit)(event);
+    }
+
+    pub fn emit_with_bytes(&self, event: Value, bytes: Vec<u8>) {
+        (self.emit_bytes)(event, bytes);
     }
 }
 
@@ -254,10 +259,16 @@ impl Peer {
         };
 
         let emit_id = id.clone();
+        let emit_bytes_id = id.clone();
         let event_peer = self.clone();
+        let event_bytes_peer = self.clone();
         let ctx = CallCtx {
             emit: Arc::new(move |event| {
                 event_peer.write(json!({ "id": emit_id, "event": event }));
+            }),
+            emit_bytes: Arc::new(move |event, bytes| {
+                event_bytes_peer
+                    .write_with_bytes(json!({ "id": emit_bytes_id, "event": event }), Some(bytes));
             }),
         };
         let reply_peer = self.clone();
@@ -302,5 +313,45 @@ impl Peer {
             Ok(msg.get("result").cloned().unwrap_or(Value::Null))
         };
         let _ = entry.reply.send(result);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn handler_can_emit_events_with_bytes() {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let sent_clone = sent.clone();
+        let peer = Peer::new(move |msg, bytes| {
+            sent_clone.lock().unwrap().push((msg, bytes));
+        });
+
+        peer.handle("stream_test", |_params, ctx| async move {
+            ctx.emit_with_bytes(json!({ "type": "frame" }), vec![1, 2, 3]);
+            Ok(json!({ "done": true }))
+        });
+
+        peer.dispatch(json!({ "id": "1", "method": "stream_test", "params": {} }))
+            .await;
+
+        // Yield to allow spawned handler task to run
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let frames = sent.lock().unwrap().clone();
+        assert_eq!(frames.len(), 2);
+        assert_eq!(
+            frames[0].0,
+            json!({ "id": "1", "event": { "type": "frame" } })
+        );
+        assert_eq!(frames[0].1, Some(vec![1, 2, 3]));
+        assert_eq!(
+            frames[1].0,
+            json!({ "id": "1", "result": { "done": true } })
+        );
+        assert_eq!(frames[1].1, None);
     }
 }

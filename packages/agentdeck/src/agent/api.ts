@@ -416,6 +416,29 @@ export class AgentApi {
       { timeoutMs: 10_000, timeoutMessage: i18n.get('screen.timeout'), ephemeral: true },
     );
 
+  /** Continuous live stream of frames for an app on the host (`ios:` / `android:` / `browser:` target). */
+  streamScreen = (
+    target: string,
+    maxWidth: number,
+    onFrame: (frame: ScreenCapture & { data: Uint8Array<ArrayBuffer> }) => void,
+    callId?: string,
+  ) =>
+    this.#peer.call<void>(
+      'screen_stream',
+      { target, maxWidth },
+      (event) => onFrame(event as ScreenCapture & { data: Uint8Array<ArrayBuffer> }),
+      { timeoutMs: 30_000, timeoutMessage: i18n.get('screen.timeout'), ephemeral: true },
+      callId,
+    );
+
+  /** Stop an active live screen stream on the host. */
+  stopStreamScreen = (target: string) =>
+    this.#peer.call<void>('screen_stream_stop', { target }, undefined, {
+      timeoutMs: 5000,
+      timeoutMessage: i18n.get('screen.timeout'),
+      ephemeral: true,
+    });
+
   /** Any host file as raw bytes, for serving it verbatim; `range` is `[offset, length]` of one slice. */
   readRawFile = (path: string, range?: [number, number], cwd?: string) =>
     this.#peer.call<{ path: string; type: 'binary'; size: number; data: Uint8Array<ArrayBuffer> }>(

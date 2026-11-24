@@ -1,5 +1,4 @@
 import { createDecoratorTheme } from '@mantou/gem/helper/theme';
-import { polling } from '@mantou/tap-ui/lib/timer';
 import type { ScreenCapture } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
@@ -7,20 +6,22 @@ import { openScreen } from '../navigation';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
-/** Pause between live frames; `polling` waits for each reply first, so slow links simply drop frames. */
-const FRAME_INTERVAL = 300;
-
 type ScreenShot = ScreenCapture & { src: string };
 
 /** Latest frame per target, shared by the cards and the live page. */
 const screenStore = createStore({ shots: {} as Record<string, ScreenShot | undefined> });
 
-const captureScreen = async (target: string, maxWidth: number) => {
-  const { data, ...capture } = await agentApi.captureScreen(target, Math.round(maxWidth * devicePixelRatio));
+const setScreenFrame = (target: string, capture: ScreenCapture & { data: Uint8Array<ArrayBuffer> }) => {
+  const { data, ...info } = capture;
   const previous = screenStore.shots[target];
   const src = URL.createObjectURL(new Blob([data], { type: 'image/jpeg' }));
-  screenStore({ shots: { ...screenStore.shots, [target]: { ...capture, src } } });
+  screenStore({ shots: { ...screenStore.shots, [target]: { ...info, src } } });
   if (previous) URL.revokeObjectURL(previous.src);
+};
+
+const captureScreen = async (target: string, maxWidth: number) => {
+  const capture = await agentApi.captureScreen(target, Math.round(maxWidth * devicePixelRatio));
+  setScreenFrame(target, capture);
 };
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -336,16 +337,37 @@ export class DeckScreenPageElement extends GemElement {
 
   @effect((i) => [i.target, i.#state.revision])
   #live = () => {
-    const stop = polling(async () => {
-      if (document.hidden) return;
+    let stopped = false;
+    const target = this.target;
+    const maxWidth = Math.round(Math.min(innerWidth, 1024) * devicePixelRatio);
+
+    const runStream = async () => {
+      if (document.hidden || stopped) return;
       try {
-        await captureScreen(this.target, Math.min(innerWidth, 1024));
+        await agentApi.streamScreen(target, maxWidth, (frame) => {
+          if (!stopped && !document.hidden) setScreenFrame(target, frame);
+        });
       } catch (error) {
-        stop();
-        this.#state({ error: errorMessage(error) });
+        if (!stopped && !document.hidden) this.#state({ error: errorMessage(error) });
       }
-    }, FRAME_INTERVAL);
-    return stop;
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        agentApi.stopStreamScreen(target).catch(() => {});
+      } else if (!stopped) {
+        runStream();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    runStream();
+
+    return () => {
+      stopped = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      agentApi.stopStreamScreen(target).catch(() => {});
+    };
   };
 
   @template()
