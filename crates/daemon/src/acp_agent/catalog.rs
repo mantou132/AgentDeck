@@ -296,10 +296,15 @@ fn candidates_for_platform(registry: Registry, platform: &str) -> Vec<AgentCandi
 fn agentdeck_env(id: &str) -> Result<Vec<(String, String)>> {
     Ok(match id {
         // Codex's bundled visualize plugin answers chart requests with
-        // `visualize{...}` references only the Codex app renders.
+        // `visualize{...}` references only the Codex app renders. Setting
+        // `thread_unload_delay_secs` to 0 lets `thread/unsubscribe` (called by
+        // ACP `session/close`) unload idle threads immediately and release the
+        // cross-process writer lock instead of waiting for Codex's default
+        // retention delay.
         "codex-acp" => vec![(
             "CODEX_CONFIG".to_string(),
-            r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}}}"#.to_string(),
+            r#"{"plugins":{"visualize@openai-bundled":{"enabled":false}},"thread_unload_delay_secs":0}"#
+                .to_string(),
         )],
         // The free agent: its own session database, no user login, only the
         // free OpenCode provider, and every render skill (OpenCode takes
@@ -474,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn codex_launch_disables_the_visualize_plugin() {
+    fn codex_launch_configures_plugin_and_immediate_unload() {
         let env = agentdeck_env("codex-acp").unwrap();
         let (_, config) = env.iter().find(|(name, _)| name == "CODEX_CONFIG").unwrap();
         let config: serde_json::Value = serde_json::from_str(config).unwrap();
@@ -482,5 +487,6 @@ mod tests {
             config["plugins"]["visualize@openai-bundled"]["enabled"],
             false
         );
+        assert_eq!(config["thread_unload_delay_secs"], 0);
     }
 }
