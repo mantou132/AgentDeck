@@ -1,11 +1,12 @@
 import { ActionSheet } from '@mantou/tap-ui/elements/action-sheet';
-import { Sheet } from '@mantou/tap-ui/elements/sheet';
+import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
-import { type AppLanguage, DISPLAY_SKILLS, langNames, SKILL_REQUIRES, WORKFLOW_SKILLS } from '../config';
+import { DISPLAY_SKILLS, langNames, SKILL_REQUIRES, WORKFLOW_SKILLS } from '../config';
 import { i18n, type LocaleKey } from '../i18n';
-import { setLanguage, setSkillEnabled } from '../state/app';
+import { setSkillEnabled } from '../state/app';
 import {
   type AppManifest,
   openSavedApp,
@@ -20,9 +21,21 @@ import { agentDeckTheme } from '../styles/theme';
 
 const style = css`
   :scope {
-    display: block;
-    padding-top: 4px;
     color: ${agentDeckTheme.textColor};
+    font-family: ${agentDeckTheme.font};
+    line-height: 1.5;
+  }
+  tap-page, tap-navbar {
+    background: ${agentDeckTheme.backgroundColor};
+  }
+  tap-navbar {
+    border: 0;
+  }
+  .page-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   tap-cell {
     padding-block: 8px;
@@ -56,6 +69,7 @@ const style = css`
 
 /** Content of the settings page's "More settings" sheet, one cell group per section. */
 @customElement('deck-more-settings')
+@adoptedStyle(blockContainer)
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
 @connectStore(savedAppsStore)
@@ -67,17 +81,10 @@ export class DeckMoreSettingsElement extends GemElement {
     if (isTauri()) this.#state({ version: await getVersion() });
   };
 
-  #selectLanguage = async () => {
-    const action = await ActionSheet.open<AppLanguage>({
-      title: i18n.get('settings.language'),
-      actions: [
-        { label: i18n.get('settings.languageSystem'), value: '' },
-        ...Object.entries(langNames).map(([value, label]) => ({ label, value: value as AppLanguage })),
-      ],
-      cancelText: i18n.get('global.cancel'),
+  #openLanguage = () => {
+    Stack.getClosestStack(this)?.push({
+      content: html`<deck-language-settings></deck-language-settings>`,
     });
-    if (!action || action.value === undefined) return;
-    await setLanguage(action.value);
   };
 
   #manageApp = async ({ id, name }: AppManifest) => {
@@ -123,50 +130,56 @@ export class DeckMoreSettingsElement extends GemElement {
     };
   };
 
+  #openChangelog = () => {
+    Stack.getClosestStack(this)?.push({
+      content: html`<deck-changelog></deck-changelog>`,
+    });
+  };
+
   @template()
   #render = () => html`
-    <tap-cell-group
-      v-if=${savedAppsStore.apps.length > 0}
-      heading=${i18n.get('settings.savedAppsTitle')}
-      footer=${i18n.get(pinSupported ? 'settings.savedAppsDesc' : 'settings.savedAppsWidgetDesc')}
-      .items=${savedAppsStore.apps.map((app) => ({
-        label: html`<div class="app"><img alt="" src=${savedAppIconUrl(app.id)} /><span>${app.name}</span></div>`,
-        onClick: () => this.#manageApp(app),
-      }))}
-    ></tap-cell-group>
-    <tap-cell-group
-      footer=${i18n.get('settings.languageDesc')}
-      .items=${[
-        {
-          label: i18n.get('settings.language'),
-          extra: agentdeckStore.language ? langNames[agentdeckStore.language] : i18n.get('settings.languageSystem'),
-          onClick: this.#selectLanguage,
-        },
-      ]}
-    ></tap-cell-group>
-    <tap-cell-group
-      heading=${i18n.get('settings.workflowSkillsTitle')}
-      footer=${i18n.get('settings.workflowSkillsDesc')}
-      .items=${WORKFLOW_SKILLS.map(this.#skillItem)}
-    ></tap-cell-group>
-    <tap-cell-group
-      heading=${i18n.get('settings.displaySkillsTitle')}
-      footer=${i18n.get('settings.skillsDesc')}
-      .items=${DISPLAY_SKILLS.map(this.#skillItem)}
-    ></tap-cell-group>
-    <tap-cell-group
-      .items=${[
-        {
-          label: i18n.get('settings.changelog'),
-          extra: this.#state.version,
-          onClick: () =>
-            Sheet.open({
-              maskClosable: true,
-              header: i18n.get('settings.changelog'),
-              body: html`<deck-changelog></deck-changelog>`,
-            }),
-        },
-      ]}
-    ></tap-cell-group>
+    <tap-page>
+      <tap-navbar slot="header" title=${i18n.get('settings.moreSettings')}></tap-navbar>
+      <div class="page-content">
+        <tap-cell-group
+          v-if=${savedAppsStore.apps.length > 0}
+          heading=${i18n.get('settings.savedAppsTitle')}
+          footer=${i18n.get(pinSupported ? 'settings.savedAppsDesc' : 'settings.savedAppsWidgetDesc')}
+          .items=${savedAppsStore.apps.map((app) => ({
+            label: html`<div class="app"><img alt="" src=${savedAppIconUrl(app.id)} /><span>${app.name}</span></div>`,
+            onClick: () => this.#manageApp(app),
+          }))}
+        ></tap-cell-group>
+        <tap-cell-group
+          footer=${i18n.get('settings.languageDesc')}
+          .items=${[
+            {
+              label: i18n.get('settings.language'),
+              extra: agentdeckStore.language ? langNames[agentdeckStore.language] : i18n.get('settings.languageSystem'),
+              onClick: this.#openLanguage,
+            },
+          ]}
+        ></tap-cell-group>
+        <tap-cell-group
+          heading=${i18n.get('settings.workflowSkillsTitle')}
+          footer=${i18n.get('settings.workflowSkillsDesc')}
+          .items=${WORKFLOW_SKILLS.map(this.#skillItem)}
+        ></tap-cell-group>
+        <tap-cell-group
+          heading=${i18n.get('settings.displaySkillsTitle')}
+          footer=${i18n.get('settings.skillsDesc')}
+          .items=${DISPLAY_SKILLS.map(this.#skillItem)}
+        ></tap-cell-group>
+        <tap-cell-group
+          .items=${[
+            {
+              label: i18n.get('settings.changelog'),
+              extra: this.#state.version,
+              onClick: this.#openChangelog,
+            },
+          ]}
+        ></tap-cell-group>
+      </div>
+    </tap-page>
   `;
 }

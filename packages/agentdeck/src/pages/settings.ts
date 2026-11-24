@@ -1,4 +1,5 @@
 import { Dialog } from '@mantou/tap-ui/elements/dialog';
+import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getVersion } from '@tauri-apps/api/app';
@@ -42,7 +43,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
     agent: agentdeckStore.settings.agent,
     relayGuideOpen: !agentdeckStore.settings.relayId && !localStorage.getItem(RELAY_GUIDE_SEEN_KEY),
     showRelayId: false,
-    moreOpen: false,
   });
 
   @effect((i) => [i.#state.relayGuideOpen])
@@ -115,6 +115,14 @@ export class AgentDeckSettingsPageElement extends GemElement {
     } catch (error) {
       Toast.open('error', error instanceof Error ? error.message : i18n.get('settings.saveFailed'));
     }
+  };
+
+  #openMoreSettings = () => {
+    Sheet.open({
+      maskClosable: true,
+      hasStack: true,
+      body: html`<deck-more-settings></deck-more-settings>`,
+    });
   };
 
   #openFeedback = async () => {
@@ -300,7 +308,7 @@ export class AgentDeckSettingsPageElement extends GemElement {
             <button
               type="button"
               class="h-full cursor-pointer border-0 bg-transparent p-0 text-xs text-describe active:opacity-70"
-              @click=${() => this.#state({ moreOpen: true })}
+              @click=${this.#openMoreSettings}
             >${i18n.get('settings.moreSettings')}</button>
             <span v-if=${!!agentdeckStore.settings.relayId} aria-hidden="true">·</span>
             <button
@@ -318,12 +326,6 @@ export class AgentDeckSettingsPageElement extends GemElement {
         .content=${html`
           <deck-relay-guide @close=${this.#closeRelayGuide}></deck-relay-guide>
         `}
-      ></deck-sheet>
-      <deck-sheet
-        ?open=${this.#state.moreOpen}
-        .heading=${i18n.get('settings.moreSettings')}
-        @close=${() => this.#state({ moreOpen: false })}
-        .content=${html`<deck-more-settings></deck-more-settings>`}
       ></deck-sheet>
     `;
   };

@@ -1,3 +1,4 @@
+import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -6,11 +7,22 @@ declare const __CHANGELOG__: Record<string, { version?: string; text: string }[]
 
 const style = css`
   :scope {
+    color: ${agentDeckTheme.textColor};
+    font-family: ${agentDeckTheme.font};
+    line-height: 1.5;
+  }
+  tap-page, tap-navbar {
+    background: ${agentDeckTheme.backgroundColor};
+  }
+  tap-navbar {
+    border: 0;
+    margin-inline: 10px;
+  }
+  .page-content {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-top: 4px;
-    color: ${agentDeckTheme.textColor};
+    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   section {
     border-radius: ${agentDeckTheme.normalRound};
@@ -26,20 +38,28 @@ const style = css`
   }
 `;
 
-/** Content of the "Release notes" sheet in More settings. */
+/** Content of the "Release notes" page in More settings. */
 @customElement('deck-changelog')
+@adoptedStyle(blockContainer)
 @adoptedStyle(style)
 export class DeckChangelogElement extends GemElement {
   @template()
   #render = () => {
     const entries = __CHANGELOG__[i18n.currentLanguage.startsWith('zh') ? 'zh-CN' : 'en-US'] ?? [];
-    return html`${entries.map(
-      ({ version, text }) => html`
-        <section class="px-4 py-3">
-          <h3 class="mb-1.5">${version ?? i18n.get('settings.changelogLatest')}</h3>
-          <p>${text}</p>
-        </section>
-      `,
-    )}`;
+    return html`
+      <tap-page>
+        <tap-navbar slot="header" title=${i18n.get('settings.changelog')} back default-back></tap-navbar>
+        <div class="page-content">
+          ${entries.map(
+            ({ version, text }) => html`
+              <section class="px-4 py-3">
+                <h3 class="mb-1.5">${version ?? i18n.get('settings.changelogLatest')}</h3>
+                <p>${text}</p>
+              </section>
+            `,
+          )}
+        </div>
+      </tap-page>
+    `;
   };
 }
