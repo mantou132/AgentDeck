@@ -4,9 +4,9 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
-import { DISPLAY_SKILLS, langNames, SKILL_REQUIRES, WORKFLOW_SKILLS } from '../config';
-import { i18n, type LocaleKey } from '../i18n';
-import { setSkillEnabled } from '../state/app';
+import { DISPLAY_SKILLS, langNames, SKILL_REQUIRES, WORKFLOW_SKILLS } from 'src/config';
+import { i18n, type LocaleKey } from 'src/i18n';
+import { setSkillEnabled } from 'src/state/app';
 import {
   type AppManifest,
   openSavedApp,
@@ -15,9 +15,9 @@ import {
   removeSavedApp,
   savedAppIconUrl,
   savedAppsStore,
-} from '../state/saved-apps';
-import { agentdeckStore, isSkillEnabled, isSkillRestricted } from '../state/store';
-import { agentDeckTheme, sheetCellGroupStyle, sheetPageStyle } from '../styles/theme';
+} from 'src/state/saved-apps';
+import { agentdeckStore, isSkillEnabled, isSkillRestricted } from 'src/state/store';
+import { agentDeckTheme, sheetCellGroupStyle, sheetPageStyle } from 'src/styles/theme';
 
 const style = css`
   .app {

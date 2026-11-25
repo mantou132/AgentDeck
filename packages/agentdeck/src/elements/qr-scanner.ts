@@ -6,7 +6,7 @@ import {
   requestPermissions,
   scan,
 } from '@tauri-apps/plugin-barcode-scanner';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme } from 'src/styles/theme';
 
 export type DeckQrScannerError = 'permission-denied' | 'scan-failed';
 

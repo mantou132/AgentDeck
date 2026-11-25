@@ -2,13 +2,13 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { followBottom } from '../lib/follow-bottom';
-import { hasActiveStream } from '../lib/stream-text';
-import { getToolStatus, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
-import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from '../state/store';
-import { icons } from '../styles/icons';
-import { agentDeckTheme, sheetPageStyle } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { followBottom } from 'src/lib/follow-bottom';
+import { hasActiveStream } from 'src/lib/stream-text';
+import { getToolStatus, getToolTitle, groupTimelineMessages, type ProcessGroup } from 'src/session/timeline';
+import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme, sheetPageStyle } from 'src/styles/theme';
 
 const style = css`
   .empty {

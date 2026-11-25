@@ -1,13 +1,14 @@
 import { ActionSheet } from '@mantou/tap-ui/elements/action-sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
-import type { TaskListItem, TaskRun } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { displayPath } from '../lib/path';
-import { openSession } from '../navigation';
-import { getSession } from '../state/sessions';
-import { agentdeckStore, hostAgents, hostHome, updateRuntime } from '../state/store';
+import type { TaskListItem, TaskRun } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { renderTaskStatus } from 'src/elements/task-group';
+import { i18n } from 'src/i18n';
+import { displayPath } from 'src/lib/path';
+import { openSession } from 'src/navigation';
+import { getSession } from 'src/state/sessions';
+import { agentdeckStore, hostAgents, hostHome, updateRuntime } from 'src/state/store';
 import {
   formatSchedule,
   formatTaskTime,
@@ -16,10 +17,9 @@ import {
   resolveTaskPermission,
   runTaskAction,
   tasksStore,
-} from '../state/tasks';
-import { icons } from '../styles/icons';
-import { pageStyle } from '../styles/theme';
-import { renderTaskStatus } from './task-group';
+} from 'src/state/tasks';
+import { icons } from 'src/styles/icons';
+import { pageStyle } from 'src/styles/theme';
 
 /** Opens a session of `agent` without switching the App's global agent setting. */
 const openAgentSession = (agent: string, sessionId: string, cwd = '') => {

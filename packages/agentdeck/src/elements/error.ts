@@ -1,8 +1,8 @@
 import type { TemplateResult } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { icons } from '../styles/icons';
+import { i18n } from 'src/i18n';
+import { icons } from 'src/styles/icons';
 
 /** Full-page error state: heading, error message, and retry button; `actions` are appended after the retry button */
 @customElement('deck-error')

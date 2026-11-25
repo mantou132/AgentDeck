@@ -1,11 +1,11 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { type AppLanguage, langNames } from '../config';
-import { i18n } from '../i18n';
-import { hapticSelection } from '../lib/haptics';
-import { setLanguage } from '../state/app';
-import { agentdeckStore } from '../state/store';
-import { icons } from '../styles/icons';
-import { sheetCellGroupStyle, sheetPageStyle } from '../styles/theme';
+import { type AppLanguage, langNames } from 'src/config';
+import { i18n } from 'src/i18n';
+import { hapticSelection } from 'src/lib/haptics';
+import { setLanguage } from 'src/state/app';
+import { agentdeckStore } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { sheetCellGroupStyle, sheetPageStyle } from 'src/styles/theme';
 
 /** Language selection page in More settings sheet. */
 @customElement('deck-language-settings')

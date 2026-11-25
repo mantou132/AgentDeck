@@ -1,5 +1,5 @@
-import type { LoadedSession, RemoteSession } from '../agent/api';
-import type { Attachment } from '../attachment/types';
+import type { LoadedSession, RemoteSession } from 'src/agent/api';
+import type { Attachment } from 'src/attachment/types';
 
 export type DeckSession = RemoteSession & {
   agent: string;

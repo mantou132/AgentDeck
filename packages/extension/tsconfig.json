@@ -17,7 +17,10 @@
     "types": ["chrome"],
     "noEmit": true,
     "baseUrl": ".",
-    "paths": { "agentdeck/*": ["../agentdeck/src/*"] }
+    "paths": {
+      "agentdeck/*": ["../agentdeck/src/*"],
+      "src/*": ["./src/*", "../agentdeck/src/*"]
+    }
   },
   "include": ["./"],
   "exclude": ["dist", "node_modules", "public"]

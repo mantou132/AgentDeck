@@ -3,10 +3,10 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { base64ToArrayBuffer } from '@mantou/tap-ui/lib/encode';
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { AttachmentError, MAX_ATTACHMENTS, readAttachment } from '../attachment/read';
-import type { Attachment } from '../attachment/types';
-import { attachmentErrorMessage } from '../elements/composer';
-import { i18n } from '../i18n';
+import { AttachmentError, MAX_ATTACHMENTS, readAttachment } from 'src/attachment/read';
+import type { Attachment } from 'src/attachment/types';
+import { attachmentErrorMessage } from 'src/elements/composer';
+import { i18n } from 'src/i18n';
 
 type SharedFile = { name: string; mimeType: string; data?: string; tooLarge: boolean };
 

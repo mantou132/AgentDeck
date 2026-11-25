@@ -1,8 +1,8 @@
-import type { SessionEvent } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { toPromptAttachment } from '../attachment/prompt';
-import { i18n } from '../i18n';
-import type { DeckSession, TextMessage } from './types';
+import type { SessionEvent } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { toPromptAttachment } from 'src/attachment/prompt';
+import { i18n } from 'src/i18n';
+import type { DeckSession, TextMessage } from 'src/session/types';
 
 type TurnHandlers = {
   onEvent: (event: SessionEvent) => void | Promise<void>;

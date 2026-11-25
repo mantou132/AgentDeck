@@ -1,9 +1,9 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import type { TaskSchedule } from '../agent/api';
-import { i18n } from '../i18n';
-import { deviceTimeZone, formatSchedule, isDraftSaved, type TaskDraft, tasksStore } from '../state/tasks';
-import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import type { TaskSchedule } from 'src/agent/api';
+import { i18n } from 'src/i18n';
+import { deviceTimeZone, formatSchedule, isDraftSaved, type TaskDraft, tasksStore } from 'src/state/tasks';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme } from 'src/styles/theme';
 
 const isTime = (value: unknown) => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 

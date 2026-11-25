@@ -1,12 +1,12 @@
 import type { MarkedExtension } from '@gem-bind/marked';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { markdownExtensions, markdownStyle, userMarkdownExtensions, userMarkdownStyle } from '../lib/markdown';
+import { markdownExtensions, markdownStyle, userMarkdownExtensions, userMarkdownStyle } from 'src/lib/markdown';
 import {
   nextStreamingText,
   registerActiveStream,
   STREAM_REVEAL_INTERVAL,
   unregisterActiveStream,
-} from '../lib/stream-text';
+} from 'src/lib/stream-text';
 
 @customElement('deck-stream-markdown')
 @adoptedStyle(blockContainer)

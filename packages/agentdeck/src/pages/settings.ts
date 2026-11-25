@@ -5,12 +5,12 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { FEEDBACK_URL, isRelayUrl, type PairingRecord, RELAY_GUIDE_SEEN_KEY } from '../config';
-import type { DeckQrScannerError } from '../elements/qr-scanner';
-import { i18n } from '../i18n';
-import { hardResetApp, removePairing, saveSettings } from '../state/app';
-import { agentdeckStore, hostAgents } from '../state/store';
-import { icons } from '../styles/icons';
+import { FEEDBACK_URL, isRelayUrl, type PairingRecord, RELAY_GUIDE_SEEN_KEY } from 'src/config';
+import type { DeckQrScannerError } from 'src/elements/qr-scanner';
+import { i18n } from 'src/i18n';
+import { hardResetApp, removePairing, saveSettings } from 'src/state/app';
+import { agentdeckStore, hostAgents } from 'src/state/store';
+import { icons } from 'src/styles/icons';
 
 const style = css`
   .settings-header {

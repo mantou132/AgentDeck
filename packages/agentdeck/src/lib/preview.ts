@@ -1,5 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { protocolUrl } from './js-protocol';
+import { protocolUrl } from 'src/lib/js-protocol';
 
 export const PREVIEW_SCHEME = 'agentdeck-preview';
 

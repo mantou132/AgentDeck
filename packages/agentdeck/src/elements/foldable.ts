@@ -2,11 +2,11 @@ import { connect } from '@mantou/gem';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
-import { openMessageLink } from '../navigation';
-import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { markdownStyle, unfoldedMarkdownExtensions } from 'src/lib/markdown';
+import { openMessageLink } from 'src/navigation';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme } from 'src/styles/theme';
 
 const style = css`
   :host {

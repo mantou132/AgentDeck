@@ -3,14 +3,14 @@ import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { isTauri } from '@tauri-apps/api/core';
 import { share } from '@vnidrop/tauri-plugin-share';
-import type { RemoteFile } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { getCodeLang, getMimeType, isSmallTextFile } from '../lib/file-preview';
-import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
-import { openFileBrowser, openMessageLink } from '../navigation';
-import { icons } from '../styles/icons';
-import { agentDeckTheme, pageStyle } from '../styles/theme';
+import type { RemoteFile } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { getCodeLang, getMimeType, isSmallTextFile } from 'src/lib/file-preview';
+import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from 'src/lib/markdown';
+import { openFileBrowser, openMessageLink } from 'src/navigation';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme, pageStyle } from 'src/styles/theme';
 
 const style = css`
   mark {

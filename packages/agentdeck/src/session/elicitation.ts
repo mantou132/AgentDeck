@@ -4,8 +4,8 @@ import type {
   ElicitationRequest,
   ElicitationResponse,
   ElicitationValue,
-} from '../agent/api';
-import { i18n } from '../i18n';
+} from 'src/agent/api';
+import { i18n } from 'src/i18n';
 
 /** A form elicitation shown in the timeline; `response` is set once it is answered, skipped or cancelled. */
 export type Elicitation = { request: ElicitationRequest; response?: ElicitationResponse };

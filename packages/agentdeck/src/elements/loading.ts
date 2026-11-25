@@ -1,5 +1,5 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { icons } from '../styles/icons';
+import { icons } from 'src/styles/icons';
 
 /** Full-page loading state, aligned with `deck-error` */
 @customElement('deck-loading')

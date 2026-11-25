@@ -1,15 +1,15 @@
 import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
-import type { Attachment } from '../attachment/types';
-import { getSubagentStatus, getSubagentTitle, isSubagentActive } from '../elements/subagent-card';
-import { i18n } from '../i18n';
-import { followBottom } from '../lib/follow-bottom';
-import { openAttachment } from '../navigation';
-import { cancelSubagent, getSession } from '../state/sessions';
-import { getMessages, getRuntime, messagesStore, sessionsStore } from '../state/store';
-import { resolvePermission } from '../state/user-input';
-import { icons } from '../styles/icons';
-import { style } from './session';
+import type { Attachment } from 'src/attachment/types';
+import { getSubagentStatus, getSubagentTitle, isSubagentActive } from 'src/elements/subagent-card';
+import { i18n } from 'src/i18n';
+import { followBottom } from 'src/lib/follow-bottom';
+import { openAttachment } from 'src/navigation';
+import { style } from 'src/pages/session';
+import { cancelSubagent, getSession } from 'src/state/sessions';
+import { getMessages, getRuntime, messagesStore, sessionsStore } from 'src/state/store';
+import { resolvePermission } from 'src/state/user-input';
+import { icons } from 'src/styles/icons';
 
 /**
  * Subagent `subagentId` of session `sessionId` (ACP Subagent Sessions RFD) is watched, never prompted, loaded or

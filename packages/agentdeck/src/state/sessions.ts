@@ -1,25 +1,36 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent, type UserInput } from '../agent/api';
-import { RpcError } from '../agent/rpc';
-import { agentApi, reconnectTransport } from '../agent/transport';
-import type { Attachment } from '../attachment/types';
-import { draftKey, removeDraft } from '../composer/drafts';
-import { i18n } from '../i18n';
-import { getConfigSelects, getConfigValues } from '../session/config-options';
-import { completeThought, finishStreaming, reduceSessionEvent } from '../session/events';
-import { getSortedSessionGroups } from '../session/groups';
-import { cancelTurnPrompt, performTurn } from '../session/turn';
-import type { DeckSession, SessionOptions, Subagent, TextMessage } from '../session/types';
-import { applyConfigSelection, getConfigDefaults, saveConfigDefaults, setAgentCommands } from './config-options';
+import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent, type UserInput } from 'src/agent/api';
+import { RpcError } from 'src/agent/rpc';
+import { agentApi, reconnectTransport } from 'src/agent/transport';
+import type { Attachment } from 'src/attachment/types';
+import { draftKey, removeDraft } from 'src/composer/drafts';
+import { i18n } from 'src/i18n';
+import { getConfigSelects, getConfigValues } from 'src/session/config-options';
+import { completeThought, finishStreaming, reduceSessionEvent } from 'src/session/events';
+import { getSortedSessionGroups } from 'src/session/groups';
+import { cancelTurnPrompt, performTurn } from 'src/session/turn';
+import type { DeckSession, SessionOptions, Subagent, TextMessage } from 'src/session/types';
+import {
+  applyConfigSelection,
+  getConfigDefaults,
+  saveConfigDefaults,
+  setAgentCommands,
+} from 'src/state/config-options';
 import {
   clearAllInFlight,
   type InFlightSession,
   removeInFlight,
   saveInFlight,
   updateInFlightMessages,
-} from './in-flight';
-import { getSessionMeta, isSessionDeleted, markSessionDeleted, saveSessionMeta, unreadRuntimes } from './session-meta';
+} from 'src/state/in-flight';
+import {
+  getSessionMeta,
+  isSessionDeleted,
+  markSessionDeleted,
+  saveSessionMeta,
+  unreadRuntimes,
+} from 'src/state/session-meta';
 import {
   agentdeckStore,
   getMessages,
@@ -35,9 +46,9 @@ import {
   setMessages,
   updateRuntime,
   updateSessionOptions,
-} from './store';
-import { showTaskPermission } from './tasks';
-import { settleUserInput, showElicitation, showPermission } from './user-input';
+} from 'src/state/store';
+import { showTaskPermission } from 'src/state/tasks';
+import { settleUserInput, showElicitation, showPermission } from 'src/state/user-input';
 
 /** Banner text for a failed prompt; an agent whose login expired gets a sign-in hint. */
 const promptErrorMessage = (error: unknown) => {

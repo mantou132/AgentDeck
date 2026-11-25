@@ -266,6 +266,9 @@ export function documentFixture(previous, options = {}) {
         if (name === '@mantou/tap-ui/lib/timer') {
           return { throttle: (fn) => fn };
         }
+        if (name.startsWith('src/')) {
+          return load(path.join(root, name.endsWith('.json') ? name : `${name}.ts`));
+        }
         if (name.endsWith('.json')) {
           return load(path.resolve(path.dirname(file), name));
         }

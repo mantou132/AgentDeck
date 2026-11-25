@@ -1,8 +1,8 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import type { PermissionRequest } from '../agent/api';
-import { i18n } from '../i18n';
-import { getUserInputSource } from './subagent-card';
+import type { PermissionRequest } from 'src/agent/api';
+import { getUserInputSource } from 'src/elements/subagent-card';
+import { i18n } from 'src/i18n';
 
 const button =
   'min-h-11 min-w-0 max-w-full flex-auto cursor-pointer truncate rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98]';

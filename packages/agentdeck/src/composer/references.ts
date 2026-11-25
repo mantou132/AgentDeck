@@ -1,4 +1,4 @@
-import type { Attachment } from '../attachment/types';
+import type { Attachment } from 'src/attachment/types';
 
 export const LONG_PASTE_CHAR_THRESHOLD = 2_000;
 

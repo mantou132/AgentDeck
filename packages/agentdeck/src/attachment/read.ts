@@ -1,7 +1,7 @@
 // Reads files picked or pasted in a composer. Shared with the extension, so errors carry a reason instead of app text.
 import { arrayBufferToBase64 } from '@mantou/tap-ui/lib/encode';
 import { compressionImage } from '@mantou/tap-ui/lib/image';
-import type { Attachment } from './types';
+import type { Attachment } from 'src/attachment/types';
 
 export const MAX_ATTACHMENTS = 10;
 export const MAX_TEXT_BYTES = 256 * 1024;

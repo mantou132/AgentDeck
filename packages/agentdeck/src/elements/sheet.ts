@@ -1,7 +1,7 @@
 import type { TemplateResult } from '@mantou/gem';
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { contentsContainer } from '@mantou/tap-ui/lib/styles';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme } from 'src/styles/theme';
 
 const layerStyle = css`
   tap-sheet::part(sheet) {

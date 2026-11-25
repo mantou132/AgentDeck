@@ -1,9 +1,9 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
+import { EVENTS_ADDED_KEY } from 'src/config';
+import { i18n, type LocaleKey } from 'src/i18n';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme } from 'src/styles/theme';
 import { addEvent, type CalendarEvent, type Recurrence } from 'tauri-plugin-add-to-calendar-api';
-import { EVENTS_ADDED_KEY } from '../config';
-import { i18n, type LocaleKey } from '../i18n';
-import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
 
 const FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'] as const;
 /** Sources of the most recently added events, enough to cover what is still on screen. */

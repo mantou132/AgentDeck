@@ -1,6 +1,6 @@
-import type { ConfigChoice, SessionConfigOption } from '../agent/api';
-import { i18n } from '../i18n';
-import type { SessionOptions } from './types';
+import type { ConfigChoice, SessionConfigOption } from 'src/agent/api';
+import { i18n } from 'src/i18n';
+import type { SessionOptions } from 'src/session/types';
 
 /** Optional session configuration (mode / model / effort...); `legacyMode` comes from ACP legacy `modes`, switched via `set_mode`. */
 export type ConfigSelect = {

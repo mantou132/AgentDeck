@@ -1,6 +1,6 @@
 // Converts attachments to the `agent_prompt` wire format. Shared with the extension.
-import type { PromptAttachment } from '../agent/api';
-import type { Attachment } from './types';
+import type { PromptAttachment } from 'src/agent/api';
+import type { Attachment } from 'src/attachment/types';
 
 export const toPromptAttachment = (attachment: Attachment): PromptAttachment => {
   const { name } = attachment;

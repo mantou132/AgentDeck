@@ -1,16 +1,16 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import { DEFAULT_STORAGE_KEY } from 'relay-client-ts';
-import type { ClientSkills } from '../agent/api';
-import { isPairingId } from '../agent/encryption';
+import type { ClientSkills } from 'src/agent/api';
+import { isPairingId } from 'src/agent/encryption';
 import {
   clearTransportStorage,
   initTransport,
   startTransport,
   type TransportMessage,
   updateTransportSkills,
-} from '../agent/transport';
-import { clearDrafts } from '../composer/drafts';
+} from 'src/agent/transport';
+import { clearDrafts } from 'src/composer/drafts';
 import {
   type AppLanguage,
   type AppSettings,
@@ -22,10 +22,10 @@ import {
   SETTINGS_KEY,
   SKILL_TOGGLES_KEY,
   SUPPORTED_SKILLS,
-} from '../config';
-import { i18n } from '../i18n';
-import { loadSkills, skillGroups, skillsHash } from '../skills';
-import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from './in-flight';
+} from 'src/config';
+import { i18n } from 'src/i18n';
+import { loadSkills, skillGroups, skillsHash } from 'src/skills';
+import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from 'src/state/in-flight';
 import {
   applySessionEvent,
   endSession,
@@ -35,9 +35,9 @@ import {
   resumeInFlightTurn,
   settleLostTurns,
   showUserInput,
-} from './sessions';
-import { agentdeckStore, isSkillEnabled, isTurnRunning, sessionsStore, updateRuntime } from './store';
-import { refreshTasks, resetTasks } from './tasks';
+} from 'src/state/sessions';
+import { agentdeckStore, isSkillEnabled, isTurnRunning, sessionsStore, updateRuntime } from 'src/state/store';
+import { refreshTasks, resetTasks } from 'src/state/tasks';
 
 /** Older daemon versions that do not report a version are also considered outdated; prerelease suffixes are ignored in comparison */
 const isDaemonOutdated = (version?: string) => {

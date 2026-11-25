@@ -1,8 +1,8 @@
 import type { LngLatBoundsLike, Map as MapLibreMap, MapOptions } from 'maplibre-gl';
-import { i18n } from '../i18n';
-import { openMap } from '../navigation';
-import { icons } from '../styles/icons';
-import { agentDeckTheme, pageStyle } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { openMap } from 'src/navigation';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme, pageStyle } from 'src/styles/theme';
 
 type Position = [lng: number, lat: number];
 

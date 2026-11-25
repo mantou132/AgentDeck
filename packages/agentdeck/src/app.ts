@@ -1,9 +1,9 @@
 import { activityStore } from '@mantou/tap-ui/lib/decorators';
-import { i18n } from './i18n';
-import { getOpenSessionId } from './navigation';
-import { isSplitView, layoutStore } from './state/layout';
-import { agentdeckStore, sessionsStore } from './state/store';
-import { icons } from './styles/icons';
+import { i18n } from 'src/i18n';
+import { getOpenSessionId } from 'src/navigation';
+import { isSplitView, layoutStore } from 'src/state/layout';
+import { agentdeckStore, sessionsStore } from 'src/state/store';
+import { icons } from 'src/styles/icons';
 
 /** Root page of the global Stack; in the split view the list moves beside the Stack. */
 @customElement('agentdeck-home')

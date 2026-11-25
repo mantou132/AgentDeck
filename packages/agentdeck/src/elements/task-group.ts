@@ -1,10 +1,10 @@
 import { repeat } from '@mantou/gem/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import type { TaskListItem } from '../agent/api';
-import { i18n } from '../i18n';
-import { openTask } from '../navigation';
-import { formatSchedule, formatTaskTime, getTaskPermission, tasksStore } from '../state/tasks';
-import { icons } from '../styles/icons';
+import type { TaskListItem } from 'src/agent/api';
+import { i18n } from 'src/i18n';
+import { openTask } from 'src/navigation';
+import { formatSchedule, formatTaskTime, getTaskPermission, tasksStore } from 'src/state/tasks';
+import { icons } from 'src/styles/icons';
 
 const badge = 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold';
 

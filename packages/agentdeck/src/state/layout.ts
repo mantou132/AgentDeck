@@ -1,5 +1,5 @@
 import { addListener } from '@mantou/gem/lib/utils';
-import { agentdeckStore } from './store';
+import { agentdeckStore } from 'src/state/store';
 
 // iPad (except mini in portrait), unfolded foldables and dual-screen devices spanning the hinge; phones in landscape are too short.
 const wideQuery = matchMedia('(min-width: 800px) and (min-height: 500px), (horizontal-viewport-segments: 2)');

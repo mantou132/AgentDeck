@@ -1,12 +1,12 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
-import type { PermissionRequest, TaskListItem, TaskSchedule, UserInput } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { getConfigSelects } from '../session/config-options';
-import type { DeckSession } from '../session/types';
-import { refreshSessions } from './sessions';
-import { agentdeckStore, getRuntime } from './store';
+import type { PermissionRequest, TaskListItem, TaskSchedule, UserInput } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { getConfigSelects } from 'src/session/config-options';
+import type { DeckSession } from 'src/session/types';
+import { refreshSessions } from 'src/state/sessions';
+import { agentdeckStore, getRuntime } from 'src/state/store';
 
 /**
  * Scheduled tasks of the connected host, across all agents; the daemon runs them. Nobody has a turn in a run, and its

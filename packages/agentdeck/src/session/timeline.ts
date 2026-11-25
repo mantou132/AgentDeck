@@ -1,7 +1,14 @@
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
-import { i18n } from '../i18n';
-import type { Elicitation } from './elicitation';
-import type { ChatMessage, SubagentMessage, TextMessage, ThoughtMessage, ToolCallData, ToolMessage } from './types';
+import { i18n } from 'src/i18n';
+import type { Elicitation } from 'src/session/elicitation';
+import type {
+  ChatMessage,
+  SubagentMessage,
+  TextMessage,
+  ThoughtMessage,
+  ToolCallData,
+  ToolMessage,
+} from 'src/session/types';
 
 export type ProcessGroup = { id: string; items: (ThoughtMessage | ToolMessage)[]; pending: boolean };
 

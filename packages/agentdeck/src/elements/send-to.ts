@@ -1,11 +1,11 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { displayPath } from '../lib/path';
-import { isSplitView } from '../state/layout';
-import { sessionsStore } from '../state/store';
-import { agentDeckTheme, sheetCellGroupStyle } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { displayPath } from 'src/lib/path';
+import { isSplitView } from 'src/state/layout';
+import { sessionsStore } from 'src/state/store';
+import { agentDeckTheme, sheetCellGroupStyle } from 'src/styles/theme';
 
 /** `new` lets the user pick the new session's directory; `sessionId` is another session. */
 export type SendTarget = 'current' | 'new' | { sessionId: string };

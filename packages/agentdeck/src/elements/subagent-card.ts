@@ -1,10 +1,10 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import type { ElicitationRequest, PermissionRequest } from '../agent/api';
-import { i18n } from '../i18n';
-import { openSubagent } from '../navigation';
-import type { Subagent } from '../session/types';
-import { getRuntime, sessionsStore } from '../state/store';
-import { icons } from '../styles/icons';
+import type { ElicitationRequest, PermissionRequest } from 'src/agent/api';
+import { i18n } from 'src/i18n';
+import { openSubagent } from 'src/navigation';
+import type { Subagent } from 'src/session/types';
+import { getRuntime, sessionsStore } from 'src/state/store';
+import { icons } from 'src/styles/icons';
 
 /** Its current work is in progress; `requires_action` is blocked on the user. */
 export const isSubagentActive = (subagent?: Subagent) =>

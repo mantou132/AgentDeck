@@ -1,11 +1,11 @@
 import { connect } from '@mantou/gem';
-import { i18n } from '../i18n';
-import { serve } from '../lib/js-protocol';
-import { escapeHtml } from '../lib/markdown';
-import { PREVIEW_SCHEME, previewSupported, resolvePreviewPath } from '../lib/preview';
-import { getSafeAreaScript } from '../lib/safe-area';
-import { agentdeckStore, isConnecting } from '../state/store';
-import { agentApi } from './transport';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { serve } from 'src/lib/js-protocol';
+import { escapeHtml } from 'src/lib/markdown';
+import { PREVIEW_SCHEME, previewSupported, resolvePreviewPath } from 'src/lib/preview';
+import { getSafeAreaScript } from 'src/lib/safe-area';
+import { agentdeckStore, isConnecting } from 'src/state/store';
 
 // A body with a content type lets the frame finish loading; WebKit never fires `load` for an untyped empty 404.
 const errorPage = (detail: string) => `<!doctype html>

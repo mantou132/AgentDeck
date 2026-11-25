@@ -3,9 +3,9 @@ import { arrayBufferToBase64 } from '@mantou/tap-ui/lib/encode';
 import { createBitmapFromSvg } from '@mantou/tap-ui/lib/image';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { agentApi } from '../agent/transport';
-import { LAUNCH_LINK_TAKEN_KEY } from '../config';
-import { protocolUrl } from '../lib/js-protocol';
+import { agentApi } from 'src/agent/transport';
+import { LAUNCH_LINK_TAKEN_KEY } from 'src/config';
+import { protocolUrl } from 'src/lib/js-protocol';
 
 // Apps built with the host's `app` skill, saved on the phone by `crates/agentdeck/src/saved_apps.rs`.
 

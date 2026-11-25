@@ -1,10 +1,10 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import type { ElicitationRequest, ElicitationResponse, PermissionRequest } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { hapticWarning } from '../lib/haptics';
-import type { Elicitation } from '../session/elicitation';
-import { getRuntime, isTurnRunning, updateRuntime } from './store';
+import type { ElicitationRequest, ElicitationResponse, PermissionRequest } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { hapticWarning } from 'src/lib/haptics';
+import type { Elicitation } from 'src/session/elicitation';
+import { getRuntime, isTurnRunning, updateRuntime } from 'src/state/store';
 
 // Requests waiting for the user (permissions and form elicitations) arrive as host notifications and are
 // answered with `agent_user_input_respond`. The host keeps them until answered and lists them again after

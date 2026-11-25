@@ -1,7 +1,7 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { i18n } from '../i18n';
-import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme } from 'src/styles/theme';
 
 /** `cwd` is the directory the agent asked for; without it the session page picks one. */
 export type NewSessionProposal = { title: string; prompt: string; cwd?: string };

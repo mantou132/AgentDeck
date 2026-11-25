@@ -1,7 +1,7 @@
-import type { AvailableCommand, SessionConfigOption, SessionEvent } from '../agent/api';
-import { imageAttachment } from '../attachment/message';
-import { i18n } from '../i18n';
-import { withCurrentMode } from './config-options';
+import type { AvailableCommand, SessionConfigOption, SessionEvent } from 'src/agent/api';
+import { imageAttachment } from 'src/attachment/message';
+import { i18n } from 'src/i18n';
+import { withCurrentMode } from 'src/session/config-options';
 import type {
   ChatMessage,
   DeckSession,
@@ -13,7 +13,7 @@ import type {
   ToolCallData,
   ToolCallStatus,
   ToolMessage,
-} from './types';
+} from 'src/session/types';
 
 type SessionEventContext = {
   agent: string;

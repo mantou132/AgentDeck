@@ -1,11 +1,11 @@
 import { type OutboundMessage, RelayClient, type RelayConnectionState, type RelayStore } from 'relay-client-ts';
-import { type AgentInfo, DEVICE_ID_KEY, RELAY_URL } from '../config';
-import { getConnectionLabel, i18n } from '../i18n';
-import { AgentApi, type ClientSkills, type SessionEvent, type UserInput } from './api';
-import { isPairingId } from './encryption';
-import { RelayCodec } from './relay-codec';
-import { clearRelayStore, indexedDbRelayStore } from './relay-store';
-import type { RpcId, RpcMessage } from './rpc';
+import { AgentApi, type ClientSkills, type SessionEvent, type UserInput } from 'src/agent/api';
+import { isPairingId } from 'src/agent/encryption';
+import { RelayCodec } from 'src/agent/relay-codec';
+import { clearRelayStore, indexedDbRelayStore } from 'src/agent/relay-store';
+import type { RpcId, RpcMessage } from 'src/agent/rpc';
+import { type AgentInfo, DEVICE_ID_KEY, RELAY_URL } from 'src/config';
+import { getConnectionLabel, i18n } from 'src/i18n';
 
 /** Sent before the host counts as connected. */
 const HANDSHAKE_METHODS = new Set(['peer_attach', 'skills_install']);

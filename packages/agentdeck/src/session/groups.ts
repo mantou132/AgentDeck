@@ -1,4 +1,4 @@
-import type { DeckSession } from './types';
+import type { DeckSession } from 'src/session/types';
 
 export type SessionGroup = {
   cwd: string;

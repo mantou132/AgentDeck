@@ -1,4 +1,4 @@
-import type { SkillBundle } from './agent/api';
+import type { SkillBundle } from 'src/agent/api';
 
 /** Hash of `skills/`, defined at build time by `rsbuild.config.ts`, which emits the files as `skills.json`. */
 declare const __SKILLS_HASH__: string;

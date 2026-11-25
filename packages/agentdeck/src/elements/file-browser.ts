@@ -2,14 +2,14 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 
-import type { BrowseEntry } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { displayPath, getBreadcrumbs, getParentPath } from '../lib/path';
-import { openFileViewer } from '../navigation';
-import { agentdeckStore, hostHome } from '../state/store';
-import { icons } from '../styles/icons';
-import { pageStyle } from '../styles/theme';
+import type { BrowseEntry } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { displayPath, getBreadcrumbs, getParentPath } from 'src/lib/path';
+import { openFileViewer } from 'src/navigation';
+import { agentdeckStore, hostHome } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { pageStyle } from 'src/styles/theme';
 
 const browserStyle = css`
   :scope {

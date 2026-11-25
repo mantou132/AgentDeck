@@ -1,12 +1,12 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { repeat } from '@mantou/gem/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { displayPath } from '../lib/path';
-import { scratchWorkspacesRoot } from '../session/groups';
-import type { DeckSession } from '../session/types';
-import { hostHome } from '../state/store';
-import { icons } from '../styles/icons';
+import { i18n } from 'src/i18n';
+import { displayPath } from 'src/lib/path';
+import { scratchWorkspacesRoot } from 'src/session/groups';
+import type { DeckSession } from 'src/session/types';
+import { hostHome } from 'src/state/store';
+import { icons } from 'src/styles/icons';
 
 const formatSessionTime = (updatedAt?: string) => {
   if (!updatedAt) return '—';

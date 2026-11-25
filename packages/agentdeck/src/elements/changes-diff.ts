@@ -1,11 +1,11 @@
-import type { GitDiffResult } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { diffColorScheme } from '../lib/diff';
-import { agentdeckStore } from '../state/store';
-import { icons } from '../styles/icons';
-import { pageStyle } from '../styles/theme';
-import { diffCounts } from './changes';
+import type { GitDiffResult } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { diffCounts } from 'src/elements/changes';
+import { i18n } from 'src/i18n';
+import { diffColorScheme } from 'src/lib/diff';
+import { agentdeckStore } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { pageStyle } from 'src/styles/theme';
 
 // Heavy element stays out of the initial bundle; markup upgrades once it defines itself.
 import('@gem-bind/diff2html');

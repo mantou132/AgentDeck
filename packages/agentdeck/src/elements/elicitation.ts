@@ -1,8 +1,9 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import type { ElicitationResponse, ElicitationValue } from '../agent/api';
-import { i18n } from '../i18n';
-import { hapticSelection } from '../lib/haptics';
+import type { ElicitationResponse, ElicitationValue } from 'src/agent/api';
+import { getUserInputSource } from 'src/elements/subagent-card';
+import { i18n } from 'src/i18n';
+import { hapticSelection } from 'src/lib/haptics';
 import {
   type Elicitation,
   type ElicitationChoice,
@@ -12,9 +13,8 @@ import {
   type ElicitationSelect,
   getElicitationContent,
   getElicitationQuestions,
-} from '../session/elicitation';
-import { icons } from '../styles/icons';
-import { getUserInputSource } from './subagent-card';
+} from 'src/session/elicitation';
+import { icons } from 'src/styles/icons';
 
 const button =
   'min-h-11 min-w-0 flex-1 cursor-pointer truncate rounded-xl border px-3 py-2 text-sm font-medium active:scale-[0.98] disabled:cursor-default disabled:opacity-45 disabled:active:scale-100';

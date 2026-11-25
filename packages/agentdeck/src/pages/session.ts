@@ -4,21 +4,21 @@ import type { EndEventDetail } from '@mantou/tap-ui/elements/gesture';
 import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import type { Attachment } from '../attachment/types';
-import { draftKey, removeDraft, restoreDraft, saveDraft, setDraftQuote } from '../composer/drafts';
-import type { ComposerInput, DeckComposerElement } from '../elements/composer';
-import { markSessionProposalStarted, type NewSessionProposal } from '../elements/new-session';
-import { pickSendTarget } from '../elements/send-to';
-import { openSessionConfig } from '../elements/session-config';
-import type { ForkRequest } from '../elements/session-timeline';
-import { getConnectionLabel, i18n } from '../i18n';
-import { followBottom } from '../lib/follow-bottom';
-import { hapticImpact } from '../lib/haptics';
-import { displayPath } from '../lib/path';
-import { openAttachment, openChanges, openSession, openSettings, replaceSession } from '../navigation';
-import { getConfigLabel, getConfigSelects } from '../session/config-options';
-import { hasPendingElicitation } from '../session/elicitation';
-import type { DeckSession } from '../session/types';
+import type { Attachment } from 'src/attachment/types';
+import { draftKey, removeDraft, restoreDraft, saveDraft, setDraftQuote } from 'src/composer/drafts';
+import type { ComposerInput, DeckComposerElement } from 'src/elements/composer';
+import { markSessionProposalStarted, type NewSessionProposal } from 'src/elements/new-session';
+import { pickSendTarget } from 'src/elements/send-to';
+import { openSessionConfig } from 'src/elements/session-config';
+import type { ForkRequest } from 'src/elements/session-timeline';
+import { getConnectionLabel, i18n } from 'src/i18n';
+import { followBottom } from 'src/lib/follow-bottom';
+import { hapticImpact } from 'src/lib/haptics';
+import { displayPath } from 'src/lib/path';
+import { openAttachment, openChanges, openSession, openSettings, replaceSession } from 'src/navigation';
+import { getConfigLabel, getConfigSelects } from 'src/session/config-options';
+import { hasPendingElicitation } from 'src/session/elicitation';
+import type { DeckSession } from 'src/session/types';
 import {
   cancelTurn,
   closeSession,
@@ -31,8 +31,8 @@ import {
   promotePendingSession,
   retrySessionLoad,
   sendPrompt,
-} from '../state/sessions';
-import { shareStore } from '../state/share';
+} from 'src/state/sessions';
+import { shareStore } from 'src/state/share';
 import {
   agentdeckStore,
   getMessages,
@@ -43,10 +43,10 @@ import {
   messagesStore,
   sessionsStore,
   updateRuntime,
-} from '../state/store';
-import { saveTaskFromSession, type TaskDraft } from '../state/tasks';
-import { resolvePermission } from '../state/user-input';
-import { icons } from '../styles/icons';
+} from 'src/state/store';
+import { saveTaskFromSession, type TaskDraft } from 'src/state/tasks';
+import { resolvePermission } from 'src/state/user-input';
+import { icons } from 'src/styles/icons';
 
 /** Also used by the subagent page. */
 export const style = css`

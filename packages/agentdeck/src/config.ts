@@ -1,8 +1,8 @@
-import type { AvailableCommand } from './agent/api';
-import { isPairingId } from './agent/encryption';
-import { calendarSupported } from './lib/calendar';
-import { previewSupported } from './lib/preview';
-import type { SessionOptions } from './session/types';
+import type { AvailableCommand } from 'src/agent/api';
+import { isPairingId } from 'src/agent/encryption';
+import { calendarSupported } from 'src/lib/calendar';
+import { previewSupported } from 'src/lib/preview';
+import type { SessionOptions } from 'src/session/types';
 
 export type AppSettings = {
   relayId: string;
@@ -17,7 +17,6 @@ export const DEVICE_ID_KEY = 'agentdeck.device_id.v1';
 export const RESET_PENDING_KEY = 'agentdeck.reset_pending.v1';
 export const RELAY_GUIDE_SEEN_KEY = 'agentdeck.relay_guide_seen.v1';
 export const ACTIVE_MARKER_KEY = 'agentdeck.active_in_flight.v1';
-export const FALLBACK_KEY = 'agentdeck.in_flight_fallback.v1';
 export const SESSION_META_KEY = 'agentdeck.meta.v1';
 export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
 export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';

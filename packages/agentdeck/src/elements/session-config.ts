@@ -1,16 +1,16 @@
 import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import type { ConfigChoice } from '../agent/api';
-import { i18n } from '../i18n';
-import { hapticSelection } from '../lib/haptics';
-import { type ConfigSelect, getConfigSelects, isModelSelect } from '../session/config-options';
-import { changeSessionConfig } from '../state/config-options';
-import { isSplitView } from '../state/layout';
-import { getSession } from '../state/sessions';
-import { getRuntime, sessionsStore } from '../state/store';
-import { icons } from '../styles/icons';
-import { agentDeckTheme, sheetCellGroupStyle, sheetPageStyle } from '../styles/theme';
+import type { ConfigChoice } from 'src/agent/api';
+import { i18n } from 'src/i18n';
+import { hapticSelection } from 'src/lib/haptics';
+import { type ConfigSelect, getConfigSelects, isModelSelect } from 'src/session/config-options';
+import { changeSessionConfig } from 'src/state/config-options';
+import { isSplitView } from 'src/state/layout';
+import { getSession } from 'src/state/sessions';
+import { getRuntime, sessionsStore } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme, sheetCellGroupStyle, sheetPageStyle } from 'src/styles/theme';
 
 const style = css`
   .choice-description {

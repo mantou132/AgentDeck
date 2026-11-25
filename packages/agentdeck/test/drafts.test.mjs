@@ -28,7 +28,7 @@ function load(indexedDB) {
   const exports = {};
   const database = {};
   vm.runInNewContext(databaseOutput, { exports: database, indexedDB, setTimeout, clearTimeout });
-  vm.runInNewContext(outputText, { exports, require: (name) => (name === '../config' ? config : database) });
+  vm.runInNewContext(outputText, { exports, require: (name) => (name === 'src/config' ? config : database) });
   return exports;
 }
 
@@ -129,17 +129,17 @@ function composerFixture() {
   vm.runInNewContext(compiled, {
     exports,
     require: (name) => {
-      if (name === '../composer/drafts')
+      if (name === 'src/composer/drafts')
         return {
           readDraft: (key) => new Promise((resolve) => loads.set(key, resolve)),
           saveDraft: async (key, draft) => {
             saves.push({ key, draft });
           },
         };
-      if (name === '../i18n') return { i18n: { get: (key) => key } };
-      if (name === '../composer/references') return { syncPasteReferences: (_, attachments) => attachments };
-      if (name === '../attachment/read') return { MAX_ATTACHMENTS: 10 };
-      if (name === '../styles/icons') return { icons: {} };
+      if (name === 'src/i18n') return { i18n: { get: (key) => key } };
+      if (name === 'src/composer/references') return { syncPasteReferences: (_, attachments) => attachments };
+      if (name === 'src/attachment/read') return { MAX_ATTACHMENTS: 10 };
+      if (name === 'src/styles/icons') return { icons: {} };
       if (name === '@mantou/tap-ui/lib/directives') return { longPress: noop };
       if (name === '@mantou/tap-ui/elements/toast') return { Toast: { open: () => {} } };
       return {};

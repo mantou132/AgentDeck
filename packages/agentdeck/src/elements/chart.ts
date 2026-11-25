@@ -1,5 +1,5 @@
 import type { EChartsOption } from '@gem-bind/echarts';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme } from 'src/styles/theme';
 
 /** Body of an `agentdeck-chart` fenced block: an ECharts option, as taught by the host's chart skill. */
 const parseOption = (source: string): EChartsOption | undefined => {

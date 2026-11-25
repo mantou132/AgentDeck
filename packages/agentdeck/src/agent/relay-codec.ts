@@ -1,6 +1,6 @@
-import { i18n } from '../i18n';
-import { createRelayEncryption, type RelayEncryption } from './encryption';
-import type { RpcMessage } from './rpc';
+import { createRelayEncryption, type RelayEncryption } from 'src/agent/encryption';
+import type { RpcMessage } from 'src/agent/rpc';
+import { i18n } from 'src/i18n';
 
 /** Relay's WebSocket message limit, including the frame envelope. */
 const MAX_FRAME_BYTES = 10 * 1024 * 1024;

@@ -5,15 +5,15 @@ import { Stack, type TapStackElement } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { sleep } from '@mantou/tap-ui/lib/timer';
 import { share } from '@vnidrop/tauri-plugin-share';
+import { agentApi } from 'src/agent/transport';
+import type { Attachment } from 'src/attachment/types';
+import { i18n } from 'src/i18n';
+import { parseMessageLink } from 'src/lib/links';
+import { toPreviewUrl } from 'src/lib/preview';
+import type { AgentDeckSessionPageElement } from 'src/pages/session';
+import { isSplitView } from 'src/state/layout';
+import { icons } from 'src/styles/icons';
 import { onWebProxyState, toWebproxyUrl } from 'tauri-plugin-webproxy-api';
-import { agentApi } from './agent/transport';
-import type { Attachment } from './attachment/types';
-import { i18n } from './i18n';
-import { parseMessageLink } from './lib/links';
-import { toPreviewUrl } from './lib/preview';
-import type { AgentDeckSessionPageElement } from './pages/session';
-import { isSplitView } from './state/layout';
-import { icons } from './styles/icons';
 
 export const openWebBrowser = async (url: string, title = '', stack?: TapStackElement) => {
   let currentUrl = url;

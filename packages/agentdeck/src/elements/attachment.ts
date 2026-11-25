@@ -1,8 +1,8 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import type { Attachment } from '../attachment/types';
+import type { Attachment } from 'src/attachment/types';
 
-import { i18n } from '../i18n';
-import { icons } from '../styles/icons';
+import { i18n } from 'src/i18n';
+import { icons } from 'src/styles/icons';
 
 const style = css`
   :scope {

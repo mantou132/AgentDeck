@@ -1,8 +1,8 @@
 // Relay outbox and receive cursor in IndexedDB. Shared with the extension.
 // localStorage (and chrome.storage) quotas are too small for prompts carrying attachments.
 import type { OutboundMessage, RelayStore } from 'relay-client-ts';
-import { DATABASES } from '../config';
-import { createDatabaseStore } from '../lib/database';
+import { DATABASES } from 'src/config';
+import { createDatabaseStore } from 'src/lib/database';
 
 type Cursor = { routeId: string; lastReceived?: number };
 type Queued = { order: number; message: OutboundMessage };

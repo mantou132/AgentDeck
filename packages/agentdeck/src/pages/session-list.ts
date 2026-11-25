@@ -1,13 +1,13 @@
 import { repeat } from '@mantou/gem/lib/element';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { sleep } from '@mantou/tap-ui/lib/timer';
+import { appendDraftAttachments, draftKey, setDraftQuote } from 'src/composer/drafts';
+import { getConnectionLabel, i18n } from 'src/i18n';
 import { hapticWarning } from 'src/lib/haptics';
-import { appendDraftAttachments, draftKey, setDraftQuote } from '../composer/drafts';
-import { getConnectionLabel, i18n } from '../i18n';
-import { openSettings, selectSession } from '../navigation';
-import { hasPendingElicitation } from '../session/elicitation';
-import { createPendingSession, deleteSession, getAgentStatusText, refreshSessions } from '../state/sessions';
-import { clearShare, shareStore } from '../state/share';
+import { openSettings, selectSession } from 'src/navigation';
+import { hasPendingElicitation } from 'src/session/elicitation';
+import { createPendingSession, deleteSession, getAgentStatusText, refreshSessions } from 'src/state/sessions';
+import { clearShare, shareStore } from 'src/state/share';
 import {
   agentdeckStore,
   getRuntime,
@@ -16,9 +16,9 @@ import {
   type SessionRuntime,
   sessionsStore,
   updateRuntime,
-} from '../state/store';
-import { tasksStore } from '../state/tasks';
-import { icons } from '../styles/icons';
+} from 'src/state/store';
+import { tasksStore } from 'src/state/tasks';
+import { icons } from 'src/styles/icons';
 
 const style = css`
   .menu-header {

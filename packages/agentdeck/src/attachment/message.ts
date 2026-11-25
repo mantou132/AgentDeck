@@ -1,6 +1,6 @@
 // Attachments carried by agent messages and session history. Shared with the extension, so names come from the caller.
 import { Cache } from '@mantou/tap-ui/lib/cache';
-import type { Attachment } from './types';
+import type { Attachment } from 'src/attachment/types';
 
 /** An ACP image content block. */
 export const imageAttachment = (data: string, mimeType: string, name: string): Attachment => ({

@@ -1,8 +1,8 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { i18n } from '../i18n';
-import { displayPath } from '../lib/path';
-import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from '../lib/preview';
-import { openPreview } from '../navigation';
+import { i18n } from 'src/i18n';
+import { displayPath } from 'src/lib/path';
+import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from 'src/lib/preview';
+import { openPreview } from 'src/navigation';
 import {
   type AppManifest,
   pinSavedApp,
@@ -11,10 +11,10 @@ import {
   saveApp,
   savedAppsStore,
   savedAppsSupported,
-} from '../state/saved-apps';
-import { hostHome } from '../state/store';
-import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+} from 'src/state/saved-apps';
+import { hostHome } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme } from 'src/styles/theme';
 
 const style = css`
   :host {

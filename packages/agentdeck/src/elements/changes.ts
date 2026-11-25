@@ -1,11 +1,11 @@
-import type { GitFileStatus, GitShowResult, GitStatusResult } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { displayPath } from '../lib/path';
-import { openChangesDiff, openGitLog } from '../navigation';
-import { agentdeckStore, hostHome } from '../state/store';
-import { icons } from '../styles/icons';
-import { pageStyle } from '../styles/theme';
+import type { GitFileStatus, GitShowResult, GitStatusResult } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { displayPath } from 'src/lib/path';
+import { openChangesDiff, openGitLog } from 'src/navigation';
+import { agentdeckStore, hostHome } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { pageStyle } from 'src/styles/theme';
 
 export const diffCounts = ({ insertions, deletions }: { insertions?: number; deletions?: number }) => html`
   ${insertions ? html`<span class="font-medium text-positive">+${insertions}</span>` : ''}

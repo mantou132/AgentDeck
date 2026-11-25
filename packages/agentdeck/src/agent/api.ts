@@ -1,7 +1,7 @@
-import type { AgentInfo } from '../config';
-import { i18n } from '../i18n';
-import type { CallOptions, RpcId, RpcMessage } from './rpc';
-import { RpcPeer } from './rpc';
+import type { CallOptions, RpcId, RpcMessage } from 'src/agent/rpc';
+import { RpcPeer } from 'src/agent/rpc';
+import type { AgentInfo } from 'src/config';
+import { i18n } from 'src/i18n';
 
 type CreateSessionOptions = {
   agent: string;

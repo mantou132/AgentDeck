@@ -1,5 +1,5 @@
-import type { AgentStatus, PermissionRequest } from '../agent/api';
-import type { ConnectionState } from '../agent/transport';
+import type { AgentStatus, PermissionRequest } from 'src/agent/api';
+import type { ConnectionState } from 'src/agent/transport';
 import {
   defaultAgents,
   readLanguage,
@@ -9,11 +9,11 @@ import {
   readSkillToggles,
   SKILL_REQUIRES,
   WORKFLOW_SKILLS,
-} from '../config';
-import type { Elicitation } from '../session/elicitation';
-import { getSortedSessionGroups, type SessionGroup } from '../session/groups';
-import type { ChatMessage, DeckSession, SessionOptions, Subagent } from '../session/types';
-import { saveSessionMeta, unreadRuntimes } from './session-meta';
+} from 'src/config';
+import type { Elicitation } from 'src/session/elicitation';
+import { getSortedSessionGroups, type SessionGroup } from 'src/session/groups';
+import type { ChatMessage, DeckSession, SessionOptions, Subagent } from 'src/session/types';
+import { saveSessionMeta, unreadRuntimes } from 'src/state/session-meta';
 
 const initialSettings = readSettings();
 

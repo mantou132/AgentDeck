@@ -3,20 +3,20 @@ import { Toast } from '@mantou/tap-ui/elements/toast';
 import { longPress } from '@mantou/tap-ui/lib/directives';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
-import type { AvailableCommand } from '../agent/api';
-import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from '../attachment/read';
-import type { Attachment } from '../attachment/types';
-import { readDraft, saveDraft } from '../composer/drafts';
+import type { AvailableCommand } from 'src/agent/api';
+import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from 'src/attachment/read';
+import type { Attachment } from 'src/attachment/types';
+import { readDraft, saveDraft } from 'src/composer/drafts';
 import {
   createPasteReference,
   expandReferenceRange,
   LONG_PASTE_CHAR_THRESHOLD,
   syncPasteReferences,
-} from '../composer/references';
-import { i18n } from '../i18n';
-import { hapticSelection } from '../lib/haptics';
-import { ensureRecognitionPermission, speechSupported, startRecognitionSession } from '../lib/speech-recognition';
-import { icons } from '../styles/icons';
+} from 'src/composer/references';
+import { i18n } from 'src/i18n';
+import { hapticSelection } from 'src/lib/haptics';
+import { ensureRecognitionPermission, speechSupported, startRecognitionSession } from 'src/lib/speech-recognition';
+import { icons } from 'src/styles/icons';
 
 export type ComposerInput = { text: string; attachments: Attachment[]; voiceChat?: boolean };
 type InputSelection = { input: string; start: number; end: number };

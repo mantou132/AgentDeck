@@ -1,17 +1,17 @@
 import { initApp } from '@mantou/tap-ui/helper/webapp';
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { startPreviewServer } from './agent/preview';
-import { startPushNotifications } from './agent/push';
-import { startApp } from './state/app';
-import { openLaunchedApp, startSavedApps } from './state/saved-apps';
-import { startShareTarget } from './state/share';
+import { startPreviewServer } from 'src/agent/preview';
+import { startPushNotifications } from 'src/agent/push';
+import { startApp } from 'src/state/app';
+import { openLaunchedApp, startSavedApps } from 'src/state/saved-apps';
+import { startShareTarget } from 'src/state/share';
 
-import './styles/theme';
-import './app';
-import './pages/session-list';
-import './pages/session';
-import './pages/subagent';
-import './pages/settings';
+import 'src/styles/theme';
+import 'src/app';
+import 'src/pages/session-list';
+import 'src/pages/session';
+import 'src/pages/subagent';
+import 'src/pages/settings';
 
 const start = async () => {
   // Confirms a hot-updated frontend booted, see `crates/agentdeck/src/frontend_update.rs`; before opening a saved app,

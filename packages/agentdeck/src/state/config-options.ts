@@ -1,11 +1,11 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import type { AvailableCommand } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { type AgentDefaults, CONFIG_DEFAULTS_KEY, readConfigDefaults } from '../config';
-import { i18n } from '../i18n';
-import { type ConfigSelect, getConfigSelects, withConfigValue, withCurrentMode } from '../session/config-options';
-import type { DeckSession, SessionOptions } from '../session/types';
-import { agentdeckStore, getRuntime, updateSessionOptions } from './store';
+import type { AvailableCommand } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { type AgentDefaults, CONFIG_DEFAULTS_KEY, readConfigDefaults } from 'src/config';
+import { i18n } from 'src/i18n';
+import { type ConfigSelect, getConfigSelects, withConfigValue, withCurrentMode } from 'src/session/config-options';
+import type { DeckSession, SessionOptions } from 'src/session/types';
+import { agentdeckStore, getRuntime, updateSessionOptions } from 'src/state/store';
 
 const saveAgentDefaults = (agent: string, patch: AgentDefaults) => {
   const defaults = readConfigDefaults();

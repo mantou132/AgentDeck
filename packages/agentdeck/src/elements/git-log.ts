@@ -1,12 +1,12 @@
 import { Time } from '@mantou/tap-ui/lib/time';
-import type { GitLogResult } from '../agent/api';
-import { agentApi } from '../agent/transport';
-import { i18n } from '../i18n';
-import { displayPath } from '../lib/path';
-import { openChanges } from '../navigation';
-import { agentdeckStore, hostHome } from '../state/store';
-import { icons } from '../styles/icons';
-import { pageStyle } from '../styles/theme';
+import type { GitLogResult } from 'src/agent/api';
+import { agentApi } from 'src/agent/transport';
+import { i18n } from 'src/i18n';
+import { displayPath } from 'src/lib/path';
+import { openChanges } from 'src/navigation';
+import { agentdeckStore, hostHome } from 'src/state/store';
+import { icons } from 'src/styles/icons';
+import { pageStyle } from 'src/styles/theme';
 
 @customElement('deck-git-log-page')
 @adoptedStyle(pageStyle)

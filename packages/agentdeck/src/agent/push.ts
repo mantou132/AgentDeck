@@ -10,12 +10,12 @@ import {
   takeOpenedNotification,
 } from '@mantou/tauri-plugin-fcm';
 import { isTauri } from '@tauri-apps/api/core';
-import { getOpenSessionId, openTask, selectSession } from '../navigation';
-import { saveSettings } from '../state/app';
-import { getSession, refreshSessions } from '../state/sessions';
-import { agentdeckStore, sessionsStore } from '../state/store';
-import { pushHostKey } from './encryption';
-import { updateFcmToken } from './transport';
+import { pushHostKey } from 'src/agent/encryption';
+import { updateFcmToken } from 'src/agent/transport';
+import { getOpenSessionId, openTask, selectSession } from 'src/navigation';
+import { saveSettings } from 'src/state/app';
+import { getSession, refreshSessions } from 'src/state/sessions';
+import { agentdeckStore, sessionsStore } from 'src/state/store';
 
 /** `data` of the push sent by the daemon's `push::send`. */
 type PushData = { type?: string; host?: string; agent?: string; sessionId?: string; taskId?: string };

@@ -1,4 +1,4 @@
-import { SESSION_META_KEY } from '../config';
+import { SESSION_META_KEY } from 'src/config';
 
 export type LocalSessionMeta = {
   title?: string;

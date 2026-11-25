@@ -1,7 +1,7 @@
-import type { Attachment } from '../attachment/types';
-import { i18n } from '../i18n';
-import { getCodeLang, isSmallTextFile } from '../lib/file-preview';
-import { agentDeckTheme } from '../styles/theme';
+import type { Attachment } from 'src/attachment/types';
+import { i18n } from 'src/i18n';
+import { getCodeLang, isSmallTextFile } from 'src/lib/file-preview';
+import { agentDeckTheme } from 'src/styles/theme';
 
 const style = css`
   :scope {

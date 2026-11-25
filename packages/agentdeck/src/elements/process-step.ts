@@ -1,12 +1,12 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { toolCallDiffs } from '../lib/diff';
-import { followBottom } from '../lib/follow-bottom';
-import { markdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
-import { hasActiveStream } from '../lib/stream-text';
-import { openMessageLink } from '../navigation';
+import { i18n } from 'src/i18n';
+import { toolCallDiffs } from 'src/lib/diff';
+import { followBottom } from 'src/lib/follow-bottom';
+import { markdownStyle, unfoldedMarkdownExtensions } from 'src/lib/markdown';
+import { hasActiveStream } from 'src/lib/stream-text';
+import { openMessageLink } from 'src/navigation';
 import {
   getToolCommand,
   getToolStatus,
@@ -14,10 +14,10 @@ import {
   groupTimelineMessages,
   type ProcessGroup,
   parseToolOutputs,
-} from '../session/timeline';
-import { getSession } from '../state/sessions';
-import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from '../state/store';
-import { agentDeckTheme, sheetPageStyle } from '../styles/theme';
+} from 'src/session/timeline';
+import { getSession } from 'src/state/sessions';
+import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from 'src/state/store';
+import { agentDeckTheme, sheetPageStyle } from 'src/styles/theme';
 
 const style = css`
   deck-stream-markdown,

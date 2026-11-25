@@ -1,16 +1,16 @@
 import { type MarkedExtension, Renderer } from '@gem-bind/marked';
-import { agentDeckTheme } from '../styles/theme';
-import { diffColorScheme } from './diff';
-import { isSmallTextFile } from './file-preview';
-import { parseMessageLink } from './links';
-import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from './preview';
+import { diffColorScheme } from 'src/lib/diff';
+import { isSmallTextFile } from 'src/lib/file-preview';
+import { parseMessageLink } from 'src/lib/links';
+import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from 'src/lib/preview';
+import { agentDeckTheme } from 'src/styles/theme';
 
-import '../elements/app';
-import '../elements/event';
-import '../elements/new-session';
-import '../elements/task';
-import '../elements/preview';
-import '../elements/screen';
+import 'src/elements/app';
+import 'src/elements/event';
+import 'src/elements/new-session';
+import 'src/elements/task';
+import 'src/elements/preview';
+import 'src/elements/screen';
 
 // Heavy elements stay out of the initial bundle; markup rendered earlier upgrades once they define themselves.
 import('@gem-bind/diff2html');

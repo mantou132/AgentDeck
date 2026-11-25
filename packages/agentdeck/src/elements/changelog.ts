@@ -1,6 +1,6 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { i18n } from '../i18n';
-import { agentDeckTheme, sheetPageStyle } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { agentDeckTheme, sheetPageStyle } from 'src/styles/theme';
 
 /** Release notes from `distribution/whatsnew` by store language, newest first; inlined by `rsbuild.config.ts`. */
 declare const __CHANGELOG__: Record<string, { version?: string; text: string }[]>;

@@ -1,10 +1,10 @@
 import { I18n } from '@mantou/gem/helper/i18n';
 import { loadLocale } from '@mantou/tap-ui/lib/locale';
-import type { ConnectionState } from './agent/transport';
-import { type AppLanguage, readLanguage } from './config';
-import enUS from './locales/en-US/basic.json';
-import zhCN from './locales/zh-CN/basic.json';
-import type { ToolStatus } from './session/timeline';
+import type { ConnectionState } from 'src/agent/transport';
+import { type AppLanguage, readLanguage } from 'src/config';
+import enUS from 'src/locales/en-US/basic.json';
+import zhCN from 'src/locales/zh-CN/basic.json';
+import type { ToolStatus } from 'src/session/timeline';
 
 export const fallbackLanguage = 'en-US';
 

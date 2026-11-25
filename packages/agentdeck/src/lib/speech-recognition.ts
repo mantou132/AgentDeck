@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
+import { speechLanguage } from 'src/i18n';
 import {
   checkPermission,
   onError,
@@ -7,7 +8,6 @@ import {
   startListening,
   stopListening,
 } from 'tauri-plugin-stt-api';
-import { speechLanguage } from '../i18n';
 
 // Mobile OS engines only (SFSpeechRecognizer / SpeechRecognizer); desktop has no plugin registered.
 export const speechSupported = isTauri() && /Android|iPhone|iPad/i.test(navigator.userAgent);

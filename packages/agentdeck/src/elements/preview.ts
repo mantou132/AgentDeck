@@ -1,8 +1,8 @@
-import { i18n } from '../i18n';
-import { isAbsoluteHostPath, previewSupported } from '../lib/preview';
-import { openPreview } from '../navigation';
-import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { i18n } from 'src/i18n';
+import { isAbsoluteHostPath, previewSupported } from 'src/lib/preview';
+import { openPreview } from 'src/navigation';
+import { icons } from 'src/styles/icons';
+import { agentDeckTheme } from 'src/styles/theme';
 
 const style = css`
   :host {
