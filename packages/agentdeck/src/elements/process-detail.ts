@@ -8,23 +8,9 @@ import { hasActiveStream } from '../lib/stream-text';
 import { getToolStatus, getToolTitle, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
 import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, sheetPageStyle } from '../styles/theme';
 
 const style = css`
-  :scope {
-    color: ${agentDeckTheme.textColor};
-    font-family: ${agentDeckTheme.font};
-    line-height: 1.5;
-  }
-  tap-page, tap-navbar {
-    background: ${agentDeckTheme.backgroundColor};
-  }
-  tap-navbar {
-    border: 0;
-  }
-  .page-content {
-    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-  }
   .empty {
     padding: 2.5rem 0;
     color: ${agentDeckTheme.describeColor};
@@ -107,6 +93,7 @@ const style = css`
 
 @customElement('deck-process-detail')
 @adoptedStyle(blockContainer)
+@adoptedStyle(sheetPageStyle)
 @adoptedStyle(style)
 @connectStore(sessionsStore)
 @connectStore(messagesStore)

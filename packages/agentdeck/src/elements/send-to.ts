@@ -5,7 +5,7 @@ import { i18n } from '../i18n';
 import { displayPath } from '../lib/path';
 import { isSplitView } from '../state/layout';
 import { sessionsStore } from '../state/store';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, sheetCellGroupStyle } from '../styles/theme';
 
 /** `new` lets the user pick the new session's directory; `sessionId` is another session. */
 export type SendTarget = 'current' | 'new' | { sessionId: string };
@@ -18,18 +18,6 @@ const style = css`
     padding: 4px 0 8px;
     color: ${agentDeckTheme.textColor};
     font-family: ${agentDeckTheme.font};
-  }
-  tap-cell-group {
-    margin: 0;
-    overflow: hidden;
-    border-radius: ${agentDeckTheme.normalRound};
-  }
-  tap-cell-group tap-cell {
-    background: ${agentDeckTheme.lightBackgroundColor};
-    cursor: pointer;
-    &:active {
-      background: ${agentDeckTheme.hoverBackgroundColor};
-    }
   }
   .line {
     overflow: hidden;
@@ -44,6 +32,7 @@ const style = css`
 
 @customElement('deck-send-to')
 @adoptedStyle(blockContainer)
+@adoptedStyle(sheetCellGroupStyle)
 @adoptedStyle(style)
 @connectStore(sessionsStore)
 export class DeckSendToElement extends GemElement {

@@ -17,40 +17,9 @@ import {
   savedAppsStore,
 } from '../state/saved-apps';
 import { agentdeckStore, isSkillEnabled, isSkillRestricted } from '../state/store';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, sheetCellGroupStyle, sheetPageStyle } from '../styles/theme';
 
 const style = css`
-  :scope {
-    color: ${agentDeckTheme.textColor};
-    font-family: ${agentDeckTheme.font};
-    line-height: 1.5;
-  }
-  tap-page, tap-navbar {
-    background: ${agentDeckTheme.backgroundColor};
-  }
-  tap-navbar {
-    border: 0;
-  }
-  .page-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-  }
-  tap-cell {
-    padding-block: 8px;
-    line-height: 1.3;
-    background: ${agentDeckTheme.lightBackgroundColor};
-  }
-  /* Round the rows, not the group, which also holds the heading and footer */
-  tap-cell:first-of-type {
-    border-start-start-radius: ${agentDeckTheme.normalRound};
-    border-start-end-radius: ${agentDeckTheme.normalRound};
-  }
-  tap-cell:last-of-type {
-    border-end-start-radius: ${agentDeckTheme.normalRound};
-    border-end-end-radius: ${agentDeckTheme.normalRound};
-  }
   .app {
     display: flex;
     align-items: center;
@@ -70,6 +39,8 @@ const style = css`
 /** Content of the settings page's "More settings" sheet, one cell group per section. */
 @customElement('deck-more-settings')
 @adoptedStyle(blockContainer)
+@adoptedStyle(sheetPageStyle)
+@adoptedStyle(sheetCellGroupStyle)
 @adoptedStyle(style)
 @connectStore(agentdeckStore)
 @connectStore(savedAppsStore)

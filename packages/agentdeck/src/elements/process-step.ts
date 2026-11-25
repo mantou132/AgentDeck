@@ -17,24 +17,9 @@ import {
 } from '../session/timeline';
 import { getSession } from '../state/sessions';
 import { getMessages, getRuntime, isTurnRunning, messagesStore, sessionsStore } from '../state/store';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, sheetPageStyle } from '../styles/theme';
 
 const style = css`
-  :scope {
-    color: ${agentDeckTheme.textColor};
-    font-family: ${agentDeckTheme.font};
-    line-height: 1.5;
-  }
-  tap-page, tap-navbar {
-    background: ${agentDeckTheme.backgroundColor};
-  }
-  tap-navbar {
-    border: 0;
-    margin-inline: 10px;
-  }
-  .page-content {
-    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-  }
   deck-stream-markdown,
   gem-bind-marked {
     color: ${agentDeckTheme.textColor};
@@ -95,6 +80,7 @@ const style = css`
 
 @customElement('deck-process-step')
 @adoptedStyle(blockContainer)
+@adoptedStyle(sheetPageStyle)
 @adoptedStyle(style)
 @connectStore(sessionsStore)
 @connectStore(messagesStore)

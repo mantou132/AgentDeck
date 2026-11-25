@@ -1,28 +1,13 @@
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, sheetPageStyle } from '../styles/theme';
 
 /** Release notes from `distribution/whatsnew` by store language, newest first; inlined by `rsbuild.config.ts`. */
 declare const __CHANGELOG__: Record<string, { version?: string; text: string }[]>;
 
 const style = css`
-  :scope {
-    color: ${agentDeckTheme.textColor};
-    font-family: ${agentDeckTheme.font};
-    line-height: 1.5;
-  }
-  tap-page, tap-navbar {
-    background: ${agentDeckTheme.backgroundColor};
-  }
-  tap-navbar {
-    border: 0;
-    margin-inline: 10px;
-  }
   .page-content {
-    display: flex;
-    flex-direction: column;
     gap: 12px;
-    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   section {
     border-radius: ${agentDeckTheme.normalRound};
@@ -41,6 +26,7 @@ const style = css`
 /** Content of the "Release notes" page in More settings. */
 @customElement('deck-changelog')
 @adoptedStyle(blockContainer)
+@adoptedStyle(sheetPageStyle)
 @adoptedStyle(style)
 export class DeckChangelogElement extends GemElement {
   @template()

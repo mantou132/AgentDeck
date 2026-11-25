@@ -5,53 +5,13 @@ import { hapticSelection } from '../lib/haptics';
 import { setLanguage } from '../state/app';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
-
-const style = css`
-  :scope {
-    color: ${agentDeckTheme.textColor};
-    font-family: ${agentDeckTheme.font};
-  }
-  tap-page, tap-navbar {
-    background: ${agentDeckTheme.backgroundColor};
-  }
-  tap-navbar {
-    border: 0;
-    margin-inline: 10px;
-  }
-  .page-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-  }
-  .page-content > tap-cell-group {
-    margin: 0;
-    overflow: hidden;
-    border-radius: ${agentDeckTheme.normalRound};
-  }
-  tap-cell-group tap-cell {
-    background: ${agentDeckTheme.lightBackgroundColor};
-    cursor: pointer;
-    &:active {
-      background: ${agentDeckTheme.hoverBackgroundColor};
-    }
-  }
-  .choices tap-cell {
-    padding-block: 8px;
-    line-height: 1.3;
-  }
-  .check {
-    display: block;
-    width: 1.25em;
-    color: ${agentDeckTheme.primaryColor};
-  }
-`;
+import { sheetCellGroupStyle, sheetPageStyle } from '../styles/theme';
 
 /** Language selection page in More settings sheet. */
 @customElement('deck-language-settings')
 @adoptedStyle(blockContainer)
-@adoptedStyle(style)
+@adoptedStyle(sheetPageStyle)
+@adoptedStyle(sheetCellGroupStyle)
 @connectStore(agentdeckStore)
 export class DeckLanguageSettingsElement extends GemElement {
   #change = async (value: AppLanguage) => {

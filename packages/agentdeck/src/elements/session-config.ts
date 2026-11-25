@@ -10,42 +10,9 @@ import { isSplitView } from '../state/layout';
 import { getSession } from '../state/sessions';
 import { getRuntime, sessionsStore } from '../state/store';
 import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, sheetCellGroupStyle, sheetPageStyle } from '../styles/theme';
 
 const style = css`
-  :scope {
-    color: ${agentDeckTheme.textColor};
-    font-family: ${agentDeckTheme.font};
-  }
-  tap-page, tap-navbar {
-    background: ${agentDeckTheme.backgroundColor};
-  }
-  tap-navbar {
-    border: 0;
-    margin-inline: 10px;
-  }
-  .page-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-  }
-  .page-content > tap-cell-group {
-    margin: 0;
-    overflow: hidden;
-    border-radius: ${agentDeckTheme.normalRound};
-  }
-  tap-cell-group tap-cell {
-    background: ${agentDeckTheme.lightBackgroundColor};
-    cursor: pointer;
-    &:active {
-      background: ${agentDeckTheme.hoverBackgroundColor};
-    }
-  }
-  .choices tap-cell {
-    padding-block: 8px;
-    line-height: 1.3;
-  }
   .choice-description {
     overflow: hidden;
     color: ${agentDeckTheme.describeColor};
@@ -53,16 +20,13 @@ const style = css`
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .check {
-    display: block;
-    width: 1.25em;
-    color: ${agentDeckTheme.primaryColor};
-  }
 `;
 
 /** Page for session config Sheet: root page (model radio + entries for other configs) when `configId` is omitted; otherwise a radio choice page for that config. */
 @customElement('deck-session-config')
 @adoptedStyle(blockContainer)
+@adoptedStyle(sheetPageStyle)
+@adoptedStyle(sheetCellGroupStyle)
 @adoptedStyle(style)
 @connectStore(sessionsStore)
 export class DeckSessionConfigElement extends GemElement {

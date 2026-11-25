@@ -36,3 +36,58 @@ export const agentDeckTheme = extendTheme({
   floatShadow: 'var(--shadow-float)',
   primaryShadow: 'var(--shadow-primary)',
 });
+
+/** Common layout for `tap-page` inside a Sheet (`Sheet.open({ hasStack: true })`). */
+export const sheetPageStyle = css`
+  :scope {
+    color: ${agentDeckTheme.textColor};
+    font-family: ${agentDeckTheme.font};
+    line-height: 1.5;
+  }
+  tap-page,
+  tap-navbar {
+    background: ${agentDeckTheme.backgroundColor};
+  }
+  tap-navbar {
+    border: 0;
+    margin-inline: 10px;
+  }
+  .page-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 10px 20px calc(20px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  }
+`;
+
+/** Common `tap-cell-group` & `tap-cell` card styling inside a Sheet. */
+export const sheetCellGroupStyle = css`
+  tap-cell-group {
+    margin: 0;
+  }
+  tap-cell {
+    padding-block: 8px;
+    line-height: 1.3;
+    background: ${agentDeckTheme.lightBackgroundColor};
+  }
+  /* Round the rows, not the group, which also holds the heading and footer */
+  tap-cell:first-of-type {
+    border-start-start-radius: ${agentDeckTheme.normalRound};
+    border-start-end-radius: ${agentDeckTheme.normalRound};
+  }
+  tap-cell:last-of-type {
+    border-end-start-radius: ${agentDeckTheme.normalRound};
+    border-end-end-radius: ${agentDeckTheme.normalRound};
+  }
+  .choices tap-cell {
+    cursor: pointer;
+    &:active {
+      background: ${agentDeckTheme.hoverBackgroundColor};
+    }
+  }
+  .check {
+    display: block;
+    width: 1.25em;
+    color: ${agentDeckTheme.primaryColor};
+  }
+`;
