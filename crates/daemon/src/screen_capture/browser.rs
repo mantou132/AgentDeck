@@ -14,6 +14,8 @@ use super::{Captured, JPEG_QUALITY, ScreenDriver, normalized_to_css};
 
 const BROWSER4AGENT_MCP_URL: &str = "http://127.0.0.1:39271/mcp";
 
+pub(super) type BrowserPeer = rmcp::service::Peer<RoleClient>;
+
 pub(super) struct BrowserDriver {
     client: Option<RunningService<RoleClient, ClientConfig>>,
     tab_id: i64,
@@ -23,14 +25,15 @@ pub(super) struct BrowserDriver {
 impl BrowserDriver {
     pub(super) async fn connect(tab_id: i64) -> Result<Self, String> {
         let client = connect_browser4agent().await?;
-        let tab = find_tab(&client, tab_id)
+        let peer = client.peer();
+        let tab = find_tab(peer, tab_id)
             .await?
             .ok_or_else(|| format!("Browser tab {tab_id} is closed"))?;
         let frame = json!({
             "kind": "browser",
             "title": tab.get("title").cloned().unwrap_or_default(),
             "url": tab.get("url").cloned().unwrap_or_default(),
-            "mobile": tab_is_mobile(&client, tab_id).await,
+            "mobile": tab_is_mobile(peer, tab_id).await,
         });
         Ok(Self {
             client: Some(client),
@@ -49,10 +52,14 @@ impl ScreenDriver for BrowserDriver {
             return Box::pin(async { Err("Browser service already closed".to_string()) });
         };
         Box::pin(capture_browser_fast(
-            client,
+            client.peer(),
             self.tab_id,
             self.frame.clone(),
         ))
+    }
+
+    fn browser_peer(&self) -> Option<BrowserPeer> {
+        self.client.as_ref().map(|client| client.peer().clone())
     }
 
     fn detach_cdp(
@@ -60,7 +67,7 @@ impl ScreenDriver for BrowserDriver {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
         Box::pin(async move {
             if let Some(client) = &self.client {
-                detach_cdp(client, self.tab_id).await;
+                detach_cdp(client.peer(), self.tab_id).await;
             }
         })
     }
@@ -87,11 +94,8 @@ pub(super) async fn connect_browser4agent()
         })
 }
 
-async fn find_tab(
-    client: &RunningService<RoleClient, ClientConfig>,
-    tab_id: i64,
-) -> Result<Option<Value>, String> {
-    let tabs = call_tool(client, "list_tabs", json!({})).await?;
+async fn find_tab(peer: &BrowserPeer, tab_id: i64) -> Result<Option<Value>, String> {
+    let tabs = call_tool(peer, "list_tabs", json!({})).await?;
     Ok(tool_text(&tabs)
         .and_then(|text| serde_json::from_str::<Value>(text).ok())
         .and_then(|tabs| {
@@ -108,7 +112,7 @@ async fn find_tab(
 pub async fn browser_has_tab(tab_id: i64, url: &str) -> bool {
     let check = async {
         let client = connect_browser4agent().await.ok()?;
-        let tab = find_tab(&client, tab_id).await.ok().flatten();
+        let tab = find_tab(client.peer(), tab_id).await.ok().flatten();
         let _ = client.cancel().await;
         tab
     };
@@ -137,12 +141,12 @@ fn detect_image_format(mime_type: &str, bytes: &[u8]) -> Result<ImageFormat, Str
 }
 
 async fn capture_browser_fast(
-    client: &RunningService<RoleClient, ClientConfig>,
+    peer: &BrowserPeer,
     tab_id: i64,
     frame: Value,
 ) -> Result<Captured, String> {
     let shot = call_tool(
-        client,
+        peer,
         "screenshot_tab",
         json!({ "tab_id": tab_id, "format": "jpeg", "quality": JPEG_QUALITY }),
     )
@@ -162,12 +166,12 @@ async fn capture_browser_fast(
 /// Whether the tab emulates a phone (DevTools device mode sets a mobile UA
 /// and coarse pointer). Pages that reject scripts, like `chrome://`, count as
 /// desktop.
-async fn tab_is_mobile(client: &RunningService<RoleClient, ClientConfig>, tab_id: i64) -> bool {
+async fn tab_is_mobile(peer: &BrowserPeer, tab_id: i64) -> bool {
     let script = json!({
         "tab_id": tab_id,
         "func_str": "() => !!navigator.userAgentData?.mobile || matchMedia('(pointer: coarse)').matches",
     });
-    let Ok(result) = call_tool(client, "execute_script", script).await else {
+    let Ok(result) = call_tool(peer, "execute_script", script).await else {
         return false;
     };
     tool_text(&result)
@@ -177,14 +181,14 @@ async fn tab_is_mobile(client: &RunningService<RoleClient, ClientConfig>, tab_id
 }
 
 async fn call_tool(
-    client: &RunningService<RoleClient, ClientConfig>,
+    peer: &BrowserPeer,
     name: &str,
     arguments: Value,
 ) -> Result<CallToolResult, String> {
     let Value::Object(arguments) = arguments else {
         unreachable!("tool arguments are an object");
     };
-    let result = client
+    let result = peer
         .call_tool(CallToolRequestParams::new(name.to_string()).with_arguments(arguments))
         .await
         .map_err(|err| format!("browser4agent {name} failed: {err}"))?;
@@ -227,13 +231,13 @@ fn parse_cdp_viewport(metrics: &Value) -> Result<(f64, f64), String> {
 }
 
 async fn cdp_command(
-    client: &RunningService<RoleClient, ClientConfig>,
+    peer: &BrowserPeer,
     tab_id: i64,
     method: &str,
     params: Value,
 ) -> Result<Value, String> {
     let result = call_tool(
-        client,
+        peer,
         "debugger_send_command",
         json!({ "tab_id": tab_id, "method": method, "params": params }),
     )
@@ -244,34 +248,69 @@ async fn cdp_command(
     serde_json::from_str(text).map_err(|err| format!("Invalid CDP {method} response: {err}"))
 }
 
-pub(super) async fn detach_cdp(client: &RunningService<RoleClient, ClientConfig>, tab_id: i64) {
+pub(super) async fn detach_cdp(peer: &BrowserPeer, tab_id: i64) {
     let _ = tokio::time::timeout(
         Duration::from_secs(2),
-        call_tool(client, "debugger_detach", json!({ "tab_id": tab_id })),
+        call_tool(peer, "debugger_detach", json!({ "tab_id": tab_id })),
     )
     .await;
 }
 
-pub(super) async fn tap(
-    client: &RunningService<RoleClient, ClientConfig>,
-    tab_id: i64,
-    x: f64,
-    y: f64,
-) -> Result<(), String> {
-    let metrics = cdp_command(client, tab_id, "Page.getLayoutMetrics", json!({})).await?;
-    let (width, height) = parse_cdp_viewport(&metrics)?;
-    let css_x = normalized_to_css(x, width);
-    let css_y = normalized_to_css(y, height);
+const BATCH_CDP_CLICK_SCRIPT: &str = r#"async (tabId, x, y) => {
+  const target = { tabId };
+  await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x,
+    y,
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+  });
+  await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x,
+    y,
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+  });
+  return true;
+}"#;
 
+async fn batch_cdp_click(
+    peer: &BrowserPeer,
+    tab_id: i64,
+    css_x: f64,
+    css_y: f64,
+) -> Result<(), String> {
+    call_tool(
+        peer,
+        "execute_script_in_background",
+        json!({
+            "func_str": BATCH_CDP_CLICK_SCRIPT,
+            "args": [tab_id, css_x, css_y],
+        }),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn sequential_cdp_click(
+    peer: &BrowserPeer,
+    tab_id: i64,
+    css_x: f64,
+    css_y: f64,
+) -> Result<(), String> {
     cdp_command(
-        client,
+        peer,
         tab_id,
         "Input.dispatchMouseEvent",
         json!({ "type": "mouseMoved", "x": css_x, "y": css_y }),
     )
     .await?;
     cdp_command(
-        client,
+        peer,
         tab_id,
         "Input.dispatchMouseEvent",
         json!({
@@ -285,7 +324,7 @@ pub(super) async fn tap(
     )
     .await?;
     cdp_command(
-        client,
+        peer,
         tab_id,
         "Input.dispatchMouseEvent",
         json!({
@@ -299,6 +338,37 @@ pub(super) async fn tap(
     )
     .await?;
     Ok(())
+}
+
+/// Dispatches a click at normalized `(x, y)` and returns the CSS viewport size
+/// used, so callers can reuse it across subsequent taps while the frame size is
+/// unchanged.
+pub(super) async fn tap(
+    peer: &BrowserPeer,
+    tab_id: i64,
+    x: f64,
+    y: f64,
+    cached_viewport: Option<(f64, f64)>,
+) -> Result<(f64, f64), String> {
+    if let Some((width, height)) = cached_viewport {
+        let css_x = normalized_to_css(x, width);
+        let css_y = normalized_to_css(y, height);
+        if batch_cdp_click(peer, tab_id, css_x, css_y).await.is_ok() {
+            return Ok((width, height));
+        }
+    }
+
+    // Attaches CDP through browser4agent's tracked debugger path and reads the
+    // live viewport metrics.
+    let metrics = cdp_command(peer, tab_id, "Page.getLayoutMetrics", json!({})).await?;
+    let (width, height) = parse_cdp_viewport(&metrics)?;
+    let css_x = normalized_to_css(x, width);
+    let css_y = normalized_to_css(y, height);
+
+    if batch_cdp_click(peer, tab_id, css_x, css_y).await.is_err() {
+        sequential_cdp_click(peer, tab_id, css_x, css_y).await?;
+    }
+    Ok((width, height))
 }
 
 #[cfg(test)]

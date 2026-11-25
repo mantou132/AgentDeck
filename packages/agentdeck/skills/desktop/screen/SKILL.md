@@ -5,7 +5,7 @@ description: Let the user watch an app you launched on this machine in the Agent
 
 # AgentDeck live screens
 
-The user reads your replies in the AgentDeck app, usually on a phone away from this machine, so they cannot see the simulator, emulator or browser on this machine's display. The client renders a fenced code block with the `agentdeck-screen` language as a card showing the current screen; tapping it opens a live view, refreshed by repeated screenshots, inside a phone or browser frame. Viewing only: the user cannot tap or type through it.
+The user reads your replies in the AgentDeck app, usually on a phone away from this machine, so they cannot see the simulator, emulator or browser on this machine's display. The client renders a fenced code block with the `agentdeck-screen` language as a card showing the current screen; tapping it opens a live view inside a phone or browser frame. The user can tap directly on `android:` and `browser:` screens (no swiping or typing yet); `ios:` is view-only.
 
 ````markdown
 ```agentdeck-screen
@@ -19,7 +19,7 @@ The body is one line, `<kind>:<id>`:
 
 - `ios:<udid>`: an iOS Simulator device. Get the UDID from `xcrun simctl list devices booted`; `ios:booted` works when exactly one device is booted.
 - `android:<serial>`: an Android emulator or device. Get the serial from `adb devices` (e.g. `android:emulator-5554`).
-- `browser:<tabId>`: a tab in the user's browser, only when the browser4agent tools are available to you. Get the id from its `list_tabs` tool. Capturing brings the tab to the front of its window.
+- `browser:<tabId>`: a tab in the user's browser, only when the browser4agent tools are available to you. Get the id from its `list_tabs` tool. On Chromium, background tabs are captured via CDP when possible; otherwise capturing brings the tab to the front of its window.
 
 ## Rules
 

@@ -48,9 +48,34 @@ const CAPTURE_TIMEOUT: Duration = Duration::from_secs(10);
 const INPUT_TIMEOUT: Duration = Duration::from_secs(5);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RawPixelFormat {
+    Rgba8888,
+    Rgbx8888,
+    Rgb888,
+    Bgra8888,
+}
+
+impl RawPixelFormat {
+    fn bytes_per_pixel(self) -> usize {
+        match self {
+            Self::Rgb888 => 3,
+            Self::Rgba8888 | Self::Rgbx8888 | Self::Bgra8888 => 4,
+        }
+    }
+}
+
 enum Captured {
     IosPng(Vec<u8>, RgbImage, Value),
     Frame(Vec<u8>, Value, ImageFormat),
+    RawPixels {
+        bytes: Vec<u8>,
+        offset: usize,
+        width: u32,
+        height: u32,
+        format: RawPixelFormat,
+        frame: Value,
+    },
 }
 
 impl Captured {
@@ -58,6 +83,7 @@ impl Captured {
         match self {
             Captured::IosPng(bytes, _, _) => bytes,
             Captured::Frame(bytes, _, _) => bytes,
+            Captured::RawPixels { bytes, offset, .. } => &bytes[*offset..],
         }
     }
 }
@@ -108,7 +134,83 @@ fn process_captured(captured: Captured, max_width: u32) -> Result<(Value, Vec<u8
                 jpeg,
             ))
         }
+        Captured::RawPixels {
+            bytes,
+            offset,
+            width,
+            height,
+            format,
+            frame,
+        } => {
+            let jpeg = encode_raw_pixels_jpeg(&bytes[offset..], width, height, format, max_width)?;
+            Ok((
+                json!({ "width": width, "height": height, "frame": frame }),
+                jpeg,
+            ))
+        }
     }
+}
+
+fn encode_raw_pixels_jpeg(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    format: RawPixelFormat,
+    max_width: u32,
+) -> Result<Vec<u8>, String> {
+    if width == 0 || height == 0 {
+        return Err("Raw screenshot has zero dimensions".to_string());
+    }
+    let bpp = format.bytes_per_pixel();
+    let expected = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|n| n.checked_mul(bpp))
+        .ok_or_else(|| "Raw screenshot dimensions overflow".to_string())?;
+    if pixels.len() < expected {
+        return Err("Truncated raw screenshot buffer".to_string());
+    }
+
+    let (out_w, out_h) = if width > max_width {
+        let h = (height as u64 * max_width as u64 / width as u64) as u32;
+        (max_width, h.max(1))
+    } else {
+        (width, height)
+    };
+    let src_w = width as usize;
+    let src_h = height as usize;
+    let dst_w = out_w as usize;
+    let dst_h = out_h as usize;
+    let sx_offsets: Vec<usize> = (0..dst_w).map(|x| (x * src_w / dst_w) * bpp).collect();
+
+    let mut rgb = vec![0u8; dst_w * dst_h * 3];
+    for y in 0..dst_h {
+        let src_row = (y * src_h / dst_h) * src_w * bpp;
+        let dst_row = y * dst_w * 3;
+        for (x, &sx_off) in sx_offsets.iter().enumerate() {
+            let s = src_row + sx_off;
+            let d = dst_row + x * 3;
+            match format {
+                RawPixelFormat::Rgba8888 | RawPixelFormat::Rgbx8888 | RawPixelFormat::Rgb888 => {
+                    rgb[d] = pixels[s];
+                    rgb[d + 1] = pixels[s + 1];
+                    rgb[d + 2] = pixels[s + 2];
+                }
+                RawPixelFormat::Bgra8888 => {
+                    rgb[d] = pixels[s + 2];
+                    rgb[d + 1] = pixels[s + 1];
+                    rgb[d + 2] = pixels[s];
+                }
+            }
+        }
+    }
+
+    let image = RgbImage::from_raw(out_w, out_h, rgb)
+        .ok_or_else(|| "Failed to build RGB image from raw screenshot".to_string())?;
+    let mut jpeg = Vec::new();
+    JpegEncoder::new_with_quality(&mut jpeg, JPEG_QUALITY)
+        .encode_image(&image)
+        .map_err(|err| format!("Failed to encode screenshot: {err}"))?;
+    Ok(jpeg)
 }
 
 fn encode_jpeg(image: RgbImage, max_width: u32) -> Result<Vec<u8>, String> {
@@ -198,6 +300,9 @@ trait ScreenDriver: Send {
     fn capture(
         &mut self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Captured, String>> + Send + '_>>;
+    fn browser_peer(&self) -> Option<browser::BrowserPeer> {
+        None
+    }
     fn detach_cdp(
         &mut self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
@@ -239,6 +344,7 @@ struct StreamEntry {
     id: u64,
     token: CancellationToken,
     cdp_input: Arc<AtomicBool>,
+    browser_peer: Option<browser::BrowserPeer>,
 }
 
 struct StreamEntryGuard {
@@ -261,6 +367,7 @@ impl Drop for StreamEntryGuard {
 pub struct ScreenStreamManager {
     streams: Arc<Mutex<HashMap<(u64, String), StreamEntry>>>,
     frame_sizes: Arc<Mutex<HashMap<String, (u32, u32)>>>,
+    browser_viewports: Arc<Mutex<HashMap<String, ((u32, u32), (f64, f64))>>>,
     next_id: Arc<AtomicU64>,
 }
 
@@ -282,6 +389,7 @@ impl ScreenStreamManager {
                     id: stream_id,
                     token: token.clone(),
                     cdp_input: cdp_input.clone(),
+                    browser_peer: None,
                 },
             ) {
                 old.token.cancel();
@@ -294,6 +402,42 @@ impl ScreenStreamManager {
             stream_id,
         };
         (stream_id, token, cdp_input, guard)
+    }
+
+    fn attach_browser_peer(
+        &self,
+        peer_id: u64,
+        target: &str,
+        stream_id: u64,
+        browser_peer: browser::BrowserPeer,
+    ) {
+        let mut streams = self.streams.lock().expect("lock poisoned");
+        let key = (peer_id, target.trim().to_string());
+        if let Some(entry) = streams.get_mut(&key)
+            && entry.id == stream_id
+        {
+            entry.browser_peer = Some(browser_peer);
+        }
+    }
+
+    fn browser_stream(&self, target: &str) -> Option<(browser::BrowserPeer, bool)> {
+        let target = target.trim();
+        let streams = self.streams.lock().expect("lock poisoned");
+        let mut peer = None;
+        let mut cdp_attached = false;
+        for ((_, t), entry) in streams.iter() {
+            if t == target {
+                if entry.cdp_input.load(Ordering::Relaxed) {
+                    cdp_attached = true;
+                }
+                if peer.is_none()
+                    && let Some(p) = &entry.browser_peer
+                {
+                    peer = Some(p.clone());
+                }
+            }
+        }
+        peer.map(|p| (p, cdp_attached))
     }
 
     fn remove_if_matches(&self, peer_id: u64, target: &str, stream_id: u64) {
@@ -341,6 +485,28 @@ impl ScreenStreamManager {
             .expect("lock poisoned")
             .get(target.trim())
             .copied()
+    }
+
+    fn cached_browser_viewport(&self, target: &str, frame_size: (u32, u32)) -> Option<(f64, f64)> {
+        self.browser_viewports
+            .lock()
+            .expect("lock poisoned")
+            .get(target.trim())
+            .and_then(|(cached_frame, viewport)| (*cached_frame == frame_size).then_some(*viewport))
+    }
+
+    fn record_browser_viewport(&self, target: &str, frame_size: (u32, u32), viewport: (f64, f64)) {
+        self.browser_viewports
+            .lock()
+            .expect("lock poisoned")
+            .insert(target.trim().to_string(), (frame_size, viewport));
+    }
+
+    fn clear_browser_viewport(&self, target: &str) {
+        self.browser_viewports
+            .lock()
+            .expect("lock poisoned")
+            .remove(target.trim());
     }
 
     pub fn stop_stream(&self, peer_id: u64, target: &str) {
@@ -401,17 +567,50 @@ impl ScreenStreamManager {
                     .map_err(|_| format!("Timed out sending tap to {target_key}"))?
             }
             ScreenTarget::Browser(tab_id) => {
-                let client = browser::connect_browser4agent().await?;
-                let result =
-                    tokio::time::timeout(INPUT_TIMEOUT, browser::tap(&client, tab_id, x, y))
-                        .await
-                        .map_err(|_| format!("Timed out sending tap to {target_key}"))
-                        .and_then(|res| res);
-                if result.is_ok() && !self.mark_cdp_input(target_key) {
-                    browser::detach_cdp(&client, tab_id).await;
+                let (peer, temp_client, cdp_attached) = match self.browser_stream(target_key) {
+                    Some((peer, cdp_attached)) => {
+                        // Mark before dispatch so a concurrent stream shutdown
+                        // still detaches CDP.
+                        self.mark_cdp_input(target_key);
+                        (peer, None, cdp_attached)
+                    }
+                    None => {
+                        let client = browser::connect_browser4agent().await?;
+                        let peer = client.peer().clone();
+                        (peer, Some(client), false)
+                    }
+                };
+                let frame_size = self.frame_size(target_key);
+                let cached_viewport = if cdp_attached {
+                    frame_size.and_then(|size| self.cached_browser_viewport(target_key, size))
+                } else {
+                    None
+                };
+                let result = tokio::time::timeout(
+                    INPUT_TIMEOUT,
+                    browser::tap(&peer, tab_id, x, y, cached_viewport),
+                )
+                .await
+                .map_err(|_| format!("Timed out sending tap to {target_key}"))
+                .and_then(|res| res);
+                match &result {
+                    Ok(viewport) => {
+                        if let Some(size) = frame_size {
+                            self.record_browser_viewport(target_key, size, *viewport);
+                        }
+                        if !self.mark_cdp_input(target_key) {
+                            browser::detach_cdp(&peer, tab_id).await;
+                            self.clear_browser_viewport(target_key);
+                        }
+                    }
+                    Err(_) => {
+                        self.clear_browser_viewport(target_key);
+                    }
                 }
-                let _ = client.cancel().await;
-                result
+                if let Some(client) = temp_client {
+                    let _ = client.cancel().await;
+                }
+                result.map(|_| ())
             }
             ScreenTarget::Ios(_) => {
                 Err("Tap input is not supported for iOS Simulator yet".to_string())
@@ -438,6 +637,9 @@ impl ScreenStreamManager {
             _ = loop_token.cancelled() => return Ok(json!({ "stopped": true })),
             res = parsed_target.connect() => res?,
         };
+        if let Some(browser_peer) = driver.browser_peer() {
+            self.attach_browser_peer(peer_id, target, stream_id, browser_peer);
+        }
 
         let target_str = target.trim().to_string();
         let mut last_hash: Option<u64> = None;
@@ -532,10 +734,11 @@ impl ScreenStreamManager {
             }
         }
 
-        if cdp_input.load(Ordering::Relaxed)
-            && !self.has_other_stream(peer_id, &target_str, stream_id)
-        {
-            driver.detach_cdp().await;
+        if !self.has_other_stream(peer_id, &target_str, stream_id) {
+            self.clear_browser_viewport(&target_str);
+            if cdp_input.load(Ordering::Relaxed) {
+                driver.detach_cdp().await;
+            }
         }
         driver.close().await;
         match stream_error {
@@ -747,5 +950,58 @@ mod tests {
 
         manager.stop_stream(2, "browser:7");
         assert!(!manager.has_other_stream(1, "browser:7", id1));
+    }
+
+    #[test]
+    fn raw_pixels_downscales_and_encodes_jpeg() {
+        let mut bytes = vec![0u8; 16 + 320 * 160 * 4];
+        for px in bytes[16..].chunks_exact_mut(4) {
+            px.copy_from_slice(&[20, 40, 200, 255]); // BGRA -> RGB (200, 40, 20)
+        }
+        let frame = json!({ "kind": "phone", "cornerRadius": 0 });
+        let (info, jpeg) = process_captured(
+            Captured::RawPixels {
+                bytes,
+                offset: 16,
+                width: 320,
+                height: 160,
+                format: RawPixelFormat::Bgra8888,
+                frame: frame.clone(),
+            },
+            160,
+        )
+        .unwrap();
+
+        assert_eq!(info["width"], 320);
+        assert_eq!(info["height"], 160);
+        assert_eq!(info["frame"], frame);
+        let decoded = image::load_from_memory_with_format(&jpeg, ImageFormat::Jpeg)
+            .unwrap()
+            .into_rgb8();
+        assert_eq!(decoded.dimensions(), (160, 80));
+        let [r, g, b] = decoded.get_pixel(80, 40).0;
+        assert!(
+            r > 180 && g < 60 && b < 40,
+            "unexpected pixel ({r}, {g}, {b})"
+        );
+    }
+
+    #[test]
+    fn browser_viewport_cache_invalidates_when_frame_size_changes() {
+        let manager = ScreenStreamManager::default();
+        manager.record_browser_viewport("browser:9", (1280, 720), (640.0, 360.0));
+        assert_eq!(
+            manager.cached_browser_viewport("browser:9", (1280, 720)),
+            Some((640.0, 360.0))
+        );
+        assert_eq!(
+            manager.cached_browser_viewport("browser:9", (800, 600)),
+            None
+        );
+        manager.clear_browser_viewport("browser:9");
+        assert_eq!(
+            manager.cached_browser_viewport("browser:9", (1280, 720)),
+            None
+        );
     }
 }

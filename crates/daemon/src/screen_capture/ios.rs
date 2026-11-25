@@ -113,6 +113,9 @@ async fn capture_ios_jpeg(udid: &str, frame: Value) -> Result<Captured, String> 
 async fn simctl_screenshot(udid: &str, format: &str, mask: &str) -> Result<Vec<u8>, String> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+    // `simctl io ... screenshot -` documents stdout, but current Xcode resolves
+    // `-` relative to CWD and writes a literal `./-` file (and `/dev/stdout`
+    // fails atomic write), so use a short-lived temp file.
     // Declared before `command` so when the future is dropped mid-capture, the
     // child process is killed first and the temp file is removed afterwards.
     let temp_file = TempFile(std::env::temp_dir().join(format!(
