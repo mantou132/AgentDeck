@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 
 /// The on-disk layout. Resolving a path never creates or deletes anything.
+#[derive(Clone, Debug)]
 pub(crate) struct AppPaths {
     root: PathBuf,
 }
@@ -105,6 +106,7 @@ impl AppPaths {
 
 /// Installed binaries, disposable download staging and owned state for one
 /// managed agent.
+#[derive(Clone, Debug)]
 pub(crate) struct AgentPaths {
     root: PathBuf,
 }

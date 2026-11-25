@@ -3,6 +3,7 @@ mod git;
 mod prompt;
 
 use std::{
+    collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     time::Duration,
@@ -73,7 +74,7 @@ pub type PeerSkills = Arc<Mutex<SkillSelection>>;
 #[derive(Clone)]
 pub struct AgentService {
     sessions: Arc<AgentSessionManager>,
-    end_listeners: Arc<Mutex<Vec<SessionEndCallback>>>,
+    end_listeners: Arc<Mutex<HashMap<u64, SessionEndCallback>>>,
     /// Scheduled tasks, set once by `init_tasks` when the daemon runs.
     tasks: Arc<OnceLock<Arc<Tasks>>>,
     screen_streams: screen_capture::ScreenStreamManager,
@@ -87,10 +88,15 @@ impl Default for AgentService {
 
 impl AgentService {
     pub fn new() -> Self {
-        let listeners: Arc<Mutex<Vec<SessionEndCallback>>> = Arc::default();
+        let listeners: Arc<Mutex<HashMap<u64, SessionEndCallback>>> = Arc::default();
         let listeners_cb = listeners.clone();
         let on_end: SessionEndCallback = Arc::new(move |agent, session_id| {
-            let list = listeners_cb.lock().expect("lock poisoned").clone();
+            let list: Vec<SessionEndCallback> = listeners_cb
+                .lock()
+                .expect("lock poisoned")
+                .values()
+                .cloned()
+                .collect();
             for cb in list {
                 cb(agent, session_id);
             }
@@ -244,15 +250,15 @@ impl AgentService {
             })
         };
         let notify_peer = peer.clone();
-        self.end_listeners
-            .lock()
-            .expect("lock poisoned")
-            .push(Arc::new(move |agent, session_id| {
+        self.end_listeners.lock().expect("lock poisoned").insert(
+            peer_id,
+            Arc::new(move |agent, session_id| {
                 notify_peer.notify(
                     "agent_session_ended",
                     json!({ "agent": agent, "sessionId": session_id }),
                 );
-            }));
+            }),
+        );
 
         let sessions = self.sessions.clone();
         peer.handle("agent_cwd_complete", move |params, _ctx| async move {

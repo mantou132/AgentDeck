@@ -148,7 +148,7 @@ pub(crate) struct Monitor {
 }
 impl Monitor {
     pub fn start(paths: &AppPaths) -> Result<Self> {
-        let paths = AppPaths::new(paths.root().to_owned());
+        let paths = paths.clone();
         let (stop, rx) = mpsc::channel();
         let thread = thread::Builder::new()
             .name("keep-awake".into())

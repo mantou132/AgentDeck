@@ -8,6 +8,7 @@ pub(crate) mod encryption;
 
 use std::{
     collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -58,11 +59,8 @@ pub(crate) struct RemoteDevice {
     pub(crate) attached_at: Option<u64>,
 }
 
-fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
-    let Ok(path) = AppPaths::discover().map(|paths| paths.peers_file()) else {
-        return HashMap::new();
-    };
-    let Ok(content) = std::fs::read_to_string(&path) else {
+fn load_persisted_peers(path: &Path) -> HashMap<String, RemoteDevice> {
+    let Ok(content) = std::fs::read_to_string(path) else {
         return HashMap::new();
     };
     let mut peers: HashMap<String, RemoteDevice> =
@@ -76,17 +74,17 @@ fn load_persisted_peers() -> HashMap<String, RemoteDevice> {
         filled = true;
     }
     if filled {
-        save_persisted_peers(&peers);
+        save_persisted_peers(Some(path), &peers);
     }
     peers
 }
 
-fn save_persisted_peers(map: &HashMap<String, RemoteDevice>) {
-    let Ok(paths) = AppPaths::discover() else {
+fn save_persisted_peers(path: Option<&Path>, map: &HashMap<String, RemoteDevice>) {
+    let Some(path) = path else {
         return;
     };
     if let Ok(content) = serde_json::to_string_pretty(map) {
-        let _ = app_data::write_file_atomic(&paths.peers_file(), content);
+        let _ = app_data::write_file_atomic(path, content);
     }
 }
 
@@ -196,6 +194,7 @@ impl Broadcaster {
 pub struct RemotePeerManager {
     service: AgentService,
     outbound_tx: OutboundSender,
+    peers_file: Option<PathBuf>,
     devices: Arc<Mutex<HashMap<String, RemoteDevice>>>,
     peers: Arc<Mutex<HashMap<u64, (Peer, PeerSkills)>>>,
     ephemeral_calls: EphemeralCalls,
@@ -209,10 +208,18 @@ pub struct RemotePeerManager {
 }
 
 impl RemotePeerManager {
-    pub fn new(service: AgentService, outbound_tx: OutboundSender, relay_id: &str) -> Self {
+    pub fn new(
+        paths: &AppPaths,
+        service: AgentService,
+        outbound_tx: OutboundSender,
+        relay_id: &str,
+    ) -> Self {
+        let peers_file = paths.peers_file();
+        let initial_devices = load_persisted_peers(&peers_file);
         Self {
+            peers_file: Some(peers_file),
             push_host: push::host_key(relay_id),
-            ..Self::with_devices(service, outbound_tx, load_persisted_peers())
+            ..Self::with_devices(service, outbound_tx, initial_devices)
         }
     }
 
@@ -229,6 +236,7 @@ impl RemotePeerManager {
         Self {
             service,
             outbound_tx,
+            peers_file: None,
             devices: Arc::new(Mutex::new(initial_dev_map)),
             peers: Arc::default(),
             ephemeral_calls: Arc::default(),
@@ -345,7 +353,7 @@ impl RemotePeerManager {
                 };
                 existing.fcm_token = new_token;
                 existing.attached_at = Some(now);
-                save_persisted_peers(&dev_map);
+                save_persisted_peers(self.peers_file.as_deref(), &dev_map);
                 return peer_id;
             }
         }
@@ -372,7 +380,7 @@ impl RemotePeerManager {
                     attached_at: Some(now),
                 },
             );
-            save_persisted_peers(&dev_map);
+            save_persisted_peers(self.peers_file.as_deref(), &dev_map);
         }
         assigned
     }
@@ -540,6 +548,7 @@ impl ClientHandler for Handler {
 
 /// Start the remote RPC transport with the configured relay URL and pairing ID.
 pub fn start(
+    paths: &AppPaths,
     relay_url: &str,
     relay_id: &str,
     service: &AgentService,
@@ -553,6 +562,7 @@ pub fn start(
     let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel::<Outbound>();
 
     let manager = Arc::new(RemotePeerManager::new(
+        paths,
         service.clone(),
         outbound_tx,
         relay_id,
@@ -747,24 +757,18 @@ mod tests {
         .unwrap();
         let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::unbounded_channel();
         // A known device keeps this test independent from user pairing files.
-        let manager = Arc::new(RemotePeerManager {
-            service: AgentService::new(),
+        let manager = Arc::new(RemotePeerManager::with_devices(
+            AgentService::new(),
             outbound_tx,
-            devices: Arc::new(Mutex::new(HashMap::from([(
+            HashMap::from([(
                 "test-phone".into(),
                 RemoteDevice {
                     peer_id: 1,
                     fcm_token: None,
                     attached_at: None,
                 },
-            )]))),
-            peers: Arc::default(),
-            ephemeral_calls: Arc::default(),
-            next_peer_id: Arc::new(AtomicU64::new(2)),
-            push_client: reqwest::Client::new(),
-            push_host: String::new(),
-            latest_skills: Arc::default(),
-        });
+            )]),
+        ));
         let handler = Handler {
             manager,
             codec: Arc::new(RelayCodec::new(vector["id"].as_str().unwrap()).unwrap()),
