@@ -442,6 +442,14 @@ export class AgentApi {
       ephemeral: true,
     });
 
+  /** Send a normalized tap (`x`, `y` in `[0, 1]`) to a screen target (`android:` / `browser:`). */
+  tapScreen = (target: string, x: number, y: number) =>
+    this.#peer.call<void>('screen_input', { target, action: 'tap', x, y }, undefined, {
+      timeoutMs: 5000,
+      timeoutMessage: i18n.get('screen.timeout'),
+      ephemeral: true,
+    });
+
   /** Any host file as raw bytes, for serving it verbatim; `range` is `[offset, length]` of one slice. */
   readRawFile = (path: string, range?: [number, number], cwd?: string) =>
     this.#peer.call<{ path: string; type: 'binary'; size: number; data: Uint8Array<ArrayBuffer> }>(

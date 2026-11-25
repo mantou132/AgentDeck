@@ -1,13 +1,18 @@
 import { createDecoratorTheme } from '@mantou/gem/helper/theme';
+import type { Emitter } from '@mantou/gem/lib/decorators';
+import { AXIS_LOCK_SLOP, type EndEventDetail, type TapGestureElement } from '@mantou/tap-ui/elements/gesture';
+import { Toast } from '@mantou/tap-ui/elements/toast';
 import type { ScreenCapture } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
+import { hapticImpact } from '../lib/haptics';
 import { openScreen } from '../navigation';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
 type ScreenShot = ScreenCapture & { src: string };
+export type ScreenTap = { x: number; y: number };
 
 /** Latest frame per target, shared by the cards and the live page. */
 const screenStore = createStore({ shots: {} as Record<string, ScreenShot | undefined> });
@@ -180,6 +185,22 @@ const deviceTheme = createDecoratorTheme({ ratio: '1', corner: '0' });
 /** Corner of a phone-emulating browser tab, which reports no screen shape; close to a current iPhone. */
 const EMULATED_PHONE_CORNER = 0.13;
 
+const exceededTapSlop = (moves: readonly { x: number; y: number }[]) => {
+  let dx = 0;
+  let dy = 0;
+  for (const move of moves) {
+    dx += move.x;
+    dy += move.y;
+    if (Math.hypot(dx, dy) > AXIS_LOCK_SLOP) return true;
+  }
+  return false;
+};
+
+const supportsTap = (target: string) => {
+  const { kind } = parseTarget(target);
+  return kind === 'android' || kind === 'browser';
+};
+
 const deviceStyle = css`
   :host {
     display: block;
@@ -198,6 +219,9 @@ const deviceStyle = css`
     display: block;
     width: 100%;
     aspect-ratio: ${deviceTheme.ratio};
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
   }
   .phone {
     --bezel: 0.625rem;
@@ -216,12 +240,31 @@ const deviceStyle = css`
     overflow: hidden;
     border-radius: calc(var(--w) * ${deviceTheme.corner});
     background: #000;
+    cursor: pointer;
+  }
+  .viewport {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .ripple {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.45);
+    box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.25);
+    opacity: 0;
+    pointer-events: none;
   }
   svg {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
   }
   .window {
     --bar: 2.25rem;
@@ -270,6 +313,52 @@ const deviceStyle = css`
 @shadow()
 export class DeckScreenDeviceElement extends GemElement {
   @property shot?: ScreenShot;
+  @emitter tap: Emitter<ScreenTap>;
+
+  #rippleRef = createRef<HTMLSpanElement>();
+  #multiTouch = false;
+
+  #preventDefault = (evt: Event) => evt.preventDefault();
+
+  #onMultiTouch = () => {
+    this.#multiTouch = true;
+  };
+
+  #showRipple = (x: number, y: number) => {
+    const el = this.#rippleRef.value;
+    if (!el) return;
+    for (const animation of el.getAnimations()) animation.cancel();
+    const left = `${x * 100}%`;
+    const top = `${y * 100}%`;
+    el.animate(
+      [
+        { left, top, transform: 'translate(-50%, -50%) scale(0.35)', opacity: 0.85 },
+        { left, top, transform: 'translate(-50%, -50%) scale(1.6)', opacity: 0 },
+      ],
+      { duration: 420, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    );
+  };
+
+  #onEnd = (evt: CustomEvent<EndEventDetail>) => {
+    const multiTouch = this.#multiTouch;
+    this.#multiTouch = false;
+    const { event, pressed } = evt.detail;
+    if (multiTouch || pressed || event.type !== 'pointerup' || !event.isPrimary) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+    const gesture = evt.currentTarget as TapGestureElement;
+    const moves = gesture.movesMap.get(event.pointerId);
+    if (moves && exceededTapSlop(moves)) return;
+
+    const rect = gesture.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+
+    this.#showRipple(x, y);
+    this.tap({ x, y });
+  };
 
   @deviceTheme((i: DeckScreenDeviceElement) => [
     i.shot?.width,
@@ -295,7 +384,15 @@ export class DeckScreenDeviceElement extends GemElement {
               <span class="dots"><i></i><i></i><i></i></span>
               <span class="url" title=${frame.url}>${frame.url || frame.title}</span>
             </div>
-            <img src=${shot.src} alt=${frame.title} />
+            <tap-gesture
+              class="viewport"
+              @end=${this.#onEnd}
+              @pinch=${this.#onMultiTouch}
+              @contextmenu=${this.#preventDefault}
+            >
+              <img src=${shot.src} alt=${frame.title} />
+              <span ${this.#rippleRef} class="ripple" aria-hidden="true"></span>
+            </tap-gesture>
           </div>
         </div>
       `;
@@ -304,12 +401,18 @@ export class DeckScreenDeviceElement extends GemElement {
     return html`
       <div class="stage">
         <div class="phone">
-          <div class="screen">
+          <tap-gesture
+            class="screen"
+            @end=${this.#onEnd}
+            @pinch=${this.#onMultiTouch}
+            @contextmenu=${this.#preventDefault}
+          >
             <img src=${shot.src} alt="" />
             <svg v-if=${!!cutouts} viewBox="0 0 ${shot.width} ${shot.height}" aria-hidden="true">
               ${cutouts?.map(({ path, transform }) => svg`<path d=${path} transform=${transform}></path>`)}
             </svg>
-          </div>
+            <span ${this.#rippleRef} class="ripple" aria-hidden="true"></span>
+          </tap-gesture>
         </div>
       </div>
     `;
@@ -336,6 +439,17 @@ export class DeckScreenPageElement extends GemElement {
   #state = createState({ error: '', revision: 0, deferFrame: false, entered: false });
 
   #retry = () => this.#state({ error: '', revision: this.#state.revision + 1 });
+
+  #onTap = async (evt: CustomEvent<ScreenTap>) => {
+    if (!this.target || this.#state.error || agentdeckStore.connection !== 'connected') return;
+    if (!supportsTap(this.target)) return;
+    hapticImpact('light');
+    try {
+      await agentApi.tapScreen(this.target, evt.detail.x, evt.detail.y);
+    } catch (error) {
+      Toast.open('error', errorMessage(error));
+    }
+  };
 
   // When there is no cached frame, the initial frame may arrive midway through enter animation; wait until animation completes before displaying device frame. Existing cached frames are displayed immediately
   @effect((i) => [i.target])
@@ -396,7 +510,12 @@ export class DeckScreenPageElement extends GemElement {
       <tap-page class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
         <tap-navbar slot="header" title=${targetName(this.target, shot)} back default-back></tap-navbar>
         <main class="relative h-full overflow-hidden">
-          <deck-screen-device v-if=${showShot} class=${error ? 'opacity-40' : ''} .shot=${shot}></deck-screen-device>
+          <deck-screen-device
+            v-if=${showShot}
+            class=${error ? 'opacity-40' : ''}
+            .shot=${shot}
+            @tap=${this.#onTap}
+          ></deck-screen-device>
           <deck-loading v-else-if=${!error} label=${i18n.get('screen.loading')}></deck-loading>
           <deck-error
             v-if=${!!error}

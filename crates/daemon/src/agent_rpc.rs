@@ -368,6 +368,24 @@ impl AgentService {
             }
         });
 
+        let input_mgr = self.screen_streams.clone();
+        peer.handle("screen_input", move |params, _ctx| {
+            let mgr = input_mgr.clone();
+            async move {
+                let target = required_str(&params, "target", "screen_input")?;
+                let action = required_str(&params, "action", "screen_input")?;
+                match action {
+                    "tap" => {
+                        let x = required_f64(&params, "x", "screen_input")?;
+                        let y = required_f64(&params, "y", "screen_input")?;
+                        mgr.tap(target, x, y).await?;
+                        Ok(json!({ "ok": true }))
+                    }
+                    other => Err(format!("Unsupported screen_input action: {other}")),
+                }
+            }
+        });
+
         peer.handle("git_status", move |params, _ctx| async move {
             let cwd = message_cwd(&params).or_else(|| {
                 params
@@ -734,6 +752,13 @@ fn non_empty_str<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
 
 fn required_str<'a>(params: &'a Value, field: &str, method: &str) -> Result<&'a str, String> {
     non_empty_str(params, field).ok_or_else(|| format!("{method} requires a string {field}"))
+}
+
+fn required_f64(params: &Value, field: &str, method: &str) -> Result<f64, String> {
+    params
+        .get(field)
+        .and_then(Value::as_f64)
+        .ok_or_else(|| format!("{method} requires a number {field}"))
 }
 
 /// An agent failure for the app. ACP `AuthRequired` gets the `auth_required`
