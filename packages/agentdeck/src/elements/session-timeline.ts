@@ -6,12 +6,12 @@ import { Sheet } from '@mantou/tap-ui/elements/sheet';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { closestElement } from '@mantou/tap-ui/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { setSelectionMenuItems } from 'src/lib/selection-menu';
 import type { ElicitationResponse } from '../agent/api';
 import { extractMessageAttachments } from '../attachment/message';
 import type { Attachment } from '../attachment/types';
 import { i18n } from '../i18n';
 import { hapticImpact } from '../lib/haptics';
+import { setSelectionMenuItems } from '../lib/selection-menu';
 import { openMessageLink } from '../navigation';
 import type { Elicitation } from '../session/elicitation';
 import { getProcessSummary, getToolStatus, groupTimelineMessages, type ProcessGroup } from '../session/timeline';
@@ -81,13 +81,17 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #openProcessSheet = (group: ProcessGroup) => {
-    Sheet.open({
+    const result = Sheet.open({
       maskClosable: true,
       hasStack: true,
       // Pulling up scales only the Stack beside the split view sidebar; fit the content instead
       snap: !isSplitView(),
       body: html`
-        <deck-process-detail .sessionId=${this.sessionKey} .groupId=${group.id}></deck-process-detail>
+        <deck-process-detail
+          .sessionId=${this.sessionKey}
+          .groupId=${group.id}
+          @navigate=${() => result.sheet.close(null)}
+        ></deck-process-detail>
       `,
     });
   };

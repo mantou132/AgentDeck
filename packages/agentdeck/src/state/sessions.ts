@@ -487,12 +487,14 @@ export const resumeInFlightTurn = ({ sessionId, rpcId, session, messages, option
     options: options ?? getRuntime(sessionId).options,
   });
   setMessages(sessionId, messages);
+  const lastUserIndex = messages.findLastIndex((m) => 'role' in m && m.role === 'user');
+  const turnStart = lastUserIndex === -1 ? 0 : lastUserIndex + 1;
   agentApi.resumePrompt(rpcId, {
     onEvent: (event) => applySessionEvent(sessionId, event),
     resolve: (result) => {
       if (result?.answer) {
         const current = getMessages(sessionId);
-        const hasAnswer = current.some((m) => 'role' in m && m.role === 'agent' && m.text);
+        const hasAnswer = current.slice(turnStart).some((m) => 'role' in m && m.role === 'agent' && m.text);
         if (!hasAnswer) {
           setMessages(sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: result.answer }]);
         }

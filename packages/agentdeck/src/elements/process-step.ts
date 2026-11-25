@@ -1,5 +1,5 @@
 import type { Emitter } from '@mantou/gem/lib/decorators';
-import { TapPageElement } from '@mantou/tap-ui/elements/page';
+import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from '../i18n';
 import { toolCallDiffs } from '../lib/diff';
@@ -90,16 +90,14 @@ export class DeckProcessStepElement extends GemElement {
   @property itemId = '';
   @emitter navigate: Emitter;
 
-  #pageRef = createRef<HTMLElement>();
+  #pageRef = createRef<TapPageElement>();
   #contentRef = createRef<HTMLElement>();
 
   @effect((i) => [i.sessionId, i.groupId, i.itemId, i.#updating, i.#pageRef.value, i.#contentRef.value])
   #followContent = () =>
-    followBottom(
-      this.#pageRef.value?.shadowRoot?.querySelector<HTMLElement>(`[part=${TapPageElement.main}]`),
-      this.#contentRef.value,
-      { isActive: () => this.#updating },
-    )?.disconnect;
+    followBottom(this.#pageRef.value?.scrollElement, this.#contentRef.value, {
+      isActive: () => this.#updating,
+    })?.disconnect;
 
   @memo((i) => [
     i.sessionId,
