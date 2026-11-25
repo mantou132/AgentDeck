@@ -426,7 +426,10 @@ export class AgentApi {
     this.#peer.call<void>(
       'screen_stream',
       { target, maxWidth },
-      (event) => onFrame(event as ScreenCapture & { data: Uint8Array<ArrayBuffer> }),
+      (event) => {
+        if ((event as { keepalive?: boolean } | null)?.keepalive) return;
+        onFrame(event as ScreenCapture & { data: Uint8Array<ArrayBuffer> });
+      },
       { timeoutMs: 30_000, timeoutMessage: i18n.get('screen.timeout'), ephemeral: true },
       callId,
     );

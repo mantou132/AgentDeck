@@ -266,10 +266,26 @@ impl RemotePeerManager {
             }
         });
         let skills = PeerSkills::default();
-        self.service
-            .attach_with_push(&peer, Some(self.push_handler(peer_id)), skills.clone());
+        self.service.attach_with_push(
+            &peer,
+            peer_id,
+            Some(self.push_handler(peer_id)),
+            skills.clone(),
+        );
         peers.insert(peer_id, (peer.clone(), skills.clone()));
         (peer, skills)
+    }
+
+    pub(crate) fn stop_streams_for_device(&self, device_id: &str) {
+        let peer_id = self
+            .devices
+            .lock()
+            .expect("lock poisoned")
+            .get(device_id)
+            .map(|device| device.peer_id);
+        if let Some(peer_id) = peer_id {
+            self.service.stop_screen_streams(peer_id);
+        }
     }
 
     fn broadcaster(&self) -> Broadcaster {
@@ -471,6 +487,17 @@ impl ClientHandler for Handler {
         });
     }
 
+    fn on_peer_connected(&self, device_id: &str) {
+        // A reconnecting or socket-replacing peer already dropped its ephemeral
+        // calls on the client side; stop any stale streams from its previous
+        // connection.
+        self.manager.stop_streams_for_device(device_id);
+    }
+
+    fn on_peer_disconnected(&self, device_id: &str) {
+        self.manager.stop_streams_for_device(device_id);
+    }
+
     fn on_connected(&self) {
         tracing::info!("Connected to relay WebSocket");
         // Ephemeral: only devices online now need to re-attach; a stored copy
@@ -490,9 +517,11 @@ impl ClientHandler for Handler {
     fn on_disconnected(&self, _error: Option<String>) {
         // Relay client reconnects indefinitely in the background; do not log
         // disconnects or connection errors to avoid flooding logs or disk.
+        self.manager.service.stop_all_screen_streams();
     }
 
     fn on_preempted(&self) {
+        self.manager.service.stop_all_screen_streams();
         tracing::info!("Relay connection preempted: another host connection opened");
     }
 }
@@ -525,7 +554,8 @@ pub fn start(
             manager: manager.clone(),
             codec: codec.clone(),
         }),
-    );
+    )
+    .with_presence();
 
     let send_client = client.clone();
     tokio::spawn(async move {

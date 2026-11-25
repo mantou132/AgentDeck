@@ -94,6 +94,7 @@ pub struct AgentService {
     end_listeners: Arc<Mutex<Vec<SessionEndCallback>>>,
     /// Scheduled tasks, set once by `init_tasks` when the daemon runs.
     tasks: Arc<OnceLock<Arc<Tasks>>>,
+    screen_streams: screen_capture::ScreenStreamManager,
 }
 
 impl Default for AgentService {
@@ -116,6 +117,7 @@ impl AgentService {
             sessions: Arc::new(AgentSessionManager::new(Some(on_end))),
             end_listeners: listeners,
             tasks: Arc::default(),
+            screen_streams: screen_capture::ScreenStreamManager::default(),
         }
     }
 
@@ -127,9 +129,18 @@ impl AgentService {
             .clone()
     }
 
+    pub fn stop_screen_streams(&self, peer_id: u64) {
+        self.screen_streams.stop_peer(peer_id);
+    }
+
+    pub fn stop_all_screen_streams(&self) {
+        self.screen_streams.stop_all();
+    }
+
     /// Gracefully close active ACP sessions and terminate managed ACP agent
     /// runtimes.
     pub async fn shutdown(&self) {
+        self.screen_streams.stop_all();
         if let Some(tasks) = self.tasks.get() {
             tasks.shutdown();
         }
@@ -223,10 +234,16 @@ impl AgentService {
     /// Attach this service's RPC handlers to a duplex Peer endpoint.
     #[allow(dead_code)]
     pub fn attach(&self, peer: &Peer) {
-        self.attach_with_push(peer, None, PeerSkills::default());
+        self.attach_with_push(peer, 0, None, PeerSkills::default());
     }
 
-    pub fn attach_with_push(&self, peer: &Peer, push: Option<PeerPush>, skills: PeerSkills) {
+    pub fn attach_with_push(
+        &self,
+        peer: &Peer,
+        peer_id: u64,
+        push: Option<PeerPush>,
+        skills: PeerSkills,
+    ) {
         // The device each session's notifications go to; see
         // `SessionActor::notifier`. A permission request or question also
         // reaches it as a push, since the turn waits on it while the App may be
@@ -331,23 +348,22 @@ impl AgentService {
             screen_capture::capture(target, max_width).await
         });
 
-        let stream_manager = screen_capture::ScreenStreamManager::default();
-        let stream_mgr = stream_manager.clone();
+        let stream_mgr = self.screen_streams.clone();
         peer.handle("screen_stream", move |params, ctx| {
             let mgr = stream_mgr.clone();
             async move {
                 let target = required_str(&params, "target", "screen_stream")?;
                 let max_width = params.get("maxWidth").and_then(Value::as_u64);
-                mgr.start_stream(target, max_width, ctx).await
+                mgr.start_stream(peer_id, target, max_width, ctx).await
             }
         });
 
-        let stop_mgr = stream_manager.clone();
+        let stop_mgr = self.screen_streams.clone();
         peer.handle("screen_stream_stop", move |params, _ctx| {
             let mgr = stop_mgr.clone();
             async move {
                 let target = required_str(&params, "target", "screen_stream_stop")?;
-                mgr.stop_stream(target);
+                mgr.stop_stream(peer_id, target);
                 Ok(json!({ "stopped": true }))
             }
         });

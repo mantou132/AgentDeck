@@ -3,6 +3,7 @@ import type { ScreenCapture } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { openScreen } from '../navigation';
+import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
 import { agentDeckTheme } from '../styles/theme';
 
@@ -139,7 +140,7 @@ export class DeckScreenElement extends GemElement {
       if (!entry.isIntersecting) return;
       observer.disconnect();
       try {
-        await captureScreen(this.#target, this.clientWidth);
+        await captureScreen(this.#target, this.clientWidth || 320);
       } catch (error) {
         this.#state({ error: errorMessage(error) });
       }
@@ -270,7 +271,11 @@ const deviceStyle = css`
 export class DeckScreenDeviceElement extends GemElement {
   @property shot?: ScreenShot;
 
-  @deviceTheme((i: DeckScreenDeviceElement) => [i.shot?.width, i.shot?.height, i.shot?.frame])
+  @deviceTheme((i: DeckScreenDeviceElement) => [
+    i.shot?.width,
+    i.shot?.height,
+    i.shot?.frame.kind === 'phone' ? i.shot.frame.cornerRadius : i.shot?.frame.mobile,
+  ])
   #theme = () => {
     const { width = 1, height = 1, frame } = this.shot || {};
     const corner = frame?.kind === 'phone' ? frame.cornerRadius / width : frame?.mobile ? EMULATED_PHONE_CORNER : 0;
@@ -320,10 +325,11 @@ const pageStyle = css`
   }
 `;
 
-/** Live view: polls frames while open; leaving the page ends the loop, so the host keeps no capture state. */
+/** Live view: streams frames while open and visible, stops when hidden or left, and resumes automatically on reconnect. */
 @customElement('deck-screen-page')
 @adoptedStyle(pageStyle)
 @connectStore(screenStore)
+@connectStore(agentdeckStore)
 export class DeckScreenPageElement extends GemElement {
   @property target = '';
 
@@ -335,26 +341,37 @@ export class DeckScreenPageElement extends GemElement {
   @effect((i) => [i.target])
   #checkCache = () => this.#state({ deferFrame: !screenStore.shots[this.target] });
 
-  @effect((i) => [i.target, i.#state.revision])
+  @effect((i) => [i.target, i.#state.revision, agentdeckStore.connection === 'connected'])
   #live = () => {
-    let stopped = false;
     const target = this.target;
+    if (!target || agentdeckStore.connection !== 'connected') return;
+
+    let stopped = false;
     const maxWidth = Math.round(Math.min(innerWidth, 1024) * devicePixelRatio);
 
+    const stopOnHost = () => {
+      if (agentdeckStore.connection === 'connected') {
+        agentApi.stopStreamScreen(target).catch(() => {});
+      }
+    };
+
     const runStream = async () => {
-      if (document.hidden || stopped) return;
+      if (document.hidden || stopped || agentdeckStore.connection !== 'connected') return;
+      this.#state({ error: '' });
       try {
         await agentApi.streamScreen(target, maxWidth, (frame) => {
           if (!stopped && !document.hidden) setScreenFrame(target, frame);
         });
       } catch (error) {
-        if (!stopped && !document.hidden) this.#state({ error: errorMessage(error) });
+        if (stopped || document.hidden || agentdeckStore.connection !== 'connected') return;
+        stopOnHost();
+        this.#state({ error: errorMessage(error) });
       }
     };
 
     const onVisibilityChange = () => {
       if (document.hidden) {
-        agentApi.stopStreamScreen(target).catch(() => {});
+        stopOnHost();
       } else if (!stopped) {
         runStream();
       }
@@ -366,7 +383,7 @@ export class DeckScreenPageElement extends GemElement {
     return () => {
       stopped = true;
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      agentApi.stopStreamScreen(target).catch(() => {});
+      stopOnHost();
     };
   };
 

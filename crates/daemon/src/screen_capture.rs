@@ -1,6 +1,6 @@
-//! `screen_capture` RPC: one frame of an app the agent launched on this
-//! machine, for the client's `agentdeck-screen` block. The client polls frame
-//! by frame, so nothing here keeps state between calls.
+//! `screen_capture` and `screen_stream` RPCs: single frame and live push stream
+//! of an app the agent launched on this machine, for the client's
+//! `agentdeck-screen` block and live view.
 //!
 //! Targets:
 //! - `ios:<udid|booted>`: iOS Simulator via `simctl`. Its alpha mask carries
@@ -18,15 +18,19 @@ use std::{
     collections::HashMap,
     env,
     hash::{DefaultHasher, Hash, Hasher},
+    io::Cursor,
     path::PathBuf,
     process::Output,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Duration,
 };
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use image::{
-    DynamicImage, ImageFormat, RgbImage,
+    DynamicImage, ImageFormat, ImageReader, RgbImage,
     codecs::jpeg::JpegEncoder,
     imageops::{self, FilterType},
 };
@@ -43,17 +47,18 @@ use tokio_util::sync::CancellationToken;
 const DEFAULT_MAX_WIDTH: u32 = 800;
 const JPEG_QUALITY: u8 = 80;
 const CAPTURE_TIMEOUT: Duration = Duration::from_secs(10);
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 const BROWSER4AGENT_MCP_URL: &str = "http://127.0.0.1:39271/mcp";
 
 enum Captured {
-    Ios(Vec<u8>),
+    IosPng(Vec<u8>, RgbImage, Value),
     Frame(Vec<u8>, Value, ImageFormat),
 }
 
 impl Captured {
     fn raw_bytes(&self) -> &[u8] {
         match self {
-            Captured::Ios(bytes) => bytes,
+            Captured::IosPng(bytes, _, _) => bytes,
             Captured::Frame(bytes, _, _) => bytes,
         }
     }
@@ -67,9 +72,27 @@ fn hash_bytes(bytes: &[u8]) -> u64 {
 
 fn process_captured(captured: Captured, max_width: u32) -> Result<(Value, Vec<u8>), String> {
     match captured {
-        Captured::Ios(png) => {
-            let (image, frame) = decode_ios_png(&png)?;
+        Captured::IosPng(_raw, image, frame) => {
             let (width, height) = (image.width(), image.height());
+            let jpeg = encode_jpeg(image, max_width)?;
+            Ok((
+                json!({ "width": width, "height": height, "frame": frame }),
+                jpeg,
+            ))
+        }
+        Captured::Frame(bytes, frame, ImageFormat::Jpeg) => {
+            let (width, height) = ImageReader::with_format(Cursor::new(&bytes), ImageFormat::Jpeg)
+                .into_dimensions()
+                .map_err(|err| format!("Failed to read JPEG dimensions: {err}"))?;
+            if width <= max_width {
+                return Ok((
+                    json!({ "width": width, "height": height, "frame": frame }),
+                    bytes,
+                ));
+            }
+            let image = image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
+                .map_err(|err| format!("Failed to decode screenshot: {err}"))?
+                .into_rgb8();
             let jpeg = encode_jpeg(image, max_width)?;
             Ok((
                 json!({ "width": width, "height": height, "frame": frame }),
@@ -170,13 +193,15 @@ impl ScreenDriver for IosDriver {
                 return capture_ios_jpeg(&self.udid, frame.clone()).await;
             }
 
-            let captured = capture_ios(&self.udid).await?;
-            let Captured::Ios(png) = &captured else {
-                unreachable!("the initial iOS capture is a PNG")
-            };
-            let (_, frame) = decode_ios_png(png)?;
-            self.frame = Some(frame);
-            Ok(captured)
+            let png = capture_ios_png(&self.udid).await?;
+            let (png, image, frame) = tokio::task::spawn_blocking(move || {
+                let (image, frame) = decode_ios_png(&png)?;
+                Ok::<_, String>((png, image, frame))
+            })
+            .await
+            .map_err(|err| format!("iOS screenshot decode task failed: {err}"))??;
+            self.frame = Some(frame.clone());
+            Ok(Captured::IosPng(png, image, frame))
         })
     }
 }
@@ -226,13 +251,14 @@ impl ScreenDriver for BrowserDriver {
 }
 
 async fn capture_raw(target: &str) -> Result<Captured, String> {
-    let target = ScreenTarget::parse(target)?;
-    let mut driver = target.connect().await?;
+    let parsed = ScreenTarget::parse(target)?;
+    let mut driver = parsed.connect().await?;
     let captured = tokio::time::timeout(CAPTURE_TIMEOUT, driver.capture())
         .await
-        .map_err(|_| format!("Timed out capturing target"))??;
+        .map_err(|_| format!("Timed out capturing {target}"))
+        .and_then(|res| res);
     driver.close().await;
-    Ok(captured)
+    captured
 }
 
 pub async fn capture(
@@ -251,22 +277,92 @@ pub async fn capture(
     .map_err(|err| format!("Screen capture task failed: {err}"))?
 }
 
-/// Tracks active screen streams, cancelling the previous loop when a client
-/// starts a new stream or disconnects.
+struct StreamEntryGuard {
+    manager: ScreenStreamManager,
+    peer_id: u64,
+    target: String,
+    stream_id: u64,
+}
+
+impl Drop for StreamEntryGuard {
+    fn drop(&mut self) {
+        self.manager
+            .remove_if_matches(self.peer_id, &self.target, self.stream_id);
+    }
+}
+
+/// Tracks active screen streams per `(peer_id, target)`, cancelling the
+/// previous loop when a client starts a new stream, stops it, or disconnects.
 #[derive(Clone, Default)]
 pub struct ScreenStreamManager {
-    streams: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    streams: Arc<Mutex<HashMap<(u64, String), (u64, CancellationToken)>>>,
+    next_id: Arc<AtomicU64>,
 }
 
 impl ScreenStreamManager {
-    pub fn stop_stream(&self, target: &str) {
-        if let Some(token) = self.streams.lock().expect("lock poisoned").remove(target) {
+    fn register(&self, peer_id: u64, target: &str) -> (u64, CancellationToken, StreamEntryGuard) {
+        let stream_id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
+        let token = CancellationToken::new();
+        {
+            let mut streams = self.streams.lock().expect("lock poisoned");
+            if let Some((_, old)) =
+                streams.insert((peer_id, target.to_string()), (stream_id, token.clone()))
+            {
+                old.cancel();
+            }
+        }
+        let guard = StreamEntryGuard {
+            manager: self.clone(),
+            peer_id,
+            target: target.to_string(),
+            stream_id,
+        };
+        (stream_id, token, guard)
+    }
+
+    fn remove_if_matches(&self, peer_id: u64, target: &str, stream_id: u64) {
+        let mut streams = self.streams.lock().expect("lock poisoned");
+        let key = (peer_id, target.to_string());
+        if streams.get(&key).is_some_and(|(id, _)| *id == stream_id) {
+            streams.remove(&key);
+        }
+    }
+
+    pub fn stop_stream(&self, peer_id: u64, target: &str) {
+        if let Some((_, token)) = self
+            .streams
+            .lock()
+            .expect("lock poisoned")
+            .remove(&(peer_id, target.to_string()))
+        {
+            token.cancel();
+        }
+    }
+
+    pub fn stop_peer(&self, peer_id: u64) {
+        let mut streams = self.streams.lock().expect("lock poisoned");
+        let keys: Vec<(u64, String)> = streams
+            .keys()
+            .filter(|(pid, _)| *pid == peer_id)
+            .cloned()
+            .collect();
+        for key in keys {
+            if let Some((_, token)) = streams.remove(&key) {
+                token.cancel();
+            }
+        }
+    }
+
+    pub fn stop_all(&self) {
+        let mut streams = self.streams.lock().expect("lock poisoned");
+        for (_, (_, token)) in streams.drain() {
             token.cancel();
         }
     }
 
     pub async fn start_stream(
         &self,
+        peer_id: u64,
         target: &str,
         max_width: Option<u64>,
         ctx: crate::peer::CallCtx,
@@ -275,83 +371,102 @@ impl ScreenStreamManager {
             .map(|width| width.clamp(160, 2000) as u32)
             .unwrap_or(DEFAULT_MAX_WIDTH);
         let parsed_target = ScreenTarget::parse(target)?;
-        let mut driver = parsed_target.connect().await?;
 
-        let token = CancellationToken::new();
-        {
-            let mut streams = self.streams.lock().expect("lock poisoned");
-            if let Some(old) = streams.insert(target.to_string(), token.clone()) {
-                old.cancel();
-            }
-        }
+        // Register before `connect()` so a stop or disconnect arriving while
+        // connecting cancels this stream immediately.
+        let (_stream_id, loop_token, _guard) = self.register(peer_id, target);
+        let mut driver = tokio::select! {
+            _ = loop_token.cancelled() => return Ok(json!({ "stopped": true })),
+            res = parsed_target.connect() => res?,
+        };
 
         let target_str = target.to_string();
-        let loop_token = token.clone();
-        let loop_mgr = self.clone();
-
         let mut last_hash: Option<u64> = None;
+        let mut last_emitted = tokio::time::Instant::now();
         let mut consecutive_errors = 0;
 
         while !loop_token.is_cancelled() {
             let frame_start = tokio::time::Instant::now();
-            tokio::select! {
+            let capture_res = tokio::select! {
                 _ = loop_token.cancelled() => break,
-                res = tokio::time::timeout(CAPTURE_TIMEOUT, driver.capture()) => {
-                    let res = match res {
-                        Ok(inner) => inner,
-                        Err(_) => Err(format!("Timed out capturing {target_str}")),
+                res = tokio::time::timeout(CAPTURE_TIMEOUT, driver.capture()) => match res {
+                    Ok(inner) => inner,
+                    Err(_) => Err(format!("Timed out capturing {target_str}")),
+                },
+            };
+
+            match capture_res {
+                Ok(captured) => {
+                    consecutive_errors = 0;
+                    let current_hash = hash_bytes(captured.raw_bytes());
+                    if last_hash == Some(current_hash) {
+                        // Screen unchanged: zero-bandwidth static detection,
+                        // with a periodic lightweight keepalive so the client's
+                        // inactivity timer does not expire on idle screens.
+                        if last_emitted.elapsed() >= KEEPALIVE_INTERVAL {
+                            ctx.emit(json!({ "keepalive": true }));
+                            last_emitted = tokio::time::Instant::now();
+                        }
+                        tokio::select! {
+                            _ = loop_token.cancelled() => break,
+                            _ = tokio::time::sleep(Duration::from_millis(50)) => {}
+                        }
+                        continue;
+                    }
+                    last_hash = Some(current_hash);
+
+                    let processed = tokio::select! {
+                        _ = loop_token.cancelled() => break,
+                        res = tokio::task::spawn_blocking(move || {
+                            process_captured(captured, max_width)
+                        }) => res,
                     };
-                    match res {
-                        Ok(captured) => {
-                            consecutive_errors = 0;
-                            let current_hash = hash_bytes(captured.raw_bytes());
-                            if last_hash == Some(current_hash) {
-                                // Screen unchanged: zero-bandwidth static detection.
-                                tokio::time::sleep(Duration::from_millis(50)).await;
-                                continue;
-                            }
-                            last_hash = Some(current_hash);
 
-                            let processed = tokio::task::spawn_blocking(move || {
-                                process_captured(captured, max_width)
-                            })
-                            .await;
+                    if loop_token.is_cancelled() {
+                        break;
+                    }
 
-                            match processed {
-                                Ok(Ok((info, bytes))) => {
-                                    ctx.emit_with_bytes(info, bytes);
-                                }
-                                Ok(Err(err)) => {
-                                    tracing::warn!("Failed to process screen frame for {target_str}: {err}");
-                                }
-                                Err(err) => {
-                                    tracing::warn!("Screen process task panicked for {target_str}: {err}");
-                                }
-                            }
-                            // Pace active frames up to ~30 FPS without extra latency
-                            let elapsed = frame_start.elapsed();
-                            let min_frame_duration = Duration::from_millis(33);
-                            if elapsed < min_frame_duration {
-                                tokio::time::sleep(min_frame_duration - elapsed).await;
-                            }
+                    match processed {
+                        Ok(Ok((info, bytes))) => {
+                            ctx.emit_with_bytes(info, bytes);
+                            last_emitted = tokio::time::Instant::now();
+                        }
+                        Ok(Err(err)) => {
+                            tracing::warn!(
+                                "Failed to process screen frame for {target_str}: {err}"
+                            );
                         }
                         Err(err) => {
-                            consecutive_errors += 1;
-                            tracing::debug!("Screen capture error for {target_str}: {err}");
-                            if consecutive_errors >= 5 {
-                                driver.close().await;
-                                loop_mgr.stop_stream(&target_str);
-                                return Err(err);
-                            }
-                            tokio::time::sleep(Duration::from_millis(200)).await;
+                            tracing::warn!("Screen process task panicked for {target_str}: {err}");
                         }
+                    }
+
+                    // Pace active frames up to ~30 FPS without extra latency.
+                    let elapsed = frame_start.elapsed();
+                    let min_frame_duration = Duration::from_millis(33);
+                    if elapsed < min_frame_duration {
+                        tokio::select! {
+                            _ = loop_token.cancelled() => break,
+                            _ = tokio::time::sleep(min_frame_duration - elapsed) => {}
+                        }
+                    }
+                }
+                Err(err) => {
+                    consecutive_errors += 1;
+                    tracing::debug!("Screen capture error for {target_str}: {err}");
+                    if consecutive_errors >= 5 {
+                        driver.close().await;
+                        return Err(err);
+                    }
+                    tokio::select! {
+                        _ = loop_token.cancelled() => break,
+                        _ = tokio::time::sleep(Duration::from_millis(200)) => {}
                     }
                 }
             }
         }
 
         driver.close().await;
-        loop_mgr.stop_stream(&target_str);
         Ok(json!({ "stopped": true }))
     }
 }
@@ -427,12 +542,19 @@ async fn simctl_path() -> Result<&'static PathBuf, String> {
         .await
 }
 
-async fn capture_ios(udid: &str) -> Result<Captured, String> {
+struct TempFile(PathBuf);
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+async fn capture_ios_png(udid: &str) -> Result<Vec<u8>, String> {
     if !cfg!(target_os = "macos") {
         return Err("iOS Simulator is only available on macOS".into());
     }
-    let png = simctl_screenshot(udid, "png", "alpha").await?;
-    Ok(Captured::Ios(png))
+    simctl_screenshot(udid, "png", "alpha").await
 }
 
 async fn capture_ios_jpeg(udid: &str, frame: Value) -> Result<Captured, String> {
@@ -444,27 +566,24 @@ async fn capture_ios_jpeg(udid: &str, frame: Value) -> Result<Captured, String> 
 }
 
 async fn simctl_screenshot(udid: &str, format: &str, mask: &str) -> Result<Vec<u8>, String> {
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let temp_path = std::env::temp_dir().join(format!(
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+    // Declared before `command` so when the future is dropped mid-capture, the
+    // child process is killed first and the temp file is removed afterwards.
+    let temp_file = TempFile(std::env::temp_dir().join(format!(
         "agentdeck-simctl-{}-{count}.{format}",
         std::process::id()
-    ));
+    )));
     let simctl = simctl_path().await?;
     let mut command = Command::new(simctl);
     let type_arg = format!("--type={format}");
     let mask_arg = format!("--mask={mask}");
     command.args(["io", udid, "screenshot", &type_arg, &mask_arg]);
-    command.arg(&temp_path);
-    let output = run(&mut command, "simctl").await;
-    let result = match output {
-        Ok(_) => tokio::fs::read(&temp_path)
-            .await
-            .map_err(|err| format!("Failed to read simctl screenshot: {err}")),
-        Err(err) => Err(err),
-    };
-    let _ = tokio::fs::remove_file(&temp_path).await;
-    result
+    command.arg(&temp_file.0);
+    run(&mut command, "simctl").await?;
+    tokio::fs::read(&temp_file.0)
+        .await
+        .map_err(|err| format!("Failed to read simctl screenshot: {err}"))
 }
 
 /// Radius of the transparent top-left corner: the diagonal meets a circle of
@@ -647,21 +766,42 @@ pub async fn browser_has_tab(tab_id: i64, url: &str) -> bool {
         .is_some_and(|tab| tab.get("url").and_then(Value::as_str) == Some(url))
 }
 
+fn detect_image_format(mime_type: &str, bytes: &[u8]) -> Result<ImageFormat, String> {
+    let mime = mime_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    match mime.as_str() {
+        "image/jpeg" | "image/jpg" => Ok(ImageFormat::Jpeg),
+        "image/png" => Ok(ImageFormat::Png),
+        _ => image::guess_format(bytes)
+            .map_err(|err| format!("Unsupported screenshot format ({mime_type}): {err}")),
+    }
+}
+
 async fn capture_browser_fast(
     client: &RunningService<RoleClient, ClientConfig>,
     tab_id: i64,
     frame: Value,
 ) -> Result<Captured, String> {
-    let shot = call_tool(client, "screenshot_tab", json!({ "tab_id": tab_id })).await?;
+    let shot = call_tool(
+        client,
+        "screenshot_tab",
+        json!({ "tab_id": tab_id, "format": "jpeg", "quality": JPEG_QUALITY }),
+    )
+    .await?;
     let data = shot
         .content
         .iter()
         .find_map(|content| content.as_image())
         .ok_or("browser4agent returned no screenshot")?;
-    let png = STANDARD
+    let bytes = STANDARD
         .decode(&data.data)
         .map_err(|err| format!("Invalid browser screenshot: {err}"))?;
-    Ok(Captured::Frame(png, frame, ImageFormat::Png))
+    let format = detect_image_format(&data.mime_type, &bytes)?;
+    Ok(Captured::Frame(bytes, frame, format))
 }
 
 /// Whether the tab emulates a phone (DevTools device mode sets a mobile UA
@@ -812,7 +952,26 @@ mod tests {
     }
 
     #[test]
-    fn processes_jpeg_frames_with_cached_frame_metadata() {
+    fn detects_jpeg_and_png_formats() {
+        assert_eq!(
+            detect_image_format("image/jpeg", &[]).unwrap(),
+            ImageFormat::Jpeg
+        );
+        assert_eq!(
+            detect_image_format("image/PNG; charset=utf-8", &[]).unwrap(),
+            ImageFormat::Png
+        );
+
+        let image = RgbImage::from_pixel(4, 4, image::Rgb([1, 2, 3]));
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, JPEG_QUALITY)
+            .encode_image(&image)
+            .unwrap();
+        assert_eq!(detect_image_format("", &jpeg).unwrap(), ImageFormat::Jpeg);
+    }
+
+    #[test]
+    fn jpeg_within_max_width_passes_through_without_reencoding() {
         let image = RgbImage::from_pixel(32, 64, image::Rgb([12, 34, 56]));
         let mut jpeg = Vec::new();
         JpegEncoder::new_with_quality(&mut jpeg, JPEG_QUALITY)
@@ -821,7 +980,7 @@ mod tests {
         let frame = json!({ "kind": "phone", "cornerRadius": 48 });
 
         let (info, output) = process_captured(
-            Captured::Frame(jpeg, frame.clone(), ImageFormat::Jpeg),
+            Captured::Frame(jpeg.clone(), frame.clone(), ImageFormat::Jpeg),
             DEFAULT_MAX_WIDTH,
         )
         .unwrap();
@@ -829,22 +988,94 @@ mod tests {
         assert_eq!(info["width"], 32);
         assert_eq!(info["height"], 64);
         assert_eq!(info["frame"], frame);
-        assert!(output.starts_with(&[0xff, 0xd8]));
+        assert_eq!(output, jpeg);
+    }
+
+    #[test]
+    fn jpeg_wider_than_max_width_is_resized() {
+        let image = RgbImage::from_pixel(320, 160, image::Rgb([12, 34, 56]));
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, JPEG_QUALITY)
+            .encode_image(&image)
+            .unwrap();
+        let frame = json!({ "kind": "browser", "title": "t", "url": "https://a", "mobile": false });
+
+        let (info, output) =
+            process_captured(Captured::Frame(jpeg, frame.clone(), ImageFormat::Jpeg), 160).unwrap();
+
+        assert_eq!(info["width"], 320);
+        assert_eq!(info["height"], 160);
+        assert_eq!(info["frame"], frame);
+        let (out_w, out_h) = ImageReader::with_format(Cursor::new(&output), ImageFormat::Jpeg)
+            .into_dimensions()
+            .unwrap();
+        assert_eq!((out_w, out_h), (160, 80));
+    }
+
+    #[test]
+    fn temp_file_is_removed_on_drop() {
+        let path =
+            std::env::temp_dir().join(format!("agentdeck-temp-file-test-{}", std::process::id()));
+        std::fs::write(&path, b"test").unwrap();
+        {
+            let _temp = TempFile(path.clone());
+            assert!(path.exists());
+        }
+        assert!(!path.exists());
     }
 
     #[tokio::test]
     async fn screen_stream_manager_cancels_active_stream() {
         let manager = ScreenStreamManager::default();
-        let token = CancellationToken::new();
-        manager
-            .streams
-            .lock()
-            .unwrap()
-            .insert("test:target".to_string(), token.clone());
+        let (_id, token, _guard) = manager.register(1, "test:target");
 
         assert!(!token.is_cancelled());
-        manager.stop_stream("test:target");
+        manager.stop_stream(1, "test:target");
         assert!(token.is_cancelled());
-        assert!(!manager.streams.lock().unwrap().contains_key("test:target"));
+        assert!(
+            !manager
+                .streams
+                .lock()
+                .unwrap()
+                .contains_key(&(1, "test:target".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn replacing_stream_does_not_let_old_guard_cancel_new_stream() {
+        let manager = ScreenStreamManager::default();
+        let (_id_a, token_a, guard_a) = manager.register(1, "test:target");
+        let (_id_b, token_b, _guard_b) = manager.register(1, "test:target");
+
+        assert!(token_a.is_cancelled());
+        assert!(!token_b.is_cancelled());
+
+        drop(guard_a);
+
+        assert!(!token_b.is_cancelled());
+        assert!(
+            manager
+                .streams
+                .lock()
+                .unwrap()
+                .contains_key(&(1, "test:target".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn stop_peer_and_stop_all_isolate_streams_by_peer() {
+        let manager = ScreenStreamManager::default();
+        let (_id1, token1, _g1) = manager.register(1, "ios:booted");
+        let (_id2, token2, _g2) = manager.register(1, "browser:1");
+        let (_id3, token3, _g3) = manager.register(2, "ios:booted");
+
+        manager.stop_peer(1);
+        assert!(token1.is_cancelled());
+        assert!(token2.is_cancelled());
+        assert!(!token3.is_cancelled());
+
+        manager.stop_all();
+        assert!(token3.is_cancelled());
+        assert!(manager.streams.lock().unwrap().is_empty());
     }
 }
