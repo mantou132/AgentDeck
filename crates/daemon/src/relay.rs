@@ -23,12 +23,12 @@ use serde_json::{Value, json};
 use self::codec::{Frame, RelayCodec};
 use crate::{
     acp_agent,
-    agent_rpc::{AgentService, PeerSkills},
+    agent_rpc::{self, AgentService, PeerSkills},
     app_data::{self, AppPaths},
     awake,
     peer::Peer,
     push,
-    render_skills::{self, SkillSelection},
+    render_skills::SkillSelection,
 };
 
 const HOST_DEVICE_ID: &str = "host";
@@ -420,40 +420,15 @@ impl RemotePeerManager {
 
         let peer_id = self.resolve_peer_id(&device_id, requested_peer_id, params.get("fcmToken"));
         let (_peer, skills) = self.peer_entry(peer_id);
-        // Every attach re-declares the client's skills; later sessions use
-        // them.
-        let mut declared: SkillSelection = params
-            .get("skills")
-            .cloned()
-            .and_then(|value| serde_json::from_value(value).ok())
-            .unwrap_or_default();
-        // Clients disable the features this host doesn't offer.
-        let restricted_features = render_skills::restricted_features(&declared.groups);
-        // The client sends this version through `skills_install` before using
-        // the host.
-        let skills_missing = !render_skills::select(&mut declared);
+        let (declared, mut result) = agent_rpc::peer_attach(&params);
         *self.latest_skills.lock().expect("lock poisoned") = declared.clone();
         *skills.lock().expect("lock poisoned") = declared;
+        result["peerId"] = json!(peer_id);
+        result["deviceId"] = json!(device_id);
 
-        // Clients compare it against their minimum supported host version.
-        let version = env!("CARGO_PKG_VERSION");
-        // Clients label remembered pairings with it.
-        let hostname = gethostname::gethostname().to_string_lossy().into_owned();
-        // Clients shorten paths under it to `~`.
-        let home = dirs::home_dir().map(|home| home.to_string_lossy().into_owned());
-        // Clients list them below `free` in their agent picker.
-        let custom_agents = acp_agent::custom_agent_list();
         let response = match id {
-            Some(req_id) => json!({
-                "peerId": peer_id,
-                "id": req_id,
-                "result": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing, "restrictedFeatures": restricted_features }
-            }),
-            None => json!({
-                "peerId": peer_id,
-                "method": "peer_attached",
-                "params": { "peerId": peer_id, "deviceId": device_id, "version": version, "hostname": hostname, "home": home, "customAgents": custom_agents, "skillsMissing": skills_missing, "restrictedFeatures": restricted_features }
-            }),
+            Some(req_id) => json!({ "peerId": peer_id, "id": req_id, "result": result }),
+            None => json!({ "peerId": peer_id, "method": "peer_attached", "params": result }),
         };
         let target = if device_id.is_empty() {
             None

@@ -758,7 +758,7 @@ mod tests {
             ),
         ]);
         assert_eq!(
-            session_metadata_from_meta(Some(&meta)),
+            super::runtime::session_metadata_from_meta(Some(&meta)),
             (
                 Some("Loaded title".to_string()),
                 Some("2026-08-27T00:00:00Z".to_string())

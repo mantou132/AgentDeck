@@ -70,6 +70,36 @@ pub type PeerPush = Arc<dyn Fn(PushKind, &str, &str) + Send + Sync>;
 /// Skills the peer declared in its latest `peer_attach`.
 pub type PeerSkills = Arc<Mutex<SkillSelection>>;
 
+/// The host side of `peer_attach`: the skills the client declares, with the
+/// ones this host doesn't offer dropped, and what the reply tells it about
+/// this host.
+pub fn peer_attach(params: &Value) -> (SkillSelection, Value) {
+    // Every attach re-declares the client's skills; later sessions use them.
+    let mut declared: SkillSelection = params
+        .get("skills")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    // Clients disable the features this host doesn't offer.
+    let restricted_features = render_skills::restricted_features(&declared.groups);
+    // The client sends this version through `skills_install` before using the
+    // host.
+    let skills_missing = !render_skills::select(&mut declared);
+    let info = json!({
+        // Clients compare it against their minimum supported host version.
+        "version": env!("CARGO_PKG_VERSION"),
+        // Clients label remembered pairings with it.
+        "hostname": gethostname::gethostname().to_string_lossy(),
+        // Clients shorten paths under it to `~`.
+        "home": dirs::home_dir().map(|home| home.to_string_lossy().into_owned()),
+        // Clients list them below `free` in their agent picker.
+        "customAgents": acp_agent::custom_agent_list(),
+        "skillsMissing": skills_missing,
+        "restrictedFeatures": restricted_features,
+    });
+    (declared, info)
+}
+
 /// Central host service managing ACP agent sessions and exposing RPC routes.
 #[derive(Clone)]
 pub struct AgentService {
