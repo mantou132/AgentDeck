@@ -37,6 +37,17 @@ export const agentDeckTheme = extendTheme({
   primaryShadow: 'var(--shadow-primary)',
 });
 
+/** Common full-height page layout with bottom safe-area footer spacer. */
+export const pageStyle = css`
+  :scope {
+    display: block;
+    height: 100%;
+  }
+  footer {
+    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  }
+`;
+
 /** Common layout for `tap-page` inside a Sheet (`Sheet.open({ hasStack: true })`). */
 export const sheetPageStyle = css`
   :scope {

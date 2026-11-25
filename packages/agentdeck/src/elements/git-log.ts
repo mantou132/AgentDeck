@@ -1,4 +1,3 @@
-import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { Time } from '@mantou/tap-ui/lib/time';
 import type { GitLogResult } from '../agent/api';
 import { agentApi } from '../agent/transport';
@@ -7,18 +6,9 @@ import { displayPath } from '../lib/path';
 import { openChanges } from '../navigation';
 import { agentdeckStore, hostHome } from '../state/store';
 import { icons } from '../styles/icons';
-
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
-`;
+import { pageStyle } from '../styles/theme';
 
 @customElement('deck-git-log-page')
-@adoptedStyle(blockContainer)
 @adoptedStyle(pageStyle)
 @connectStore(agentdeckStore)
 export class DeckGitLogPageElement extends GemElement {

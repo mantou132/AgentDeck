@@ -1,6 +1,5 @@
 import { ActionSheet } from '@mantou/tap-ui/elements/action-sheet';
 import { Stack } from '@mantou/tap-ui/elements/stack';
-import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import type { TaskListItem, TaskRun } from '../agent/api';
 import { agentApi } from '../agent/transport';
@@ -19,19 +18,8 @@ import {
   tasksStore,
 } from '../state/tasks';
 import { icons } from '../styles/icons';
+import { pageStyle } from '../styles/theme';
 import { renderTaskStatus } from './task-group';
-
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
-  deck-foldable {
-    margin: 0;
-  }
-`;
 
 /** Opens a session of `agent` without switching the App's global agent setting. */
 const openAgentSession = (agent: string, sessionId: string, cwd = '') => {
@@ -57,7 +45,6 @@ const duration = ({ startedAt, endedAt }: TaskRun) =>
 
 /** A scheduled task: a waiting permission request of its run, what it does, its runs and the actions. */
 @customElement('deck-task-page')
-@adoptedStyle(blockContainer)
 @adoptedStyle(pageStyle)
 @connectStore(tasksStore)
 @connectStore(agentdeckStore)

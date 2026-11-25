@@ -1,7 +1,6 @@
 import type { TapCodeBlockElement } from '@mantou/tap-ui/elements/code-block';
 import { Stack } from '@mantou/tap-ui/elements/stack';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { isTauri } from '@tauri-apps/api/core';
 import { share } from '@vnidrop/tauri-plugin-share';
 import type { RemoteFile } from '../agent/api';
@@ -11,24 +10,18 @@ import { getCodeLang, getMimeType, isSmallTextFile } from '../lib/file-preview';
 import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from '../lib/markdown';
 import { openFileBrowser, openMessageLink } from '../navigation';
 import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, pageStyle } from '../styles/theme';
 
 const style = css`
-  :scope {
-    height: 100%;
-  }
   mark {
     background: ${agentDeckTheme.primarySoftColor};
     color: inherit;
     scroll-margin-inline-start: 1rem;
   }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
 `;
 
 @customElement('deck-file-viewer')
-@adoptedStyle(blockContainer)
+@adoptedStyle(pageStyle)
 @adoptedStyle(style)
 export class DeckFileViewerElement extends GemElement {
   @property path = '';

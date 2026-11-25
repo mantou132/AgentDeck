@@ -9,7 +9,7 @@ import { hapticImpact } from '../lib/haptics';
 import { openScreen } from '../navigation';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, pageStyle } from '../styles/theme';
 
 type ScreenShot = ScreenCapture & { src: string };
 export type ScreenTap = { x: number; y: number };
@@ -418,15 +418,6 @@ export class DeckScreenDeviceElement extends GemElement {
     `;
   };
 }
-
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
-`;
 
 /** Live view: streams frames while open and visible, stops when hidden or left, and resumes automatically on reconnect. */
 @customElement('deck-screen-page')

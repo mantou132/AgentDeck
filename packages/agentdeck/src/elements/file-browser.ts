@@ -9,6 +9,7 @@ import { displayPath, getBreadcrumbs, getParentPath } from '../lib/path';
 import { openFileViewer } from '../navigation';
 import { agentdeckStore, hostHome } from '../state/store';
 import { icons } from '../styles/icons';
+import { pageStyle } from '../styles/theme';
 
 const browserStyle = css`
   :scope {
@@ -23,22 +24,6 @@ const browserStyle = css`
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior-y: contain;
-  }
-`;
-
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
-  deck-file-browser {
-    height: 100%;
-  }
-  deck-file-browser .entries-container {
-    max-height: none;
-    flex: 1;
-  }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -303,7 +288,6 @@ export class DeckFileBrowserElement extends GemElement {
 }
 
 @customElement('deck-file-browser-page')
-@adoptedStyle(blockContainer)
 @adoptedStyle(pageStyle)
 export class DeckFileBrowserPageElement extends GemElement {
   @property path = '';

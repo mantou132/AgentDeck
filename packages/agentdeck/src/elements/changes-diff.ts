@@ -1,25 +1,16 @@
-import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { GitDiffResult } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
 import { diffColorScheme } from '../lib/diff';
 import { agentdeckStore } from '../state/store';
 import { icons } from '../styles/icons';
+import { pageStyle } from '../styles/theme';
+import { diffCounts } from './changes';
 
 // Heavy element stays out of the initial bundle; markup upgrades once it defines itself.
 import('@gem-bind/diff2html');
 
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
-`;
-
 @customElement('deck-changes-diff-page')
-@adoptedStyle(blockContainer)
 @adoptedStyle(pageStyle)
 @connectStore(agentdeckStore)
 export class DeckChangesDiffPageElement extends GemElement {
@@ -75,10 +66,7 @@ export class DeckChangesDiffPageElement extends GemElement {
         </tap-navbar>
         <div slot="header" class="flex items-center gap-2 border-b border-border-strong bg-bg-light/75 px-4 py-2 font-mono text-xs backdrop-blur-lg">
           <deck-file-path class="min-w-0 flex-1 text-describe" path=${this.path}></deck-file-path>
-          <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5">
-            ${stats?.insertions ? html`<span class="font-medium text-positive">+${stats.insertions}</span>` : ''}
-            ${stats?.deletions ? html`<span class="font-medium text-negative">-${stats.deletions}</span>` : ''}
-          </div>
+          <div v-if=${!!stats} class="flex shrink-0 items-center gap-1.5">${stats && diffCounts(stats)}</div>
         </div>
 
         <main class="flex min-h-full flex-col">

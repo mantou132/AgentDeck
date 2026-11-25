@@ -2,7 +2,7 @@ import type { LngLatBoundsLike, Map as MapLibreMap, MapOptions } from 'maplibre-
 import { i18n } from '../i18n';
 import { openMap } from '../navigation';
 import { icons } from '../styles/icons';
-import { agentDeckTheme } from '../styles/theme';
+import { agentDeckTheme, pageStyle } from '../styles/theme';
 
 type Position = [lng: number, lat: number];
 
@@ -323,10 +323,7 @@ export class DeckMapElement extends GemElement {
   };
 }
 
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
+const mapPageStyle = css`
   :scope .map {
     position: absolute;
     inset: 0;
@@ -346,13 +343,11 @@ const pageStyle = css`
   :scope .maplibregl-popup-content strong {
     color: ${agentDeckTheme.highlightColor};
   }
-  :scope footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
 `;
 
 @customElement('deck-map-page')
 @adoptedStyle(pageStyle)
+@adoptedStyle(mapPageStyle)
 export class DeckMapPageElement extends GemElement {
   @property source = '';
 

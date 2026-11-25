@@ -253,7 +253,7 @@ export const selectSession = (sessionId: string) => {
 export const openTask = (taskId: string) => {
   Stack.push({
     animated: true,
-    content: html`<deck-task-page class="block h-full" .taskId=${taskId}></deck-task-page>`,
+    content: html`<deck-task-page .taskId=${taskId}></deck-task-page>`,
     gesture: true,
   });
 };

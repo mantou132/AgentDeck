@@ -1,4 +1,3 @@
-import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { GitFileStatus, GitShowResult, GitStatusResult } from '../agent/api';
 import { agentApi } from '../agent/transport';
 import { i18n } from '../i18n';
@@ -6,17 +5,9 @@ import { displayPath } from '../lib/path';
 import { openChangesDiff, openGitLog } from '../navigation';
 import { agentdeckStore, hostHome } from '../state/store';
 import { icons } from '../styles/icons';
+import { pageStyle } from '../styles/theme';
 
-const pageStyle = css`
-  :scope {
-    height: 100%;
-  }
-  footer {
-    height: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  }
-`;
-
-const diffCounts = ({ insertions, deletions }: { insertions?: number; deletions?: number }) => html`
+export const diffCounts = ({ insertions, deletions }: { insertions?: number; deletions?: number }) => html`
   ${insertions ? html`<span class="font-medium text-positive">+${insertions}</span>` : ''}
   ${deletions ? html`<span class="font-medium text-negative">-${deletions}</span>` : ''}
 `;
@@ -49,7 +40,6 @@ const badgeInfo = (status: string) => {
 };
 
 @customElement('deck-changes-page')
-@adoptedStyle(blockContainer)
 @adoptedStyle(pageStyle)
 @connectStore(agentdeckStore)
 export class DeckChangesPageElement extends GemElement {
