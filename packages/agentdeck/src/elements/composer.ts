@@ -2,10 +2,10 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { longPress } from '@mantou/tap-ui/lib/directives';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
-import { getStringFromTemplate } from '@mantou/tap-ui/lib/utils';
 import type { AvailableCommand } from 'src/agent/api';
-import { AttachmentError, MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from 'src/attachment/read';
+import { MAX_ATTACHMENTS, MAX_TEXT_BYTES, readAttachment } from 'src/attachment/read';
 import type { Attachment } from 'src/attachment/types';
+import { readAttachments } from 'src/composer/attachments';
 import { readDraft, saveDraft } from 'src/composer/drafts';
 import {
   createPasteReference,
@@ -15,7 +15,8 @@ import {
 } from 'src/composer/references';
 import { i18n } from 'src/i18n';
 import { hapticSelection } from 'src/lib/haptics';
-import { ensureRecognitionPermission, speechSupported, startRecognitionSession } from 'src/lib/speech-recognition';
+import { isMobileApp } from 'src/lib/platform';
+import { ensureRecognitionPermission, startRecognitionSession } from 'src/lib/speech-recognition';
 import { icons } from 'src/styles/icons';
 
 export type ComposerInput = { text: string; attachments: Attachment[]; voiceChat?: boolean };
@@ -34,16 +35,6 @@ const style = css`
     }
   }
 `;
-
-export const attachmentErrorMessage = (error: unknown) =>
-  error instanceof AttachmentError
-    ? getStringFromTemplate(
-        i18n.get(
-          error.reason === 'tooLarge' ? 'composer.attachmentTooLarge' : 'composer.attachmentReadFailed',
-          error.fileName,
-        ),
-      )
-    : String(error);
 
 @customElement('deck-composer')
 @adoptedStyle(style)
@@ -134,12 +125,7 @@ export class DeckComposerElement extends GemElement {
   get #voiceChatEntry() {
     const { draft, quote, attachments } = this.#state;
     return (
-      speechSupported &&
-      !this.pending &&
-      !draft.trim() &&
-      !quote.trim() &&
-      !attachments.length &&
-      !this.#activeSuggestion
+      isMobileApp && !this.pending && !draft.trim() && !quote.trim() && !attachments.length && !this.#activeSuggestion
     );
   }
 
@@ -291,13 +277,7 @@ export class DeckComposerElement extends GemElement {
     }
     this.#state({ readingAttachments: true });
     // No extra isolation when switching sessions while reading attachments.
-    const results = await Promise.allSettled(files.map(readAttachment));
-    const attachments: Attachment[] = [];
-    const errors: string[] = [];
-    for (const result of results) {
-      if (result.status === 'fulfilled') attachments.push(result.value);
-      else errors.push(attachmentErrorMessage(result.reason));
-    }
+    const { attachments, errors } = await readAttachments(files, readAttachment);
     if (selection) this.#insertPastedAttachments(attachments, selection);
     else this.#state({ attachments: [...this.#state.attachments, ...attachments] });
     this.#saveDraft();
@@ -509,7 +489,7 @@ export class DeckComposerElement extends GemElement {
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
-                    v-if=${speechSupported}
+                    v-if=${isMobileApp}
                     type="button"
                     class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent active:bg-bg-hover disabled:cursor-default disabled:opacity-45 ${this.#state.dictating ? 'text-primary' : 'text-describe'}"
                     aria-label=${this.#state.dictating ? i18n.get('composer.stopDictationAria') : i18n.get('composer.startDictationAria')}

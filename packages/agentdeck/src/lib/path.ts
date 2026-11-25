@@ -46,3 +46,11 @@ export const getParentPath = (path: string): string | null => {
   if (!norm || norm === '/') return null;
   return norm.replace(/[\\/][^\\/]+$/, '') || '/';
 };
+
+export const getBaseName = (path: string): string =>
+  path
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .pop() || path;
+
+export const getDirName = (path: string): string => path.replace(/[\\/][^\\/]*$/, '');

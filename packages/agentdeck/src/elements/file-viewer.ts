@@ -8,6 +8,7 @@ import { agentApi } from 'src/agent/transport';
 import { i18n } from 'src/i18n';
 import { getCodeLang, getMimeType, isSmallTextFile } from 'src/lib/file-preview';
 import { fileViewerMarkdownStyle, unfoldedMarkdownExtensions } from 'src/lib/markdown';
+import { getBaseName, getDirName } from 'src/lib/path';
 import { openFileBrowser, openMessageLink } from 'src/navigation';
 import { icons } from 'src/styles/icons';
 import { agentDeckTheme, pageStyle } from 'src/styles/theme';
@@ -42,7 +43,7 @@ export class DeckFileViewerElement extends GemElement {
 
   // Relative images resolve against the host file's directory.
   get #markdownExtensions() {
-    return unfoldedMarkdownExtensions(this.#state.file?.path.replace(/[^\\/]+$/, ''));
+    return unfoldedMarkdownExtensions(this.#state.file ? getDirName(this.#state.file.path) || '/' : undefined);
   }
 
   @effect((i) => [i.path, i.cwd, i.#state.revision])
@@ -128,7 +129,7 @@ export class DeckFileViewerElement extends GemElement {
   #render = () => {
     const { file, loading, error, source, entered } = this.#state;
     const path = file?.path || this.path;
-    const name = path.split(/[\\/]/).pop() || path;
+    const name = getBaseName(path);
     const markdown = file?.type === 'text' && /\.(md|markdown)$/i.test(path);
     const isText = file?.type === 'text';
     const text = isText ? file.text : '';
@@ -184,7 +185,7 @@ export class DeckFileViewerElement extends GemElement {
             class="select-text mx-auto box-border block w-full max-w-[760px] p-5"
             .mdStyle=${fileViewerMarkdownStyle}
             .extensions=${this.#markdownExtensions}
-            @click=${(event: MouseEvent) => openMessageLink(event, path.replace(/[^\\/]+$/, ''))}
+            @click=${(event: MouseEvent) => openMessageLink(event, getDirName(path) || '/')}
           >${text}</gem-bind-marked>
           <tap-code-block
             v-else-if=${isText && isSmall}

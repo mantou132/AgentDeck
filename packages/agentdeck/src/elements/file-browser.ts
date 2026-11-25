@@ -5,7 +5,7 @@ import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import type { BrowseEntry } from 'src/agent/api';
 import { agentApi } from 'src/agent/transport';
 import { i18n } from 'src/i18n';
-import { displayPath, getBreadcrumbs, getParentPath } from 'src/lib/path';
+import { displayPath, getBaseName, getBreadcrumbs, getParentPath } from 'src/lib/path';
 import { openFileViewer } from 'src/navigation';
 import { agentdeckStore, hostHome } from 'src/state/store';
 import { icons } from 'src/styles/icons';
@@ -298,14 +298,7 @@ export class DeckFileBrowserPageElement extends GemElement {
   #title = () => {
     const p = this.#state.currentPath || this.path;
     if (displayPath(p, hostHome()) === '~') return '~';
-    return (
-      p
-        .split(/[\\/]+/)
-        .filter(Boolean)
-        .pop() ||
-      p ||
-      '/'
-    );
+    return getBaseName(p) || '/';
   };
 
   @template()

@@ -5,7 +5,7 @@ import { RelayCodec } from 'src/agent/relay-codec';
 import { clearRelayStore, indexedDbRelayStore } from 'src/agent/relay-store';
 import type { RpcId, RpcMessage } from 'src/agent/rpc';
 import { type AgentInfo, DEVICE_ID_KEY, RELAY_URL } from 'src/config';
-import { getConnectionLabel, i18n } from 'src/i18n';
+import { i18n } from 'src/i18n';
 
 /** Sent before the host counts as connected. */
 const HANDSHAKE_METHODS = new Set(['peer_attach', 'skills_install']);
@@ -30,9 +30,6 @@ type InitTransportOptions = {
 };
 
 export type ConnectionState = RelayConnectionState | 'attaching' | 'unavailable';
-export const connectionLabels = new Proxy({} as Record<ConnectionState, string>, {
-  get: (_, prop: ConnectionState) => getConnectionLabel(prop),
-});
 
 export type TransportMessage =
   /** Host info comes with `connected`; old hosts omit `hostVersion`, `hostname` and `restrictedFeatures`. */

@@ -1,17 +1,10 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { i18n } from 'src/i18n';
-import { displayPath } from 'src/lib/path';
+import { displayPath, getDirName } from 'src/lib/path';
+import { isAndroidApp, isMobileApp } from 'src/lib/platform';
 import { isAbsoluteHostPath, previewSupported, toPreviewUrl } from 'src/lib/preview';
 import { openPreview } from 'src/navigation';
-import {
-  type AppManifest,
-  pinSavedApp,
-  pinSupported,
-  readAppManifest,
-  saveApp,
-  savedAppsStore,
-  savedAppsSupported,
-} from 'src/state/saved-apps';
+import { type AppManifest, pinSavedApp, readAppManifest, saveApp, savedAppsStore } from 'src/state/saved-apps';
 import { hostHome } from 'src/state/store';
 import { icons } from 'src/styles/icons';
 import { agentDeckTheme } from 'src/styles/theme';
@@ -103,7 +96,7 @@ export class DeckAppElement extends GemElement {
   }
 
   get #dir() {
-    return this.#entry.replace(/[\\/][^\\/]*$/, '');
+    return getDirName(this.#entry);
   }
 
   get #usable() {
@@ -137,7 +130,7 @@ export class DeckAppElement extends GemElement {
       closeToast();
       if (update) {
         Toast.open('success', i18n.get('app.updated'));
-      } else if (pinSupported) {
+      } else if (isAndroidApp) {
         await pinSavedApp(manifest);
       } else {
         Toast.open('success', i18n.get('app.widgetHint'));
@@ -175,9 +168,9 @@ export class DeckAppElement extends GemElement {
           <div class="name">${manifest?.name || (dirName === 'dist' ? parent : dirName)}</div>
           <div class="dir">${displayPath(this.#entry, hostHome())}</div>
         </div>
-        <span v-if=${!savedAppsSupported} class="action">${i18n.get('app.preview')}</span>
+        <span v-if=${!isMobileApp} class="action">${i18n.get('app.preview')}</span>
       </button>
-      <button v-if=${savedAppsSupported} class="action" type="button" ?disabled=${!this.#usable || saving} @click=${this.#save}>
+      <button v-if=${isMobileApp} class="action" type="button" ?disabled=${!this.#usable || saving} @click=${this.#save}>
         ${i18n.get(this.#saved ? 'app.update' : 'app.save')}
       </button>
     `;

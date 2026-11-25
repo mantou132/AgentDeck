@@ -3,6 +3,7 @@ import { agentApi } from 'src/agent/transport';
 import { diffCounts } from 'src/elements/changes';
 import { i18n } from 'src/i18n';
 import { diffColorScheme } from 'src/lib/diff';
+import { getBaseName } from 'src/lib/path';
 import { agentdeckStore } from 'src/state/store';
 import { icons } from 'src/styles/icons';
 import { pageStyle } from 'src/styles/theme';
@@ -48,7 +49,7 @@ export class DeckChangesDiffPageElement extends GemElement {
   @template()
   #render = () => {
     const { loading, error, result, entered } = this.#state;
-    const fileName = this.path.split(/[/\\]/).filter(Boolean).pop() || this.path || i18n.get('changes.diffTitle');
+    const fileName = getBaseName(this.path) || i18n.get('changes.diffTitle');
     const stats = result?.stats;
     const diff = result?.diff;
 

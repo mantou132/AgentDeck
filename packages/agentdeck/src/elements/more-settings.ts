@@ -6,12 +6,12 @@ import { getVersion } from '@tauri-apps/api/app';
 import { isTauri } from '@tauri-apps/api/core';
 import { DISPLAY_SKILLS, langNames, SKILL_REQUIRES, WORKFLOW_SKILLS } from 'src/config';
 import { i18n, type LocaleKey } from 'src/i18n';
+import { isAndroidApp } from 'src/lib/platform';
 import { setSkillEnabled } from 'src/state/app';
 import {
   type AppManifest,
   openSavedApp,
   pinSavedApp,
-  pinSupported,
   removeSavedApp,
   savedAppIconUrl,
   savedAppsStore,
@@ -63,7 +63,7 @@ export class DeckMoreSettingsElement extends GemElement {
       title: name,
       actions: [
         { label: i18n.get('app.open'), value: 'open' },
-        ...(pinSupported ? [{ label: i18n.get('app.pin'), value: 'pin' }] : []),
+        ...(isAndroidApp ? [{ label: i18n.get('app.pin'), value: 'pin' }] : []),
         { label: i18n.get('app.remove'), value: 'remove', danger: true },
       ],
       cancelText: i18n.get('global.cancel'),
@@ -115,7 +115,7 @@ export class DeckMoreSettingsElement extends GemElement {
         <tap-cell-group
           v-if=${savedAppsStore.apps.length > 0}
           heading=${i18n.get('settings.savedAppsTitle')}
-          footer=${i18n.get(pinSupported ? 'settings.savedAppsDesc' : 'settings.savedAppsWidgetDesc')}
+          footer=${i18n.get(isAndroidApp ? 'settings.savedAppsDesc' : 'settings.savedAppsWidgetDesc')}
           .items=${savedAppsStore.apps.map((app) => ({
             label: html`<div class="app"><img alt="" src=${savedAppIconUrl(app.id)} /><span>${app.name}</span></div>`,
             onClick: () => this.#manageApp(app),

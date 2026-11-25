@@ -5,7 +5,7 @@ import { base64ToArrayBuffer } from '@mantou/tap-ui/lib/encode';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { AttachmentError, MAX_ATTACHMENTS, readAttachment } from 'src/attachment/read';
 import type { Attachment } from 'src/attachment/types';
-import { attachmentErrorMessage } from 'src/elements/composer';
+import { readAttachments } from 'src/composer/attachments';
 import { i18n } from 'src/i18n';
 
 type SharedFile = { name: string; mimeType: string; data?: string; tooLarge: boolean };
@@ -23,13 +23,7 @@ const readSharedFile = async ({ name, mimeType, data, tooLarge }: SharedFile) =>
 const takeShare = async () => {
   const files = await invoke<SharedFile[]>('share_take');
   if (!files.length) return;
-  const results = await Promise.allSettled(files.map(readSharedFile));
-  const attachments: Attachment[] = [];
-  const errors: string[] = [];
-  for (const result of results) {
-    if (result.status === 'fulfilled') attachments.push(result.value);
-    else errors.push(attachmentErrorMessage(result.reason));
-  }
+  const { attachments, errors } = await readAttachments(files, readSharedFile);
   if (attachments.length > MAX_ATTACHMENTS) {
     attachments.length = MAX_ATTACHMENTS;
     errors.push(i18n.get('composer.maxAttachments'));

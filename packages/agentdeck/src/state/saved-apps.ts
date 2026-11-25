@@ -1,22 +1,18 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
 import { arrayBufferToBase64 } from '@mantou/tap-ui/lib/encode';
 import { createBitmapFromSvg } from '@mantou/tap-ui/lib/image';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { agentApi } from 'src/agent/transport';
 import { LAUNCH_LINK_TAKEN_KEY } from 'src/config';
 import { protocolUrl } from 'src/lib/js-protocol';
+import { getDirName } from 'src/lib/path';
+import { isMobileApp } from 'src/lib/platform';
 
 // Apps built with the host's `app` skill, saved on the phone by `crates/agentdeck/src/saved_apps.rs`.
 
 /** `agentdeck.json` next to the built `index.html`. */
 export type AppManifest = { id: string; name: string };
-
-/** Home screen entries are for the phone App. */
-export const savedAppsSupported = isTauri() && /Android|iPhone|iPad/i.test(navigator.userAgent);
-
-/** Android pins a launcher shortcut per app; iOS opens them from the AgentDeck widget. */
-export const pinSupported = savedAppsSupported && /Android/i.test(navigator.userAgent);
 
 export const savedAppsStore = createStore({ apps: [] as AppManifest[] });
 
@@ -31,14 +27,12 @@ export const loadSavedApps = async () => {
   savedAppsStore({ apps: await invoke<AppManifest[]>('saved_app_list') });
 };
 
-const dirname = (path: string) => path.replace(/[\\/][^\\/]*$/, '');
-
 const readHostFile = async (path: string) =>
   new Uint8Array(await new Blob(await agentApi.readWholeRawFile(path)).arrayBuffer());
 
 /** `agentdeck.json` of the build that `entry` (its `index.html`) belongs to. */
 export const readAppManifest = async (entry: string): Promise<AppManifest> =>
-  JSON.parse(new TextDecoder().decode(await readHostFile(`${dirname(entry)}/agentdeck.json`)));
+  JSON.parse(new TextDecoder().decode(await readHostFile(`${getDirName(entry)}/agentdeck.json`)));
 
 /** Files under a host directory, recursively. */
 const listFiles = async (dir: string): Promise<string[]> => {
@@ -53,7 +47,7 @@ const rasterizeIcon = async (svg: Uint8Array<ArrayBuffer>) =>
 
 /** Copies the build that `entry` belongs to onto the phone, replacing an earlier copy. */
 export const saveApp = async (entry: string) => {
-  const dir = dirname(entry);
+  const dir = getDirName(entry);
   const manifest = await readAppManifest(entry);
   const { id } = manifest;
   const write = (path: string, data: Uint8Array<ArrayBuffer>) =>
@@ -100,7 +94,7 @@ const showError = (error: unknown) => Toast.open('error', error instanceof Error
  * exits, so it is taken once per launch. Resolves whether an app is opening.
  */
 export const openLaunchedApp = async () => {
-  if (!savedAppsSupported || sessionStorage.getItem(LAUNCH_LINK_TAKEN_KEY)) return false;
+  if (!isMobileApp || sessionStorage.getItem(LAUNCH_LINK_TAKEN_KEY)) return false;
   sessionStorage.setItem(LAUNCH_LINK_TAKEN_KEY, '1');
   const id = (await getCurrent())?.map(linkedAppId).find(Boolean);
   if (!id) return false;
@@ -119,7 +113,7 @@ export const openLaunchedApp = async () => {
  * Rust handles links.
  */
 export const startSavedApps = async () => {
-  if (!savedAppsSupported) return;
+  if (!isMobileApp) return;
   await loadSavedApps();
   await onOpenUrl(async (urls) => {
     const id = urls.map(linkedAppId).find(Boolean);

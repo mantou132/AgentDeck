@@ -1,6 +1,6 @@
 import type { AvailableCommand } from 'src/agent/api';
 import { isPairingId } from 'src/agent/encryption';
-import { calendarSupported } from 'src/lib/calendar';
+import { isMobileApp } from 'src/lib/platform';
 import { previewSupported } from 'src/lib/preview';
 import type { SessionOptions } from 'src/session/types';
 
@@ -63,7 +63,7 @@ export const DISPLAY_SKILLS = [
   'screen',
   'session',
   'task',
-  ...(calendarSupported ? ['event'] : []),
+  ...(isMobileApp ? ['event'] : []),
 ];
 
 export const SUPPORTED_SKILLS = [...WORKFLOW_SKILLS, ...DISPLAY_SKILLS];

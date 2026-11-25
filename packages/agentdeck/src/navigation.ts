@@ -9,6 +9,7 @@ import { agentApi } from 'src/agent/transport';
 import type { Attachment } from 'src/attachment/types';
 import { i18n } from 'src/i18n';
 import { parseMessageLink } from 'src/lib/links';
+import { getBaseName } from 'src/lib/path';
 import { toPreviewUrl } from 'src/lib/preview';
 import type { AgentDeckSessionPageElement } from 'src/pages/session';
 import { isSplitView } from 'src/state/layout';
@@ -71,7 +72,7 @@ export const openPreview = (path: string, { edgeToEdge, headerless, stack }: Pre
     src: toPreviewUrl(path, edgeToEdge || headerless),
     floatheader: edgeToEdge,
     headerless,
-    title: path.split(/[\\/]/).pop(),
+    title: getBaseName(path),
     stack,
     actions: [
       {
