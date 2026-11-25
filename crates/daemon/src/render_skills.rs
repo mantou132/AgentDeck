@@ -10,16 +10,49 @@ use std::{
     collections::HashMap,
     fs,
     path::{Component, Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
 };
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-use crate::{
-    app_data::AppPaths,
-    features::{self, FeatureGroups},
-};
+use crate::app_data::AppPaths;
+
+/// Group of each feature (skill), as the client assigns them in `peer_attach`.
+pub type FeatureGroups = HashMap<String, String>;
+
+/// Offered features and groups (`--features`); unset or `None` offers
+/// everything.
+static OFFERED: OnceLock<Option<Vec<String>>> = OnceLock::new();
+
+pub fn init_features(offered: Option<Vec<String>>) {
+    let _ = OFFERED.set(offered);
+}
+
+fn offers(offered: Option<&[String]>, feature: &str, groups: &FeatureGroups) -> bool {
+    offered.is_none_or(|offered| {
+        offered
+            .iter()
+            .any(|name| name == feature || groups.get(feature) == Some(name))
+    })
+}
+
+/// Whether this host offers the feature; one in no group is offered only by
+/// name.
+fn allows(feature: &str, groups: &FeatureGroups) -> bool {
+    offers(OFFERED.get().cloned().flatten().as_deref(), feature, groups)
+}
+
+/// The client's features this host doesn't offer, for it to disable.
+pub fn restricted_features(groups: &FeatureGroups) -> Vec<String> {
+    let mut restricted: Vec<String> = groups
+        .keys()
+        .filter(|feature| !allows(feature, groups))
+        .cloned()
+        .collect();
+    restricted.sort();
+    restricted
+}
 
 /// Skills a client declares in `peer_attach`.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -85,7 +118,7 @@ fn learned_dir(root: &Path, skill: &str) -> PathBuf {
 pub fn select(selection: &mut SkillSelection) -> bool {
     selection
         .enabled
-        .retain(|skill| features::allows(skill, &selection.groups));
+        .retain(|skill| allows(skill, &selection.groups));
     *CURRENT_GROUPS.lock().expect("lock poisoned") = Some(selection.groups.clone());
     let Some(hash) = selection.hash.as_deref() else {
         return true;
@@ -218,7 +251,7 @@ pub fn all_skill_paths() -> Vec<PathBuf> {
         .unwrap_or_default();
     entries
         .filter_map(|entry| entry.ok())
-        .filter(|entry| features::allows(&entry.file_name().to_string_lossy(), &groups))
+        .filter(|entry| allows(&entry.file_name().to_string_lossy(), &groups))
         .map(|entry| entry.path().join(SKILL_ROOTS[0]))
         .collect()
 }
@@ -226,6 +259,20 @@ pub fn all_skill_paths() -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn offers_listed_features_and_groups() {
+        let groups = FeatureGroups::from([
+            ("chart".to_string(), "basic".to_string()),
+            ("job".to_string(), "desktop".to_string()),
+        ]);
+        assert!(offers(None, "job", &groups));
+        let offered = ["basic".to_string(), "screen".to_string()];
+        assert!(offers(Some(&offered), "chart", &groups));
+        assert!(!offers(Some(&offered), "job", &groups));
+        assert!(offers(Some(&offered), "screen", &groups));
+        assert!(!offers(Some(&offered), "map", &groups));
+    }
 
     #[test]
     fn installs_versions_for_codex_and_claude() {

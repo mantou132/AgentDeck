@@ -21,9 +21,10 @@ use serde_json::{Value, json};
 
 use self::codec::{Frame, RelayCodec};
 use crate::{
+    acp_agent,
     agent_rpc::{AgentService, PeerSkills},
     app_data::{self, AppPaths},
-    features,
+    awake,
     peer::Peer,
     push,
     render_skills::{self, SkillSelection},
@@ -252,6 +253,7 @@ impl RemotePeerManager {
         let devices = self.devices.clone();
         let ephemeral_calls = self.ephemeral_calls.clone();
         let peer = Peer::new(move |mut message, bytes, replace_key| {
+            awake::record_activity();
             let ephemeral = take_ephemeral_reply(&ephemeral_calls, peer_id, &message);
             if let Value::Object(ref mut map) = message {
                 map.insert("peerId".to_string(), json!(peer_id));
@@ -376,6 +378,7 @@ impl RemotePeerManager {
     }
 
     pub async fn dispatch(&self, mut payload: Value) {
+        awake::record_activity();
         if payload.get("method").and_then(Value::as_str) == Some("peer_attach") {
             self.handle_attach(payload);
             return;
@@ -417,7 +420,7 @@ impl RemotePeerManager {
             .and_then(|value| serde_json::from_value(value).ok())
             .unwrap_or_default();
         // Clients disable the features this host doesn't offer.
-        let restricted_features = features::restricted(&declared.groups);
+        let restricted_features = render_skills::restricted_features(&declared.groups);
         // The client sends this version through `skills_install` before using
         // the host.
         let skills_missing = !render_skills::select(&mut declared);
@@ -431,7 +434,7 @@ impl RemotePeerManager {
         // Clients shorten paths under it to `~`.
         let home = dirs::home_dir().map(|home| home.to_string_lossy().into_owned());
         // Clients list them below `free` in their agent picker.
-        let custom_agents = crate::acp_agent::custom_agent_list();
+        let custom_agents = acp_agent::custom_agent_list();
         let response = match id {
             Some(req_id) => json!({
                 "peerId": peer_id,
@@ -611,13 +614,11 @@ pub fn start(
 /// Scheduled runs have no device: their notifications go to every device, and
 /// permission requests and questions also push to every device.
 impl crate::tasks::TaskHost for RemotePeerManager {
-    fn notifier(&self, task_id: &str) -> crate::acp_agent::Notifier {
+    fn notifier(&self, task_id: &str) -> acp_agent::Notifier {
         let broadcaster = self.broadcaster();
         let task_id = task_id.to_owned();
         Arc::new(move |method, params| {
-            if let Some((agent, session_id)) =
-                crate::agent_rpc::input_request_session(method, &params)
-            {
+            if let Some((agent, session_id)) = acp_agent::input_request_session(method, &params) {
                 broadcaster.push(
                     push::PushKind::InputRequest,
                     agent,

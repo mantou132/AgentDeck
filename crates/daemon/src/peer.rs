@@ -113,7 +113,6 @@ impl Peer {
         bytes: Option<Vec<u8>>,
         replace_key: Option<String>,
     ) {
-        crate::awake::record_activity();
         (self.writer)(message, bytes, replace_key);
     }
 
@@ -224,7 +223,6 @@ impl Peer {
 
     /// Route one incoming message from the peer.
     pub async fn dispatch(&self, msg: Value) {
-        crate::awake::record_activity();
         let id = msg.get("id").and_then(|v| v.as_str()).map(str::to_string);
         let method = msg
             .get("method")

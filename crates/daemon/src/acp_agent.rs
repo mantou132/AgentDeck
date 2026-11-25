@@ -82,6 +82,24 @@ impl UserInput {
     }
 }
 
+/// The `(agent, sessionId)` a notification asks the user about, if it is a
+/// permission request or a question.
+pub(crate) fn input_request_session<'a>(
+    method: &str,
+    params: &'a serde_json::Value,
+) -> Option<(&'a str, &'a str)> {
+    if !matches!(
+        method,
+        "agent_permission_request" | "agent_elicitation_request"
+    ) {
+        return None;
+    }
+    Some((
+        params.get("agent")?.as_str()?,
+        params.get("sessionId")?.as_str()?,
+    ))
+}
+
 /// Raw Claude Agent SDK message forwarded by claude-agent-acp when the session
 /// opts in through `_meta.claudeCode.emitRawSDKMessages`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonRpcNotification)]
@@ -1412,7 +1430,28 @@ fn to_json(value: impl Serialize) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{system_prompt_meta, update_to_json};
+    use serde_json::json;
+
+    use super::{input_request_session, system_prompt_meta, update_to_json};
+
+    #[test]
+    fn input_requests_name_their_session() {
+        let params = json!({ "agent": "claude-acp", "sessionId": "s1", "requestId": "1" });
+        for method in ["agent_permission_request", "agent_elicitation_request"] {
+            assert_eq!(
+                input_request_session(method, &params),
+                Some(("claude-acp", "s1"))
+            );
+        }
+        assert_eq!(input_request_session("agent_session_update", &params), None);
+        assert_eq!(
+            input_request_session(
+                "agent_permission_request",
+                &json!({ "agent": "claude-acp" })
+            ),
+            None
+        );
+    }
 
     #[test]
     fn system_prompt_meta_targets_standard_and_antigravity_keys() {

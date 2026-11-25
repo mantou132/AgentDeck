@@ -66,24 +66,6 @@ async fn settle_forwarder((tx, done): EventForwarder, ok: bool) -> bool {
 /// Pushes a notification to the peer's device: `(kind, agent, session_id)`.
 pub type PeerPush = Arc<dyn Fn(PushKind, &str, &str) + Send + Sync>;
 
-/// The `(agent, sessionId)` a notification asks the user about, if it is a
-/// permission request or a question.
-pub(crate) fn input_request_session<'a>(
-    method: &str,
-    params: &'a Value,
-) -> Option<(&'a str, &'a str)> {
-    if !matches!(
-        method,
-        "agent_permission_request" | "agent_elicitation_request"
-    ) {
-        return None;
-    }
-    Some((
-        params.get("agent")?.as_str()?,
-        params.get("sessionId")?.as_str()?,
-    ))
-}
-
 /// Skills the peer declared in its latest `peer_attach`.
 pub type PeerSkills = Arc<Mutex<SkillSelection>>;
 
@@ -253,7 +235,8 @@ impl AgentService {
             let push = push.clone();
             Arc::new(move |method, params| {
                 if let Some(push) = &push
-                    && let Some((agent, session_id)) = input_request_session(method, &params)
+                    && let Some((agent, session_id)) =
+                        acp_agent::input_request_session(method, &params)
                 {
                     push(PushKind::InputRequest, agent, session_id);
                 }
@@ -847,28 +830,4 @@ async fn session_context(
         input_timeout: None,
         auto_approve: false,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn input_requests_name_their_session() {
-        let params = json!({ "agent": "claude-acp", "sessionId": "s1", "requestId": "1" });
-        for method in ["agent_permission_request", "agent_elicitation_request"] {
-            assert_eq!(
-                input_request_session(method, &params),
-                Some(("claude-acp", "s1"))
-            );
-        }
-        assert_eq!(input_request_session("agent_session_update", &params), None);
-        assert_eq!(
-            input_request_session(
-                "agent_permission_request",
-                &json!({ "agent": "claude-acp" })
-            ),
-            None
-        );
-    }
 }

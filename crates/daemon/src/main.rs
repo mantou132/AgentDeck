@@ -10,7 +10,6 @@ mod app_data;
 mod awake;
 mod config;
 pub mod daemon;
-mod features;
 mod logger;
 mod peer;
 mod push;
@@ -193,7 +192,7 @@ async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
     tracing::info!("Starting AgentDeck daemon v{}", env!("CARGO_PKG_VERSION"));
 
     let config = DaemonConfig::load_or_init(paths, options)?;
-    features::init(config.features.clone());
+    render_skills::init_features(config.features.clone());
     let _awake_monitor = awake::Monitor::start(paths)?;
     let relay_id = config.relay_id();
 
