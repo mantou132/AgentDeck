@@ -16,7 +16,7 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 #[derive(Clone)]
 pub struct CallCtx {
     emit: Arc<dyn Fn(Value) + Send + Sync>,
-    emit_bytes: Arc<dyn Fn(Value, Vec<u8>) + Send + Sync>,
+    emit_bytes: Arc<dyn Fn(Value, Vec<u8>, Option<String>) + Send + Sync>,
 }
 
 impl CallCtx {
@@ -24,8 +24,10 @@ impl CallCtx {
         (self.emit)(event);
     }
 
-    pub fn emit_with_bytes(&self, event: Value, bytes: Vec<u8>) {
-        (self.emit_bytes)(event, bytes);
+    /// Emits a binary stream event; when `replace_key` is set, the transport
+    /// may drop older unsent frames with the same key for the same recipient.
+    pub fn emit_with_bytes(&self, event: Value, bytes: Vec<u8>, replace_key: Option<String>) {
+        (self.emit_bytes)(event, bytes, replace_key);
     }
 }
 
@@ -50,9 +52,11 @@ impl From<String> for RpcError {
         }
     }
 }
-/// Writes one outgoing message; the bytes only accompany a reply from
-/// [`Peer::handle_with_bytes`].
-type Writer = Arc<dyn Fn(Value, Option<Vec<u8>>) + Send + Sync>;
+/// Writes one outgoing message; bytes accompany a reply from
+/// [`Peer::handle_with_bytes`] or a frame from [`CallCtx::emit_with_bytes`],
+/// and `replace_key` enables latest-wins coalescing for ephemeral stream
+/// frames.
+type Writer = Arc<dyn Fn(Value, Option<Vec<u8>>, Option<String>) + Send + Sync>;
 
 struct Pending {
     reply: oneshot::Sender<Result<Value, String>>,
@@ -78,7 +82,7 @@ pub struct Peer {
 
 impl Default for Peer {
     fn default() -> Self {
-        Self::new(|_message, _bytes| ())
+        Self::new(|_message, _bytes, _replace_key| ())
     }
 }
 
@@ -88,7 +92,7 @@ impl Peer {
     /// isolated even when several clients control the same native host.
     pub fn new<F>(writer: F) -> Self
     where
-        F: Fn(Value, Option<Vec<u8>>) + Send + Sync + 'static,
+        F: Fn(Value, Option<Vec<u8>>, Option<String>) + Send + Sync + 'static,
     {
         Self {
             pending: Arc::default(),
@@ -100,12 +104,17 @@ impl Peer {
     }
 
     fn write(&self, message: Value) {
-        self.write_with_bytes(message, None);
+        self.write_with_bytes(message, None, None);
     }
 
-    fn write_with_bytes(&self, message: Value, bytes: Option<Vec<u8>>) {
+    fn write_with_bytes(
+        &self,
+        message: Value,
+        bytes: Option<Vec<u8>>,
+        replace_key: Option<String>,
+    ) {
         crate::awake::record_activity();
-        (self.writer)(message, bytes);
+        (self.writer)(message, bytes, replace_key);
     }
 
     /// Call the peer and await its final result.
@@ -266,16 +275,19 @@ impl Peer {
             emit: Arc::new(move |event| {
                 event_peer.write(json!({ "id": emit_id, "event": event }));
             }),
-            emit_bytes: Arc::new(move |event, bytes| {
-                event_bytes_peer
-                    .write_with_bytes(json!({ "id": emit_bytes_id, "event": event }), Some(bytes));
+            emit_bytes: Arc::new(move |event, bytes, replace_key| {
+                event_bytes_peer.write_with_bytes(
+                    json!({ "id": emit_bytes_id, "event": event }),
+                    Some(bytes),
+                    replace_key,
+                );
             }),
         };
         let reply_peer = self.clone();
         tokio::spawn(async move {
             match handler(params, ctx).await {
                 Ok((result, bytes)) => {
-                    reply_peer.write_with_bytes(json!({ "id": id, "result": result }), bytes)
+                    reply_peer.write_with_bytes(json!({ "id": id, "result": result }), bytes, None)
                 }
                 Err(RpcError { message, code }) => {
                     let mut reply = json!({ "id": id, "error": message });
@@ -326,12 +338,16 @@ mod tests {
     async fn handler_can_emit_events_with_bytes() {
         let sent = Arc::new(Mutex::new(Vec::new()));
         let sent_clone = sent.clone();
-        let peer = Peer::new(move |msg, bytes| {
-            sent_clone.lock().unwrap().push((msg, bytes));
+        let peer = Peer::new(move |msg, bytes, replace_key| {
+            sent_clone.lock().unwrap().push((msg, bytes, replace_key));
         });
 
         peer.handle("stream_test", |_params, ctx| async move {
-            ctx.emit_with_bytes(json!({ "type": "frame" }), vec![1, 2, 3]);
+            ctx.emit_with_bytes(
+                json!({ "type": "frame" }),
+                vec![1, 2, 3],
+                Some("s:1".to_string()),
+            );
             Ok(json!({ "done": true }))
         });
 
@@ -348,10 +364,12 @@ mod tests {
             json!({ "id": "1", "event": { "type": "frame" } })
         );
         assert_eq!(frames[0].1, Some(vec![1, 2, 3]));
+        assert_eq!(frames[0].2.as_deref(), Some("s:1"));
         assert_eq!(
             frames[1].0,
             json!({ "id": "1", "result": { "done": true } })
         );
         assert_eq!(frames[1].1, None);
+        assert_eq!(frames[1].2, None);
     }
 }

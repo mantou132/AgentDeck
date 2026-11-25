@@ -96,6 +96,9 @@ pub(crate) struct Outbound {
     /// Replies to an ephemeral request skip Relay storage, like the request
     /// did.
     ephemeral: bool,
+    /// Optional latest-wins coalescing key for ephemeral frames (e.g. live
+    /// screen streams).
+    replace_key: Option<String>,
 }
 
 type OutboundSender = tokio::sync::mpsc::UnboundedSender<Outbound>;
@@ -245,7 +248,7 @@ impl RemotePeerManager {
         let outbound_tx = self.outbound_tx.clone();
         let devices = self.devices.clone();
         let ephemeral_calls = self.ephemeral_calls.clone();
-        let peer = Peer::new(move |mut message, bytes| {
+        let peer = Peer::new(move |mut message, bytes, replace_key| {
             let ephemeral = take_ephemeral_reply(&ephemeral_calls, peer_id, &message);
             if let Value::Object(ref mut map) = message {
                 map.insert("peerId".to_string(), json!(peer_id));
@@ -260,6 +263,7 @@ impl RemotePeerManager {
                 bytes,
                 target_device_id,
                 ephemeral,
+                replace_key,
             };
             if outbound_tx.send(outbound).is_err() {
                 tracing::info!("Relay client stopped; peer {peer_id} message dropped");
@@ -447,6 +451,7 @@ impl RemotePeerManager {
             bytes: None,
             target_device_id: target,
             ephemeral: false,
+            replace_key: None,
         });
     }
 }
@@ -511,6 +516,7 @@ impl ClientHandler for Handler {
             bytes: None,
             target_device_id: None,
             ephemeral: true,
+            replace_key: None,
         });
     }
 
@@ -564,15 +570,24 @@ pub fn start(
             bytes,
             target_device_id,
             ephemeral,
+            replace_key,
         }) = outbound_rx.recv().await
         {
-            let sent = match codec.encode(message, bytes, target_device_id.as_deref(), ephemeral) {
+            let sent = match codec.encode(
+                message,
+                bytes,
+                target_device_id.as_deref(),
+                ephemeral,
+                replace_key.as_deref(),
+            ) {
                 Ok(Frame::Binary(body)) => {
-                    send_client.send_binary(&body, target_device_id, None).await
+                    send_client
+                        .send_binary(&body, target_device_id, None, replace_key)
+                        .await
                 }
                 Ok(Frame::Json(payload)) if ephemeral => {
                     send_client
-                        .send_ephemeral(payload, target_device_id, None)
+                        .send_ephemeral(payload, target_device_id, None, replace_key)
                         .await
                 }
                 Ok(Frame::Json(payload)) => {

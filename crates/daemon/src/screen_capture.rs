@@ -642,6 +642,9 @@ impl ScreenStreamManager {
         }
 
         let target_str = target.trim().to_string();
+        // Opaque per-stream key so Relay coalesces unsent frames without
+        // exposing target identifiers (UDID, serial, tab id) in plaintext.
+        let replace_key = format!("s:{stream_id}");
         let mut last_hash: Option<u64> = None;
         let mut last_emitted = tokio::time::Instant::now();
         let mut consecutive_errors = 0;
@@ -696,7 +699,7 @@ impl ScreenStreamManager {
                             ) {
                                 self.record_frame_size(&target_str, w as u32, h as u32);
                             }
-                            ctx.emit_with_bytes(info, bytes);
+                            ctx.emit_with_bytes(info, bytes, Some(replace_key.clone()));
                             last_emitted = tokio::time::Instant::now();
                         }
                         Ok(Err(err)) => {

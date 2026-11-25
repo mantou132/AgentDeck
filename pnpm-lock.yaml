@@ -107,8 +107,8 @@ importers:
         specifier: ^11.0.1
         version: 11.0.1
       relay-client-ts:
-        specifier: ^0.1.11
-        version: 0.1.11
+        specifier: ^0.1.12
+        version: 0.1.12
       tauri-plugin-add-to-calendar-api:
         specifier: ^0.1.0
         version: 0.1.0
@@ -177,8 +177,8 @@ importers:
         specifier: ^2.3.2
         version: 2.3.2(@mantou/gem@2.3.3)
       relay-client-ts:
-        specifier: ^0.1.11
-        version: 0.1.11
+        specifier: ^0.1.12
+        version: 0.1.12
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.0
@@ -4326,8 +4326,8 @@ packages:
     resolution: {integrity: sha512-ZbgR5aZEdf4UKZVBPYIgaglBmSF2Hi94s2PcIHhRGFjKYu+chjJdYfHn4rt3hB6eCKLJ8giVIIfgMa1ehDfZKA==}
     engines: {node: '>=0.10.0'}
 
-  relay-client-ts@0.1.11:
-    resolution: {integrity: sha512-X62lC2ktVFUIBbt+wxzo+wUk5ln48r7ExtYsXcv5mioDKW0wuddJ3Mli49xqzaRJ3XGb9MZrpmsvDY+fDTdAnA==}
+  relay-client-ts@0.1.12:
+    resolution: {integrity: sha512-JMi2BSBsX92tYORWBNRLkCvlHnKzQZlTZOFbVxe1KNCdyiltpWXK89JSj3/DpprsVGmm/x/DczZVWt8YVRcp+g==}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -9474,7 +9474,7 @@ snapshots:
     dependencies:
       rc: 1.2.8
 
-  relay-client-ts@0.1.11: {}
+  relay-client-ts@0.1.12: {}
 
   require-directory@2.1.1: {}
 

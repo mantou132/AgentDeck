@@ -48,6 +48,7 @@ impl RelayCodec {
         bytes: Option<Vec<u8>>,
         target_device_id: Option<&str>,
         ephemeral: bool,
+        replace_key: Option<&str>,
     ) -> Result<Frame> {
         if let Some(bytes) = bytes {
             let body = binary_body(&message, bytes)?;
@@ -74,6 +75,7 @@ impl RelayCodec {
             payload: Value::Null,
             target_device_id: target_device_id.map(str::to_owned),
             ephemeral,
+            replace_key: replace_key.map(str::to_owned),
         };
         let size =
             serde_json::to_vec(&empty_frame)?.len() - 4 + serde_json::to_vec(&payload)?.len();
@@ -135,7 +137,10 @@ mod tests {
         let codec = RelayCodec::new(PLAIN_ID).unwrap();
         assert_eq!(codec.route_id, PLAIN_ID);
         let message = json!({ "id": "1", "result": {} });
-        let Frame::Json(payload) = codec.encode(message.clone(), None, None, false).unwrap() else {
+        let Frame::Json(payload) = codec
+            .encode(message.clone(), None, None, false, None)
+            .unwrap()
+        else {
             panic!("expected a JSON frame");
         };
         assert_eq!(payload, message);
@@ -150,6 +155,7 @@ mod tests {
                 None,
                 Some("test-phone"),
                 false,
+                None,
             )
             .unwrap()
         else {
@@ -172,7 +178,13 @@ mod tests {
         // Bytes always travel as a binary frame, whatever the delivery mode.
         for ephemeral in [true, false] {
             let Frame::Binary(body) = codec
-                .encode(reply.clone(), Some(vec![0, 1, 2, 255]), None, ephemeral)
+                .encode(
+                    reply.clone(),
+                    Some(vec![0, 1, 2, 255]),
+                    None,
+                    ephemeral,
+                    None,
+                )
                 .unwrap()
             else {
                 panic!("expected a binary frame");
@@ -184,7 +196,7 @@ mod tests {
         }
 
         let Frame::Binary(sealed) = encrypted_codec()
-            .encode(reply, Some(vec![0, 1, 2, 255]), None, true)
+            .encode(reply, Some(vec![0, 1, 2, 255]), None, true, Some("s:1"))
             .unwrap()
         else {
             panic!("expected a binary frame");

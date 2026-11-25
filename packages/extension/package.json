@@ -17,7 +17,7 @@
     "agentdeck": "workspace:*",
     "diff": "^8.0.4",
     "duoyun-ui": "^2.3.2",
-    "relay-client-ts": "^0.1.11"
+    "relay-client-ts": "^0.1.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
