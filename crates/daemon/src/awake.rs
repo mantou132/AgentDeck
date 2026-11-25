@@ -1,3 +1,5 @@
+mod power;
+
 use std::{
     fs,
     sync::{Mutex, OnceLock, mpsc},
@@ -5,14 +7,85 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use anstream::println;
 use anyhow::Result;
+use clap::Subcommand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     app_data::{self, AppPaths},
     config::DaemonConfig,
-    power,
+    daemon, ui,
 };
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum AwakeCommand {
+    /// Always prevent automatic sleep while the daemon runs
+    Always,
+    /// Prevent automatic sleep on external power
+    #[command(alias = "on")]
+    Plugged,
+    /// Stay awake for one hour after the last RPC activity
+    Active,
+    /// Let the operating system sleep normally
+    #[command(alias = "off")]
+    Never,
+    /// Show the saved mode and actual runtime state
+    Status,
+}
+
+pub(crate) async fn run_command(paths: &AppPaths, command: Option<AwakeCommand>) -> Result<()> {
+    let mode = match command {
+        Some(AwakeCommand::Always) => Some(Mode::Always),
+        Some(AwakeCommand::Plugged) => Some(Mode::Plugged),
+        Some(AwakeCommand::Active) => Some(Mode::Active),
+        Some(AwakeCommand::Never) => Some(Mode::Never),
+        None | Some(AwakeCommand::Status) => None,
+    };
+    let config = match mode {
+        Some(mode) => DaemonConfig::set_awake(paths, mode)?,
+        None => DaemonConfig::read(paths)?,
+    };
+    let Some(pid) = daemon::InstanceLock::check_running_at(&paths.lock_file())? else {
+        ui::kv("Keep awake", config.awake);
+        println!(
+            "{}",
+            ui::dim("Daemon is not running. Setting will take effect when it starts.")
+        );
+        return Ok(());
+    };
+    for _ in 0..40 {
+        if let Some(status) = read_status(paths, pid, config.awake) {
+            let state = if status.on {
+                ui::green("on")
+            } else {
+                ui::dim("off")
+            };
+            ui::kv("Keep awake", format!("{} ({state})", status.mode));
+            if let Some(error) = status.error {
+                anyhow::bail!("Keep awake unavailable: {error}");
+            }
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    ui::kv(
+        "Keep awake",
+        format!(
+            "{} ({})",
+            config.awake,
+            ui::yellow("runtime status unavailable")
+        ),
+    );
+    println!(
+        "{}",
+        ui::dim(
+            "Setting saved. The running daemon has not confirmed it; restart it if it predates \
+             awake support."
+        )
+    );
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

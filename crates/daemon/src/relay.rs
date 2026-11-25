@@ -3,6 +3,9 @@
 //! A, Phone B) communicating over endpoint 1 and demultiplexes by an
 //! auto-incrementing `peerId`.
 
+mod codec;
+pub(crate) mod encryption;
+
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -16,13 +19,13 @@ use relay_client::{Client, ClientHandler, memory::MemoryStore, relay_frame::Endp
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use self::codec::{Frame, RelayCodec};
 use crate::{
     agent_rpc::{AgentService, PeerSkills},
     app_data::{self, AppPaths},
     features,
     peer::Peer,
     push,
-    relay_codec::{Frame, RelayCodec},
     render_skills::{self, SkillSelection},
 };
 
@@ -641,8 +644,8 @@ impl crate::tasks::TaskHost for RemotePeerManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{config::DEFAULT_RELAY_URL, relay_encryption::is_plain_id};
+    use super::{encryption::is_plain_id, *};
+    use crate::config::DEFAULT_RELAY_URL;
 
     #[tokio::test]
     async fn repeated_attach_updates_fcm_token() {

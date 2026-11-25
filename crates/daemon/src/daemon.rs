@@ -32,7 +32,7 @@ pub use platform::{
 /// Homebrew (`Cellar/<formula>/<version>/bin/<name>`) and Scoop
 /// (`apps/<app>/<version>/<name>`) paths to their stable entry points so
 /// upgrading and pruning old versions does not break autostart.
-pub(super) fn service_program() -> Result<PathBuf> {
+fn service_program() -> Result<PathBuf> {
     let exe = std::env::current_exe().context("failed to get current executable path")?;
     Ok(resolve_stable_program(&exe))
 }

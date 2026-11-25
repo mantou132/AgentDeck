@@ -124,13 +124,7 @@ impl DaemonConfig {
     }
 
     fn save(&self, paths: &AppPaths) -> Result<()> {
-        app_data::ensure_dir(paths.root())?;
-        let path = paths.config_file();
-        let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
-        fs::write(&temporary, serde_json::to_string_pretty(self)?)
-            .with_context(|| format!("failed to write daemon config to {}", temporary.display()))?;
-        fs::rename(&temporary, &path)
-            .with_context(|| format!("failed to replace daemon config at {}", path.display()))
+        app_data::write_file_atomic(&paths.config_file(), serde_json::to_string_pretty(self)?)
     }
 }
 
@@ -203,9 +197,9 @@ mod tests {
         assert_ne!(reset.relay_id, original.relay_id);
         assert_eq!(reset.relay_url(), DEFAULT_RELAY_URL);
         let new_id = reset.relay_id.as_deref().unwrap();
-        let new_codec = crate::relay_encryption::RelayEncryption::new(new_id).unwrap();
+        let new_codec = crate::relay::encryption::RelayEncryption::new(new_id).unwrap();
         let old_codec =
-            crate::relay_encryption::RelayEncryption::new(original.relay_id.as_deref().unwrap())
+            crate::relay::encryption::RelayEncryption::new(original.relay_id.as_deref().unwrap())
                 .unwrap();
         assert_ne!(new_codec.route_id, old_codec.route_id);
         let reloaded = load_config(&paths, None, None).unwrap();

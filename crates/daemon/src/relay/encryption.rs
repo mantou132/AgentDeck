@@ -154,7 +154,7 @@ mod tests {
 
     fn vector() -> Value {
         serde_json::from_str(include_str!(
-            "../../../packages/agentdeck/test/fixtures/e2ee-v1.json"
+            "../../../../packages/agentdeck/test/fixtures/e2ee-v1.json"
         ))
         .unwrap()
     }

@@ -5,7 +5,7 @@
 use anyhow::Result;
 use serde_json::{Value, json};
 
-use crate::relay_encryption::{RelayEncryption, is_plain_id};
+use super::encryption::{RelayEncryption, is_plain_id};
 
 /// Relay's WebSocket message limit, including the frame envelope.
 const MAX_FRAME_BYTES: usize = 10 * 1024 * 1024;
@@ -126,7 +126,7 @@ mod tests {
 
     fn encrypted_codec() -> RelayCodec {
         let vector: Value = serde_json::from_str(include_str!(
-            "../../../packages/agentdeck/test/fixtures/e2ee-v1.json"
+            "../../../../packages/agentdeck/test/fixtures/e2ee-v1.json"
         ))
         .unwrap();
         RelayCodec::new(vector["id"].as_str().unwrap()).unwrap()

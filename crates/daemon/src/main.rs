@@ -13,11 +13,8 @@ pub mod daemon;
 mod features;
 mod logger;
 mod peer;
-mod power;
 mod push;
-mod relay_client;
-mod relay_codec;
-mod relay_encryption;
+mod relay;
 mod render_skills;
 mod screen_capture;
 mod tasks;
@@ -25,6 +22,7 @@ mod ui;
 
 use agent_rpc::AgentService;
 use app_data::AppPaths;
+use awake::AwakeCommand;
 use config::{ConfigOptions, DaemonConfig};
 
 #[derive(Parser, Debug)]
@@ -84,75 +82,6 @@ enum Commands {
         #[command(subcommand)]
         command: Option<AwakeCommand>,
     },
-}
-
-#[derive(Subcommand, Debug)]
-enum AwakeCommand {
-    /// Always prevent automatic sleep while the daemon runs
-    Always,
-    /// Prevent automatic sleep on external power
-    #[command(alias = "on")]
-    Plugged,
-    /// Stay awake for one hour after the last RPC activity
-    Active,
-    /// Let the operating system sleep normally
-    #[command(alias = "off")]
-    Never,
-    /// Show the saved mode and actual runtime state
-    Status,
-}
-
-async fn awake_command(paths: &AppPaths, command: Option<AwakeCommand>) -> Result<()> {
-    let mode = match command {
-        Some(AwakeCommand::Always) => Some(awake::Mode::Always),
-        Some(AwakeCommand::Plugged) => Some(awake::Mode::Plugged),
-        Some(AwakeCommand::Active) => Some(awake::Mode::Active),
-        Some(AwakeCommand::Never) => Some(awake::Mode::Never),
-        None | Some(AwakeCommand::Status) => None,
-    };
-    let config = match mode {
-        Some(mode) => DaemonConfig::set_awake(paths, mode)?,
-        None => DaemonConfig::read(paths)?,
-    };
-    let Some(pid) = daemon::InstanceLock::check_running_at(&paths.lock_file())? else {
-        ui::kv("Keep awake", config.awake);
-        println!(
-            "{}",
-            ui::dim("Daemon is not running. Setting will take effect when it starts.")
-        );
-        return Ok(());
-    };
-    for _ in 0..40 {
-        if let Some(status) = awake::read_status(paths, pid, config.awake) {
-            let state = if status.on {
-                ui::green("on")
-            } else {
-                ui::dim("off")
-            };
-            ui::kv("Keep awake", format!("{} ({state})", status.mode));
-            if let Some(error) = status.error {
-                anyhow::bail!("Keep awake unavailable: {error}");
-            }
-            return Ok(());
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
-    ui::kv(
-        "Keep awake",
-        format!(
-            "{} ({})",
-            config.awake,
-            ui::yellow("runtime status unavailable")
-        ),
-    );
-    println!(
-        "{}",
-        ui::dim(
-            "Setting saved. The running daemon has not confirmed it; restart it if it predates \
-             awake support."
-        )
-    );
-    Ok(())
 }
 
 fn parse_relay_url(value: &str) -> std::result::Result<String, String> {
@@ -273,7 +202,7 @@ async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
     tracing::info!("Connecting to Relay");
 
     let tasks = service.init_tasks(AppPaths::new(paths.root().to_path_buf()));
-    let remote_manager = relay_client::start(config.relay_url(), relay_id, &service)
+    let remote_manager = relay::start(config.relay_url(), relay_id, &service)
         .context("failed to start Relay remote peer manager")?;
     tasks.start(remote_manager);
 
@@ -338,7 +267,7 @@ async fn main() -> Result<()> {
             print_daemon_status(&paths)?;
         }
         Some(Commands::Awake { command }) => {
-            awake_command(&paths, command).await?;
+            awake::run_command(&paths, command).await?;
         }
         Some(Commands::Status) => {
             print_daemon_status(&paths)?;
