@@ -11,7 +11,6 @@ import { agentDeckTheme } from 'src/styles/theme';
 const style = css`
   :host {
     position: relative;
-    display: block;
   }
   .content {
     overflow: hidden;

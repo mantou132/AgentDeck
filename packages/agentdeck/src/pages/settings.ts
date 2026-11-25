@@ -21,10 +21,6 @@ const style = css`
     padding-bottom: calc(12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
-  input[type='password'] {
-    letter-spacing: 0.2em;
-  }
-
   input::-ms-reveal,
   input::-ms-clear {
     display: none;

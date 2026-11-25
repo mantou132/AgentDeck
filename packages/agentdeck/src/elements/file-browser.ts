@@ -168,10 +168,7 @@ export class DeckFileBrowserElement extends GemElement {
       </div>
 
       <div class="entries-container">
-        <div v-if=${loading || this.deferred} class="flex items-center justify-center gap-2 py-12 text-sm text-describe">
-          <tap-use class="size-4" .element=${icons.loading}></tap-use>
-          ${i18n.get('cwdPicker.reading')}
-        </div>
+        <deck-loading v-if=${loading || this.deferred} label=${i18n.get('cwdPicker.reading')}></deck-loading>
 
         <div v-else>
           <button

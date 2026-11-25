@@ -75,10 +75,10 @@ export const messagesStore = createStore({
 
 const getPairing = (relayId: string) => agentdeckStore.pairingHistory.find((item) => item.relayId === relayId);
 
-/** Home directory of the current host, remembered from its last handshake. */
 /** Automatic reconnection in progress; errors raised meanwhile are cleared once connected. */
 export const isConnecting = () => ['connecting', 'reconnecting', 'attaching'].includes(agentdeckStore.connection);
 
+/** Home directory of the current host, remembered from its last handshake. */
 export const hostHome = () => getPairing(agentdeckStore.settings.relayId)?.home;
 
 /** `free`, the host's custom agents remembered from its last handshake, then the other built-in agents. */
@@ -122,11 +122,15 @@ export const getMessages = (sessionId: string): ChatMessage[] => messagesStore.b
 export const setMessages = (sessionId: string, messages: ChatMessage[]) =>
   messagesStore({ bySession: { ...messagesStore.bySession, [sessionId]: messages } });
 
+/** The session id followed by its known subagent session ids. */
+export const sessionTreeIds = (sessionId: string) => [sessionId, ...Object.keys(getRuntime(sessionId).subagents ?? {})];
+
 /** Drops everything the App holds about the session, its subagents' messages included. */
 export const removeRuntime = (sessionId: string) => {
-  const { [sessionId]: runtime, ...runtimes } = sessionsStore.runtimes;
+  const ids = sessionTreeIds(sessionId);
+  const { [sessionId]: _, ...runtimes } = sessionsStore.runtimes;
   const bySession = { ...messagesStore.bySession };
-  for (const id of [sessionId, ...Object.keys(runtime?.subagents ?? {})]) delete bySession[id];
+  for (const id of ids) delete bySession[id];
   sessionsStore({ runtimes });
   messagesStore({ bySession });
 };

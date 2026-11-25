@@ -689,7 +689,7 @@ export class AgentApi {
       undefined,
       {
         timeoutMs: 10_000,
-        timeoutMessage: 'Complete cwd timeout',
+        timeoutMessage: i18n.get('error.readCwdTimeout'),
       },
     );
 

@@ -43,6 +43,7 @@ import {
   removeRuntime,
   runningSessionIds,
   sessionsStore,
+  sessionTreeIds,
   setMessages,
   updateRuntime,
   updateSessionOptions,
@@ -196,6 +197,9 @@ export const isPlaceholderTitle = (title?: string) => {
   return false;
 };
 
+const resolveSessionTitle = (title?: string, savedTitle?: string) =>
+  isPlaceholderTitle(title) && savedTitle ? savedTitle : title || savedTitle;
+
 agentApi.setAgentStatusHandler((agent, status) => {
   const { [agent]: _, ...rest } = sessionsStore.agentStatus;
   sessionsStore({ agentStatus: status ? { ...rest, [agent]: status } : rest });
@@ -228,11 +232,10 @@ export const refreshSessions = async () => {
       .filter((session) => !isSessionDeleted(session.sessionId))
       .map((session) => {
         const meta = getSessionMeta(session.sessionId);
-        const title = isPlaceholderTitle(session.title) && meta?.title ? meta.title : session.title || meta?.title;
         return {
           ...session,
           agent,
-          title,
+          title: resolveSessionTitle(session.title, meta?.title),
           updatedAt: session.updatedAt || meta?.updatedAt,
         };
       });
@@ -371,9 +374,9 @@ export const ensureSessionLoaded = async (sessionId: string) => {
   const token = ++loadRequest;
   const isCurrent = () => getRuntime(sessionId).loadToken === token;
   // The load replays the subagents.
-  const subagentIds = Object.keys(getRuntime(sessionId).subagents ?? {});
+  const ids = sessionTreeIds(sessionId);
   updateRuntime(sessionId, { load: 'loading', loadToken: token, error: '', subagents: undefined });
-  for (const id of [sessionId, ...subagentIds]) setMessages(id, []);
+  for (const id of ids) setMessages(id, []);
 
   try {
     // First time entering session after restart: run close + load session
@@ -404,7 +407,7 @@ export const ensureSessionLoaded = async (sessionId: string) => {
     updateRuntime(sessionId, { load: 'loaded', options: { ...getRuntime(sessionId).options, ...loadedOptions } });
 
     const meta = getSessionMeta(sessionId);
-    const title = isPlaceholderTitle(loaded.title) && meta?.title ? meta.title : loaded.title || meta?.title;
+    const title = resolveSessionTitle(loaded.title, meta?.title);
     const updatedAt = loaded.updatedAt || meta?.updatedAt;
     patchSession(sessionId, {
       ...(title ? { title } : {}),
@@ -432,10 +435,21 @@ export const retrySessionLoad = (sessionId: string) => {
 const endTurn = (sessionId: string, completed: boolean) => {
   removeInFlight(sessionId);
   settleUserInput(sessionId);
-  for (const id of [sessionId, ...Object.keys(getRuntime(sessionId).subagents ?? {})]) {
+  for (const id of sessionTreeIds(sessionId)) {
     setMessages(id, finishStreaming(getMessages(id)));
   }
   updateRuntime(sessionId, { turn: undefined, ...(completed && isTurnRunning(sessionId) ? { unread: true } : {}) });
+};
+
+/** Appends a final RPC answer only if the turn did not already stream agent text. */
+const appendFallbackAnswer = (sessionId: string, turnStart: number, answer: string) => {
+  const current = getMessages(sessionId);
+  const receivedAgentText = current
+    .slice(turnStart)
+    .some((message) => 'role' in message && message.role === 'agent' && message.text);
+  if (!receivedAgentText) {
+    setMessages(sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: answer }]);
+  }
 };
 
 const runPromptTurn = (
@@ -465,15 +479,7 @@ const runPromptTurn = (
     prompt,
     {
       onEvent: (event) => applySessionEvent(sessionId, event),
-      onAnswer: (answer) => {
-        const current = getMessages(sessionId);
-        const receivedAgentText = current
-          .slice(turnStart)
-          .some((message) => 'role' in message && message.role === 'agent' && message.text);
-        if (!receivedAgentText) {
-          setMessages(sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: answer }]);
-        }
-      },
+      onAnswer: (answer) => appendFallbackAnswer(sessionId, turnStart, answer),
       onError: (error) => {
         removeInFlight(sessionId);
         updateRuntime(sessionId, { error: promptErrorMessage(error) });
@@ -503,13 +509,7 @@ export const resumeInFlightTurn = ({ sessionId, rpcId, session, messages, option
   agentApi.resumePrompt(rpcId, {
     onEvent: (event) => applySessionEvent(sessionId, event),
     resolve: (result) => {
-      if (result?.answer) {
-        const current = getMessages(sessionId);
-        const hasAnswer = current.slice(turnStart).some((m) => 'role' in m && m.role === 'agent' && m.text);
-        if (!hasAnswer) {
-          setMessages(sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: result.answer }]);
-        }
-      }
+      if (result?.answer) appendFallbackAnswer(sessionId, turnStart, result.answer);
       endTurn(sessionId, true);
     },
     reject: (error) => {

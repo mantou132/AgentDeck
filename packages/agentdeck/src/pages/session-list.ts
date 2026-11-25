@@ -46,7 +46,6 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
   #state = createState({
     sheetOpen: false,
-    newSessionError: '',
     selectedCwd: '',
     navigatingCwd: false,
   });
@@ -60,13 +59,12 @@ export class AgentDeckSessionListPageElement extends GemElement {
   #openNewSession = () => {
     this.#state({
       sheetOpen: true,
-      newSessionError: '',
       navigatingCwd: !this.#state.selectedCwd,
     });
   };
 
   #closeNewSession = () => {
-    this.#state({ sheetOpen: false, newSessionError: '', navigatingCwd: false });
+    this.#state({ sheetOpen: false, navigatingCwd: false });
     clearShare();
   };
 
@@ -89,7 +87,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
     if (!selectedCwd || navigatingCwd) return;
     const session = createPendingSession({ agent: agentdeckStore.settings.agent, cwd: selectedCwd });
     const { attachments, quote } = shareStore;
-    this.#state({ sheetOpen: false, newSessionError: '' });
+    this.#state({ sheetOpen: false });
     clearShare();
     // Saved before the page opens, where the composer reads its draft.
     if (attachments.length || quote) {
@@ -114,7 +112,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
 
   @template()
   #render = () => {
-    const { sheetOpen, newSessionError, selectedCwd, navigatingCwd } = this.#state;
+    const { sheetOpen, selectedCwd, navigatingCwd } = this.#state;
     const { connection, connectionError, settings } = agentdeckStore;
     const { sessionGroups, sessionsLoading, sessionsLoaded, sessionsError, runtimes } = sessionsStore;
     const selectedAgent = hostAgents().find((agent) => agent.id === settings.agent);
@@ -332,13 +330,6 @@ export class AgentDeckSessionListPageElement extends GemElement {
                 ></deck-file-browser>
               `,
             )}
-
-            <div
-              v-if=${newSessionError}
-              class="mt-3 shrink-0 rounded-[13px] border border-negative/30 bg-negative/[0.07] px-3.5 py-2.5 text-sm leading-relaxed text-negative"
-            >
-              ${newSessionError}
-            </div>
 
             <button
               type="button"
