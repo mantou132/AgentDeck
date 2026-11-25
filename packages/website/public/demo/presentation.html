@@ -1,0 +1,4351 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>重识 Web Components：Gem</title>
+    <style>
+/* Deck base styles shared by courseware and presentation templates: a 1920×1080 stage scaled to the screen,
+   slides, steps, choices, dragging, toolbar, overlays, print and scan-to-answer. Colors can be changed in :root. */
+:root {
+  --bg: #f6f4ee;
+  --paper: #fffdf8;
+  --ink: #23303b;
+  --muted: #6b7680;
+  --line: #d9d4c7;
+  --primary: #2f6fb3;
+  --accent: #e07a3a;
+  --good: #2e9d62;
+  --bad: #d2463c;
+  --soft-primary: #e3eef9;
+  --soft-accent: #fbeadd;
+  --soft-good: #e1f3e8;
+  --c1: #4c8fd6;
+  --c2: #e9893e;
+  --c3: #52b07c;
+  --c4: #d9584c;
+  --c5: #9a6fd0;
+  --c6: #e6b93c;
+  --font:
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif;
+  --num: "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1d232a;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#cw-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  transform: var(--cw-fit);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Slides */
+.slide {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: 80px 110px 90px;
+  font-size: 40px;
+  line-height: 1.5;
+}
+
+/* Speaker notes inside slides: hidden during presentation view */
+.slide .notes,
+.slide aside.notes {
+  display: none;
+}
+
+.slide.cw-current {
+  display: flex;
+}
+
+.slide > h2 {
+  margin: 0 0 40px;
+  font-size: 60px;
+  line-height: 1.25;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.slide h3 {
+  margin: 0 0 16px;
+  font-size: 46px;
+}
+
+.slide p {
+  margin: 0 0 24px;
+}
+
+.slide ul,
+.slide ol {
+  margin: 0 0 24px;
+  padding-left: 1.4em;
+}
+
+.slide li {
+  margin-bottom: 12px;
+}
+
+/* Title slide */
+.slide.title {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(160deg, var(--soft-primary), var(--paper) 55%, var(--soft-accent));
+}
+
+.slide.title h1 {
+  margin: 0 0 32px;
+  font-size: 110px;
+  line-height: 1.2;
+  letter-spacing: 4px;
+}
+
+.slide.title .subtitle {
+  font-size: 44px;
+  color: var(--muted);
+}
+
+/* Layout helpers */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 32px;
+}
+
+.cols {
+  flex: 1;
+  display: flex;
+  gap: 60px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.cols > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card {
+  background: var(--paper);
+  border: 3px solid var(--line);
+  border-radius: 28px;
+  padding: 36px 44px;
+}
+
+.card.primary {
+  background: var(--soft-primary);
+  border-color: var(--primary);
+}
+
+.card.accent {
+  background: var(--soft-accent);
+  border-color: var(--accent);
+}
+
+.card.good {
+  background: var(--soft-good);
+  border-color: var(--good);
+}
+
+.big {
+  font-size: 72px;
+  line-height: 1.3;
+}
+
+.huge {
+  font-size: 120px;
+  line-height: 1.2;
+  font-family: var(--num);
+  font-weight: 700;
+}
+
+.small {
+  font-size: 32px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.primary-text {
+  color: var(--primary);
+}
+
+.accent-text {
+  color: var(--accent);
+}
+
+.good-text {
+  color: var(--good);
+}
+
+.bad-text {
+  color: var(--bad);
+}
+
+.tag {
+  display: inline-block;
+  padding: 4px 22px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: middle;
+}
+
+.slide > h2 .tag {
+  font-size: 32px;
+}
+
+.tag.accent {
+  background: var(--accent);
+}
+
+.tag.good {
+  background: var(--good);
+}
+
+.blank {
+  display: inline-block;
+  min-width: 2.4em;
+  border-bottom: 4px solid currentColor;
+  text-align: center;
+}
+
+.mark {
+  background: linear-gradient(transparent 55%, var(--soft-accent) 55%);
+  padding: 0 4px;
+}
+
+.slide img,
+.slide svg {
+  max-width: 100%;
+}
+
+/* Steps: elements with data-step appear one by one before the slide advances. */
+[data-step] {
+  transition:
+    opacity 0.35s,
+    transform 0.35s;
+}
+
+[data-step].cw-hidden {
+  opacity: 0;
+  transform: translateY(16px);
+  pointer-events: none;
+}
+
+/* Multiple choice: <ol class="choices"><li data-correct>…</li><li>…</li></ol> */
+.slide .choices {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+  counter-reset: choice;
+}
+
+.choices.one-col {
+  grid-template-columns: 1fr;
+}
+
+.choices > li {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 120px;
+  counter-increment: choice;
+  position: relative;
+  margin: 0;
+  padding: 24px 36px 24px 110px;
+  background: var(--paper);
+  border: 4px solid var(--line);
+  border-radius: 24px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.choices > li::before {
+  content: counter(choice, upper-alpha);
+  position: absolute;
+  left: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--soft-primary);
+  color: var(--primary);
+  font-weight: 700;
+  text-align: center;
+  line-height: 56px;
+}
+
+.choices > li.cw-right {
+  background: var(--soft-good);
+  border-color: var(--good);
+}
+
+.choices > li.cw-right::after {
+  content: "✓";
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--good);
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+.choices > li.cw-wrong {
+  background: #fbe6e4;
+  border-color: var(--bad);
+  animation: cw-shake 0.4s;
+}
+
+.choices > li.cw-wrong::after {
+  content: "✗";
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--bad);
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+@keyframes cw-shake {
+  25% {
+    transform: translateX(-10px);
+  }
+  50% {
+    transform: translateX(10px);
+  }
+  75% {
+    transform: translateX(-6px);
+  }
+}
+
+/* Free dragging: any element with data-drag inside a slide */
+[data-drag] {
+  cursor: grab;
+  touch-action: none;
+  position: relative;
+}
+
+[data-drag].cw-dragging {
+  cursor: grabbing;
+  z-index: 10;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.2));
+}
+
+/* Formulas: LaTeX typeset by KaTeX when online (deck.js); the source shows until then. */
+.tex.display {
+  display: block;
+  text-align: center;
+  margin: 12px 0;
+}
+
+.tex:not(.cw-typeset) {
+  font-family: var(--num);
+  color: var(--muted);
+}
+
+.cw-controls {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cw-btn {
+  font: inherit;
+  font-size: 32px;
+  line-height: 1;
+  padding: 18px 32px;
+  min-width: 80px;
+  border-radius: 18px;
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cw-btn:active {
+  background: var(--soft-primary);
+}
+
+.cw-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Teacher toolbar */
+#cw-toolbar {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(29, 35, 42, 0.72);
+  color: #fff;
+  font: 15px / 1 var(--font);
+  z-index: 1000;
+  opacity: 0.25;
+  transition: opacity 0.3s;
+}
+
+#cw-toolbar:hover,
+#cw-toolbar.cw-active {
+  opacity: 1;
+}
+
+#cw-toolbar button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+#cw-toolbar button:hover,
+#cw-toolbar button.cw-on {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+#cw-toolbar .cw-page {
+  min-width: 64px;
+  text-align: center;
+  font-family: var(--num);
+}
+
+#cw-toolbar .cw-pen-colors {
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+
+#cw-toolbar.cw-pen .cw-pen-colors {
+  display: flex;
+}
+
+#cw-toolbar .cw-swatch {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+
+#cw-toolbar .cw-swatch.cw-on {
+  border-color: #fff;
+}
+
+#cw-ink {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  touch-action: none;
+}
+
+#cw-ink.cw-on {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+#cw-blackout {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 2000;
+  display: none;
+}
+
+#cw-blackout.cw-on {
+  display: block;
+}
+
+/* Overlays (timer, picker) live on the stage so they scale with it. */
+.cw-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(29, 35, 42, 0.45);
+}
+
+.cw-overlay.cw-on {
+  display: flex;
+}
+
+.cw-panel {
+  position: relative;
+  min-width: 900px;
+  padding: 60px 80px;
+  border-radius: 40px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+}
+
+.cw-panel .cw-close {
+  position: absolute;
+  right: 24px;
+  top: 24px;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  font-size: 36px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.cw-timer-display {
+  font-family: var(--num);
+  font-size: 260px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cw-timer-display.cw-done {
+  color: var(--bad);
+  animation: cw-pulse 0.8s infinite alternate;
+}
+
+@keyframes cw-pulse {
+  to {
+    transform: scale(1.06);
+  }
+}
+
+.cw-picker-name {
+  font-size: 180px;
+  font-weight: 700;
+  line-height: 1.1;
+  min-width: 4em;
+  color: var(--primary);
+}
+
+.cw-panel textarea {
+  width: 1100px;
+  height: 260px;
+  font: 32px / 1.5 var(--font);
+  padding: 20px;
+  border-radius: 18px;
+  border: 3px solid var(--line);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.cw-panel input[type="number"] {
+  width: 200px;
+  font: 40px var(--num);
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 3px solid var(--line);
+  text-align: center;
+}
+
+/* Print / PDF: every slide on its own page with all steps shown. */
+@media print {
+  @page {
+    size: 16in 9in;
+    margin: 0;
+  }
+
+  html,
+  body {
+    overflow: visible;
+    height: auto;
+    background: none;
+  }
+
+  #cw-stage {
+    position: static;
+    transform: none;
+    width: auto;
+    height: auto;
+    background: none;
+    overflow: visible;
+  }
+
+  .slide {
+    position: relative;
+    display: flex;
+    width: 1920px;
+    height: 1080px;
+    zoom: 0.8;
+    background: var(--bg);
+    break-after: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-step].cw-hidden {
+    opacity: 1;
+    transform: none;
+  }
+
+  #cw-toolbar,
+  #cw-ink,
+  #cw-reactions,
+  .cw-overlay,
+  .cw-controls {
+    display: none;
+  }
+}
+
+/* Scan-to-answer (live.js) */
+.cw-live {
+  display: flex;
+  gap: 60px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.cw-live-qr svg {
+  display: block;
+  border-radius: 16px;
+}
+
+.cw-live-info p {
+  margin: 0 0 12px;
+}
+
+.cw-live-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cw-live-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 16px;
+  border-radius: 16px;
+}
+
+.cw-live-bar.cw-right {
+  background: var(--soft-good);
+}
+
+.cw-live-label {
+  width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cw-live-track {
+  flex: 1;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  overflow: hidden;
+}
+
+.cw-live-track span {
+  display: block;
+  height: 100%;
+  background: var(--c1);
+  transition: width 0.4s;
+}
+
+.cw-live-bar.cw-right .cw-live-track span {
+  background: var(--good);
+}
+
+.cw-live-count {
+  width: 180px;
+  font-family: var(--num);
+  font-weight: 700;
+}
+
+.cw-live-count small,
+.cw-live-chip small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+.cw-live-wall {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  max-height: 520px;
+  overflow: hidden;
+  align-content: flex-start;
+}
+
+.cw-live-chip,
+.cw-live-card {
+  padding: 12px 26px;
+  border-radius: 18px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  font-size: 40px;
+}
+
+.cw-live-chip {
+  font-family: var(--num);
+  font-weight: 700;
+}
+
+.cw-live-chip.cw-right {
+  border-color: var(--good);
+  background: var(--soft-good);
+}
+
+.cw-live-card {
+  cursor: pointer;
+}
+
+/* Word cloud, rating and questions fill the rest of their slide. */
+cw-wordcloud.cw-live,
+cw-questions.cw-live {
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+cw-wordcloud .cw-live-qr,
+cw-questions .cw-live-qr {
+  align-self: center;
+}
+
+.cw-cloud {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+}
+
+.cw-cloud span {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.cw-rating-score {
+  text-align: center;
+}
+
+.cw-rating-score p {
+  margin: 0;
+}
+
+.cw-rating-star,
+.cw-rating-label {
+  color: #f2b01e;
+}
+
+.cw-rating-label {
+  width: 30%;
+  letter-spacing: 4px;
+}
+
+.cw-q-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 18px;
+}
+
+.cw-q-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 24px;
+  border-radius: 20px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  font-size: 34px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.cw-q-card.cw-done {
+  opacity: 0.55;
+}
+
+.cw-q-card.cw-on {
+  padding: 32px 44px;
+  border-color: var(--primary);
+  background: var(--soft-primary);
+  font-size: 56px;
+}
+
+.cw-q-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cw-q-votes {
+  white-space: nowrap;
+  font-family: var(--num);
+  color: var(--muted);
+}
+
+.cw-q-hide {
+  border: 0;
+  background: none;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Reactions float up the right side of the stage over any slide. */
+#cw-reactions {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#cw-reactions span {
+  position: absolute;
+  bottom: -100px;
+  font-size: 80px;
+  animation: cw-float 3s ease-out forwards;
+}
+
+@keyframes cw-float {
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--cw-drift), -760px) scale(1.3);
+  }
+}
+
+/* ---------- Mobile Teleprompter Mode ---------- */
+
+:root {
+  --prompter-bg: #111418;
+  --prompter-surface: #1a1f26;
+  --prompter-border: rgba(255, 255, 255, 0.12);
+  --prompter-text: #f0f3f6;
+  --prompter-muted: #8b949e;
+  --prompter-fs: 21px;
+}
+
+#cw-prompter {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--prompter-bg);
+  color: var(--prompter-text);
+  z-index: 5000;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--font);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+body.cw-prompter-active {
+  overflow: hidden;
+}
+
+body.cw-prompter-active #cw-prompter {
+  display: flex;
+}
+
+body.cw-prompter-active #cw-stage,
+body.cw-prompter-active #cw-toolbar,
+body.cw-prompter-active #cw-reactions,
+body.cw-prompter-active .cw-controls {
+  display: none;
+}
+
+/* Floating switch button when on mobile viewing slides (NEVER shown on desktop) */
+#cw-prompter-toggle {
+  display: none;
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 4000;
+  background: rgba(17, 20, 24, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  border: 1px solid var(--prompter-border);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Only display prompter toggle on touch / mobile devices when NOT in prompter mode */
+@media (max-width: 768px), (pointer: coarse) {
+  body:not(.cw-prompter-active) #cw-prompter-toggle {
+    display: flex;
+  }
+}
+
+/* Prompter Header */
+.cw-prompter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--prompter-surface);
+  border-bottom: 1px solid var(--prompter-border);
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.cw-prompter-header-left,
+.cw-prompter-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cw-prompter-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--prompter-border);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cw-prompter-btn:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.cw-prompter-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-family: var(--num);
+  color: var(--prompter-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.cw-prompter-page {
+  font-weight: 600;
+  color: var(--prompter-text);
+}
+
+.cw-prompter-timer {
+  font-variant-numeric: tabular-nums;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.cw-prompter-wake {
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--prompter-muted);
+  cursor: pointer;
+  border: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cw-prompter-wake.cw-on {
+  color: #56d364;
+  background: rgba(86, 211, 100, 0.15);
+}
+
+/* Prompter Content Body */
+.cw-prompter-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 20px 84px;
+  font-size: var(--prompter-fs);
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.cw-prompter-body p {
+  margin: 0 0 1.2em;
+}
+
+.cw-prompter-body p:last-child {
+  margin-bottom: 0;
+}
+
+.cw-prompter-empty {
+  color: var(--prompter-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 40px 0;
+}
+
+/* Action Cue Badges */
+.cw-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 4px;
+  vertical-align: 1px;
+}
+
+.cw-cue-flip {
+  background: rgba(56, 139, 253, 0.2);
+  border: 1px solid rgba(56, 139, 253, 0.5);
+  color: #79c0ff;
+}
+
+.cw-cue-pause {
+  background: rgba(210, 153, 34, 0.2);
+  border: 1px solid rgba(210, 153, 34, 0.5);
+  color: #e3b341;
+}
+
+.cw-cue-interact {
+  background: rgba(46, 160, 67, 0.2);
+  border: 1px solid rgba(46, 160, 67, 0.5);
+  color: #56d364;
+}
+
+.cw-cue-default {
+  background: rgba(163, 113, 247, 0.2);
+  border: 1px solid rgba(163, 113, 247, 0.5);
+  color: #d2a8ff;
+}
+
+/* Prompter Bottom Navigation */
+.cw-prompter-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(to top, rgba(17, 20, 24, 0.96) 70%, transparent);
+  pointer-events: auto;
+}
+
+.cw-prompter-nav-btn {
+  flex: 1;
+  height: 50px;
+  border-radius: 14px;
+  border: 1px solid var(--prompter-border);
+  background: var(--prompter-surface);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.cw-prompter-nav-btn.cw-next {
+  flex: 1.6;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.cw-prompter-nav-btn:active {
+  transform: scale(0.98);
+}
+
+/* Presenter Remote Modal (Key M) */
+.cw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 16, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.cw-modal-backdrop.cw-on {
+  display: flex;
+}
+
+.cw-modal-card {
+  background: #1c2128;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 32px 36px;
+  width: 360px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.cw-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.cw-modal-sub {
+  font-size: 13px;
+  color: #8b949e;
+  margin-bottom: 20px;
+}
+
+.cw-modal-qr {
+  width: 240px;
+  height: 240px;
+  background: #fff;
+  padding: 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.cw-modal-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cw-modal-status {
+  font-size: 14px;
+  color: #c9d1d9;
+  margin-top: 18px;
+  font-weight: 500;
+}
+
+.cw-modal-tip {
+  font-size: 12px;
+  color: #6e7681;
+  margin-top: 10px;
+}
+
+</style>
+    <style>
+/* Talk theme and layouts over deck.css: few words, big type, high contrast for projectors. Colors in :root. */
+:root {
+  --bg: #fbfaf7;
+  --paper: #ffffff;
+  --ink: #16181d;
+  --muted: #6a6f7a;
+  --line: #e2e0da;
+  --primary: #3346d3;
+  --accent: #ff6a3d;
+  --good: #1f9d6a;
+  --bad: #d63c3c;
+  --soft-primary: #e8ebfb;
+  --soft-accent: #ffece5;
+  --soft-good: #e2f4ec;
+  --dark: #14161c;
+  --c1: #3346d3;
+  --c2: #ff6a3d;
+  --c3: #1f9d6a;
+  --c4: #c23a8a;
+  --c5: #e0a21b;
+  --c6: #2a9bc4;
+}
+
+.slide {
+  padding: 96px 128px 104px;
+  font-size: 44px;
+}
+
+.slide > h2 {
+  margin-bottom: 48px;
+  font-size: 68px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+/* Side-by-side blocks keep their own height, centred in the space left. */
+.slide .cols {
+  flex: none;
+  margin: auto 0;
+}
+
+/* A small label above a heading: <p class="kicker">第一部分</p> */
+.kicker {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
+.slide .kicker {
+  margin: 0 0 16px;
+}
+
+.slide.dark,
+.slide.title,
+.slide.section {
+  background: var(--dark);
+  color: #fff;
+}
+
+.slide.dark .muted,
+.slide.title .muted,
+.slide.section .muted {
+  color: rgb(255 255 255 / 0.6);
+}
+
+.slide.dark .card {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.18);
+}
+
+/* Cover and closing slide */
+.slide.title {
+  align-items: flex-start;
+  text-align: left;
+  padding-left: 160px;
+}
+
+.slide.title::before {
+  content: "";
+  width: 120px;
+  height: 12px;
+  margin-bottom: 48px;
+  border-radius: 6px;
+  background: var(--accent);
+}
+
+.slide.title h1 {
+  margin: 0 0 36px;
+  max-width: 1500px;
+  font-size: 120px;
+  line-height: 1.12;
+  letter-spacing: -1px;
+}
+
+.slide.title .subtitle {
+  max-width: 1400px;
+  font-size: 48px;
+  color: rgb(255 255 255 / 0.75);
+}
+
+.slide.title .byline {
+  margin-top: 72px;
+  font-size: 34px;
+  color: rgb(255 255 255 / 0.6);
+}
+
+/* Section divider: <section class="slide section"><span class="num">01</span><h2>…</h2></section> */
+.slide.section {
+  justify-content: center;
+  padding-left: 160px;
+}
+
+.slide.section .num {
+  font-family: var(--num);
+  font-size: 200px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.slide.section > h2 {
+  margin: 24px 0 0;
+  font-size: 96px;
+}
+
+/* One sentence the audience should remember: <section class="slide statement"><p>… <em>…</em></p></section> */
+.slide.statement {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.slide.statement p {
+  margin: 0;
+  max-width: 1500px;
+  font-size: 96px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.slide.statement em,
+.slide.title em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+/* Quote: <blockquote>…<cite>— 谁，出处</cite></blockquote> */
+.slide blockquote {
+  position: relative;
+  margin: auto 0;
+  padding-left: 180px;
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.slide blockquote::before {
+  content: "“";
+  position: absolute;
+  left: 0;
+  top: -40px;
+  font-size: 260px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.slide blockquote cite {
+  display: block;
+  margin-top: 40px;
+  font-size: 38px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Big numbers: <div class="stats"><div class="stat"><b>3 倍</b><span>说明</span></div>…</div> */
+.stats {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 60px;
+  text-align: center;
+}
+
+.stat b {
+  display: block;
+  font-family: var(--num);
+  font-size: 150px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--primary);
+}
+
+.stat:nth-child(2) b {
+  color: var(--accent);
+}
+
+.stat:nth-child(3) b {
+  color: var(--good);
+}
+
+.stat span {
+  display: block;
+  margin-top: 16px;
+  font-size: 36px;
+  color: var(--muted);
+}
+
+/* Agenda: <ol class="agenda"><li>…</li></ol> */
+.slide .agenda {
+  list-style: none;
+  padding: 0;
+  margin: auto 0;
+  counter-reset: agenda;
+}
+
+.agenda > li {
+  display: flex;
+  align-items: baseline;
+  gap: 40px;
+  margin: 0;
+  padding: 26px 0;
+  border-bottom: 2px solid var(--line);
+  font-size: 54px;
+  font-weight: 700;
+  counter-increment: agenda;
+}
+
+.agenda > li::before {
+  content: counter(agenda, decimal-leading-zero);
+  font-family: var(--num);
+  font-size: 40px;
+  color: var(--accent);
+}
+
+/* Full-bleed picture: <section class="slide image"><img class="cover" src="…"><p class="caption">…</p></section> */
+.slide.image {
+  padding: 0;
+  justify-content: flex-end;
+}
+
+.slide.image img.cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+.slide.image .caption {
+  position: relative;
+  margin: 0;
+  padding: 200px 128px 88px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.7));
+  color: #fff;
+  font-size: 56px;
+  font-weight: 700;
+}
+
+/* Scan-to-answer on a talk deck */
+.slide.dark .cw-live-track,
+.slide.title .cw-live-track {
+  background: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.2);
+}
+
+.slide.dark .cw-q-card,
+.slide.dark .cw-btn {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.2);
+  color: #fff;
+}
+
+.slide.dark .cw-q-card.cw-on {
+  border-color: var(--accent);
+  background: rgb(255 106 61 / 0.16);
+}
+
+@media print {
+  .slide.dark,
+  .slide.title,
+  .slide.section {
+    background: var(--dark);
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <main id="cw-stage" data-picker="抽奖">
+      <!-- 1. 封面 -->
+      <section class="slide title">
+
+        <h1>重识 Web Components：<em>Gem</em></h1>
+        <div class="subtitle">让现代 Web 开发回归原生标准与极致轻量</div>
+        <div class="byline">mantou · 技术分享</div>
+        <cw-reactions emoji="👏,❤️,😂,😮,🤔"></cw-reactions>
+      <aside class="notes">
+        <p>【幻灯片显示封面，副标题与作者信息】  
+【停顿 2 秒，环视全场】</p>
+        <p>各位前端同行、技术朋友们，大家早上好/下午好！非常高兴今天能和大家聚在这里，聊聊我们每天都在打交道的前端技术。</p>
+        <p>今天我的分享主题叫作《重识 Web Components：Gem》。在聊 Gem 之前，我想先请大家思考一个我们前端工程师每天都会面对的日常：</p>
+        <p>每天早上我们打开电脑，`npm run dev`，看着终端里滚动出成百上千个模块，`node_modules` 动辄几百兆；为了在浏览器里画几个按钮、搞几个列表，我们给页面打包进去了几十 KB 甚至几百 KB 的框架运行时，还有庞大的虚拟 DOM 树。</p>
+        <p>我们似乎早就习惯了这一切。但很多时候我们可能会忽略一件事：浏览器自己其实早就推出了一套组件化标准——Web Components。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 2. 扫码互动加入 -->
+      <section class="slide">
+
+        <h2>扫码加入现场互动</h2>
+        <div class="fill"><cw-live-join></cw-live-join></div>
+      <aside class="notes">
+        <p>【幻灯片显示二维码及加入人数提示】  
+【指向大屏幕】</p>
+        <p>在深入聊之前，今天我们准备了实时互动的环节。大家可以拿出手机，微信或者浏览器扫一下大屏幕上的二维码。</p>
+        <p>【停顿，等观众拿起手机扫码】</p>
+        <p>进到页面之后，大家不仅能参与稍后的现场投票，更重要的是：在整个分享过程中，如果你对哪个技术点有疑问、想讨论，或者有什么看法，随时可以在手机上点击“提问”，问题会实时同步到我大屏幕的提问池里。在分享结束后的 Q&A 环节，我们会挑点赞最高的问题一起交流。</p>
+        <p>好，我看已经有不少同学进来了，我们直接进入第一个小互动。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 3. 破冰投票 -->
+      <section class="slide">
+
+        <p class="kicker">先问大家</p>
+        <h2>你目前在项目中使用 Web Components 的情况是？</h2>
+        <div class="fill">
+          <cw-poll options="没用过（觉得繁琐）,只做通用基础组件,尝试过但缺少好框架,已经在深度使用" qr></cw-poll>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示实时投票组件 cw-poll】  
+【请大家在手机上选择】</p>
+        <p>请大家看手机屏幕上的投票题：**你目前在项目中使用 Web Components 的情况或印象是怎样的？**</p>
+        <p>选项有四个：  
+A. 没用过（觉得繁琐）；  
+B. 只做通用基础组件（比如公司内部的跨框架通用 Button/Icon）；  
+C. 尝试过但缺少好框架（想做复杂业务但缺乏好用的应用层封装）；  
+D. 已经在深度使用。</p>
+        <p>【看大屏幕柱状图变化，读出最多的选项】  
+大家可以看到大屏幕上的实时分布——果然，选 A 和 B 的同学占了绝大多数！很多人第一反应是：“Web Components 概念听了五六年了，但原生写起来实在太反人类了，除了封装个无状态的基础 UI 组件，谁敢拿它写完整的前端应用？”</p>
+        <p>大家选得很真实。这也是我今天站在这里的原因。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 4. 议程 -->
+      <section class="slide">
+
+        <h2>今天分享三件事</h2>
+        <ol class="agenda">
+          <li>标准演进：Web Components 真的不好用吗？</li>
+          <li>走近 Gem：原生标准与现代开发体验的统一</li>
+          <li>真实收益：为什么我们在生产中选择它</li>
+        </ol>
+      <aside class="notes">
+        <p>【幻灯片显示议程】</p>
+        <p>今天我想花接下来的 15 分钟，和大家真诚地聊三件事：</p>
+        <p>第一，**标准演进**：过去的 Web Components 到底卡在哪里？为什么大家觉得它不好用？而今天的 Web 标准又发生了什么根本性的变化？  
+第二，**走近 Gem**：我是如何站在原生标准的肩膀上，设计出 Gem 这个兼具标准纯粹与现代开发体验的前端框架的？  
+第三，**真实收益**：在真实的生产环境和跨平台应用中，放弃重型框架、选择 Gem 能给我们带来什么实质性的收益？</p>
+        <p>说完框架，我们先来看第一个问题：过去的痛点。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 5. 第一部分 分隔页 -->
+      <section class="slide section">
+
+        <span class="num">01</span>
+        <h2>Web Components 真的不好用吗？</h2>
+      <aside class="notes">
+        <p>【章节过渡页：01 Web Components 真的不好用吗？】  
+【停顿，语气转入技术剖析】</p>
+        <p>让我们把时钟拨回到几年前。为什么很多团队调研过 Web Components，最后还是默默回到了 React 或 Vue？</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 6. 过去痛点 -->
+      <section class="slide">
+
+        <p class="kicker">曾经的痛点</p>
+        <h2>为什么原生 Custom Elements 很难直接写复杂业务？</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="accent-text">样板代码繁琐</h3>
+            <p class="small muted">属性监听与反射（observedAttributes）需手动类型转换与序列化，缺乏静态类型约束。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">DOM 手动更新</h3>
+            <p class="small muted">
+              缺少响应式状态与细粒度模板渲染，状态更新依赖手动操作真实 DOM，极易产生漏洞与性能瓶颈。
+            </p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">样式与封装摩擦</h3>
+            <p class="small muted">
+              Shadow DOM 虽隔离了样式，但在全局设计规范共享、动态主题换肤和跨组件穿透上充满心智摩擦。
+            </p>
+          </div>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示三栏卡片】</p>
+        <p>原生 Custom Elements 最大的问题，不是标准不能用，而是**标准只提供了最底层的积木，没有提供舒适的工程化体验**。</p>
+        <p>【点击出现第一条：样板代码繁琐】  
+第一，样板代码极多。写过原生自定义元素的同学都知道，想要监听一个属性变化，你得先在 `observedAttributes` 数组里声明字符串，再在 `attributeChangedCallback` 里手动写 `if-else` 或 `switch`，自己做字符串转布尔、转数字、转对象，不仅繁琐，而且完全失去了 TypeScript 的类型推导与编译期保障。</p>
+        <p>【点击出现第二条：DOM 手动更新】  
+第二，没有内置的响应式与模板机制。原生标准只告诉你“元素被挂载了”、“属性变了”，至于属性变了之后怎么更新 DOM？标准留给你自己用 `this.innerHTML = ...` 或者一系列 `document.createElement` 去拼。面对稍微复杂的列表渲染、条件判断，手写 DOM 操作极其痛苦，稍微不注意就会引发性能退化和内存泄漏。</p>
+        <p>【点击出现第三条：样式与封装摩擦】  
+第三，Shadow DOM 的双刃剑。Shadow DOM 提供了完美的样式隔离，但在实践中，跨组件共享全局设计规范、统一主题变量，或者外部样式局部穿透时，原生的方案充满了各种 hack，开发心智负担很重。</p>
+        <p>正因为这些痛点，过去的社区只能靠大型框架去弥补。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 7. 观点提炼 -->
+      <section class="slide statement">
+
+        <p>过去我们用框架弥补标准，<br>但现在<em>标准已经补全</em>。</p>
+      <aside class="notes">
+        <p>【幻灯片大字陈述页】  
+【加重语气】</p>
+        <p>在过去的十年里，前端框架飞速发展，本质上是因为浏览器标准有缺失。**我们用几百 KB 的框架运行时，去填补浏览器没有给我们的能力。**</p>
+        <p>但是今天，情况彻底变了。我想提醒大家注意：现在的 Web 平台，早已不是当年的 Web 平台了。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 8. 现代标准契机 -->
+      <section class="slide">
+
+        <p class="kicker">标准契机</p>
+        <h2>现代浏览器补齐了关键拼图</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="good-text">ES 2023 标准装饰器</h3>
+            <p class="small muted">TC39 Stage 3 装饰器标准正式落地，以纯粹语言特性实现声明式组件，无需实验性 hack。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="good-text">AdoptedStyleSheets</h3>
+            <p class="small muted">
+              可构造样式表完美解决 Shadow DOM 间共享样式的性能开销，零成本共享设计 Token 与主题。
+            </p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="good-text">全平台原生性能</h3>
+            <p class="small muted">现代浏览器与嵌入式 WebView 均全面支持 Custom Elements v1，直接调用底层 C++ 引擎。</p>
+          </div>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示三大标准契机】</p>
+        <p>在最近一两年里，几个重量级的标准拼图终于全部就位：</p>
+        <p>【点击出现第一条：ES 2023 标准装饰器】  
+首先是 **ES 2023 标准装饰器（TC39 Stage 3）**。过去我们写装饰器依赖 TypeScript 的实验性语法或者 Babel 的转译 hack，语法飘忽不定；而现在，JavaScript 官方标准装饰器已经正式落地！这意味着我们可以用完全符合语言标准的声明式语法，来定义属性、方法和组件元数据。</p>
+        <p>【点击出现第二条：AdoptedStyleSheets】  
+其次是 **Constructable Stylesheets，也就是 AdoptedStyleSheets**。以前每个 Shadow Root 都要复制一份 <code>&amp;lt;style&amp;gt;</code> 标签，内存开销巨大；现在，一个样式表对象可以在多个组件乃至全局之间零拷贝共享，动态换肤、Token 继承变得比传统 CSS-in-JS 还要轻快。</p>
+        <p>【点击出现第三条：全平台原生性能】  
+最后，所有的主流浏览器、移动端 WebView、桌面端嵌入式环境（Chromium、Safari、Firefox、Webkit），对 Custom Elements v1 的原生支持都已经到了极其成熟稳定的阶段。</p>
+        <p>既然浏览器的底层能力已经完全武装到了牙齿，我们为什么还要在上面套一层厚重的虚拟 DOM 运行时呢？</p>
+        <p>基于这个思考，我写了 **Gem**。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 9. 第二部分 分隔页 -->
+      <section class="slide section">
+
+        <span class="num">02</span>
+        <h2>走近 Gem：原生标准与现代体验</h2>
+      <aside class="notes">
+        <p>【章节过渡页：02 走近 Gem】  
+【语气变得充满热情与自信】</p>
+        <p>Gem 的诞生，就是要回答一个问题：**如果不脱离原生 Web Components 标准，我们能获得多爽的现代开发体验？**</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 10. Gem 哲学 -->
+      <section class="slide">
+
+        <p class="kicker">设计哲学</p>
+        <h2>Gem 的核心原则</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="primary-text">紧跟标准，零私有运行时</h3>
+            <p class="small muted">继承原生 GemElement (HTMLElement)，无虚拟 DOM 层，让浏览器做最擅长的事。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">声明式与细粒度响应式</h3>
+            <p class="small muted">基于标准 ES 装饰器与微任务批处理，精准更新变动 DOM，告别全树 Diff 性能负担。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="good-text">极致轻量与零妥协 TS</h3>
+            <p class="small muted">
+              框架核心仅数 KB；TypeScript 优先，从属性、事件到模板提供第一等公民的静态类型安全。
+            </p>
+          </div>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示三大设计哲学卡片】</p>
+        <p>Gem 的设计哲学非常纯粹，可以概括为三句话：</p>
+        <p>【点击出现第一条：紧跟标准，零私有运行时】  
+第一，**紧跟标准，零私有运行时**。在 Gem 里，每一个组件就是一个普通的 ES 类，继承自 `GemElement`，而 `GemElement` 本质上就是原生的 `HTMLElement`。它没有自己造一套闭门造车的虚拟节点树，没有庞大的 Synthetic Event 合成事件系统，直接把执行权交给浏览器引擎。</p>
+        <p>【点击出现第二条：声明式与细粒度响应式】  
+第二，**声明式与细粒度响应式**。我们不需要回到手动操纵 DOM 的石器时代。Gem 基于模板标签和微任务队列，实现了真正的细粒度更新：哪里的数据变了，就精确打补丁到对应的真实 DOM 节点上，完全避免了每次更新自顶向下对比整棵树的性能损耗。</p>
+        <p>【点击出现第三条：极致轻量与零妥协 TS】  
+第三，**极致轻量，TypeScript 优先**。整个框架核心只有几 KB，但从属性定义、事件传递到模板类型推断，全流程享受第一等公民的静态类型安全。</p>
+        <p>说起来很抽象，我们直接来看一段代码是怎么写的。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 11. 开发体验 -->
+      <section class="slide">
+
+        <p class="kicker">开发体验</p>
+        <h2>清晰、直观的组件语法</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="accent-text">输入与状态</h3>
+            <p class="small muted">
+              <strong>@property</strong>
+              属性响应式同步<br><strong>@state</strong>
+              映射 CSS 状态伪类<br><strong>createState</strong>
+              管理私有状态
+            </p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">渲染与生命周期</h3>
+            <p class="small muted">
+              <strong>@template</strong>
+              声明模板与 html 标签<br><strong>@memo / @effect</strong>
+              显式依赖追踪<br><strong>@adoptedStyle</strong>
+              高效共享样式表
+            </p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">全局状态与事件</h3>
+            <p class="small muted">
+              <strong>createStore</strong>
+              / <strong>@connectStore</strong> 状态跨组件联动<br><strong>@emitter</strong>
+              / <strong>@globalemitter</strong> 规范事件派发
+            </p>
+          </div>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示三组核心特性卡片】</p>
+        <p>如果你熟悉 React Hooks 或者 Vue Composition API，看 Gem 的代码会感到极度的亲切和自然，甚至更加清晰：</p>
+        <p>【点击出现第一组：输入与状态】  
+- **输入与属性**：一个 `@property` 装饰器，就能直接把类属性与元素属性双向同步，不仅自动做类型转换，还会自动触发响应式重绘；用 `@state` 可以直接将组件内部状态映射为 CSS 自定义状态伪类；用 `createState` 轻松管理私有状态。</p>
+        <p>【点击出现第二组：渲染与生命周期】  
+- **渲染与逻辑**：用 `@template` 定义渲染函数，内部直接写现代的模板字符串 `html\`...\``。依赖跟踪用 `@memo` 和 `@effect`，清清楚楚地通过依赖数组控制副作用，返回清理函数；通过 `@adoptedStyle`，你可以轻松把公共样式挂载到当前组件的 Shadow DOM 中，零运行时开销。</p>
+        <p>【点击出现第三组：全局状态与事件】  
+- **全局状态与通信**：多组件状态共享不需要冗长的 Redux 或 Pinia，一个 `createStore` 创建响应式 Store，在组件上挂一个 `@connectStore` 装饰器，组件就会在 Store 数据变动时自动重绘。组件对外通知用 `@emitter`，如果需要跨 Shadow DOM 向外层广播，一个 `@globalemitter` 就搞定了。</p>
+        <p>没有魔法，全都是标准的 ECMAScript 语法。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 12. 生态体系 -->
+      <section class="slide">
+
+        <p class="kicker">工程化与生态</p>
+        <h2>不只一个运行时，而是一整套生态</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="primary-text">unplugin-gem</h3>
+            <p class="small muted">支持 Vite、Rsbuild、Webpack，实现 Gem API 与自定义组件自动按需导入与无缝 HMR。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">Duoyun UI & Tap UI</h3>
+            <p class="small muted">开箱即用的原生 UI 库，分别专为桌面端与移动端场景量身打磨，交互细腻、轻巧顺滑。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="good-text">@gem-bind/*</h3>
+            <p class="small muted">官方提供 ECharts、Mermaid、Marked、LaTeX 等高频生态的 Custom Elements 快速包装。</p>
+          </div>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示生态组成】</p>
+        <p>有的同学可能会问：“单有框架还不够，现代开发需要工程化工具，需要组件库，Gem 的生态怎样？”</p>
+        <p>Gem 从一开始就考虑到了完整的工程化闭环：</p>
+        <p>【点击出现第一条：unplugin-gem】  
+首先是构建工具。我们开发了 `unplugin-gem`，支持 Vite、Rsbuild、Webpack 等所有主流构建工具。它支持**全自动按需导入**，写代码时你根本不需要手动 `import { GemElement, html, ... }`，开箱即用，同时提供了完美的开发期 HMR（热更新）体验。</p>
+        <p>【点击出现第二条：Duoyun UI & Tap UI】  
+其次是组件库。我们拥有专为桌面端打造的 **Duoyun UI**，以及专为移动端打造的 **Tap UI**。它们完全由 Gem 编写，这意味着它们是纯正的原生 Web Components，拥有极高质量的交互手感与可定制性。</p>
+        <p>【点击出现第三条：@gem-bind/*】  
+最后是流行工具的绑定。无论你想在应用中嵌入 ECharts 图表、Mermaid 流程图、Marked Markdown 渲染，还是 LaTeX 数学公式，我们都提供了官方的 `@gem-bind/*` 包，把复杂的第三方库封装成一个简单干净的原生自定义元素。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 13. 第三部分 分隔页 -->
+      <section class="slide section">
+
+        <span class="num">03</span>
+        <h2>真实收益：为什么在生产中选择 Gem？</h2>
+      <aside class="notes">
+        <p>【章节过渡页：03 真实收益】  
+【语气转入务实、严谨的工程实践视角】</p>
+        <p>聊完了语法和生态，我们回到最核心的技术选型问题：把这样一套基于 Web Components 的架构推向生产环境，我们能拿到什么实实在在的收益？</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 14. 生产指标 -->
+      <section class="slide">
+
+        <p class="kicker">生产指标</p>
+        <h2>极致的轻量与性能</h2>
+        <div class="stats">
+          <div class="stat" data-step><b>&lt; 10 KB</b><span>运行时 gzip 体积</span></div>
+          <div class="stat" data-step><b>0 VDOM</b><span>零虚拟 DOM 开销</span></div>
+          <div class="stat" data-step><b>100%</b><span>标准 Web Components</span></div>
+        </div>
+        <p class="small muted center">冷启动更快、内存占用更低、跨应用嵌入毫无包袱。</p>
+      <aside class="notes">
+        <p>【幻灯片显示三大数字指标】</p>
+        <p>最直接的收益就是**轻量与性能**。</p>
+        <p>【点击出现指标一：< 10 KB】  
+框架的核心运行时非常精简，相比动辄几十 KB 的通用框架，Gem 的体积优势在低网速环境或者资源敏感型场景下极其显著。</p>
+        <p>【点击出现指标二：0 VDOM】  
+没有庞大的虚拟 DOM 运行时。所有的模板编译在构建期完成，运行期依托浏览器的原生模板与细粒度节点替换，没有大树对比的内存开销与 CPU 毛刺。</p>
+        <p>【点击出现指标三：100% 原生标准】  
+每一个产出元素，都是浏览器标准认可的 Custom Element。它在浏览器 DevTools 里是一个干干净净的自定义标签，没有冗杂的包裹层。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 15. 架构收益 -->
+      <section class="slide">
+
+        <p class="kicker">架构收益</p>
+        <h2>在复杂生产应用中的实践价值</h2>
+        <div class="cols">
+          <div class="card" data-step>
+            <h3 class="accent-text">真正的跨宿主与微前端</h3>
+            <p class="small muted">
+              桌面客户端（Tauri）、浏览器扩展、任意宿主微前端，原生标签即插即用，绝无运行时多实例冲突。
+            </p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">天然的沙箱与样式隔离</h3>
+            <p class="small muted">Shadow DOM 彻底隔绝样式污染，无需复杂的 CSS Modules 哈希化，样式安全有保障。</p>
+          </div>
+          <div class="card" data-step>
+            <h3 class="accent-text">穿越框架周期的代码资产</h3>
+            <p class="small muted">
+              框架潮起潮落，但浏览器标准永存。基于 Gem 开发的组件将长久稳定运行在标准 Web 平台之上。
+            </p>
+          </div>
+        </div>
+      <aside class="notes">
+        <p>【幻灯片显示三项架构收益】</p>
+        <p>在更宏观的架构层面上，Gem 带来了三个很多传统框架无法比拟的优势：</p>
+        <p>【点击出现第一条：真正的跨宿主与微前端】  
+第一，**真正的跨宿主与微前端**。如果你做过跨团队协作或者微前端，你一定体会过不同 React/Vue 版本冲突、全局变量污染的痛苦。而基于 Gem 构建的组件，输出的就是原生标签。无论宿主页面用的是 Next.js、Vue 还是 Angular，直接 <code>&amp;lt;my-element&amp;gt;</code> 就能渲染，甚至作为浏览器扩展的内容注入脚本（Content Script），都天然没有多实例冲突的问题。</p>
+        <p>【点击出现第二条：天然的沙箱与样式隔离】  
+第二，**天然的沙箱与样式隔离**。Shadow DOM 提供了由浏览器引擎保证的样式边界。你永远不需要担心业务里的类名和外部库冲突，也不需要依赖复杂的 CSS Modules 哈希命名。</p>
+        <p>【点击出现第三条：穿越框架周期的代码资产】  
+第三，**穿越框架周期的资产积累**。前端圈的技术风向变化极快。今天流行的 API，明天可能就被弃用了。但 Web 标准不会死，浏览器对 Custom Elements 的支持不会推倒重来。你用 Gem 写的组件，在五年、十年后，依然是标准浏览器里可以直接运行的代码。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 16. 核心陈述 -->
+      <section class="slide statement">
+
+        <p>回归标准不是倒退，<br>而是让代码活得<em>比任何框架都更久</em>。</p>
+      <aside class="notes">
+        <p>【幻灯片大字陈述页】  
+【语气坚定、充满感召力】</p>
+        <p>我们经常开玩笑说前端技术在“倒退”：以前大家嫌原生难用，造了框架；现在又回过头来拥抱原生。</p>
+        <p>但我想说：**回归标准从来不是倒退，而是一种成熟。** 当标准足够强大时，放下沉重的历史包袱，让浏览器做它最擅长的事情，才是长久之道。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 17. Q&A -->
+      <section class="slide dark">
+
+        <h2>现场问答交流</h2>
+        <p class="small muted">大家可以在手机互动页面随时提交问题或点赞，屏幕将实时同步展示。</p>
+        <cw-questions qr></cw-questions>
+      <aside class="notes">
+        <p>【幻灯片切换为 Q&A 提问看板 cw-questions】  
+【面向观众微笑】</p>
+        <p>现在我们进入问答交流环节。大家可以看一下大屏幕，手机端提问列表里已经收到了不少朋友提出的问题。</p>
+        <p>【看大屏幕上的问题列表，选择点赞最高的一个或两个问题宣读并回答】  
+【例如针对 SSR、兼容性或组件生态的问题进行回应】</p>
+        <p>非常感谢大家的精彩提问！如果稍后还有更细节的技术讨论，也欢迎线下随时交流。</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 18. 打分 -->
+      <section class="slide">
+
+        <h2>给今天的分享打个分</h2>
+        <div class="fill"><cw-rating max="5" qr></cw-rating></div>
+      <aside class="notes">
+        <p>【幻灯片显示评分组件 cw-rating】</p>
+        <p>在结束之前，请大家拿出手机，在页面上给今天的内容打个分。无论是对技术内容的建议，还是对未来 Gem 生态的期望，都非常欢迎大家的真实反馈！</p>
+        <p>【等待几秒，看大屏幕平均分显示】</p>
+        <p>感谢大家的鼓励和支持！</p>
+        <p>【翻页】</p>
+        <p>---</p>
+      </aside>
+    </section>
+
+      <!-- 19. 封底 -->
+      <section class="slide title">
+
+        <h1>谢谢大家</h1>
+        <div class="subtitle">让标准真正为我们所用 · 欢迎体验 Gem</div>
+        <div class="byline">mantou · GitHub: mantou132/gem</div>
+      <aside class="notes">
+        <p>【幻灯片显示封底与 GitHub 地址】</p>
+        <p>最后，再次感谢大家的时间！</p>
+        <p>Gem 是完全开源的项目，相关的生态组件库和插件也都在 GitHub 开源。如果大家对轻量级 Web Components 开发感兴趣，欢迎在 GitHub 搜索关注 `@mantou132/gem`，欢迎提 issue、提 PR，或者一起探索更多原生前端的可能性。</p>
+        <p>谢谢大家！</p>
+      </aside>
+    </section>
+    </main>
+
+    <script>
+/*
+ * Deck engine shared by the courseware and presentation templates: stage scaling, navigation (keys, clickers,
+ * swipe, toolbar), steps, multiple choice, dragging, pen, timer, random picker. Plain script (no modules) so it
+ * runs from file:// in older browsers. `data-picker="抽奖"` on #cw-stage renames the toolbar's 点名 button.
+ */
+(() => {
+  const W = 1920;
+  const H = 1080;
+  const stage = document.getElementById('cw-stage');
+  const slides = [].slice.call(stage.children).filter((el) => el.classList.contains('slide'));
+  const params = new URLSearchParams(location.search);
+  const showAllSteps = params.get('steps') === 'all';
+  const isEn = (document.documentElement.lang || '').toLowerCase().startsWith('en');
+  let scale = 1;
+  let index = 0;
+  let stepIndex = 0;
+  let stepGroups = [];
+
+  function el(tag, attrs, children) {
+    const node = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach((key) => {
+        if (key === 'text') node.textContent = attrs[key];
+        else if (key === 'onclick') node.addEventListener('click', attrs[key]);
+        else node.setAttribute(key, attrs[key]);
+      });
+    }
+    (children || []).forEach((child) => {
+      node.appendChild(child);
+    });
+    return node;
+  }
+
+  /* ---------- Scaling ---------- */
+
+  function fit() {
+    scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+    const x = (window.innerWidth - W * scale) / 2;
+    const y = (window.innerHeight - H * scale) / 2;
+    stage.style.setProperty('--cw-fit', `translate(${x}px,${y}px) scale(${scale})`);
+  }
+
+  /** Converts a pointer event to stage coordinates. */
+  function stagePoint(event) {
+    const rect = stage.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
+  }
+
+  /* ---------- Steps ---------- */
+
+  /** Groups [data-step] elements: numbers order them, empty values follow document order, "&" joins the previous one. */
+  function collectSteps(slide) {
+    const groups = {};
+    let key = 0;
+    [].slice.call(slide.querySelectorAll('[data-step]')).forEach((node, i) => {
+      const raw = node.getAttribute('data-step');
+      if (raw !== '&') {
+        const value = parseFloat(raw);
+        key = Number.isNaN(value) ? i + 1 : value;
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(node);
+    });
+    return Object.keys(groups)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((key) => groups[key]);
+  }
+
+  function applySteps() {
+    stepGroups.forEach((group, i) => {
+      group.forEach((node) => {
+        node.classList.toggle('cw-hidden', i >= stepIndex);
+      });
+    });
+  }
+
+  /* ---------- Navigation ---------- */
+
+  function go(target, revealAll) {
+    target = Math.max(0, Math.min(slides.length - 1, target));
+    slides[index].classList.remove('cw-current');
+    index = target;
+    const slide = slides[index];
+    slide.classList.add('cw-current');
+    stepGroups = collectSteps(slide);
+    stepIndex = revealAll || showAllSteps ? stepGroups.length : 0;
+    applySteps();
+    ink.show(index);
+    pageLabel.textContent = `${index + 1} / ${slides.length}`;
+    if (typeof updatePrompterContent === 'function') updatePrompterContent();
+    if (history.replaceState) history.replaceState(null, '', `${location.search}#${index + 1}`);
+    slide.dispatchEvent(new CustomEvent('cw-enter', { bubbles: true }));
+  }
+
+  function next() {
+    if (stepIndex < stepGroups.length) {
+      stepIndex++;
+      applySteps();
+    } else if (index < slides.length - 1) {
+      go(index + 1);
+    }
+  }
+
+  function prev() {
+    if (stepIndex > 0 && !showAllSteps) {
+      stepIndex--;
+      applySteps();
+    } else if (index > 0) {
+      go(index - 1, true);
+    }
+  }
+
+  function toggleFullscreen() {
+    const doc = document;
+    const root = doc.documentElement;
+    if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+      (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc);
+    } else {
+      const request = root.requestFullscreen || root.webkitRequestFullscreen;
+      if (request) request.call(root);
+    }
+  }
+
+  /** Resets the current slide: manipulatives, dragged items, answers, steps and ink. */
+  function resetSlide() {
+    const slide = slides[index];
+    [].slice.call(slide.querySelectorAll('*')).forEach((node) => {
+      if (typeof node.cwReset === 'function') node.cwReset();
+    });
+    stepGroups = collectSteps(slide);
+    [].slice.call(slide.querySelectorAll('[data-drag]')).forEach((node) => {
+      node.style.transform = '';
+      node.classList.remove('cw-right', 'cw-wrong');
+    });
+    [].slice.call(slide.querySelectorAll('.cw-right, .cw-wrong')).forEach((node) => {
+      node.classList.remove('cw-right', 'cw-wrong');
+    });
+    stepIndex = showAllSteps ? stepGroups.length : 0;
+    applySteps();
+    ink.clear();
+  }
+
+  /* ---------- Multiple choice ---------- */
+
+  stage.addEventListener('click', (event) => {
+    const item = event.target.closest('.choices > li');
+    if (!item) return;
+    const marked = item.classList.contains('cw-right') || item.classList.contains('cw-wrong');
+    item.classList.remove('cw-right', 'cw-wrong');
+    if (!marked) item.classList.add(item.hasAttribute('data-correct') ? 'cw-right' : 'cw-wrong');
+  });
+
+  /* ---------- Dragging: [data-drag], optional [data-drop] targets ---------- */
+
+  function translateOf(node) {
+    const match = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(node.style.transform);
+    return match ? { x: parseFloat(match[1]), y: parseFloat(match[2]) } : { x: 0, y: 0 };
+  }
+
+  stage.addEventListener('pointerdown', (event) => {
+    const item = event.target.closest('[data-drag]');
+    if (!item || ink.active) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const start = stagePoint(event);
+    const origin = translateOf(item);
+    const snap = parseFloat(item.getAttribute('data-snap')) || 0;
+    item.classList.add('cw-dragging');
+    item.classList.remove('cw-right', 'cw-wrong');
+    item.setPointerCapture(event.pointerId);
+
+    function move(e) {
+      const p = stagePoint(e);
+      let x = origin.x + p.x - start.x;
+      let y = origin.y + p.y - start.y;
+      if (snap) {
+        x = Math.round(x / snap) * snap;
+        y = Math.round(y / snap) * snap;
+      }
+      item.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    function up(e) {
+      item.classList.remove('cw-dragging');
+      item.removeEventListener('pointermove', move);
+      item.removeEventListener('pointerup', up);
+      item.removeEventListener('pointercancel', up);
+      const slide = item.closest('.slide');
+      const zones = [].slice.call(slide.querySelectorAll('[data-drop]'));
+      if (!zones.length) return;
+      const zone = zones.filter((z) => {
+        const r = z.getBoundingClientRect();
+        return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      })[0];
+      if (!zone) return;
+      const accepts = zone.getAttribute('data-drop').split(/\s+/);
+      if (accepts.indexOf(item.getAttribute('data-drag')) >= 0 || accepts.indexOf('*') >= 0) {
+        item.classList.add('cw-right');
+      } else {
+        item.classList.add('cw-wrong');
+        setTimeout(() => {
+          item.style.transition = 'transform 0.4s';
+          item.style.transform = `translate(${origin.x}px, ${origin.y}px)`;
+          setTimeout(() => {
+            item.style.transition = '';
+            item.classList.remove('cw-wrong');
+          }, 450);
+        }, 500);
+      }
+    }
+
+    item.addEventListener('pointermove', move);
+    item.addEventListener('pointerup', up);
+    item.addEventListener('pointercancel', up);
+  });
+
+  /* ---------- Swipe to turn pages ---------- */
+
+  let swipe = null;
+  stage.addEventListener('pointerdown', (event) => {
+    if (ink.active || event.pointerType === 'mouse') return;
+    if (event.target.closest('.cw-tool, [data-drag], .choices, button, input, textarea, .cw-overlay')) return;
+    swipe = { x: event.clientX, y: event.clientY };
+  });
+  window.addEventListener('pointerup', (event) => {
+    if (!swipe) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) next();
+      else prev();
+    }
+  });
+
+  /* ---------- Pen ---------- */
+
+  const ink = (() => {
+    const canvas = el('canvas', { id: 'cw-ink', width: W, height: H });
+    stage.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    const strokes = {};
+    let current = 0;
+    let color = '#d2463c';
+    let drawing = null;
+
+    function draw(stroke) {
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      stroke.points.forEach((p, i) => {
+        if (i) ctx.lineTo(p.x, p.y);
+        else ctx.moveTo(p.x, p.y);
+      });
+      if (stroke.points.length === 1) ctx.lineTo(stroke.points[0].x + 0.1, stroke.points[0].y);
+      ctx.stroke();
+    }
+
+    function redraw() {
+      ctx.clearRect(0, 0, W, H);
+      (strokes[current] || []).forEach(draw);
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      canvas.setPointerCapture(event.pointerId);
+      drawing = { color: color, width: color === 'erase' ? 0 : 7, points: [stagePoint(event)] };
+      if (color === 'erase') return;
+      if (!strokes[current]) strokes[current] = [];
+      strokes[current].push(drawing);
+      draw(drawing);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!drawing) return;
+      const p = stagePoint(event);
+      if (color === 'erase') {
+        strokes[current] = (strokes[current] || []).filter(
+          (stroke) => !stroke.points.some((q) => Math.abs(q.x - p.x) < 30 && Math.abs(q.y - p.y) < 30),
+        );
+        redraw();
+        return;
+      }
+      drawing.points.push(p);
+      redraw();
+    });
+    ['pointerup', 'pointercancel'].forEach((type) => {
+      canvas.addEventListener(type, () => {
+        drawing = null;
+      });
+    });
+
+    return {
+      active: false,
+      setActive: function (on) {
+        this.active = on;
+        canvas.classList.toggle('cw-on', on);
+      },
+      setColor: (c) => {
+        color = c;
+      },
+      show: (i) => {
+        current = i;
+        redraw();
+      },
+      clear: () => {
+        strokes[current] = [];
+        redraw();
+      },
+    };
+  })();
+
+  /* ---------- Overlays ---------- */
+
+  function overlay(content) {
+    const close = el('button', { class: 'cw-close', text: '×', 'aria-label': '关闭' });
+    const panel = el('div', { class: 'cw-panel' }, [close].concat(content));
+    const layer = el('div', { class: 'cw-overlay' }, [panel]);
+    close.addEventListener('click', () => {
+      layer.classList.remove('cw-on');
+    });
+    layer.addEventListener('pointerdown', (event) => {
+      if (event.target === layer) layer.classList.remove('cw-on');
+    });
+    stage.appendChild(layer);
+    return layer;
+  }
+
+  function closeOverlays() {
+    const open = stage.querySelectorAll('.cw-overlay.cw-on');
+    [].slice.call(open).forEach((layer) => {
+      layer.classList.remove('cw-on');
+    });
+    return open.length > 0;
+  }
+
+  /* ---------- Timer ---------- */
+
+  const timer = (() => {
+    let total = 180;
+    let left = total;
+    let running = false;
+    let last = 0;
+    const display = el('div', { class: 'cw-timer-display' });
+    const startBtn = el('button', { class: 'cw-btn primary', text: '开始' });
+    const presets = el(
+      'div',
+      { class: 'cw-controls' },
+      [30, 60, 120, 180, 300, 600].map((s) =>
+        el('button', {
+          class: 'cw-btn',
+          text: s < 60 ? `${s} 秒` : `${s / 60} 分`,
+          onclick: () => {
+            set(s);
+          },
+        }),
+      ),
+    );
+    const adjust = el('div', { class: 'cw-controls' }, [
+      el('button', {
+        class: 'cw-btn',
+        text: '−10 秒',
+        onclick: () => {
+          set(Math.max(10, left - 10), true);
+        },
+      }),
+      startBtn,
+      el('button', {
+        class: 'cw-btn',
+        text: '重置',
+        onclick: () => {
+          set(total);
+        },
+      }),
+      el('button', {
+        class: 'cw-btn',
+        text: '+10 秒',
+        onclick: () => {
+          set(left + 10, true);
+        },
+      }),
+    ]);
+    const layer = overlay([display, presets, adjust]);
+
+    function format(s) {
+      let m = Math.floor(s / 60);
+      const r = Math.ceil(s % 60) % 60;
+      if (Math.ceil(s % 60) === 60) m++;
+      return `${m}:${r < 10 ? '0' : ''}${r}`;
+    }
+
+    function render() {
+      display.textContent = format(Math.max(0, left));
+      display.classList.toggle('cw-done', left <= 0);
+      startBtn.textContent = running ? '暂停' : '开始';
+      timerBtn.textContent = running || (left > 0 && left < total) ? format(Math.max(0, left)) : '计时';
+      timerBtn.classList.toggle('cw-on', running);
+    }
+
+    function set(s, keepRunning) {
+      if (!keepRunning) {
+        total = s;
+        running = false;
+      }
+      left = s;
+      render();
+    }
+
+    function beep() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const audio = new Ctx();
+        [0, 0.35, 0.7].forEach((t) => {
+          const osc = audio.createOscillator();
+          const gain = audio.createGain();
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.3, audio.currentTime + t);
+          gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + t + 0.3);
+          osc.connect(gain).connect(audio.destination);
+          osc.start(audio.currentTime + t);
+          osc.stop(audio.currentTime + t + 0.3);
+        });
+      } catch (e) {
+        // No audio on this machine; the flashing display is enough.
+      }
+    }
+
+    function tick(now) {
+      if (!running) return;
+      left -= (now - last) / 1000;
+      last = now;
+      if (left <= 0) {
+        left = 0;
+        running = false;
+        beep();
+        layer.classList.add('cw-on');
+      }
+      render();
+      if (running) requestAnimationFrame(tick);
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (left <= 0) left = total;
+      running = !running;
+      if (running) {
+        last = performance.now();
+        requestAnimationFrame(tick);
+      }
+      render();
+    });
+
+    return {
+      open: () => {
+        layer.classList.add('cw-on');
+        render();
+      },
+      render: render,
+    };
+  })();
+
+  /* ---------- Random picker ---------- */
+
+  const picker = (() => {
+    const KEY = 'cw-picker-names';
+    const name = el('div', { class: 'cw-picker-name', text: '?' });
+    const info = el('div', { class: 'small muted' });
+    let drawn = [];
+    let rolling = false;
+    /** Set by live.js: draws among the audience's numbers while anyone has scanned in. */
+    let source = null;
+    const listInput = el('textarea', {
+      placeholder: isEn
+        ? 'Paste name list, one per line; leave empty for numbers'
+        : '粘贴名单，每行一个；留空则按编号抽',
+    });
+    const countInput = el('input', { type: 'number', min: '2', max: '99', value: '40' });
+    const settings = el('div', { style: 'display:none;flex-direction:column;align-items:center;gap:20px' }, [
+      listInput,
+      el('div', { class: 'row small' }, [
+        el('span', { text: isEn ? 'Default count without list' : '没有名单时的人数' }),
+        countInput,
+      ]),
+    ]);
+    const drawBtn = el('button', { class: 'cw-btn primary', text: isEn ? 'Pick One' : '抽一个' });
+    const layer = overlay([
+      name,
+      info,
+      el('div', { class: 'cw-controls' }, [
+        drawBtn,
+        el('button', {
+          class: 'cw-btn',
+          text: isEn ? 'Restart' : '重新开始',
+          onclick: () => {
+            drawn = [];
+            name.textContent = '?';
+            renderInfo();
+          },
+        }),
+        el('button', {
+          class: 'cw-btn',
+          text: isEn ? 'List' : '名单',
+          onclick: () => {
+            settings.style.display = settings.style.display === 'none' ? 'flex' : 'none';
+          },
+        }),
+      ]),
+      settings,
+    ]);
+
+    try {
+      listInput.value = localStorage.getItem(KEY) || '';
+    } catch (e) {
+      // Storage may be disabled for file:// pages; the list then lasts until the page closes.
+    }
+    listInput.addEventListener('input', () => {
+      drawn = [];
+      try {
+        localStorage.setItem(KEY, listInput.value);
+      } catch (e) {
+        // See above.
+      }
+      renderInfo();
+    });
+    countInput.addEventListener('input', () => {
+      drawn = [];
+      renderInfo();
+    });
+
+    function fromAudience() {
+      return source ? source.names() : [];
+    }
+
+    function pool() {
+      const audience = fromAudience();
+      if (audience.length) return audience;
+      const names = listInput.value
+        .split(/[\n,，、]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (names.length) return names;
+      const n = Math.max(2, Math.min(99, parseInt(countInput.value, 10) || 40));
+      const numbers = [];
+      for (let i = 1; i <= n; i++) numbers.push(isEn ? `#${i}` : `${i} 号`);
+      return numbers;
+    }
+
+    function renderInfo() {
+      const all = pool();
+      const scanned = fromAudience().length ? (isEn ? 'Audience, ' : '扫码观众，') : '';
+      info.textContent = isEn
+        ? `${scanned}Picked ${drawn.length} / ${all.length}, no repeats`
+        : `${scanned}已抽 ${drawn.length} / ${all.length}，不重复`;
+    }
+
+    drawBtn.addEventListener('click', () => {
+      if (rolling) return;
+      const all = pool();
+      let left = all.filter((n) => drawn.indexOf(n) < 0);
+      if (!left.length) {
+        drawn = [];
+        left = all;
+      }
+      const pick = left[Math.floor(Math.random() * left.length)];
+      rolling = true;
+      let count = 0;
+      const spin = setInterval(() => {
+        name.textContent = all[Math.floor(Math.random() * all.length)];
+        if (++count >= 18) {
+          clearInterval(spin);
+          name.textContent = pick;
+          drawn.push(pick);
+          rolling = false;
+          renderInfo();
+          if (source && fromAudience().indexOf(pick) >= 0) source.picked(pick);
+        }
+      }, 70);
+    });
+
+    return {
+      open: () => {
+        renderInfo();
+        layer.classList.add('cw-on');
+      },
+      /** `{ names(): string[], picked(name) }` */
+      setSource: (s) => {
+        source = s;
+        drawn = [];
+      },
+    };
+  })();
+
+  /* ---------- Toolbar ---------- */
+
+  const blackout = el('div', { id: 'cw-blackout' });
+  document.body.appendChild(blackout);
+  blackout.addEventListener('click', () => {
+    blackout.classList.remove('cw-on');
+  });
+
+  const pageLabel = el('span', { class: 'cw-page' });
+  const penBtn = el('button', { text: isEn ? 'Pen' : '画笔', title: isEn ? 'Pen (P)' : '画笔 (P)' });
+  const timerBtn = el('button', { text: isEn ? 'Timer' : '计时', title: isEn ? 'Timer (T)' : '计时器 (T)' });
+  const swatches = ['#d2463c', '#2f6fb3', '#2e9d62', '#23303b', 'erase'].map((c, i) => {
+    const b = el('button', {
+      class: `cw-swatch${i === 0 ? ' cw-on' : ''}`,
+      title: c === 'erase' ? (isEn ? 'Eraser' : '橡皮') : isEn ? 'Color' : '颜色',
+      text: c === 'erase' ? '⌫' : '',
+    });
+    if (c !== 'erase') b.style.background = c;
+    else b.style.background = '#fff';
+    if (c === 'erase') b.style.color = '#23303b';
+    b.addEventListener('click', () => {
+      ink.setColor(c);
+      swatches.forEach((s) => {
+        s.classList.toggle('cw-on', s === b);
+      });
+    });
+    return b;
+  });
+  const toolbar = el('div', { id: 'cw-toolbar' }, [
+    el('button', { text: '‹', title: isEn ? 'Previous' : '上一步', onclick: prev }),
+    pageLabel,
+    el('button', { text: '›', title: isEn ? 'Next' : '下一步', onclick: next }),
+    penBtn,
+    el(
+      'span',
+      { class: 'cw-pen-colors' },
+      swatches.concat([
+        el('button', {
+          text: isEn ? 'Clear' : '清除',
+          onclick: () => {
+            ink.clear();
+          },
+        }),
+      ]),
+    ),
+    timerBtn,
+    el('button', {
+      text: stage.getAttribute('data-picker') || (isEn ? 'Picker' : '点名'),
+      title: isEn ? 'Random pick (R)' : '随机抽取 (R)',
+      onclick: () => {
+        picker.open();
+      },
+    }),
+    el('button', { text: isEn ? 'Reset' : '重置', title: isEn ? 'Reset this slide' : '重置本页', onclick: resetSlide }),
+    el('button', {
+      text: isEn ? 'Fullscreen' : '全屏',
+      title: isEn ? 'Fullscreen (F)' : '全屏 (F)',
+      onclick: toggleFullscreen,
+    }),
+  ]);
+  if (params.get('toolbar') !== '0') document.body.appendChild(toolbar);
+
+  function setPen(on) {
+    ink.setActive(on);
+    penBtn.classList.toggle('cw-on', on);
+    toolbar.classList.toggle('cw-pen', on);
+    toolbar.classList.toggle('cw-active', on);
+  }
+  penBtn.addEventListener('click', () => {
+    setPen(!ink.active);
+  });
+  timerBtn.addEventListener('click', () => {
+    timer.open();
+  });
+
+  /* ---------- Keyboard and clickers ---------- */
+
+  document.addEventListener('keydown', (event) => {
+    const tag = event.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (blackout.classList.contains('cw-on')) {
+      blackout.classList.remove('cw-on');
+      event.preventDefault();
+      return;
+    }
+    const key = event.key;
+    let handled = true;
+    if (key === 'ArrowRight' || key === 'ArrowDown' || key === 'PageDown' || key === ' ' || key === 'Enter') next();
+    else if (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp' || key === 'Backspace') prev();
+    else if (key === 'Home') go(0);
+    else if (key === 'End') go(slides.length - 1);
+    else if (key === 'F5' || key === 'f' || key === 'F') toggleFullscreen();
+    else if (key === 'b' || key === 'B' || key === '.' || key === 'w' || key === 'W') blackout.classList.add('cw-on');
+    else if (key === 'p' || key === 'P') setPen(!ink.active);
+    else if (key === 't' || key === 'T') timer.open();
+    else if (key === 'r' || key === 'R') picker.open();
+    else if (key === 'n' || key === 'N') setPrompterActive(!prompterActive);
+    else if (key === 'Escape') {
+      if (!closeOverlays() && ink.active) setPen(false);
+      handled = false;
+    } else handled = false;
+    if (handled) event.preventDefault();
+  });
+
+  /* ---------- Formulas ---------- */
+
+  // LaTeX in .tex elements is typeset with KaTeX from a CDN, only when the deck has any; offline the source stays.
+  const KATEX = 'https://registry.npmmirror.com/katex/0.19.1/files/dist/';
+  const formulas = stage.querySelectorAll('.tex');
+  if (formulas.length) {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = `${KATEX}katex.min.css`;
+    document.head.appendChild(css);
+    const script = document.createElement('script');
+    script.src = `${KATEX}katex.min.js`;
+    script.onload = () => {
+      formulas.forEach((node) => {
+        window.katex.render(node.textContent, node, {
+          displayMode: node.classList.contains('display'),
+          throwOnError: false,
+        });
+        node.classList.add('cw-typeset');
+      });
+    };
+    document.head.appendChild(script);
+  }
+
+  /* ---------- Teleprompter Mode ---------- */
+
+  let prompterActive = false;
+  let prompterEl = null;
+  let prompterToggleBtn = null;
+  let prompterBody = null;
+  let prompterPage = null;
+  let prompterTimer = null;
+  let prompterWakeBtn = null;
+  let prompterFontSize = 21;
+  let prompterTimerInterval = null;
+  let prompterElapsedSec = 0;
+  let prompterTimerRunning = false;
+  let wakeLockObj = null;
+  let noSleepVid = null;
+
+  function isMobileEnv() {
+    if (params.get('mode') === 'prompter') return true;
+    if (params.get('mode') === 'slide') return false;
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    const isNarrow = window.innerWidth <= 768;
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|MicroMessenger/i.test(
+      navigator.userAgent,
+    );
+    return isNarrow || isMobileUA || (isTouch && window.innerWidth < 1024);
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  function startPrompterTimer() {
+    if (prompterTimerRunning) return;
+    prompterTimerRunning = true;
+    prompterTimerInterval = setInterval(() => {
+      prompterElapsedSec++;
+      if (prompterTimer) {
+        prompterTimer.textContent = formatTime(prompterElapsedSec);
+      }
+    }, 1000);
+  }
+
+  function resetPrompterTimer() {
+    clearInterval(prompterTimerInterval);
+    prompterTimerRunning = false;
+    prompterElapsedSec = 0;
+    if (prompterTimer) prompterTimer.textContent = '00:00';
+  }
+
+  function updateWakeLockUI(active) {
+    if (!prompterWakeBtn) return;
+    prompterWakeBtn.classList.toggle('cw-on', active);
+    prompterWakeBtn.textContent = active ? (isEn ? '🟢 Awake' : '🟢 常亮') : isEn ? '⚪ Sleep' : '⚪ 常亮';
+  }
+
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockObj = await navigator.wakeLock.request('screen');
+        wakeLockObj.addEventListener('release', () => {
+          wakeLockObj = null;
+          updateWakeLockUI(false);
+        });
+        updateWakeLockUI(true);
+        return true;
+      } catch (err) {
+        // Fallback below
+      }
+    }
+    try {
+      if (!noSleepVid) {
+        noSleepVid = document.createElement('video');
+        noSleepVid.setAttribute('playsinline', '');
+        noSleepVid.setAttribute('muted', '');
+        noSleepVid.setAttribute('loop', '');
+        noSleepVid.muted = true;
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.fillRect(0, 0, 1, 1);
+        if (canvas.captureStream) {
+          noSleepVid.srcObject = canvas.captureStream(1);
+          await noSleepVid.play();
+          updateWakeLockUI(true);
+          return true;
+        }
+      } else {
+        await noSleepVid.play();
+        updateWakeLockUI(true);
+        return true;
+      }
+    } catch (e) {
+      // ignore
+    }
+    updateWakeLockUI(false);
+    return false;
+  }
+
+  function releaseWakeLock() {
+    if (wakeLockObj) {
+      wakeLockObj.release().catch(() => {});
+      wakeLockObj = null;
+    }
+    if (noSleepVid) {
+      noSleepVid.pause();
+    }
+    updateWakeLockUI(false);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && prompterActive && !wakeLockObj) {
+      requestWakeLock();
+    }
+  });
+
+  function parseCue(_match, text) {
+    let cls = 'cw-cue-default';
+    if (/翻页|下一页|Next/i.test(text)) cls = 'cw-cue-flip';
+    else if (/停顿|暂停|等|Pause/i.test(text)) cls = 'cw-cue-pause';
+    else if (/扫码|互动|投票|提问|点赞|看屏幕|看大屏|大屏幕|Scan|Poll|Vote|Screen/i.test(text)) cls = 'cw-cue-interact';
+    return `<span class="cw-cue ${cls}">${text}</span>`;
+  }
+
+  function formatNotesHTML(html) {
+    return html.replace(/【(.*?)】/g, parseCue).replace(/\[(.*?)\]/g, parseCue);
+  }
+
+  function updatePrompterContent() {
+    if (!prompterEl) return;
+    const slide = slides[index];
+    if (prompterPage) {
+      prompterPage.textContent = `${index + 1} / ${slides.length}`;
+    }
+    const notesNode = slide.querySelector('.notes, aside.notes');
+    if (notesNode?.innerHTML.trim()) {
+      prompterBody.innerHTML = formatNotesHTML(notesNode.innerHTML);
+    } else {
+      prompterBody.innerHTML = `<div class="cw-prompter-empty">${isEn ? '(No speaker notes for this slide)' : '（本页无讲稿）'}</div>`;
+    }
+    prompterBody.scrollTop = 0;
+  }
+
+  function setPrompterActive(active) {
+    if (!prompterEl) return;
+    prompterActive = active;
+    document.body.classList.toggle('cw-prompter-active', active);
+    if (active) {
+      updatePrompterContent();
+      startPrompterTimer();
+      requestWakeLock();
+    }
+  }
+
+  function initPrompter() {
+    const hasNotes = slides.some((slide) => slide.querySelector('.notes, aside.notes'));
+    if (!hasNotes && !location.search.includes('mode=prompter')) {
+      return;
+    }
+
+    prompterToggleBtn = el('button', {
+      id: 'cw-prompter-toggle',
+      onclick: () => setPrompterActive(true),
+    });
+    prompterToggleBtn.textContent = `🎙️ ${isEn ? 'Prompter' : '提词器'}`;
+    prompterToggleBtn.addEventListener('click', () => setPrompterActive(true));
+    document.body.appendChild(prompterToggleBtn);
+
+    prompterPage = el('span', { class: 'cw-prompter-page', text: `${index + 1} / ${slides.length}` });
+    prompterTimer = el('span', {
+      class: 'cw-prompter-timer',
+      text: '00:00',
+      title: isEn ? 'Click to reset timer' : '点击重置计时',
+      onclick: () => {
+        if (confirm(isEn ? 'Reset timer?' : '重置计时器？')) resetPrompterTimer();
+      },
+    });
+    prompterWakeBtn = el('button', {
+      class: 'cw-prompter-wake',
+      text: isEn ? '⚪ Sleep' : '⚪ 常亮',
+      title: isEn ? 'Toggle screen keep-awake' : '保持屏幕常亮',
+      onclick: (e) => {
+        e.stopPropagation();
+        if (wakeLockObj || (noSleepVid && !noSleepVid.paused)) releaseWakeLock();
+        else requestWakeLock();
+      },
+    });
+
+    const fontSmaller = el('button', {
+      class: 'cw-prompter-btn',
+      text: 'A-',
+      title: isEn ? 'Smaller font' : '缩小字号',
+      onclick: (e) => {
+        e.stopPropagation();
+        prompterFontSize = Math.max(16, prompterFontSize - 2);
+        document.documentElement.style.setProperty('--prompter-fs', `${prompterFontSize}px`);
+      },
+    });
+    const fontLarger = el('button', {
+      class: 'cw-prompter-btn',
+      text: 'A+',
+      title: isEn ? 'Larger font' : '放大字号',
+      onclick: (e) => {
+        e.stopPropagation();
+        prompterFontSize = Math.min(36, prompterFontSize + 2);
+        document.documentElement.style.setProperty('--prompter-fs', `${prompterFontSize}px`);
+      },
+    });
+
+    const slideViewBtn = el('button', {
+      class: 'cw-prompter-btn cw-prompter-slide-btn',
+      text: isEn ? 'Slide ↗' : '幻灯片 ↗',
+      onclick: () => setPrompterActive(false),
+    });
+
+    const header = el('div', { class: 'cw-prompter-header' }, [
+      el('div', { class: 'cw-prompter-header-left' }, [slideViewBtn]),
+      el('div', { class: 'cw-prompter-meta' }, [prompterPage, prompterTimer]),
+      el('div', { class: 'cw-prompter-header-right' }, [fontSmaller, fontLarger, prompterWakeBtn]),
+    ]);
+
+    prompterBody = el('div', { class: 'cw-prompter-body' });
+    prompterBody.addEventListener('click', () => {
+      if (!wakeLockObj) requestWakeLock();
+      if (!prompterTimerRunning) startPrompterTimer();
+    });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    prompterBody.addEventListener(
+      'touchstart',
+      (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      },
+      { passive: true },
+    );
+
+    prompterBody.addEventListener(
+      'touchend',
+      (e) => {
+        if (e.changedTouches.length === 1) {
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0) next();
+            else prev();
+          }
+        }
+      },
+      { passive: true },
+    );
+
+    const btnPrev = el('button', {
+      class: 'cw-prompter-nav-btn',
+      text: isEn ? '◀ Prev' : '◀ 上一页',
+      onclick: prev,
+    });
+    const btnNext = el('button', {
+      class: 'cw-prompter-nav-btn cw-next',
+      text: isEn ? 'Next ▶' : '下一页 ▶',
+      onclick: next,
+    });
+    const nav = el('div', { class: 'cw-prompter-nav' }, [btnPrev, btnNext]);
+
+    prompterEl = el('div', { id: 'cw-prompter' }, [header, prompterBody, nav]);
+    document.body.appendChild(prompterEl);
+
+    if (isMobileEnv()) {
+      setPrompterActive(true);
+    }
+  }
+
+  /* ---------- Start ---------- */
+
+  window.addEventListener('resize', fit);
+  fit();
+  slides.forEach((slide) => {
+    slide.classList.remove('cw-current');
+  });
+  slides[0].classList.add('cw-current');
+  const start = parseInt(location.hash.slice(1), 10);
+  go(Number.isNaN(start) ? 0 : start - 1);
+  timer.render();
+  initPrompter();
+
+  window.courseware = { next: next, prev: prev, go: go, reset: resetSlide, setPickerSource: picker.setSource };
+})();
+
+</script>
+    <script>
+/*
+ * Scan-to-answer for a deck (courseware or presentation): the audience scans a QR code, opens the AgentDeck
+ * audience page (https://agentdeck.xianqiao.wang/zh/live) on their phones and answers; this page shows the results
+ * live. Load after deck.js. Needs this computer and the phones online. Elements:
+ *   <cw-live-join>                       QR code and how many joined
+ *   <cw-poll options="…" correct="2">    single or multiple choice, also true/false
+ *   <cw-responses type="number|text">    collect a number or a short text from everyone
+ *   <cw-wordcloud max="3">               a word cloud of short words
+ *   <cw-rating max="5">                  stars (or 1–max) with the average and distribution
+ *   <cw-questions>                       questions with upvotes, asked from any slide, shown on its own slide
+ *   <cw-reactions emoji="👏,❤️">          emoji the audience taps on any slide, floating up over the deck
+ * Each phone gets a number (1 号, 2 号 …) that stays the same for this deck, and the toolbar's picker draws among
+ * them. `CwLive.room()` gives the room for custom interactives. Protocol and internals: README.md.
+ */
+(() => {
+  const isEn = (document.documentElement.lang || '').toLowerCase().startsWith('en');
+  const SITE = 'https://agentdeck.xianqiao.wang';
+  const RELAY_URL = 'wss://agentdeck.xianqiao.wang/ws';
+  const QR_MODULE = 'https://esm.sh/qrcode-generator@2.0.4';
+
+  const b64url = (bytes) =>
+    btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  const unb64url = (text) => Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+  const random = (length) => b64url(crypto.getRandomValues(new Uint8Array(length)));
+
+  const importKey = (raw) => crypto.subtle.importKey('raw', unb64url(raw), 'AES-GCM', false, ['encrypt', 'decrypt']);
+
+  const seal = async (key, message) => {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = new TextEncoder().encode(JSON.stringify(message));
+    const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data));
+    return { iv: b64url(iv), c: b64url(sealed) };
+  };
+
+  const unseal = async (key, payload) => {
+    const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64url(payload.iv) }, key, unb64url(payload.c));
+    return JSON.parse(new TextDecoder().decode(data));
+  };
+
+  /**
+   * Parts every phone shows under whatever view is on (the reaction bar, the 提问 button), registered by elements
+   * when the deck loads. Each is HTML whose scripts add buttons to `#dock`.
+   */
+  const docks = [];
+
+  const DOCK_BASE = `
+<style>
+body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+#dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: rgb(255 255 255 / 0.96); border-top: 1px solid var(--line); }
+#dock button { width: auto; margin: 0; padding: 10px 16px; border-radius: 999px; text-align: center; }
+#dock .emoji { padding: 6px 8px; border: 0; background: transparent; font-size: 28px; line-height: 1; }
+#dock .emoji:active { transform: scale(1.3); }
+</style>
+<div id="dock"></div>`;
+
+  const WAITING = isEn
+    ? '<p class="muted center" style="margin-top:30vh">Joined! Look at the big screen</p>'
+    : '<p class="muted center" style="margin-top:30vh">已加入，请看大屏幕</p>';
+
+  const load = (storageKey) => {
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch (_error) {
+      return {}; // Storage may be unavailable for file:// pages; the room then lasts until the page closes.
+    }
+  };
+
+  const save = (storageKey, value) => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(value));
+    } catch (_error) {
+      // See above.
+    }
+  };
+
+  // Plain fields and methods (no `#private`, `?.` or `??`): this runs on classroom computers with old browsers.
+  class LiveRoom extends EventTarget {
+    constructor(storageKey, saved, key) {
+      super();
+      this.status = 'connecting';
+      this._storageKey = storageKey;
+      this._saved = saved;
+      this._key = key;
+      this._device = `presenter-${random(9)}`;
+      this._view = null;
+      this._socket = null;
+      this._delay = 1000;
+      this._presenterDevices = new Set();
+      this._connect();
+
+      document.addEventListener('cw-enter', (e) => {
+        if (this._presenterDevices.size === 0) return;
+        const slideElements = Array.from(document.querySelectorAll('#cw-stage .slide'));
+        const curIndex = slideElements.indexOf(e.target);
+        if (curIndex >= 0) {
+          for (const dev of this._presenterDevices) {
+            this._send({ t: 'presenter_sync', index: curIndex }, dev);
+          }
+        }
+      });
+    }
+
+    /** The link the audience opens. */
+    get url() {
+      const lang = isEn ? 'en' : 'zh';
+      return `${SITE}/${lang}/live#${this._saved.room}.${this._saved.key}`;
+    }
+
+    /** The private link the presenter opens on their phone for remote control and teleprompter. */
+    get presenterUrl() {
+      const lang = isEn ? 'en' : 'zh';
+      if (!this._saved.presenterKey) {
+        this._saved.presenterKey = random(16);
+        save(this._storageKey, this._saved);
+      }
+      return `${SITE}/${lang}/live#${this._saved.room}.${this._saved.key}.${this._saved.presenterKey}`;
+    }
+
+    /** How many phones have joined this deck. */
+    get count() {
+      return Object.keys(this._saved.numbers).length;
+    }
+
+    /** A phone's number, given out the first time it joins and kept for this deck. */
+    numberOf(from) {
+      return this._saved.numbers[from];
+    }
+
+    /** Listens to `join` ({ from }), `data` ({ from, value }) or `status` (string); returns a function that stops. */
+    on(type, listener) {
+      const handler = (event) => listener(event.detail);
+      this.addEventListener(type, handler);
+      return () => this.removeEventListener(type, handler);
+    }
+
+    /** Shows `html` on every phone, including ones that join later. Scripts in it run in a sandbox with `live`. */
+    show(html) {
+      this._view = html;
+      this._send({ t: 'view', html: this._composed() });
+    }
+
+    /** Sends `value` to the phones' `live.onmessage`, to everyone or to one id. */
+    send(value, to) {
+      this._send({ t: 'data', value }, to);
+    }
+
+    /** Pops up `text` on one phone over whatever it shows, if it's connected. */
+    notice(text, to) {
+      this._send({ t: 'notice', text }, to);
+    }
+
+    async _buildQr(targetUrl, size) {
+      const qrcode = (await import(QR_MODULE)).default;
+      const code = qrcode(0, 'M');
+      code.addData(targetUrl);
+      code.make();
+      const count = code.getModuleCount();
+      const margin = 2;
+      let path = '';
+      for (let y = 0; y < count; y++) {
+        for (let x = 0; x < count; x++) {
+          if (code.isDark(y, x)) path += `M${x + margin} ${y + margin}h1v1h-1z`;
+        }
+      }
+      const total = count + margin * 2;
+      const svg = new DOMParser().parseFromString(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path d="${path}" fill="black"/></svg>`,
+        'image/svg+xml',
+      ).documentElement;
+      return document.importNode(svg, true);
+    }
+
+    /** An SVG QR code of `url`, `size` pixels wide. */
+    async qr(size) {
+      return this._buildQr(this.url, size);
+    }
+
+    /** An SVG QR code for the presenter remote, `size` pixels wide. */
+    async remoteQr(size) {
+      return this._buildQr(this.presenterUrl, size);
+    }
+
+    /** The current view with the dock under it; before any view, a waiting line with the dock. */
+    _composed() {
+      if (!docks.length) return this._view;
+      return (this._view === null ? WAITING : this._view) + DOCK_BASE + docks.join('');
+    }
+
+    _emit(type, detail) {
+      this.dispatchEvent(new CustomEvent(type, { detail }));
+    }
+
+    _setStatus(status) {
+      if (this.status === status) return;
+      this.status = status;
+      this._emit('status', status);
+    }
+
+    _number(from) {
+      const numbers = this._saved.numbers;
+      if (!numbers[from]) {
+        numbers[from] = this.count + 1;
+        save(this._storageKey, this._saved);
+      }
+      return numbers[from];
+    }
+
+    _connect() {
+      const url = new URL(RELAY_URL);
+      url.searchParams.set('id', `live_${this._saved.room}`);
+      url.searchParams.set('endpoint', '1');
+      url.searchParams.set('device_id', this._device);
+      const socket = new WebSocket(url);
+      this._socket = socket;
+      // Decrypting is async; the chain handles frames in order (a changed answer after the first one).
+      let queue = Promise.resolve();
+      socket.onmessage = (event) => {
+        if (typeof event.data !== 'string') return;
+        const frame = JSON.parse(event.data);
+        queue = queue.then(() => (this._socket === socket ? this._handle(frame) : undefined));
+      };
+      socket.onclose = () => {
+        if (this._socket !== socket) return;
+        this._setStatus('reconnecting');
+        setTimeout(() => this._connect(), this._delay);
+        this._delay = Math.min(this._delay * 2, 30000);
+      };
+    }
+
+    async _handle(frame) {
+      if (frame.type === 'ready') {
+        this._delay = 1000;
+        this._setStatus('connected');
+        // Phones that came before this page (or stayed while it reloaded) join again and get their number and view.
+        this._send({ t: 'present' });
+      } else if (frame.type === 'ephemeral' || frame.type === 'message') {
+        let message;
+        try {
+          message = await unseal(this._key, frame.payload);
+        } catch (_error) {
+          return; // Not sealed with this room's key.
+        }
+        if (typeof message.from !== 'string') return;
+        if (message.t === 'join') {
+          this._send({ t: 'hello', n: this._number(message.from) }, message.from);
+          if (this._view !== null || docks.length) this._send({ t: 'view', html: this._composed() }, message.from);
+          this._emit('join', { from: message.from });
+        } else if (message.t === 'data') {
+          this._number(message.from);
+          this._emit('data', { from: message.from, value: message.value });
+        } else if (message.t === 'presenter_join') {
+          if (message.key === this._saved.presenterKey) {
+            this._presenterDevices.add(message.from);
+            this._emit('presenter_connect', { from: message.from, count: this._presenterDevices.size });
+            const slideElements = Array.from(document.querySelectorAll('#cw-stage .slide'));
+            const slidesData = slideElements.map((s, idx) => {
+              const h = s.querySelector('h1, h2, h3');
+              const title = h ? h.textContent.trim() : isEn ? `Slide ${idx + 1}` : `第 ${idx + 1} 页`;
+              const notesEl = s.querySelector('aside.notes');
+              return {
+                index: idx,
+                title,
+                notes: notesEl ? notesEl.innerHTML : '',
+              };
+            });
+            const curIndex = Math.max(
+              0,
+              slideElements.findIndex((s) => s.classList.contains('cw-current')),
+            );
+            this._send(
+              {
+                t: 'presenter_init',
+                current: curIndex,
+                total: slideElements.length,
+                slides: slidesData,
+              },
+              message.from,
+            );
+          }
+        } else if (message.t === 'cmd') {
+          if (this._presenterDevices.has(message.from)) {
+            if (message.op === 'next') {
+              if (window.courseware) window.courseware.next();
+            } else if (message.op === 'prev') {
+              if (window.courseware) window.courseware.prev();
+            } else if (message.op === 'go' && typeof message.index === 'number') {
+              if (window.courseware) window.courseware.go(message.index);
+            }
+          }
+        }
+      }
+    }
+
+    /** Sealing is async; the chain keeps messages in order (a view before the data meant for it). */
+    _send(message, to) {
+      this._sending = (this._sending || Promise.resolve()).then(() => this._sendNow(message, to));
+      return this._sending;
+    }
+
+    async _sendNow(message, to) {
+      const payload = await seal(this._key, message);
+      const socket = this._socket;
+      if (!socket || socket.readyState !== WebSocket.OPEN || this.status !== 'connected') return;
+      const frame = { type: 'message', message_id: random(12), payload, ephemeral: true };
+      if (to) frame.target_device_id = to;
+      socket.send(JSON.stringify(frame));
+    }
+  }
+
+  let roomPromise = null;
+
+  /** One room per deck, kept across reloads so a QR code on screen keeps working and numbers stay the same. */
+  function room() {
+    if (!roomPromise) {
+      const storageKey = `cw-live:${location.pathname}`;
+      const saved = load(storageKey);
+      if (!saved.room) saved.room = random(16);
+      if (!saved.key) saved.key = random(32);
+      if (!saved.numbers) saved.numbers = {};
+      save(storageKey, saved);
+      roomPromise = importKey(saved.key).then((key) => {
+        const r = new LiveRoom(storageKey, saved, key);
+        if (window.courseware) {
+          window.courseware.setPickerSource({
+            names: () =>
+              Object.keys(saved.numbers)
+                .map((id) => saved.numbers[id])
+                .sort((a, b) => a - b)
+                .map((n) => (isEn ? `#${n}` : `${n} 号`)),
+            picked: (name) => {
+              const n = parseInt(name.replace(/^#/, ''), 10);
+              const id = Object.keys(saved.numbers).filter((key) => saved.numbers[key] === n)[0];
+              if (id) r.notice(isEn ? 'You won!' : '你被抽到了！', id);
+            },
+          });
+        }
+        return r;
+      });
+    }
+    return roomPromise;
+  }
+
+  window.CwLive = { room, openPresenterModal, closePresenterModal, togglePresenterModal };
+
+  /* ---------- Presenter Remote Modal (Key M) ---------- */
+
+  let presenterModal = null;
+  let presenterQrEl = null;
+  let presenterStatusEl = null;
+
+  function updatePresenterStatus(count) {
+    if (!presenterStatusEl) return;
+    if (count > 0) {
+      presenterStatusEl.textContent = isEn ? `🟢 Phone connected (${count})` : `🟢 手机已连接 (${count})`;
+      presenterStatusEl.style.color = '#56d364';
+    } else {
+      presenterStatusEl.textContent = isEn ? 'Waiting for phone scan...' : '等待手机扫码连接...';
+      presenterStatusEl.style.color = '#c9d1d9';
+    }
+  }
+
+  function setupPresenterModal() {
+    presenterModal = document.createElement('div');
+    presenterModal.className = 'cw-modal-backdrop';
+
+    const card = document.createElement('div');
+    card.className = 'cw-modal-card';
+    card.addEventListener('click', (e) => e.stopPropagation());
+
+    const title = document.createElement('div');
+    title.className = 'cw-modal-title';
+    title.textContent = isEn ? 'Presenter Remote' : '手机翻页与提词器';
+
+    const sub = document.createElement('div');
+    sub.className = 'cw-modal-sub';
+    sub.textContent = isEn ? 'Scan to connect, clean big screen' : '手机扫码连接，大屏不留痕迹';
+
+    presenterQrEl = document.createElement('div');
+    presenterQrEl.className = 'cw-modal-qr';
+
+    presenterStatusEl = document.createElement('div');
+    presenterStatusEl.className = 'cw-modal-status';
+    presenterStatusEl.textContent = isEn ? 'Waiting for phone scan...' : '等待手机扫码连接...';
+
+    const tip = document.createElement('div');
+    tip.className = 'cw-modal-tip';
+    tip.textContent = isEn ? 'Press M or Esc to close' : '按 M 或 Esc 关闭弹窗，随时按键控制';
+
+    card.append(title, sub, presenterQrEl, presenterStatusEl, tip);
+    presenterModal.appendChild(card);
+    presenterModal.addEventListener('click', closePresenterModal);
+    document.body.appendChild(presenterModal);
+  }
+
+  async function openPresenterModal() {
+    if (!presenterModal) {
+      setupPresenterModal();
+    }
+    presenterModal.classList.add('cw-on');
+    const r = await room();
+    r.on('presenter_connect', (d) => {
+      updatePresenterStatus(d.count);
+    });
+    if (!presenterQrEl.hasChildNodes()) {
+      presenterQrEl.innerHTML = '';
+      const svg = await r.remoteQr(216);
+      presenterQrEl.appendChild(svg);
+    }
+    updatePresenterStatus(r._presenterDevices.size);
+  }
+
+  function closePresenterModal() {
+    if (presenterModal) presenterModal.classList.remove('cw-on');
+  }
+
+  function togglePresenterModal() {
+    if (presenterModal?.classList.contains('cw-on')) {
+      closePresenterModal();
+    } else {
+      openPresenterModal();
+    }
+  }
+
+  document.addEventListener('keydown', (event) => {
+    const tag = event.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'm' || event.key === 'M') {
+      event.preventDefault();
+      togglePresenterModal();
+    } else if (event.key === 'Escape') {
+      if (presenterModal?.classList.contains('cw-on')) {
+        closePresenterModal();
+        event.preventDefault();
+      }
+    }
+  });
+
+  function esc(text) {
+    return String(text).replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+    );
+  }
+
+  function list(value) {
+    if (!value) return [];
+    const str = String(value).trim();
+    if (!str) return [];
+    const delim = str.includes('|') ? '|' : str.includes(',') ? ',' : '，';
+    return str
+      .split(delim)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function uid() {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  function offline(el) {
+    el.innerHTML = '<p class="muted small">扫码互动需要联网，请检查这台电脑的网络。</p>';
+  }
+
+  /** Data inlined into a view's script; `<` is escaped so the HTML can't be closed early. */
+  function json(value) {
+    return JSON.stringify(value).replace(/</g, '\\u003c');
+  }
+
+  /** The question students see: the attribute, else the slide's heading. */
+  function questionOf(el) {
+    if (el.getAttribute('question')) return el.getAttribute('question');
+    const heading = (el.closest('.slide') || el).querySelector('h2');
+    if (!heading) return '';
+    const copy = heading.cloneNode(true);
+    for (const tag of copy.querySelectorAll('.tag')) tag.remove();
+    return copy.textContent.trim();
+  }
+
+  /** Runs `fn` each time the element's slide is shown, and now if it is showing. */
+  function onSlideEnter(el, fn) {
+    const slide = el.closest('.slide');
+    if (!slide) return;
+    slide.addEventListener('cw-enter', (event) => {
+      if (event.target === slide) fn();
+    });
+    if (slide.classList.contains('cw-current')) fn();
+  }
+
+  function button(parent, text, onClick, cls) {
+    const b = document.createElement('button');
+    b.className = `cw-btn${cls ? ` ${cls}` : ''}`;
+    b.textContent = text;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+    parent.appendChild(b);
+  }
+
+  async function addQr(el, size) {
+    try {
+      const r = await room();
+      const box = document.createElement('div');
+      box.className = 'cw-live-qr';
+      box.appendChild(await r.qr(size));
+      el.prepend(box);
+    } catch (_error) {
+      // Offline: the element already says so.
+    }
+  }
+
+  class LiveJoin extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      this.classList.add('cw-live');
+      const size = Number(this.getAttribute('size')) || 420;
+      this.innerHTML = '<div class="cw-live-qr"></div><div class="cw-live-info"></div>';
+      room().then(
+        async (r) => {
+          const info = this.querySelector('.cw-live-info');
+          const render = () => {
+            const state = isEn
+              ? { connecting: 'Connecting…', connected: '', reconnecting: 'Disconnected, reconnecting…' }[r.status]
+              : { connecting: '连接中…', connected: '', reconnecting: '网络断开，正在重连…' }[r.status];
+            const title = isEn ? 'Scan to Join' : '扫码加入';
+            const joinedText = isEn ? 'joined' : '人已加入';
+            const hint = isEn ? 'Scan with your phone, no app required' : '用手机扫码，不需要安装应用';
+            info.innerHTML = `<p class="big">${title}</p><p class="huge primary-text">${r.count} <span class="small muted">${joinedText}</span></p><p class="small muted">${state || hint}</p>`;
+          };
+          r.on('join', render);
+          r.on('data', render);
+          r.on('status', render);
+          render();
+          try {
+            this.querySelector('.cw-live-qr').appendChild(await r.qr(size));
+          } catch (_error) {
+            offline(info);
+          }
+        },
+        () => offline(this),
+      );
+    }
+  }
+
+  const POLL_VIEW = `
+<h2 id="q"></h2><div id="opts"></div><button class="primary" id="submit" hidden>提交</button><p class="muted center" id="note"></p>
+\x3cscript>
+(() => {
+  const cfg = __CFG__;
+  let picked = [];
+  let locked = false;
+  const note = document.getElementById('note');
+  const submit = document.getElementById('submit');
+  document.getElementById('q').textContent = cfg.question;
+  const buttons = cfg.options.map((text, i) => {
+    const b = document.createElement('button');
+    b.textContent = String.fromCharCode(65 + i) + '. ' + text;
+    b.onclick = () => {
+      if (locked) return;
+      if (cfg.multiple) picked = picked.includes(i) ? picked.filter((p) => p !== i) : picked.concat(i);
+      else { picked = [i]; send(); }
+      paint();
+    };
+    document.getElementById('opts').appendChild(b);
+    return b;
+  });
+  const paint = () => buttons.forEach((b, i) => b.classList.toggle('selected', picked.includes(i)));
+  const send = () => {
+    live.send({ id: cfg.id, choice: picked.slice().sort((a, b) => a - b) });
+    note.textContent = cfg.multiple ? '已提交，可以修改后再提交' : '已提交，可以改选';
+  };
+  if (cfg.multiple) { submit.hidden = false; submit.onclick = () => { if (!locked && picked.length) send(); }; }
+  live.onmessage = (m) => {
+    if (!m || m.id !== cfg.id) return;
+    if (m.reveal) {
+      locked = true;
+      submit.disabled = true;
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        if (m.reveal.includes(i)) b.classList.add('right');
+        else if (picked.includes(i)) b.classList.add('wrong');
+      });
+      const right = picked.length && picked.join() === m.reveal.join();
+      note.textContent = picked.length ? (right ? '答对了！' : '再想想正确答案为什么是它') : '';
+    }
+    if (m.reset) {
+      locked = false;
+      picked = [];
+      submit.disabled = false;
+      buttons.forEach((b) => { b.disabled = false; b.className = ''; });
+      note.textContent = '';
+    }
+  };
+})();
+\x3c/script>`;
+
+  class Poll extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      this.classList.add('cw-live');
+      this._id = uid();
+      this._answers = new Map();
+      this._revealed = false;
+      this.innerHTML =
+        '<div class="cw-live-body"><div class="cw-live-bars"></div><p class="cw-live-total small muted"></p><div class="cw-controls"></div></div>';
+      const controls = this.querySelector('.cw-controls');
+      if (this.getAttribute('correct'))
+        button(controls, isEn ? 'Reveal Answer' : '公布答案', () => this._reveal(), 'primary');
+      button(controls, isEn ? 'Restart Poll' : '重新作答', () => this.cwReset());
+      this._render();
+      room().then(
+        (r) => {
+          r.on('data', ({ from, value }) => {
+            if (!value || value.id !== this._id || !Array.isArray(value.choice)) return;
+            this._answers.set(from, value.choice);
+            this._render();
+          });
+          onSlideEnter(this, () => r.show(this._view()));
+          if (this.hasAttribute('qr')) addQr(this, 260);
+        },
+        () => offline(this.querySelector('.cw-live-total')),
+      );
+    }
+
+    get _options() {
+      return list(this.getAttribute('options'));
+    }
+
+    get _correct() {
+      return list(this.getAttribute('correct')).map((n) => Number(n) - 1);
+    }
+
+    _view() {
+      const cfg = {
+        id: this._id,
+        question: questionOf(this),
+        options: this._options,
+        multiple: this.hasAttribute('multiple'),
+      };
+      return POLL_VIEW.replace('__CFG__', json(cfg));
+    }
+
+    _reveal() {
+      this._revealed = true;
+      this._render();
+      room().then(
+        (r) => r.send({ id: this._id, reveal: this._correct }),
+        () => {},
+      );
+    }
+
+    cwReset() {
+      this._answers.clear();
+      this._revealed = false;
+      this._render();
+      room().then(
+        (r) => r.send({ id: this._id, reset: true }),
+        () => {},
+      );
+    }
+
+    _render() {
+      const options = this._options;
+      const counts = options.map(() => 0);
+      for (const choice of this._answers.values()) for (const i of choice) if (counts[i] !== undefined) counts[i]++;
+      const total = this._answers.size;
+      const correct = this._correct;
+      const max = Math.max(1, ...counts);
+      this.querySelector('.cw-live-bars').innerHTML = options
+        .map((text, i) => {
+          const right = this._revealed && correct.includes(i);
+          const pct = total ? Math.round((counts[i] / total) * 100) : 0;
+          return `<div class="cw-live-bar${right ? ' cw-right' : ''}"><span class="cw-live-label">${String.fromCharCode(65 + i)}. ${esc(text)}</span><span class="cw-live-track"><span style="width:${(counts[i] / max) * 100}%"></span></span><span class="cw-live-count">${counts[i]}<small>${total ? ` ${pct}%` : ''}</small></span></div>`;
+        })
+        .join('');
+      let summary = `已作答 ${total} 人`;
+      if (this._revealed && total) {
+        let right = 0;
+        for (const choice of this._answers.values()) if (choice.join() === correct.join()) right++;
+        summary += `，答对 ${right} 人（${Math.round((right / total) * 100)}%）`;
+      }
+      this.querySelector('.cw-live-total').textContent = summary;
+    }
+  }
+
+  const RESPONSE_VIEW = `
+<h2 id="q"></h2><input id="v" autocomplete="off"><button class="primary" id="go">提交</button><p class="muted center" id="note"></p>
+\x3cscript>
+(() => {
+  const cfg = __CFG__;
+  const input = document.getElementById('v');
+  const note = document.getElementById('note');
+  document.getElementById('q').textContent = cfg.question;
+  if (cfg.type === 'number') { input.type = 'text'; input.inputMode = 'decimal'; }
+  else { input.maxLength = 40; }
+  input.placeholder = cfg.placeholder || (cfg.type === 'number' ? '填一个数' : '写一句话');
+  const go = () => {
+    const raw = input.value.trim();
+    if (!raw) return;
+    if (cfg.type === 'number' && !/^-?\\d+(\\.\\d+)?$/.test(raw)) { note.textContent = '请填一个数'; return; }
+    live.send({ id: cfg.id, value: raw });
+    note.textContent = '已提交，可以修改后再提交';
+  };
+  document.getElementById('go').onclick = go;
+  input.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  live.onmessage = (m) => {
+    if (!m || m.id !== cfg.id) return;
+    if (m.reveal !== undefined) note.textContent = '答案：' + m.reveal;
+    if (m.reset) { input.value = ''; note.textContent = ''; }
+  };
+})();
+\x3c/script>`;
+
+  class Responses extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      this.classList.add('cw-live');
+      this._id = uid();
+      this._answers = new Map();
+      this._hidden = new Set();
+      this._revealed = false;
+      this.innerHTML =
+        '<div class="cw-live-body"><div class="cw-live-stats"></div><div class="cw-live-wall"></div><div class="cw-controls"></div></div>';
+      const controls = this.querySelector('.cw-controls');
+      if (this.getAttribute('answer'))
+        button(controls, isEn ? 'Reveal Answer' : '公布答案', () => this._reveal(), 'primary');
+      button(controls, isEn ? 'Restart' : '重新作答', () => this.cwReset());
+      this.querySelector('.cw-live-wall').addEventListener('click', (e) => {
+        const card = e.target.closest('[data-from]');
+        if (!card) return;
+        e.stopPropagation();
+        this._hidden.add(card.getAttribute('data-from'));
+        this._render();
+      });
+      this._render();
+      room().then(
+        (r) => {
+          r.on('data', ({ from, value }) => {
+            if (!value || value.id !== this._id || typeof value.value !== 'string') return;
+            this._answers.delete(from);
+            this._answers.set(from, value.value.slice(0, 40));
+            this._hidden.delete(from);
+            this._render();
+          });
+          onSlideEnter(this, () => r.show(this._view()));
+          if (this.hasAttribute('qr')) addQr(this, 260);
+        },
+        () => offline(this.querySelector('.cw-live-stats')),
+      );
+    }
+
+    get _type() {
+      return this.getAttribute('type') === 'number' ? 'number' : 'text';
+    }
+
+    _view() {
+      const cfg = {
+        id: this._id,
+        question: questionOf(this),
+        type: this._type,
+        placeholder: this.getAttribute('placeholder') || '',
+      };
+      return RESPONSE_VIEW.replace('__CFG__', json(cfg));
+    }
+
+    _reveal() {
+      this._revealed = true;
+      this._render();
+      room().then(
+        (r) => r.send({ id: this._id, reveal: this.getAttribute('answer') }),
+        () => {},
+      );
+    }
+
+    cwReset() {
+      this._answers.clear();
+      this._hidden.clear();
+      this._revealed = false;
+      this._render();
+      room().then(
+        (r) => r.send({ id: this._id, reset: true }),
+        () => {},
+      );
+    }
+
+    _render() {
+      const unit = esc(this.getAttribute('unit') || '');
+      const answer = this.getAttribute('answer');
+      const entries = [...this._answers].filter(([from]) => !this._hidden.has(from));
+      const stats = this.querySelector('.cw-live-stats');
+      const wall = this.querySelector('.cw-live-wall');
+      if (this._type === 'number') {
+        const counts = new Map();
+        for (const [, v] of entries) counts.set(Number(v), (counts.get(Number(v)) || 0) + 1);
+        const values = entries.map(([, v]) => Number(v));
+        const sorted = [...counts].sort((a, b) => a[0] - b[0]);
+        const right = answer === null ? 0 : values.filter((v) => v === Number(answer)).length;
+        stats.innerHTML = values.length
+          ? `已作答 ${values.length} 人　最小 ${Math.min(...values)}${unit}　最大 ${Math.max(...values)}${unit}　平均 ${Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100}${unit}${this._revealed ? `　答对 ${right} 人` : ''}`
+          : '已作答 0 人';
+        wall.innerHTML = sorted
+          .map(
+            ([v, n]) =>
+              `<span class="cw-live-chip${this._revealed && v === Number(answer) ? ' cw-right' : ''}">${v}${unit}${n > 1 ? `<small> ×${n}</small>` : ''}</span>`,
+          )
+          .join('');
+      } else {
+        stats.textContent = `已作答 ${entries.length} 人${entries.length ? '（点卡片可隐藏）' : ''}`;
+        wall.innerHTML = entries
+          .reverse()
+          .map(([from, v]) => `<span class="cw-live-card" data-from="${esc(from)}">${esc(v)}</span>`)
+          .join('');
+      }
+    }
+  }
+
+  /** Broadcasts at most every 300 ms, so a burst of answers sends one update. */
+  function throttled(fn) {
+    let timer = null;
+    return () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        fn();
+      }, 300);
+    };
+  }
+
+  function isCurrent(el) {
+    const slide = el.closest('.slide');
+    return !!slide && slide.classList.contains('cw-current');
+  }
+
+  const WORDCLOUD_VIEW = `
+<h2 id="q"></h2><input id="v" autocomplete="off" maxlength="16"><button class="primary" id="go">提交</button><p class="muted center" id="note"></p><div id="mine"></div>
+<style>#mine { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; } #mine span { padding: 6px 14px; border-radius: 999px; background: #eef0fb; }</style>
+\x3cscript>
+(() => {
+  const cfg = __CFG__;
+  const input = document.getElementById('v');
+  const note = document.getElementById('note');
+  const mine = document.getElementById('mine');
+  let words = [];
+  document.getElementById('q').textContent = cfg.question;
+  input.placeholder = cfg.placeholder || '写一个词';
+  const paint = () => {
+    mine.textContent = '';
+    words.forEach((w) => { const s = document.createElement('span'); s.textContent = w; mine.appendChild(s); });
+    note.textContent = !words.length ? '' : words.length < cfg.max ? '已提交，还可以再写 ' + (cfg.max - words.length) + ' 个' : '已提交，再写会替换最早的一个';
+  };
+  const go = () => {
+    const w = input.value.trim().replace(/\\s+/g, ' ');
+    if (!w) return;
+    words = words.filter((x) => x !== w).concat(w).slice(-cfg.max);
+    live.send({ id: cfg.id, words });
+    input.value = '';
+    paint();
+  };
+  document.getElementById('go').onclick = go;
+  input.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  live.onmessage = (m) => { if (m && m.id === cfg.id && m.reset) { words = []; paint(); } };
+})();
+\x3c/script>`;
+
+  class WordCloud extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      this.classList.add('cw-live');
+      this._id = uid();
+      this._answers = new Map();
+      this._hidden = new Set();
+      this.innerHTML =
+        '<div class="cw-live-body"><div class="cw-cloud"></div><p class="cw-live-total small muted"></p><div class="cw-controls"></div></div>';
+      button(this.querySelector('.cw-controls'), isEn ? 'Collect Again' : '重新收集', () => this.cwReset());
+      this.querySelector('.cw-cloud').addEventListener('click', (e) => {
+        const word = e.target.closest('[data-key]');
+        if (!word) return;
+        e.stopPropagation();
+        this._hidden.add(word.getAttribute('data-key'));
+        this._render();
+      });
+      this._render();
+      room().then(
+        (r) => {
+          r.on('data', ({ from, value }) => {
+            if (!value || value.id !== this._id || !Array.isArray(value.words)) return;
+            this._answers.set(
+              from,
+              value.words.filter((w) => typeof w === 'string').map((w) => w.trim().slice(0, 16)),
+            );
+            this._render();
+          });
+          onSlideEnter(this, () => {
+            r.show(this._view());
+            this._render();
+          });
+          if (this.hasAttribute('qr')) addQr(this, 260);
+        },
+        () => offline(this.querySelector('.cw-live-total')),
+      );
+    }
+
+    get _max() {
+      return Math.max(1, Number(this.getAttribute('max')) || 3);
+    }
+
+    _view() {
+      const cfg = {
+        id: this._id,
+        question: questionOf(this),
+        max: this._max,
+        placeholder: this.getAttribute('placeholder') || '',
+      };
+      return WORDCLOUD_VIEW.replace('__CFG__', json(cfg));
+    }
+
+    cwReset() {
+      this._answers.clear();
+      this._hidden.clear();
+      this._render();
+      room().then(
+        (r) => r.send({ id: this._id, reset: true }),
+        () => {},
+      );
+    }
+
+    /** Words by count; the same word in other letter case or spacing counts as one, shown as first written. */
+    _words() {
+      const counts = new Map();
+      for (const words of this._answers.values()) {
+        for (const w of words.slice(-this._max)) {
+          const key = w.toLowerCase().replace(/\s+/g, ' ');
+          if (!key || this._hidden.has(key)) continue;
+          const entry = counts.get(key) || { key, text: w, n: 0 };
+          entry.n++;
+          counts.set(key, entry);
+        }
+      }
+      return [...counts.values()].sort((a, b) => b.n - a.n);
+    }
+
+    _render() {
+      const words = this._words();
+      let total = 0;
+      for (const w of words) total += w.n;
+      this.querySelector('.cw-live-total').textContent =
+        `已参与 ${this._answers.size} 人，${total} 个词${words.length ? '（点词可隐藏）' : ''}`;
+      // Placing needs layout, so a hidden slide waits until it is shown.
+      if (isCurrent(this)) this._layout(words);
+    }
+
+    /** Biggest words first, each on an outward spiral from the centre until it overlaps nothing. */
+    _layout(words) {
+      const cloud = this.querySelector('.cw-cloud');
+      cloud.innerHTML = '';
+      const width = cloud.clientWidth;
+      const height = cloud.clientHeight;
+      if (!words.length || !width || !height) return;
+      const top = words[0].n;
+      const placed = [];
+      words.slice(0, 80).forEach((w, i) => {
+        const span = document.createElement('span');
+        span.textContent = w.text;
+        span.setAttribute('data-key', w.key);
+        span.style.fontSize = `${Math.round(40 + 110 * Math.sqrt(top > 1 ? (w.n - 1) / (top - 1) : 1))}px`;
+        span.style.color = `var(--c${(i % 6) + 1})`;
+        cloud.appendChild(span);
+        const w2 = span.offsetWidth;
+        const h2 = span.offsetHeight;
+        for (let t = 0; t < 2000; t++) {
+          const angle = t * 0.35;
+          const radius = t * 1.6;
+          const x = width / 2 + radius * Math.cos(angle) * 1.6 - w2 / 2;
+          const y = height / 2 + radius * Math.sin(angle) - h2 / 2;
+          if (x < 0 || y < 0 || x + w2 > width || y + h2 > height) continue;
+          const box = { x, y, w: w2, h: h2 };
+          const hit = placed.some((p) => x < p.x + p.w && p.x < x + w2 && y < p.y + p.h && p.y < y + h2);
+          if (hit) continue;
+          placed.push(box);
+          span.style.left = `${x}px`;
+          span.style.top = `${y}px`;
+          return;
+        }
+        span.remove(); // No room left: the smallest words are dropped.
+      });
+    }
+  }
+
+  const RATING_VIEW = `
+<h2 id="q"></h2><div id="opts"></div><p class="muted center" id="note"></p>
+<style>
+#opts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
+#opts button { width: auto; margin: 0; min-width: 56px; text-align: center; }
+#opts.stars button { border: 0; background: transparent; padding: 4px; font-size: 52px; line-height: 1; color: #d6d8e0; }
+#opts.stars button.selected { color: #f2b01e; background: transparent; }
+</style>
+\x3cscript>
+(() => {
+  const cfg = __CFG__;
+  const opts = document.getElementById('opts');
+  const note = document.getElementById('note');
+  let score = 0;
+  document.getElementById('q').textContent = cfg.question;
+  const stars = cfg.max <= 5;
+  opts.className = stars ? 'stars' : '';
+  const buttons = [];
+  for (let i = 1; i <= cfg.max; i++) {
+    const b = document.createElement('button');
+    b.textContent = stars ? '★' : String(i);
+    b.onclick = () => { score = i; live.send({ id: cfg.id, score: i }); paint(); };
+    opts.appendChild(b);
+    buttons.push(b);
+  }
+  const paint = () => {
+    buttons.forEach((b, i) => b.classList.toggle('selected', stars ? i < score : i + 1 === score));
+    note.textContent = score ? '已评 ' + score + ' 分，可以修改' : '';
+  };
+  live.onmessage = (m) => { if (m && m.id === cfg.id && m.reset) { score = 0; paint(); } };
+})();
+\x3c/script>`;
+
+  class Rating extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      this.classList.add('cw-live');
+      this._id = uid();
+      this._answers = new Map();
+      this.innerHTML =
+        '<div class="cw-rating-score"></div><div class="cw-live-body"><div class="cw-live-bars"></div><div class="cw-controls"></div></div>';
+      button(this.querySelector('.cw-controls'), isEn ? 'Reset Rating' : '重新评分', () => this.cwReset());
+      this._render();
+      room().then(
+        (r) => {
+          r.on('data', ({ from, value }) => {
+            if (!value || value.id !== this._id) return;
+            const score = Number(value.score);
+            if (!(score >= 1 && score <= this._max && score === Math.round(score))) return;
+            this._answers.set(from, score);
+            this._render();
+          });
+          onSlideEnter(this, () => r.show(this._view()));
+          if (this.hasAttribute('qr')) addQr(this, 260);
+        },
+        () => offline(this.querySelector('.cw-live-bars')),
+      );
+    }
+
+    get _max() {
+      return Math.min(10, Math.max(2, Number(this.getAttribute('max')) || 5));
+    }
+
+    _view() {
+      return RATING_VIEW.replace('__CFG__', json({ id: this._id, question: questionOf(this), max: this._max }));
+    }
+
+    cwReset() {
+      this._answers.clear();
+      this._render();
+      room().then(
+        (r) => r.send({ id: this._id, reset: true }),
+        () => {},
+      );
+    }
+
+    _render() {
+      const max = this._max;
+      const counts = [];
+      for (let i = 0; i <= max; i++) counts.push(0);
+      let sum = 0;
+      for (const score of this._answers.values()) {
+        counts[score]++;
+        sum += score;
+      }
+      const total = this._answers.size;
+      const top = Math.max(1, ...counts);
+      const star = max <= 5 ? '★' : '';
+      this.querySelector('.cw-rating-score').innerHTML =
+        `<p class="huge">${total ? (sum / total).toFixed(1) : '–'}<span class="cw-rating-star">${star}</span></p><p class="small muted">${total} 人评分，满分 ${max}</p>`;
+      let bars = '';
+      for (let i = max; i >= 1; i--) {
+        const pct = total ? Math.round((counts[i] / total) * 100) : 0;
+        bars += `<div class="cw-live-bar"><span class="cw-live-label cw-rating-label">${star ? star.repeat(i) : `${i} 分`}</span><span class="cw-live-track"><span style="width:${(counts[i] / top) * 100}%"></span></span><span class="cw-live-count">${counts[i]}<small>${total ? ` ${pct}%` : ''}</small></span></div>`;
+      }
+      this.querySelector('.cw-live-bars').innerHTML = bars;
+    }
+  }
+
+  const REACTIONS_DOCK = `
+\x3cscript>
+(() => {
+  const cfg = __CFG__;
+  const dock = document.getElementById('dock');
+  let last = 0;
+  cfg.emoji.forEach((e, i) => {
+    const b = document.createElement('button');
+    b.className = 'emoji';
+    b.textContent = e;
+    b.onclick = () => {
+      const now = Date.now();
+      if (now - last < 250) return;
+      last = now;
+      live.send({ id: cfg.id, e: i });
+    };
+    dock.appendChild(b);
+  });
+})();
+\x3c/script>`;
+
+  /** Registers the reaction bar on every phone and floats each tap up over the right side of the stage. */
+  class Reactions extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      const id = uid();
+      const emoji = list(this.getAttribute('emoji'));
+      if (!emoji.length) emoji.push('👏', '❤️', '😂', '😮', '🤔');
+      docks.push(REACTIONS_DOCK.replace('__CFG__', json({ id, emoji })));
+      const layer = document.createElement('div');
+      layer.id = 'cw-reactions';
+      document.getElementById('cw-stage').appendChild(layer);
+      room().then(
+        (r) =>
+          r.on('data', ({ value }) => {
+            if (!value || value.id !== id || !emoji[value.e] || layer.childElementCount >= 40) return;
+            const span = document.createElement('span');
+            span.textContent = emoji[value.e];
+            span.style.left = `${1500 + Math.random() * 300}px`;
+            span.style.setProperty('--cw-drift', `${Math.round(Math.random() * 160 - 80)}px`);
+            span.addEventListener('animationend', () => span.remove());
+            layer.appendChild(span);
+          }),
+        () => {},
+      );
+    }
+  }
+
+  const QUESTIONS_DOCK = `
+<style>
+#q-sheet { position: fixed; inset: 0; z-index: 20; overflow: auto; padding: 20px 20px calc(24px + env(safe-area-inset-bottom)); background: #f6f7fb; }
+#q-sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+#q-sheet header h2 { margin: 0; }
+#q-sheet header button { width: auto; margin: 0; padding: 8px 16px; }
+#q-sheet textarea { min-height: 88px; }
+#q-list button { display: flex; gap: 12px; align-items: flex-start; }
+#q-list button span:first-child { flex: 1; }
+#q-list button span:last-child { white-space: nowrap; color: var(--muted); }
+#q-list button.selected span:last-child { color: var(--accent); font-weight: 700; }
+#q-list button.done { opacity: 0.6; }
+</style>
+<div id="q-sheet" hidden>
+  <header><h2>提问</h2><button id="q-close">关闭</button></header>
+  <textarea id="q-text" maxlength="120" placeholder="写下你想问的问题"></textarea>
+  <button class="primary" id="q-send">提交问题</button>
+  <p class="muted center" id="q-note"></p>
+  <div id="q-list"></div>
+</div>
+\x3cscript>
+(() => {
+  const cfg = __CFG__;
+  const sheet = document.getElementById('q-sheet');
+  const list = document.getElementById('q-list');
+  const text = document.getElementById('q-text');
+  const note = document.getElementById('q-note');
+  const open = document.createElement('button');
+  let qs = [];
+  let mine = new Set();
+  let sent = 0;
+  open.onclick = () => { sheet.hidden = false; };
+  document.getElementById('dock').appendChild(open);
+  document.getElementById('q-close').onclick = () => { sheet.hidden = true; };
+  if (window.liveOpenQuestions) sheet.hidden = false;
+  document.getElementById('q-send').onclick = () => {
+    const value = text.value.trim();
+    if (!value) return;
+    sent++;
+    live.send({ id: cfg.id, ask: value, k: live.id + '-' + Date.now().toString(36) });
+    text.value = '';
+    note.textContent = '已提交，讲者会在提问环节看到';
+  };
+  const paint = () => {
+    open.textContent = qs.length ? '提问 · ' + qs.length : '提问';
+    list.textContent = '';
+    if (qs.length) {
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = '给想听的问题点赞';
+      list.appendChild(p);
+    }
+    qs.forEach((q) => {
+      const b = document.createElement('button');
+      const t = document.createElement('span');
+      const n = document.createElement('span');
+      t.textContent = q.text;
+      n.textContent = (q.now ? '正在回答 · ' : q.done ? '已回答 · ' : '') + '👍 ' + q.n;
+      b.append(t, n);
+      b.classList.toggle('selected', mine.has(q.k));
+      b.classList.toggle('done', !!q.done && !q.now);
+      b.onclick = () => {
+        const on = !mine.has(q.k);
+        if (on) mine.add(q.k); else mine.delete(q.k);
+        q.n += on ? 1 : -1;
+        live.send({ id: cfg.id, vote: q.k, on });
+        paint();
+      };
+      list.appendChild(b);
+    });
+  };
+  addEventListener('live', (e) => {
+    const m = e.detail;
+    if (!m || m.id !== cfg.id || !m.qs) return;
+    qs = m.qs;
+    if (m.mine) mine = new Set(m.mine);
+    paint();
+  });
+  paint();
+  live.send({ id: cfg.id, sync: true });
+})();
+\x3c/script>`;
+
+  /**
+   * Questions the audience asks from the 提问 button on any slide and upvotes; this element shows them on its slide
+   * (the Q&A), where tapping one marks it as being answered.
+   */
+  class Questions extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      this.classList.add('cw-live');
+      this._id = uid();
+      this._qs = [];
+      this._now = null;
+      this._broadcast = throttled(() =>
+        room().then(
+          (r) => r.send({ id: this._id, qs: this._public() }),
+          () => {},
+        ),
+      );
+      docks.push(QUESTIONS_DOCK.replace('__CFG__', json({ id: this._id })));
+      this.innerHTML =
+        '<div class="cw-live-body"><div class="cw-q-now"></div><p class="cw-live-total small muted"></p><div class="cw-q-list"></div><div class="cw-controls"></div></div>';
+      button(this.querySelector('.cw-controls'), isEn ? 'Clear Questions' : '清空问题', () => this.cwReset());
+      this.addEventListener('click', (e) => {
+        const card = e.target.closest('[data-k]');
+        if (!card) return;
+        e.stopPropagation();
+        const q = this._find(card.getAttribute('data-k'));
+        if (e.target.closest('.cw-q-hide')) {
+          q.hidden = true;
+          if (this._now === q.k) this._now = null;
+        } else if (this._now === q.k) {
+          this._now = null;
+        } else {
+          this._now = q.k;
+          q.done = true;
+        }
+        this._changed();
+      });
+      this._render();
+      room().then(
+        (r) => {
+          r.on('data', ({ from, value }) => {
+            if (!value || value.id !== this._id) return;
+            if (value.sync) {
+              const mine = this._qs.filter((q) => q.voters.has(from)).map((q) => q.k);
+              r.send({ id: this._id, qs: this._public(), mine }, from);
+            } else if (typeof value.ask === 'string' && typeof value.k === 'string' && !this._find(value.k)) {
+              const text = value.ask.trim().slice(0, 120);
+              if (!text) return;
+              this._qs.push({ k: value.k, text, voters: new Set(), done: false, hidden: false, t: Date.now() });
+              this._changed();
+            } else if (typeof value.vote === 'string') {
+              const q = this._find(value.vote);
+              if (!q) return;
+              if (value.on) q.voters.add(from);
+              else q.voters.delete(from);
+              this._changed();
+            }
+          });
+          // Phones open the question list on this slide.
+          onSlideEnter(this, () => r.show('\x3cscript>window.liveOpenQuestions = true;\x3c/script>'));
+          if (this.hasAttribute('qr')) addQr(this, 260);
+        },
+        () => offline(this.querySelector('.cw-live-total')),
+      );
+    }
+
+    _find(k) {
+      return this._qs.filter((q) => q.k === k)[0];
+    }
+
+    _sorted() {
+      return this._qs.filter((q) => !q.hidden).sort((a, b) => b.voters.size - a.voters.size || a.t - b.t);
+    }
+
+    _public() {
+      return this._sorted().map((q) => ({
+        k: q.k,
+        text: q.text,
+        n: q.voters.size,
+        done: q.done,
+        now: q.k === this._now,
+      }));
+    }
+
+    _changed() {
+      this._render();
+      this._broadcast();
+    }
+
+    cwReset() {
+      this._qs = [];
+      this._now = null;
+      this._changed();
+    }
+
+    _render() {
+      const qs = this._sorted();
+      const now = this._now ? this._find(this._now) : null;
+      this.querySelector('.cw-q-now').innerHTML = now
+        ? `<div class="cw-q-card cw-on" data-k="${esc(now.k)}"><span class="cw-q-text">${esc(now.text)}</span><span class="cw-q-votes">👍 ${now.voters.size}</span></div>`
+        : '';
+      this.querySelector('.cw-live-total').textContent = qs.length
+        ? `${qs.length} 个问题，按点赞排序（点问题标为正在回答，× 隐藏）`
+        : '还没有问题：手机上点「提问」';
+      this.querySelector('.cw-q-list').innerHTML = qs
+        .filter((q) => q !== now)
+        .map(
+          (q) =>
+            `<div class="cw-q-card${q.done ? ' cw-done' : ''}" data-k="${esc(q.k)}"><span class="cw-q-text">${esc(q.text)}</span><span class="cw-q-votes">👍 ${q.voters.size}</span><button class="cw-q-hide" title="隐藏">×</button></div>`,
+        )
+        .join('');
+    }
+  }
+
+  customElements.define('cw-live-join', LiveJoin);
+  customElements.define('cw-poll', Poll);
+  customElements.define('cw-responses', Responses);
+  customElements.define('cw-wordcloud', WordCloud);
+  customElements.define('cw-rating', Rating);
+  customElements.define('cw-reactions', Reactions);
+  customElements.define('cw-questions', Questions);
+})();
+
+</script>
+  </body>
+</html>
