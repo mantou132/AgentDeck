@@ -457,3 +457,48 @@ test('starting a new turn clears unread and trailing agent_session_state cannot 
   assert.equal(fixture.app.getRuntime('s1').running, true);
   assert.equal(fixture.app.getRuntime('s1').unread, false);
 });
+
+test('leaving a session page while openSession is in flight unsubscribes once openSession resolves', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  fixture.heldMethods.add('agent_session_open');
+
+  const untrack = fixture.app.trackSessionPage('s1');
+  const opening = fixture.app.ensureSessionLoaded('s1');
+  await tick();
+
+  const openReq = fixture.requests.findLast((r) => r.payload.method === 'agent_session_open');
+  assert.ok(openReq, 'openSession request sent');
+
+  // User navigates away before openSession finishes.
+  untrack();
+  await tick();
+  assert.equal(
+    fixture.requests.some((r) => r.payload.method === 'agent_session_unsubscribe'),
+    false,
+    'does not unsubscribe before openSession registers the subscriber',
+  );
+
+  fixture.reply(openReq, {
+    agent: 'codex',
+    sessionId: 's1',
+    epoch: 'ep-1',
+    seq: 2,
+    running: false,
+    userInputs: [],
+    fullReplay: true,
+    freshLoad: false,
+  });
+  await opening;
+  await tick();
+
+  assert.equal(fixture.app.getRuntime('s1').subscribed, false, 'stays unsubscribed after late openSession');
+  assert.equal(fixture.app.getRuntime('s1').load, 'loaded', 'keeps loaded snapshot for incremental re-entry');
+  assert.equal(
+    fixture.requests.some(
+      (r) => r.payload.method === 'agent_session_unsubscribe' && r.payload.params.sessionId === 's1',
+    ),
+    true,
+    'sends agent_session_unsubscribe once daemon subscribed the peer',
+  );
+});

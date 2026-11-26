@@ -642,6 +642,7 @@ export const ensureSessionLoaded = async (sessionId: string, options?: { force?:
 
   const token = ++loadRequest;
   const isCurrent = () => getRuntime(sessionId).loadToken === token;
+  const tracked = openPages.has(sessionId);
   const hadLoaded = runtime.load === 'loaded';
   const sinceEpoch = hadLoaded ? runtime.epoch : undefined;
   const sinceSeq = hadLoaded && sinceEpoch ? (runtime.lastSeq ?? 0) : undefined;
@@ -735,6 +736,9 @@ export const ensureSessionLoaded = async (sessionId: string, options?: { force?:
       options: { ...getRuntime(sessionId).options, ...loadedOptions },
     });
     replaceSessionUserInputs(sessionId, opened.userInputs ?? []);
+    if (tracked && !openPages.has(sessionId)) {
+      unsubscribeSession(sessionId);
+    }
 
     const meta = getSessionMeta(sessionId);
     const title = resolveSessionTitle(opened.title, meta?.title);
