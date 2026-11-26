@@ -9,20 +9,21 @@ use std::{
     time::Duration,
 };
 
-pub(crate) use prompt::remote_app_system_prompt;
+pub(crate) use prompt::{VOICE_CHAT_MARKER, remote_app_system_prompt};
 use serde_json::{Value, json};
-use tokio::sync::mpsc;
 
 use self::{
     files::{browse_files, complete_directories, read_raw_file, read_remote_file},
     git::{GIT_LOG_LIMIT, annotate_worktrees, git_diff, git_log, git_show, git_status},
     prompt::{
-        VOICE_CHAT_MARKER, message_attachments, message_panel_system_prompt, message_timeout_secs,
-        message_voice_chat,
+        message_attachments, message_panel_system_prompt, message_timeout_secs, message_voice_chat,
     },
 };
 use crate::{
-    acp_agent::{self, AgentEvent, AgentSessionManager, SessionContext, SessionEndCallback},
+    acp_agent::{
+        self, AgentSessionManager, PromptOptions, SessionContext, SessionObserver,
+        SessionStateUpdate, SessionSubscriber, TaskInputPush, UserInput,
+    },
     app_data::AppPaths,
     peer::{CallCtx, Peer, RpcError},
     push::PushKind,
@@ -30,39 +31,6 @@ use crate::{
     screen_capture,
     tasks::Tasks,
 };
-
-/// Forwards a request's agent events; resolves to whether the turn stopped
-/// because it was cancelled.
-type EventForwarder = (
-    mpsc::UnboundedSender<AgentEvent>,
-    tokio::task::JoinHandle<bool>,
-);
-
-/// Stream agent events as `{ id, event }` frames while a request runs.
-fn event_forwarder(ctx: &CallCtx) -> EventForwarder {
-    let (event_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
-    let ctx = ctx.clone();
-    let done = tokio::spawn(async move {
-        let mut cancelled = false;
-        while let Some(event) = event_rx.recv().await {
-            if let AgentEvent::Stop { stop_reason } = &event {
-                cancelled = stop_reason == "cancelled";
-            }
-            let event = serde_json::to_value(&event).unwrap_or(Value::Null);
-            ctx.emit(event);
-        }
-        cancelled
-    });
-    (event_tx, done)
-}
-
-/// Drop the event sender and wait for the forwarder to drain so streamed
-/// events never overtake the final result. Returns whether the turn completed:
-/// it succeeded and was not cancelled.
-async fn settle_forwarder((tx, done): EventForwarder, ok: bool) -> bool {
-    drop(tx);
-    ok && !done.await.unwrap_or(false)
-}
 
 /// Pushes a notification to the peer's device: `(kind, agent, session_id)`.
 pub type PeerPush = Arc<dyn Fn(PushKind, &str, &str) + Send + Sync>;
@@ -100,11 +68,91 @@ pub fn peer_attach(params: &Value) -> (SkillSelection, Value) {
     (declared, info)
 }
 
+#[derive(Clone)]
+struct PeerEntry {
+    peer: Peer,
+    push: Option<PeerPush>,
+}
+
+struct ServiceObserver {
+    peers: Arc<Mutex<HashMap<u64, PeerEntry>>>,
+}
+
+impl ServiceObserver {
+    fn broadcast(&self, method: &str, params: Value) {
+        let peers: Vec<Peer> = self
+            .peers
+            .lock()
+            .expect("lock poisoned")
+            .values()
+            .map(|entry| entry.peer.clone())
+            .collect();
+        for peer in peers {
+            peer.notify(method, params.clone());
+        }
+    }
+}
+
+impl SessionObserver for ServiceObserver {
+    fn on_state(&self, update: SessionStateUpdate) {
+        self.broadcast(
+            "agent_session_state",
+            serde_json::to_value(update).unwrap_or(Value::Null),
+        );
+    }
+
+    fn on_user_input(
+        &self,
+        input: &UserInput,
+        originator_peer_id: Option<u64>,
+        task_push: Option<&TaskInputPush>,
+    ) {
+        let params = input.params();
+        if let (Some(agent), Some(session_id)) = (
+            params.get("agent").and_then(Value::as_str),
+            params.get("sessionId").and_then(Value::as_str),
+        ) {
+            if let Some(push) = task_push {
+                push(agent, session_id);
+            } else if let Some(peer_id) = originator_peer_id {
+                let push = self
+                    .peers
+                    .lock()
+                    .expect("lock poisoned")
+                    .get(&peer_id)
+                    .and_then(|entry| entry.push.clone());
+                if let Some(push) = push {
+                    push(PushKind::InputRequest, agent, session_id);
+                }
+            }
+        }
+        self.broadcast(input.method(), params.clone());
+    }
+
+    fn on_user_input_resolved(&self, agent: &str, session_id: &str, request_id: &str) {
+        self.broadcast(
+            "agent_user_input_resolved",
+            json!({
+                "agent": agent,
+                "sessionId": session_id,
+                "requestId": request_id,
+            }),
+        );
+    }
+
+    fn on_session_ended(&self, agent: &str, session_id: &str) {
+        self.broadcast(
+            "agent_session_ended",
+            json!({ "agent": agent, "sessionId": session_id }),
+        );
+    }
+}
+
 /// Central host service managing ACP agent sessions and exposing RPC routes.
 #[derive(Clone)]
 pub struct AgentService {
     sessions: Arc<AgentSessionManager>,
-    end_listeners: Arc<Mutex<HashMap<u64, SessionEndCallback>>>,
+    peers: Arc<Mutex<HashMap<u64, PeerEntry>>>,
     /// Scheduled tasks, set once by `init_tasks` when the daemon runs.
     tasks: Arc<OnceLock<Arc<Tasks>>>,
     screen_streams: screen_capture::ScreenStreamManager,
@@ -118,22 +166,13 @@ impl Default for AgentService {
 
 impl AgentService {
     pub fn new() -> Self {
-        let listeners: Arc<Mutex<HashMap<u64, SessionEndCallback>>> = Arc::default();
-        let listeners_cb = listeners.clone();
-        let on_end: SessionEndCallback = Arc::new(move |agent, session_id| {
-            let list: Vec<SessionEndCallback> = listeners_cb
-                .lock()
-                .expect("lock poisoned")
-                .values()
-                .cloned()
-                .collect();
-            for cb in list {
-                cb(agent, session_id);
-            }
+        let peers: Arc<Mutex<HashMap<u64, PeerEntry>>> = Arc::default();
+        let observer = Arc::new(ServiceObserver {
+            peers: peers.clone(),
         });
         Self {
-            sessions: Arc::new(AgentSessionManager::new(Some(on_end))),
-            end_listeners: listeners,
+            sessions: Arc::new(AgentSessionManager::new(Some(observer))),
+            peers,
             tasks: Arc::default(),
             screen_streams: screen_capture::ScreenStreamManager::default(),
         }
@@ -153,6 +192,20 @@ impl AgentService {
 
     pub fn stop_all_screen_streams(&self) {
         self.screen_streams.stop_all();
+    }
+
+    pub fn unsubscribe_peer(&self, peer_id: u64) {
+        let sessions = self.sessions.clone();
+        tokio::spawn(async move {
+            sessions.unsubscribe_peer(peer_id).await;
+        });
+    }
+
+    pub fn unsubscribe_all_peers(&self) {
+        let sessions = self.sessions.clone();
+        tokio::spawn(async move {
+            sessions.unsubscribe_all_peers().await;
+        });
     }
 
     /// Gracefully close active ACP sessions and terminate managed ACP agent
@@ -262,32 +315,17 @@ impl AgentService {
         push: Option<PeerPush>,
         skills: PeerSkills,
     ) {
-        // The device each session's notifications go to; see
-        // `SessionActor::notifier`. A permission request or question also
-        // reaches it as a push, since the turn waits on it while the App may be
-        // in the background.
         let notifier: acp_agent::Notifier = {
             let peer = peer.clone();
-            let push = push.clone();
-            Arc::new(move |method, params| {
-                if let Some(push) = &push
-                    && let Some((agent, session_id)) =
-                        acp_agent::input_request_session(method, &params)
-                {
-                    push(PushKind::InputRequest, agent, session_id);
-                }
-                peer.notify(method, params)
-            })
+            Arc::new(move |method, params| peer.notify(method, params))
         };
-        let notify_peer = peer.clone();
-        self.end_listeners.lock().expect("lock poisoned").insert(
+        let subscriber = SessionSubscriber { peer_id, notifier };
+        self.peers.lock().expect("lock poisoned").insert(
             peer_id,
-            Arc::new(move |agent, session_id| {
-                notify_peer.notify(
-                    "agent_session_ended",
-                    json!({ "agent": agent, "sessionId": session_id }),
-                );
-            }),
+            PeerEntry {
+                peer: peer.clone(),
+                push: push.clone(),
+            },
         );
 
         let sessions = self.sessions.clone();
@@ -449,26 +487,28 @@ impl AgentService {
 
         let create_sessions = sessions.clone();
         let create_skills = skills.clone();
-        let create_notifier = notifier.clone();
+        let create_subscriber = subscriber.clone();
         peer.handle("agent_session_create", move |params, ctx| {
             let sessions = create_sessions.clone();
             let skills = create_skills.clone();
-            let notifier = create_notifier.clone();
+            let subscriber = create_subscriber.clone();
             async move {
                 let agent = required_agent(&params, "agent_session_create")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &skills, notifier).await?;
+                let context = session_context(&params, &skills).await?;
                 let timeout_secs = message_timeout_secs(&params);
                 prepare_agent(&sessions, agent, &ctx).await?;
                 match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
-                    sessions.create_session(agent, cwd, context),
+                    sessions.create_session(agent, cwd, context, Some(subscriber)),
                 )
                 .await
                 {
                     Ok(Ok(created)) => Ok(json!({
                         "agent": agent,
                         "sessionId": created.session_id,
+                        "epoch": created.epoch,
+                        "seq": created.seq,
                         "title": created.title,
                         "updatedAt": created.updated_at,
                         "modes": created.modes,
@@ -480,50 +520,72 @@ impl AgentService {
             }
         });
 
-        let load_sessions = sessions.clone();
-        let load_notifier = notifier.clone();
-        peer.handle("agent_session_load", move |params, ctx| {
-            let sessions = load_sessions.clone();
+        let open_sessions = sessions.clone();
+        let open_subscriber = subscriber.clone();
+        peer.handle("agent_session_open", move |params, ctx| {
+            let sessions = open_sessions.clone();
             let skills = skills.clone();
-            let notifier = load_notifier.clone();
+            let subscriber = open_subscriber.clone();
             async move {
-                let (agent, session_id) = required_agent_session(&params, "agent_session_load")?;
+                let (agent, session_id) = required_agent_session(&params, "agent_session_open")?;
                 let cwd = message_cwd(&params);
-                let context = session_context(&params, &skills, notifier).await?;
+                let since_epoch = non_empty_str(&params, "sinceEpoch").map(str::to_string);
+                let since_seq = params.get("sinceSeq").and_then(Value::as_u64).unwrap_or(0);
+                let context = session_context(&params, &skills).await?;
                 let timeout_secs = message_timeout_secs(&params);
                 prepare_agent(&sessions, agent, &ctx).await?;
 
-                // The actor drains the load-time history replay into this
-                // channel while the load runs; afterwards the buffered frames
-                // are emitted (receiver closed, so the actor's live sender
-                // can't keep it open) before the final result, so history
-                // precedes the response.
-                let (replay_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
-
-                let result = match tokio::time::timeout(
+                match tokio::time::timeout(
                     Duration::from_secs(timeout_secs),
-                    sessions.load_session(agent, session_id, cwd, context, replay_tx),
+                    sessions.open_session(
+                        agent,
+                        session_id,
+                        cwd,
+                        context,
+                        Some(subscriber),
+                        since_epoch,
+                        since_seq,
+                    ),
                 )
                 .await
                 {
-                    Ok(Ok(created)) => Ok(json!({
-                        "agent": agent,
-                        "sessionId": created.session_id,
-                        "title": created.title,
-                        "updatedAt": created.updated_at,
-                        "modes": created.modes,
-                        "configOptions": created.config_options,
-                    })),
+                    Ok(Ok(opened)) => {
+                        for event in &opened.events {
+                            let value = serde_json::to_value(event).unwrap_or(Value::Null);
+                            ctx.emit(value);
+                        }
+                        Ok(json!({
+                            "agent": agent,
+                            "sessionId": opened.session_id,
+                            "epoch": opened.epoch,
+                            "seq": opened.seq,
+                            "title": opened.title,
+                            "updatedAt": opened.updated_at,
+                            "modes": opened.modes,
+                            "configOptions": opened.config_options,
+                            "running": opened.running,
+                            "userInputs": opened.user_inputs,
+                            "suggestion": opened.suggestion,
+                            "fullReplay": opened.full_replay,
+                            "freshLoad": opened.fresh_load,
+                        }))
+                    }
                     Ok(Err(err)) => Err(err.to_string()),
-                    Err(_) => Err("Timeout loading ACP agent session".to_string()),
-                };
-
-                event_rx.close();
-                while let Some(event) = event_rx.recv().await {
-                    let event = serde_json::to_value(&event).unwrap_or(Value::Null);
-                    ctx.emit(event);
+                    Err(_) => Err("Timeout opening ACP agent session".to_string()),
                 }
-                result
+            }
+        });
+
+        let unsubscribe_sessions = sessions.clone();
+        peer.handle("agent_session_unsubscribe", move |params, _ctx| {
+            let sessions = unsubscribe_sessions.clone();
+            async move {
+                let (agent, session_id) =
+                    required_agent_session(&params, "agent_session_unsubscribe")?;
+                sessions
+                    .unsubscribe_session(agent, session_id, peer_id)
+                    .await;
+                Ok(json!({ "ok": true }))
             }
         });
 
@@ -629,18 +691,13 @@ impl AgentService {
             }
         });
 
-        let running_sessions = sessions.clone();
-        peer.handle("agent_prompts_running", move |_params, _ctx| {
-            let sessions = running_sessions.clone();
+        let active_sessions = sessions.clone();
+        peer.handle("agent_active_sessions", move |_params, _ctx| {
+            let sessions = active_sessions.clone();
             async move {
-                let running: Vec<Value> = sessions
-                    .running_prompts()
-                    .await
-                    .into_iter()
-                    .map(|(agent, session_id)| json!({ "agent": agent, "sessionId": session_id }))
-                    .collect();
+                let active = sessions.active_sessions().await;
                 let user_inputs = sessions.pending_user_inputs().await;
-                Ok(json!({ "sessions": running, "userInputs": user_inputs }))
+                Ok(json!({ "sessions": active, "userInputs": user_inputs }))
             }
         });
 
@@ -667,10 +724,11 @@ impl AgentService {
         });
 
         let prompt_sessions = sessions.clone();
-        peer.handle_rpc("agent_prompt", move |params, ctx| {
+        let prompt_subscriber = subscriber;
+        peer.handle_rpc("agent_prompt", move |params, _ctx| {
             let push = push.clone();
             let sessions = prompt_sessions.clone();
-            let notifier = notifier.clone();
+            let subscriber = prompt_subscriber.clone();
             async move {
                 let agent = required_agent(&params, "agent_prompt")?;
                 // The prompt may be empty when the content lives in
@@ -681,50 +739,48 @@ impl AgentService {
                     .unwrap_or_default()
                     .to_string();
                 let timeout_secs = message_timeout_secs(&params);
-                let mut attachments = message_attachments(&params)?;
+                let attachments = message_attachments(&params)?;
                 if prompt.is_empty() && attachments.is_empty() {
                     return Err("agent_prompt requires a non-empty prompt or attachments"
                         .to_string()
                         .into());
                 }
                 let session_id = required_session_id(&params, "agent_prompt")?;
-                if message_voice_chat(&params) {
-                    attachments.push(acp_agent::Attachment::Text {
-                        text: VOICE_CHAT_MARKER.to_string(),
+                let voice_chat = message_voice_chat(&params);
+                let client_message_id =
+                    non_empty_str(&params, "clientMessageId").map(str::to_string);
+
+                let handle = sessions
+                    .start_prompt(
+                        agent,
+                        session_id,
+                        PromptOptions {
+                            prompt,
+                            attachments,
+                            voice_chat,
+                            client_message_id,
+                            timeout_secs,
+                            originator_peer_id: Some(peer_id),
+                            subscriber: Some(subscriber),
+                        },
+                    )
+                    .await
+                    .map_err(agent_error)?;
+
+                if let Some(push) = push {
+                    let agent = agent.to_string();
+                    let session_id = session_id.to_string();
+                    tokio::spawn(async move {
+                        if let Ok(done) = handle.completion.await
+                            && !done.cancelled
+                            && done.result.is_ok()
+                        {
+                            push(PushKind::ResponseComplete, &agent, &session_id);
+                        }
                     });
                 }
 
-                // Stream agent events as `{ id, event }` frames while the
-                // prompt runs; the forwarder is drained before the final result
-                // so no event overtakes the response. Permission requests,
-                // questions and the next-prompt suggestion go to this device as
-                // notifications; any device answers with
-                // `agent_user_input_respond`.
-                let forwarder = event_forwarder(&ctx);
-                let event_tx = forwarder.0.clone();
-
-                let result = sessions
-                    .prompt(
-                        agent,
-                        session_id,
-                        prompt,
-                        attachments,
-                        timeout_secs,
-                        event_tx,
-                        Some(notifier),
-                    )
-                    .await;
-
-                // A turn the user cancelled is not announced as complete.
-                if settle_forwarder(forwarder, result.is_ok()).await
-                    && let Some(push) = push
-                {
-                    push(PushKind::ResponseComplete, agent, session_id);
-                }
-
-                result
-                .map(|answer| json!({ "answer": answer, "agent": agent, "sessionId": session_id }))
-                .map_err(agent_error)
+                Ok(json!({ "ok": true, "agent": agent, "sessionId": session_id }))
             }
         });
 
@@ -783,13 +839,9 @@ fn required_f64(params: &Value, field: &str, method: &str) -> Result<f64, String
 /// An agent failure for the app. ACP `AuthRequired` gets the `auth_required`
 /// code, so the app can tell the user to sign in to the agent on this computer.
 pub(crate) fn agent_error(err: anyhow::Error) -> RpcError {
-    let auth_required = err
-        .chain()
-        .filter_map(|cause| cause.downcast_ref::<agent_client_protocol::Error>())
-        .any(|cause| cause.code == agent_client_protocol::ErrorCode::AuthRequired);
     RpcError {
+        code: acp_agent::anyhow_error_code(&err),
         message: err.to_string(),
-        code: auth_required.then_some("auth_required"),
     }
 }
 
@@ -854,16 +906,12 @@ fn message_cwd(params: &Value) -> Option<PathBuf> {
     non_empty_str(params, "cwd").map(PathBuf::from)
 }
 
-async fn session_context(
-    params: &Value,
-    skills: &PeerSkills,
-    notifier: acp_agent::Notifier,
-) -> Result<SessionContext, String> {
+async fn session_context(params: &Value, skills: &PeerSkills) -> Result<SessionContext, String> {
     Ok(SessionContext {
         system_prompt: message_panel_system_prompt(params).await?,
         skills: skills.lock().expect("lock poisoned").clone(),
-        notifier: Some(notifier),
         input_timeout: None,
         auto_approve: false,
+        task_push: None,
     })
 }

@@ -16,7 +16,6 @@ export const SETTINGS_KEY = 'agentdeck.settings.v1';
 export const DEVICE_ID_KEY = 'agentdeck.device_id.v1';
 export const RESET_PENDING_KEY = 'agentdeck.reset_pending.v1';
 export const RELAY_GUIDE_SEEN_KEY = 'agentdeck.relay_guide_seen.v1';
-export const ACTIVE_MARKER_KEY = 'agentdeck.active_in_flight.v1';
 export const SESSION_META_KEY = 'agentdeck.meta.v1';
 export const CONFIG_DEFAULTS_KEY = 'agentdeck.config_defaults.v1';
 export const PAIRING_HISTORY_KEY = 'agentdeck.pairing_history.v1';
@@ -36,7 +35,6 @@ export type AppLanguage = '' | keyof typeof langNames;
 // IndexedDB database names are unique within this app's origin.
 // Keep all database/store identities here; retain existing names for persisted data.
 export const DATABASES = {
-  inFlight: { name: 'agentdeck-db', version: 1, storeName: 'in_flight_sessions', keyPath: 'sessionId' },
   drafts: { name: 'agentdeck-drafts', version: 1, storeName: 'drafts' },
   relay: { name: 'agentdeck-relay', version: 1, storeName: 'relay' },
 } as const;

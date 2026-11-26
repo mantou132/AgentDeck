@@ -205,7 +205,7 @@ mod tests {
         assert!(codec.open(v["appFrame"].clone()).is_err());
         assert!(
             codec
-                .open(json!({"method": "agent_prompts_running"}))
+                .open(json!({"method": "agent_active_sessions"}))
                 .is_err()
         );
         assert!(codec.open(v["hostFrame"].clone()).is_err());

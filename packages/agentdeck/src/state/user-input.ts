@@ -1,14 +1,14 @@
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import type { ElicitationRequest, ElicitationResponse, PermissionRequest } from 'src/agent/api';
+import type { ElicitationRequest, ElicitationResponse, PermissionRequest, UserInput } from 'src/agent/api';
 import { agentApi } from 'src/agent/transport';
 import { i18n } from 'src/i18n';
 import { hapticWarning } from 'src/lib/haptics';
 import type { Elicitation } from 'src/session/elicitation';
 import { getRuntime, isTurnRunning, updateRuntime } from 'src/state/store';
 
-// Requests waiting for the user (permissions and form elicitations) arrive as host notifications and are
-// answered with `agent_user_input_respond`. The host keeps them until answered and lists them again after
-// reconnecting, so repeats are ignored by `requestId`.
+// Requests waiting for the user (permissions and form elicitations) arrive as broadcast host notifications,
+// are included in `openSession` / `listActiveSessions` snapshots, and are cleared via `agent_user_input_resolved`
+// when answered on any device or cancelled by the host.
 
 /** `undefined` drops the session's permission request. */
 const setPermission = (sessionId: string, permission?: PermissionRequest) => updateRuntime(sessionId, { permission });
@@ -24,7 +24,6 @@ const setElicitationResponse = (request: ElicitationRequest, response?: Elicitat
   );
 
 export const showPermission = (request: PermissionRequest) => {
-  if (!isTurnRunning(request.sessionId)) return;
   if (getRuntime(request.sessionId).permission?.requestId === request.requestId) return;
   setPermission(request.sessionId, request);
   hapticWarning();
@@ -44,7 +43,6 @@ export const resolvePermission = async (sessionId: string, optionId: string | nu
 };
 
 export const showElicitation = (request: ElicitationRequest) => {
-  if (!isTurnRunning(request.sessionId)) return;
   const current = getRuntime(request.sessionId).elicitations ?? [];
   if (current.some((item) => item.request.requestId === request.requestId)) return;
   setElicitations(request.sessionId, [...current, { request }]);
@@ -60,6 +58,37 @@ export const answerElicitation = async (request: ElicitationRequest, response: E
     setElicitationResponse(request);
     Toast.open('error', i18n.get('userInput.failed'));
   }
+};
+
+/** Drops a pending request that was answered on another device or cancelled by the host. */
+export const clearUserInput = (sessionId: string, requestId: string) => {
+  const { permission, elicitations } = getRuntime(sessionId);
+  if (permission?.requestId === requestId) setPermission(sessionId);
+  if (elicitations?.some((item) => !item.response && item.request.requestId === requestId)) {
+    setElicitations(
+      sessionId,
+      elicitations.filter((item) => item.response || item.request.requestId !== requestId),
+    );
+  }
+};
+
+/** Reconciles a session's pending user inputs with an authoritative snapshot from `openSession`. */
+export const replaceSessionUserInputs = (sessionId: string, inputs: UserInput[]) => {
+  const permission = inputs.find((item) => item.method === 'agent_permission_request')?.params as
+    | PermissionRequest
+    | undefined;
+  const pendingElicitations = inputs
+    .filter((item) => item.method === 'agent_elicitation_request')
+    .map((item) => item.params as ElicitationRequest);
+  const current = getRuntime(sessionId).elicitations ?? [];
+  const answered = current.filter((item) => Boolean(item.response));
+  const nextElicitations: Elicitation[] = [
+    ...answered,
+    ...pendingElicitations
+      .filter((request) => !answered.some((item) => item.request.requestId === request.requestId))
+      .map((request) => ({ request })),
+  ];
+  updateRuntime(sessionId, { permission, elicitations: nextElicitations.length ? nextElicitations : undefined });
 };
 
 /**

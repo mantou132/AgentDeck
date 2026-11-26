@@ -53,9 +53,6 @@
   "devtoolsPanelEnqueue": {
     "message": "加入队列"
   },
-  "devtoolsPanelHostReconnected": {
-    "message": "Native host 已重连，当前会话已失效，请重新打开或新建会话"
-  },
   "devtoolsPanelImageAttachment": {
     "message": "图片"
   },

@@ -1,15 +1,21 @@
 import { TapSwipeoutElement } from '@mantou/tap-ui/elements/swipeout';
 import { Toast } from '@mantou/tap-ui/elements/toast';
-import { type CreatedSession, REMOTE_APP_PANEL_CONTEXT, type SessionEvent, type UserInput } from 'src/agent/api';
+import {
+  type CreatedSession,
+  REMOTE_APP_PANEL_CONTEXT,
+  type SessionEvent,
+  type SessionStateUpdate,
+  type UserInput,
+} from 'src/agent/api';
 import { RpcError } from 'src/agent/rpc';
 import { agentApi, reconnectTransport } from 'src/agent/transport';
+import { toPromptAttachment } from 'src/attachment/prompt';
 import type { Attachment } from 'src/attachment/types';
 import { draftKey, removeDraft } from 'src/composer/drafts';
 import { i18n } from 'src/i18n';
 import { getConfigSelects, getConfigValues } from 'src/session/config-options';
 import { completeThought, finishStreaming, reduceSessionEvent } from 'src/session/events';
 import { getSortedSessionGroups } from 'src/session/groups';
-import { cancelTurnPrompt, performTurn } from 'src/session/turn';
 import type { DeckSession, SessionOptions, Subagent, TextMessage } from 'src/session/types';
 import {
   applyConfigSelection,
@@ -17,13 +23,6 @@ import {
   saveConfigDefaults,
   setAgentCommands,
 } from 'src/state/config-options';
-import {
-  clearAllInFlight,
-  type InFlightSession,
-  removeInFlight,
-  saveInFlight,
-  updateInFlightMessages,
-} from 'src/state/in-flight';
 import {
   getSessionMeta,
   isSessionDeleted,
@@ -48,19 +47,69 @@ import {
   updateRuntime,
   updateSessionOptions,
 } from 'src/state/store';
-import { showTaskPermission } from 'src/state/tasks';
-import { settleUserInput, showElicitation, showPermission } from 'src/state/user-input';
+import { clearTaskPermission, getRunningTask, showTaskPermission } from 'src/state/tasks';
+import {
+  clearUserInput,
+  replaceSessionUserInputs,
+  settleUserInput,
+  showElicitation,
+  showPermission,
+} from 'src/state/user-input';
 
 /** Banner text for a failed prompt; an agent whose login expired gets a sign-in hint. */
+const formatTurnError = (message: string, code?: string) =>
+  code === 'auth_required' ? i18n.get('error.agentAuthRequired') : message;
+
 const promptErrorMessage = (error: unknown) => {
-  if (error instanceof RpcError && error.code === 'auth_required') return i18n.get('error.agentAuthRequired');
+  if (error instanceof RpcError) return formatTurnError(error.message, error.code);
   return error instanceof Error ? error.message : i18n.get('error.sendMessageFailed');
+};
+
+const sendTurnPrompt = (
+  session: DeckSession,
+  { id, text, attachments = [], voiceChat }: Pick<TextMessage, 'id' | 'text' | 'attachments' | 'voiceChat'>,
+) =>
+  agentApi.prompt({
+    agent: session.agent,
+    sessionId: session.sessionId,
+    prompt: text,
+    attachments: attachments.map(toPromptAttachment),
+    voiceChat,
+    clientMessageId: id,
+  });
+
+const cancelTurnPrompt = async (session: DeckSession, childSessionId?: string) => {
+  const result = await agentApi.cancelPrompt(session.sessionId, session.agent, childSessionId);
+  if (result.cancelled === false) {
+    throw new Error(i18n.get('error.cannotStopTask'));
+  }
 };
 
 let sessionsRequest = 0;
 let loadRequest = 0;
+let remoteGeneration = 0;
+let createRequest = 0;
 
-export const isSessionOpened = (sessionId: string) => getRuntime(sessionId).load === 'loaded';
+/** Sessions with an `openSession` RPC in flight, buffering live `agent_session_event` notifications until it settles. */
+const pendingOpenEvents = new Map<string, Array<{ epoch: string; event: SessionEvent }>>();
+/** Client message IDs rendered optimistically on this device, used to dedupe echoed `user_message_chunk`s. */
+const optimisticMessageIds = new Map<string, Set<string>>();
+/** Pending-session creation tokens, invalidated if creation is cancelled or closed. */
+const creatingTokens = new Map<string, number>();
+/** Refcount of mounted session pages viewing each session id (used for reconnect resync & unsubscribe). */
+const openPages = new Map<string, number>();
+
+const clearSessionTransient = (sessionId: string) => {
+  pendingOpenEvents.delete(sessionId);
+  optimisticMessageIds.delete(sessionId);
+  creatingTokens.delete(sessionId);
+};
+
+const finishSessionTree = (sessionId: string) => {
+  for (const id of sessionTreeIds(sessionId)) {
+    setMessages(id, finishStreaming(getMessages(id)));
+  }
+};
 
 /** Subagent `childSessionId` of `sessionId` was announced, or what is known about it changed. */
 const applySubagentUpdate = (sessionId: string, childSessionId: string, patch: Partial<Subagent>) => {
@@ -74,28 +123,124 @@ const applySubagentUpdate = (sessionId: string, childSessionId: string, patch: P
 };
 
 /**
+ * Applies one reduced event to the message timeline and runtime metadata.
  * Updates of subagents (`childSessionId`, nested ones too) are kept under their own session id and belong to
- * the root session `sessionId`: its turn drives them, and they never change its session, options or commands.
+ * the root session `sessionId`: they never change its session, options or commands.
  */
-export const applySessionEvent = (sessionId: string, event: SessionEvent) => {
+const applyReducedEvent = (sessionId: string, event: SessionEvent, streaming: boolean) => {
   const subagentId = event.event === 'session_update' ? event.childSessionId : undefined;
   const target = subagentId || sessionId;
-  const { turn, options } = getRuntime(sessionId);
-  const streaming = Boolean(turn);
+  const { options } = getRuntime(sessionId);
   const agent = getSession(sessionId)?.agent ?? agentdeckStore.settings.agent;
-  const reduction = reduceSessionEvent(getMessages(target), event, { agent, streaming, options, subagentId });
+  const reduction = reduceSessionEvent(getMessages(target), event, {
+    agent,
+    streaming,
+    options,
+    subagentId,
+    optimisticMessageIds: subagentId ? undefined : optimisticMessageIds.get(sessionId),
+  });
   if (!reduction) return;
   if (reduction.messages) {
     setMessages(target, reduction.messages);
-    if (streaming && !subagentId) {
-      updateInFlightMessages(sessionId, reduction.messages);
-    }
   }
   if (reduction.subagent) applySubagentUpdate(sessionId, reduction.subagent.sessionId, reduction.subagent.patch);
   if (subagentId) return;
   if (reduction.sessionPatch) patchSession(sessionId, reduction.sessionPatch);
   if (reduction.optionsPatch) updateSessionOptions(sessionId, reduction.optionsPatch);
   if (reduction.commands) setAgentCommands(agent, reduction.commands);
+};
+
+/** Public helper for applying a live `agent_session_event` notification from the daemon. */
+export const handleSessionEvent = (sessionId: string, epoch: string, event: SessionEvent) => {
+  const buffer = pendingOpenEvents.get(sessionId);
+  if (buffer) {
+    buffer.push({ epoch, event });
+    return;
+  }
+  const runtime = getRuntime(sessionId);
+  if (!runtime.subscribed) return;
+  if (runtime.epoch && runtime.epoch !== epoch) {
+    ensureSessionLoaded(sessionId, { force: true });
+    return;
+  }
+  if (runtime.lastSeq !== undefined && event.seq <= runtime.lastSeq) return;
+  if (runtime.epoch === epoch && runtime.lastSeq !== undefined && event.seq > runtime.lastSeq + 1) {
+    ensureSessionLoaded(sessionId, { force: true });
+    return;
+  }
+
+  if (event.event === 'turn_started') {
+    applyReducedEvent(sessionId, event, true);
+    updateRuntime(sessionId, { epoch, lastSeq: event.seq, running: true, error: '', suggestion: '' });
+    return;
+  }
+  if (event.event === 'turn_ended') {
+    finishSessionTree(sessionId);
+    settleUserInput(sessionId);
+    const completed = !event.error && event.stopReason !== 'cancelled';
+    updateRuntime(sessionId, {
+      epoch,
+      lastSeq: event.seq,
+      running: false,
+      ...(event.error ? { error: formatTurnError(event.error, event.code) } : {}),
+      ...(completed ? { unread: true } : {}),
+    });
+    return;
+  }
+  applyReducedEvent(sessionId, event, Boolean(runtime.running));
+  updateRuntime(sessionId, { epoch, lastSeq: event.seq });
+};
+
+/** Applies a broadcast `agent_session_state` notification (turn start/end or metadata change). */
+export const handleSessionState = (state: SessionStateUpdate) => {
+  const { sessionId, agent } = state;
+  if (isSessionDeleted(sessionId) || getRunningTask(sessionId)) return;
+
+  const prev = getRuntime(sessionId);
+  const existing = getSession(sessionId);
+  const meta = getSessionMeta(sessionId);
+  const title = resolveSessionTitle(state.title, meta?.title);
+  const updatedAt = state.updatedAt || meta?.updatedAt;
+
+  if (!existing && agent === agentdeckStore.settings.agent && state.cwd) {
+    const nextSession: DeckSession = {
+      agent,
+      sessionId,
+      cwd: state.cwd,
+      title,
+      updatedAt: updatedAt || new Date().toISOString(),
+    };
+    const nextSessions = mergeSessionsWithActive(sessionsStore.sessions, [nextSession]);
+    sessionsStore({
+      sessions: nextSessions,
+      sessionGroups: getSortedSessionGroups(nextSessions, sessionsStore.sessionGroups),
+    });
+    updateRuntime(sessionId, { session: nextSession });
+  } else if (existing && (title || updatedAt)) {
+    patchSession(sessionId, {
+      ...(title ? { title } : {}),
+      ...(updatedAt ? { updatedAt } : {}),
+    });
+  }
+
+  // Subscribed sessions receive turn_started / turn_ended on the sequenced event stream;
+  // applying unsequenced state broadcasts here can re-mark unread or race with a newly started turn.
+  if (prev.subscribed) return;
+
+  if (!state.running) {
+    settleUserInput(sessionId);
+    finishSessionTree(sessionId);
+  }
+
+  updateRuntime(sessionId, {
+    running: state.running,
+    ...(state.completed ? { unread: true } : {}),
+    ...(state.error
+      ? { error: formatTurnError(state.error, state.code) }
+      : state.running
+        ? { error: '', suggestion: '' }
+        : {}),
+  });
 };
 
 /** Cancel subagent `childSessionId`'s current work; the agent reports it `idle` / `cancelled` when it stopped. */
@@ -109,17 +254,43 @@ export const cancelSubagent = async (sessionId: string, childSessionId: string) 
   }
 };
 
-/** Permission requests and questions are shown only for the running turn of the device that started it. */
+/** Shows a broadcast permission request or elicitation on the matching task or session. */
 export const showUserInput = ({ method, params }: UserInput) => {
   if (method === 'agent_permission_request' && showTaskPermission(params)) return;
-  if (getSession(params.sessionId)?.agent !== params.agent) return;
+  const session = getSession(params.sessionId);
+  if (session && session.agent !== params.agent) return;
+  if (!session && params.agent !== agentdeckStore.settings.agent) return;
   if (method === 'agent_permission_request') showPermission(params);
   else showElicitation(params);
 };
 
+/** Dismisses a permission request or elicitation answered on another device or cancelled by the host. */
+export const handleUserInputResolved = (sessionId: string, requestId: string) => {
+  clearTaskPermission(requestId);
+  clearUserInput(sessionId, requestId);
+};
+
+/** Marks all local subscriptions stale when the connection leaves `connected`. */
+export const markAllUnsubscribed = () => {
+  let changed = false;
+  const runtimes = { ...sessionsStore.runtimes };
+  for (const [sessionId, runtime] of Object.entries(runtimes)) {
+    if (runtime.subscribed) {
+      runtimes[sessionId] = { ...runtime, subscribed: false };
+      changed = true;
+    }
+  }
+  if (changed) sessionsStore({ runtimes });
+};
+
 export const resetRemoteState = () => {
   sessionsRequest += 1;
-  clearAllInFlight();
+  loadRequest += 1;
+  remoteGeneration += 1;
+  pendingOpenEvents.clear();
+  optimisticMessageIds.clear();
+  creatingTokens.clear();
+  openPages.clear();
   sessionsStore({
     sessions: [],
     sessionGroups: [],
@@ -131,27 +302,27 @@ export const resetRemoteState = () => {
   messagesStore({ bySession: {} });
 };
 
-/** Switching agents on the same host only swaps the list; runtimes keep receiving updates of turns still running. */
+/** Switching agents on the same host only swaps the list; runtimes keep tracking turns still running. */
 export const resetSessionList = () => {
   sessionsRequest += 1;
   sessionsStore({ sessions: [], sessionGroups: [], sessionsLoading: false, sessionsLoaded: false, sessionsError: '' });
 };
 
-export const mergeSessionsWithInFlight = (
+export const mergeSessionsWithActive = (
   remoteSessions: DeckSession[],
-  inFlightList: Iterable<DeckSession>,
+  activeList: Iterable<DeckSession>,
 ): DeckSession[] => {
   const remoteMap = new Map(remoteSessions.map((s) => [s.sessionId, s]));
   const merged: DeckSession[] = [...remoteSessions];
 
-  for (const inFlight of inFlightList) {
-    const activeUpdatedAt = inFlight.updatedAt || new Date().toISOString();
-    const activeSession: DeckSession = { ...inFlight, updatedAt: activeUpdatedAt };
-    const existing = remoteMap.get(inFlight.sessionId);
+  for (const active of activeList) {
+    const activeUpdatedAt = active.updatedAt || new Date().toISOString();
+    const activeSession: DeckSession = { ...active, updatedAt: activeUpdatedAt };
+    const existing = remoteMap.get(active.sessionId);
     if (existing) {
       const localTime = Date.parse(activeUpdatedAt) || 0;
       const remoteTime = Date.parse(existing.updatedAt || '') || 0;
-      const index = merged.findIndex((s) => s.sessionId === inFlight.sessionId);
+      const index = merged.findIndex((s) => s.sessionId === active.sessionId);
       if (index !== -1) {
         merged[index] = {
           ...existing,
@@ -167,10 +338,10 @@ export const mergeSessionsWithInFlight = (
   return merged;
 };
 
-/** Created sessions with a running turn, which the remote list may not have yet. */
+/** Created or active sessions with a running turn, which the remote list may not have yet. */
 const runningLocalSessions = () =>
-  Object.values(sessionsStore.runtimes).flatMap(({ session, turn }) =>
-    session && turn && !session.pendingCreation && session.agent === agentdeckStore.settings.agent ? [session] : [],
+  Object.values(sessionsStore.runtimes).flatMap(({ session, running }) =>
+    session && running && !session.pendingCreation && session.agent === agentdeckStore.settings.agent ? [session] : [],
   );
 
 export const isPlaceholderTitle = (title?: string) => {
@@ -239,7 +410,7 @@ export const refreshSessions = async () => {
           updatedAt: session.updatedAt || meta?.updatedAt,
         };
       });
-    const merged = mergeSessionsWithInFlight(normalized, runningLocalSessions());
+    const merged = mergeSessionsWithActive(normalized, runningLocalSessions());
     const prevGroups = sessionsStore.sessionsLoaded ? sessionsStore.sessionGroups : [];
     sessionsStore({
       sessions: merged,
@@ -264,6 +435,57 @@ export const refreshSessions = async () => {
       sessionsError: error instanceof Error ? error.message : i18n.get('error.fetchSessionsFailed'),
     });
   }
+};
+
+/** Reconciles running sessions and pending user inputs against the daemon after connecting. */
+export const syncActiveSessions = async () => {
+  if (agentdeckStore.connection !== 'connected') return;
+  const generation = remoteGeneration;
+  const { sessions, userInputs = [] } = await agentApi.listActiveSessions();
+  if (generation !== remoteGeneration) return;
+
+  const activeIds = new Set(sessions.map((item) => item.sessionId));
+  for (const sessionId of runningSessionIds()) {
+    const runtime = getRuntime(sessionId);
+    if (runtime.creating || activeIds.has(sessionId)) continue;
+    settleUserInput(sessionId);
+    finishSessionTree(sessionId);
+    updateRuntime(sessionId, { running: false, unread: true });
+  }
+
+  const currentAgentActive: DeckSession[] = [];
+  for (const active of sessions) {
+    if (isSessionDeleted(active.sessionId) || getRunningTask(active.sessionId)) continue;
+    const meta = getSessionMeta(active.sessionId);
+    const title = resolveSessionTitle(active.title, meta?.title);
+    const updatedAt = active.updatedAt || meta?.updatedAt;
+    const existing = getSession(active.sessionId);
+    const session: DeckSession | undefined = existing
+      ? { ...existing, ...(title ? { title } : {}), ...(updatedAt ? { updatedAt } : {}) }
+      : active.cwd
+        ? {
+            agent: active.agent,
+            sessionId: active.sessionId,
+            cwd: active.cwd,
+            title,
+            updatedAt: updatedAt || new Date().toISOString(),
+          }
+        : undefined;
+    updateRuntime(active.sessionId, { running: true, ...(session ? { session } : {}) });
+    if (session && active.agent === agentdeckStore.settings.agent) {
+      currentAgentActive.push(session);
+    }
+  }
+
+  if (currentAgentActive.length) {
+    const merged = mergeSessionsWithActive(sessionsStore.sessions, currentAgentActive);
+    sessionsStore({
+      sessions: merged,
+      sessionGroups: getSortedSessionGroups(merged, sessionsStore.sessionGroups),
+    });
+  }
+
+  for (const input of userInputs) showUserInput(input);
 };
 
 export const getSession = (sessionId: string): DeckSession | undefined =>
@@ -292,7 +514,8 @@ export const deleteSession = async (sessionId: string) => {
 
     // A list request started before deletion must not restore the removed row.
     sessionsRequest += 1;
-    removeInFlight(sessionId);
+    clearSessionTransient(sessionId);
+    openPages.delete(sessionId);
     removeDraft(draftKey(session)).catch(console.error);
     removeRuntime(sessionId);
     const sessions = sessionsStore.sessions.filter((item) => item.sessionId !== sessionId);
@@ -309,17 +532,28 @@ export const deleteSession = async (sessionId: string) => {
   }
 };
 
+/** Explicitly closes the session on the daemon (cancels any active turn and releases the actor). */
 export const closeSession = async (sessionId: string) => {
   const session = getSession(sessionId);
   if (session?.pendingCreation) {
-    // A creation still in flight sees its turn gone and closes the created session.
+    // A creation still in flight sees its token gone and closes the created session.
+    creatingTokens.delete(sessionId);
     removeRuntime(sessionId);
     return;
   }
+  clearSessionTransient(sessionId);
   settleUserInput(sessionId);
-  removeInFlight(sessionId);
-  setMessages(sessionId, finishStreaming(getMessages(sessionId)));
-  updateRuntime(sessionId, { load: 'idle', loadToken: undefined, turn: undefined, unread: false, error: '' });
+  finishSessionTree(sessionId);
+  updateRuntime(sessionId, {
+    load: 'idle',
+    loadToken: undefined,
+    running: false,
+    subscribed: false,
+    epoch: undefined,
+    lastSeq: undefined,
+    unread: false,
+    error: '',
+  });
 
   if (session && agentdeckStore.connection === 'connected') {
     try {
@@ -327,6 +561,39 @@ export const closeSession = async (sessionId: string) => {
     } catch (error) {
       console.error(error);
     }
+  }
+};
+
+/** Unsubscribes this device from live events of `sessionId` without closing or cancelling the remote session. */
+export const unsubscribeSession = (sessionId: string) => {
+  const runtime = getRuntime(sessionId);
+  if (!runtime.subscribed) return;
+  updateRuntime(sessionId, { subscribed: false });
+  const session = getSession(sessionId);
+  if (session && !session.pendingCreation && agentdeckStore.connection === 'connected') {
+    agentApi.unsubscribeSession(session.agent, sessionId).catch(() => {});
+  }
+};
+
+/** Tracks a mounted session page so reconnects resync it and unmounting unsubscribes it. */
+export const trackSessionPage = (sessionId: string) => {
+  if (!sessionId || sessionId.startsWith('pending-')) return () => {};
+  openPages.set(sessionId, (openPages.get(sessionId) ?? 0) + 1);
+  return () => {
+    const next = (openPages.get(sessionId) ?? 1) - 1;
+    if (next <= 0) {
+      openPages.delete(sessionId);
+      unsubscribeSession(sessionId);
+    } else {
+      openPages.set(sessionId, next);
+    }
+  };
+};
+
+/** Resubscribes and incrementally catches up every currently open session page after a reconnect. */
+export const resyncOpenSessions = () => {
+  for (const sessionId of openPages.keys()) {
+    ensureSessionLoaded(sessionId, { force: true });
   }
 };
 
@@ -350,73 +617,158 @@ export const createPendingSession = ({ agent, cwd }: CreateSessionInput): DeckSe
 
 /** The page drops its pending session once it no longer shows it. */
 export const discardPendingSession = (sessionId: string) => {
-  if (getRuntime(sessionId).session?.pendingCreation) removeRuntime(sessionId);
+  if (getRuntime(sessionId).session?.pendingCreation) {
+    creatingTokens.delete(sessionId);
+    removeRuntime(sessionId);
+  }
 };
 
 /**
- * Core runtime rules:
- * Once a session is opened, it does not need to be closed or repeat close+load session.
- * Only on first entry after app restart does it run through close + load.
+ * Idempotently opens and subscribes to a session on the daemon.
+ * - First open (or after `closeSession`): loads history and subscribes.
+ * - Re-entering an unsubscribed session or reconnecting: sends `sinceEpoch`/`sinceSeq` to replay only missed events
+ *   without wiping the timeline or cancelling any running turn.
  */
-export const ensureSessionLoaded = async (sessionId: string) => {
+export const ensureSessionLoaded = async (sessionId: string, options?: { force?: boolean }) => {
+  const force = Boolean(options?.force);
   const runtime = getRuntime(sessionId);
-  // Loaded, loading, or failed until retried
-  if (runtime.load !== 'idle') return;
-  if (runtime.turn) {
-    updateRuntime(sessionId, { load: 'loaded' });
-    return;
-  }
+  if (!force && runtime.load === 'loaded' && runtime.subscribed) return;
+  if (!force && (runtime.load === 'loading' || runtime.load === 'failed')) return;
+  if (pendingOpenEvents.has(sessionId) && !force) return;
+
   const session = getSession(sessionId);
-  if (!session) return;
-  // Stays idle; the session page loads it once connected
+  if (!session || session.pendingCreation) return;
   if (agentdeckStore.connection !== 'connected') return;
 
   const token = ++loadRequest;
   const isCurrent = () => getRuntime(sessionId).loadToken === token;
-  // The load replays the subagents.
-  const ids = sessionTreeIds(sessionId);
-  updateRuntime(sessionId, { load: 'loading', loadToken: token, error: '', subagents: undefined });
-  for (const id of ids) setMessages(id, []);
+  const hadLoaded = runtime.load === 'loaded';
+  const sinceEpoch = hadLoaded ? runtime.epoch : undefined;
+  const sinceSeq = hadLoaded && sinceEpoch ? (runtime.lastSeq ?? 0) : undefined;
+  const wasRunning = Boolean(runtime.running);
 
+  pendingOpenEvents.set(sessionId, []);
+
+  if (!hadLoaded) {
+    const ids = sessionTreeIds(sessionId);
+    optimisticMessageIds.delete(sessionId);
+    updateRuntime(sessionId, { load: 'loading', loadToken: token, error: '', subagents: undefined });
+    for (const id of ids) setMessages(id, []);
+  } else {
+    updateRuntime(sessionId, { loadToken: token, error: '' });
+  }
+
+  const replayEvents: SessionEvent[] = [];
   try {
-    // First time entering session after restart: run close + load session
-    await agentApi.closeSession(session.agent, sessionId);
-    const loaded = await agentApi.loadSession({
+    const opened = await agentApi.openSession({
       agent: session.agent,
       sessionId,
       cwd: session.cwd,
-      onEvent: (event) => applySessionEvent(sessionId, event),
+      sinceEpoch,
+      sinceSeq,
+      onEvent: (event) => {
+        if (isCurrent()) replayEvents.push(event);
+      },
       panelContext: REMOTE_APP_PANEL_CONTEXT,
     });
     if (!isCurrent()) return;
-    let loadedOptions: SessionOptions = { modes: loaded.modes, configOptions: loaded.configOptions ?? [] };
-    const defaults = getConfigDefaults(session.agent);
-    // Agents reset mode / model on load; re-apply the agent's saved selection
-    if (getConfigSelects(defaults).length) {
-      try {
-        loadedOptions = await applyConfigSelection(session, loadedOptions, getConfigValues(defaults));
-      } catch (error) {
-        Toast.open('error', error instanceof Error ? error.message : i18n.get('error.switchConfigFailed'));
-      }
-      if (!isCurrent()) return;
-    } else {
-      // No selection saved for this agent yet: use the first loaded session as defaults for new sessions
-      saveConfigDefaults(session.agent, loadedOptions);
+
+    if (opened.fullReplay) {
+      const ids = sessionTreeIds(sessionId);
+      optimisticMessageIds.delete(sessionId);
+      updateRuntime(sessionId, { subagents: undefined });
+      for (const id of ids) setMessages(id, []);
     }
-    setMessages(sessionId, finishStreaming(getMessages(sessionId)));
-    updateRuntime(sessionId, { load: 'loaded', options: { ...getRuntime(sessionId).options, ...loadedOptions } });
+
+    let inTurn = opened.fullReplay ? false : wasRunning;
+    let lastSeq = opened.fullReplay ? 0 : (sinceSeq ?? 0);
+    let lastTurnError = '';
+
+    for (const event of replayEvents) {
+      if (event.seq <= lastSeq) continue;
+      if (event.event === 'turn_started') {
+        inTurn = true;
+        lastTurnError = '';
+      }
+      applyReducedEvent(sessionId, event, inTurn);
+      if (event.event === 'turn_ended') {
+        inTurn = false;
+        if (event.error) lastTurnError = formatTurnError(event.error, event.code);
+      }
+      lastSeq = event.seq;
+    }
+
+    lastSeq = Math.max(lastSeq, opened.seq ?? 0);
+    let running = Boolean(opened.running);
+
+    const buffered = (pendingOpenEvents.get(sessionId) ?? [])
+      .filter((item) => item.epoch === opened.epoch && item.event.seq > lastSeq)
+      .sort((a, b) => a.event.seq - b.event.seq);
+    pendingOpenEvents.delete(sessionId);
+
+    for (const { event } of buffered) {
+      if (event.seq <= lastSeq) continue;
+      if (event.event === 'turn_started') {
+        running = true;
+        lastTurnError = '';
+      }
+      applyReducedEvent(sessionId, event, running);
+      if (event.event === 'turn_ended') {
+        running = false;
+        if (event.error) lastTurnError = formatTurnError(event.error, event.code);
+      }
+      lastSeq = event.seq;
+    }
+
+    if (!running) {
+      finishSessionTree(sessionId);
+    }
+
+    let loadedOptions: SessionOptions = { modes: opened.modes, configOptions: opened.configOptions ?? [] };
+    updateRuntime(sessionId, {
+      subscribed: true,
+      epoch: opened.epoch,
+      lastSeq,
+      running,
+      suggestion: opened.suggestion ?? '',
+      error: lastTurnError,
+      options: { ...getRuntime(sessionId).options, ...loadedOptions },
+    });
+    replaceSessionUserInputs(sessionId, opened.userInputs ?? []);
 
     const meta = getSessionMeta(sessionId);
-    const title = resolveSessionTitle(loaded.title, meta?.title);
-    const updatedAt = loaded.updatedAt || meta?.updatedAt;
+    const title = resolveSessionTitle(opened.title, meta?.title);
+    const updatedAt = opened.updatedAt || meta?.updatedAt;
     patchSession(sessionId, {
       ...(title ? { title } : {}),
       ...(updatedAt ? { updatedAt } : {}),
     });
+
+    // Agents reset mode / model on a fresh ACP `session/load`; re-apply the agent's saved selection only then.
+    if (opened.freshLoad) {
+      const defaults = getConfigDefaults(session.agent);
+      if (getConfigSelects(defaults).length) {
+        try {
+          loadedOptions = await applyConfigSelection(session, loadedOptions, getConfigValues(defaults));
+        } catch (error) {
+          Toast.open('error', error instanceof Error ? error.message : i18n.get('error.switchConfigFailed'));
+        }
+        if (!isCurrent()) return;
+      } else {
+        // No selection saved for this agent yet: use the first loaded session as defaults for new sessions
+        saveConfigDefaults(session.agent, loadedOptions);
+      }
+    }
+    updateRuntime(sessionId, {
+      load: 'loaded',
+      options: { ...getRuntime(sessionId).options, ...loadedOptions },
+    });
   } catch (error) {
     if (!isCurrent()) return;
+    pendingOpenEvents.delete(sessionId);
     updateRuntime(sessionId, {
-      load: 'failed',
+      load: hadLoaded ? 'loaded' : 'failed',
+      subscribed: false,
       error: error instanceof Error ? error.message : i18n.get('error.loadSessionFailed'),
     });
   }
@@ -427,120 +779,43 @@ export const retrySessionLoad = (sessionId: string) => {
     reconnect();
     return;
   }
-  updateRuntime(sessionId, { load: 'idle', error: '' });
-  return ensureSessionLoaded(sessionId);
-};
-
-/** Ends the local turn; a completed turn whose reply nobody saw yet is marked unread. */
-const endTurn = (sessionId: string, completed: boolean) => {
-  removeInFlight(sessionId);
-  settleUserInput(sessionId);
-  for (const id of sessionTreeIds(sessionId)) {
-    setMessages(id, finishStreaming(getMessages(id)));
+  const runtime = getRuntime(sessionId);
+  if (runtime.load === 'failed') {
+    updateRuntime(sessionId, { load: 'idle', error: '' });
   }
-  updateRuntime(sessionId, { turn: undefined, ...(completed && isTurnRunning(sessionId) ? { unread: true } : {}) });
+  return ensureSessionLoaded(sessionId, { force: true });
 };
 
-/** Appends a final RPC answer only if the turn did not already stream agent text. */
-const appendFallbackAnswer = (sessionId: string, turnStart: number, answer: string) => {
-  const current = getMessages(sessionId);
-  const receivedAgentText = current
-    .slice(turnStart)
-    .some((message) => 'role' in message && message.role === 'agent' && message.text);
-  if (!receivedAgentText) {
-    setMessages(sessionId, [...current, { id: crypto.randomUUID(), role: 'agent', text: answer }]);
+const recordOptimisticMessage = (sessionId: string, clientMessageId: string) => {
+  let ids = optimisticMessageIds.get(sessionId);
+  if (!ids) {
+    ids = new Set();
+    optimisticMessageIds.set(sessionId, ids);
   }
+  ids.add(clientMessageId);
 };
 
-const runPromptTurn = (
-  session: DeckSession,
-  prompt: TextMessage,
-  turnStart: number,
-  onFailed?: () => void,
-  callId?: string,
-) => {
+const startPromptOnSession = (session: DeckSession, userMessage: TextMessage, onFailed?: () => void) => {
   const { sessionId } = session;
   const now = new Date().toISOString();
-  const rpcId = callId ?? crypto.randomUUID();
   const activeSession: DeckSession = { ...session, updatedAt: now };
   patchSession(sessionId, { updatedAt: now });
-  updateRuntime(sessionId, { session: activeSession, turn: { rpcId }, unread: false, error: '', suggestion: '' });
-  saveInFlight({
-    sessionId,
-    agent: session.agent,
-    rpcId,
-    session: activeSession,
-    messages: getMessages(sessionId),
-    options: getRuntime(sessionId).options,
-    updatedAt: Date.now(),
-  });
-  performTurn(
-    session,
-    prompt,
-    {
-      onEvent: (event) => applySessionEvent(sessionId, event),
-      onAnswer: (answer) => appendFallbackAnswer(sessionId, turnStart, answer),
-      onError: (error) => {
-        removeInFlight(sessionId);
-        updateRuntime(sessionId, { error: promptErrorMessage(error) });
-        setMessages(
-          sessionId,
-          getMessages(sessionId).map((message) => (message.id === prompt.id ? { ...message, failed: true } : message)),
-        );
-        onFailed?.();
-      },
-      onDone: (completed) => endTurn(sessionId, completed),
-    },
-    rpcId,
-  );
-};
-
-/** Resumes waiting for a turn persisted before the App restarted. */
-export const resumeInFlightTurn = ({ sessionId, rpcId, session, messages, options }: InFlightSession) => {
   updateRuntime(sessionId, {
-    session,
-    load: 'loaded',
-    turn: { rpcId },
-    options: options ?? getRuntime(sessionId).options,
+    session: activeSession,
+    running: true,
+    unread: false,
+    error: '',
+    suggestion: '',
   });
-  setMessages(sessionId, messages);
-  const lastUserIndex = messages.findLastIndex((m) => 'role' in m && m.role === 'user');
-  const turnStart = lastUserIndex === -1 ? 0 : lastUserIndex + 1;
-  agentApi.resumePrompt(rpcId, {
-    onEvent: (event) => applySessionEvent(sessionId, event),
-    resolve: (result) => {
-      if (result?.answer) appendFallbackAnswer(sessionId, turnStart, result.answer);
-      endTurn(sessionId, true);
-    },
-    reject: (error) => {
-      removeInFlight(sessionId);
-      updateRuntime(sessionId, { error: promptErrorMessage(error), turn: undefined });
-      setMessages(sessionId, finishStreaming(getMessages(sessionId)));
-    },
+  sendTurnPrompt(session, userMessage).catch((error) => {
+    optimisticMessageIds.get(sessionId)?.delete(userMessage.id);
+    updateRuntime(sessionId, { running: false, error: promptErrorMessage(error) });
+    setMessages(
+      sessionId,
+      getMessages(sessionId).map((message) => (message.id === userMessage.id ? { ...message, failed: true } : message)),
+    );
+    onFailed?.();
   });
-};
-
-/**
- * Relay drops messages unacknowledged for a long time, so a turn's final response may never arrive.
- * Reconcile after connecting to host: turns still pending locally whose daemon task is no longer running are ended immediately and history is reloaded.
- */
-export const settleLostTurns = async () => {
-  if (!runningSessionIds().some((sessionId) => getRuntime(sessionId).turn?.rpcId)) return;
-  const { sessions, userInputs = [] } = await agentApi.listRunningPrompts();
-  const running = new Set(sessions.map((session) => session.sessionId));
-  // Responses prior to the query reply are already processed; any turns still pending whose daemon is no longer running are lost-reply turns
-  for (const sessionId of runningSessionIds()) {
-    const rpcId = getRuntime(sessionId).turn?.rpcId;
-    if (!rpcId || running.has(sessionId)) continue;
-    // The final reply might still be in flight; forget this call to prevent it from landing on the reloaded timeline
-    agentApi.forgetPrompt(rpcId);
-    removeInFlight(sessionId);
-    settleUserInput(sessionId);
-    updateRuntime(sessionId, { turn: undefined, unread: true, load: 'idle' });
-    ensureSessionLoaded(sessionId);
-  }
-  // Permission requests and questions delivered before a reload are shown again.
-  for (const input of userInputs) showUserInput(input);
 };
 
 /**
@@ -562,14 +837,14 @@ export const promotePendingSession = async (
   }
   const selectedOptions = getRuntime(pendingId).options ?? {};
   const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments, voiceChat };
-  // Cancelling or closing drops this turn; a later send starts another one.
-  const turn = {};
-  const isCanceled = () => getRuntime(pendingId).turn !== turn;
+  const token = ++createRequest;
+  creatingTokens.set(pendingId, token);
+  const isCanceled = () => creatingTokens.get(pendingId) !== token;
   const clearCanceled = () => {
     if (pendingId in sessionsStore.runtimes) setMessages(pendingId, []);
   };
   setMessages(pendingId, [userMessage]);
-  updateRuntime(pendingId, { turn, error: '' });
+  updateRuntime(pendingId, { creating: true, error: '' });
 
   let created: CreatedSession;
   try {
@@ -583,9 +858,10 @@ export const promotePendingSession = async (
     }
   } catch (error) {
     if (!isCanceled()) {
+      creatingTokens.delete(pendingId);
       setMessages(pendingId, []);
       updateRuntime(pendingId, {
-        turn: undefined,
+        creating: false,
         error: error instanceof Error ? error.message : i18n.get('error.createSessionFailed'),
       });
     }
@@ -615,6 +891,16 @@ export const promotePendingSession = async (
   });
 
   let options: SessionOptions = { modes: created.modes, configOptions: created.configOptions };
+  // The daemon subscribed this device on `createSession`; track `(epoch, seq)` before applying config
+  // so `current_mode_update` / `config_option_update` broadcasts advance `lastSeq` without triggering a gap resync.
+  updateRuntime(sessionId, {
+    session: liveSession,
+    subscribed: true,
+    epoch: created.epoch,
+    lastSeq: created.seq ?? 0,
+    options,
+  });
+
   let configError = '';
   try {
     options = await applyConfigSelection(liveSession, options, getConfigValues(selectedOptions));
@@ -623,25 +909,32 @@ export const promotePendingSession = async (
     configError = error instanceof Error ? error.message : i18n.get('error.switchConfigFailed');
   }
   if (isCanceled()) {
+    removeRuntime(sessionId);
     agentApi.closeSession(pendingSession.agent, sessionId).catch(() => {});
     clearCanceled();
     return null;
   }
+  creatingTokens.delete(pendingId);
 
   const nextSessions = [liveSession, ...sessionsStore.sessions.filter((s) => s.sessionId !== sessionId)];
   sessionsStore({
     sessions: nextSessions,
     sessionGroups: getSortedSessionGroups(nextSessions, sessionsStore.sessionGroups),
   });
-  updateRuntime(sessionId, { session: liveSession, load: 'loaded', options });
+  updateRuntime(sessionId, {
+    session: liveSession,
+    load: 'loaded',
+    options: { ...getRuntime(sessionId).options, ...options },
+  });
 
   if (configError) {
     setMessages(sessionId, [{ ...userMessage, failed: true }]);
     updateRuntime(sessionId, { error: configError });
     onFailed?.();
   } else {
+    recordOptimisticMessage(sessionId, userMessage.id);
     setMessages(sessionId, [userMessage]);
-    runPromptTurn(liveSession, userMessage, 1, onFailed);
+    startPromptOnSession(liveSession, userMessage, onFailed);
   }
   return liveSession;
 };
@@ -682,12 +975,14 @@ export const sendPrompt = (
 ) => {
   const text = prompt.trim();
   const session = getSession(sessionId);
+  const runtime = getRuntime(sessionId);
   if (
     (!text && !attachments.length) ||
     !session ||
     session.pendingCreation ||
     agentdeckStore.connection !== 'connected' ||
-    getRuntime(sessionId).load !== 'loaded' ||
+    runtime.load !== 'loaded' ||
+    !runtime.subscribed ||
     isTurnRunning(sessionId)
   ) {
     onFailed?.();
@@ -695,8 +990,9 @@ export const sendPrompt = (
   }
   const messages = completeThought(getMessages(sessionId));
   const userMessage: TextMessage = { id: crypto.randomUUID(), role: 'user', text, attachments, voiceChat };
+  recordOptimisticMessage(sessionId, userMessage.id);
   setMessages(sessionId, [...messages, userMessage]);
-  runPromptTurn(session, userMessage, messages.length + 1, onFailed);
+  startPromptOnSession(session, userMessage, onFailed);
   return true;
 };
 
@@ -705,19 +1001,28 @@ export const cancelTurn = (sessionId: string) => {
   if (!session || !isTurnRunning(sessionId)) return;
   settleUserInput(sessionId);
   if (session.pendingCreation) {
-    updateRuntime(sessionId, { turn: undefined });
+    creatingTokens.delete(sessionId);
+    updateRuntime(sessionId, { creating: false });
     return;
   }
   cancelTurnPrompt(session).catch((error) => {
     Toast.open('error', error instanceof Error ? error.message : i18n.get('error.cancelTaskFailed'));
-    removeInFlight(sessionId);
-    updateRuntime(sessionId, { turn: undefined });
-    setMessages(sessionId, finishStreaming(getMessages(sessionId)));
+    updateRuntime(sessionId, { running: false });
+    finishSessionTree(sessionId);
   });
 };
 
+/** Called only when the daemon reports an unexpected ACP failure (`agent_session_ended`). */
 export const endSession = (sessionId: string) => {
+  clearSessionTransient(sessionId);
   settleUserInput(sessionId);
-  removeInFlight(sessionId);
-  updateRuntime(sessionId, { load: 'idle', turn: undefined, error: i18n.get('error.remoteSessionEnded') });
+  finishSessionTree(sessionId);
+  updateRuntime(sessionId, {
+    load: 'idle',
+    running: false,
+    subscribed: false,
+    epoch: undefined,
+    lastSeq: undefined,
+    error: i18n.get('error.remoteSessionEnded'),
+  });
 };

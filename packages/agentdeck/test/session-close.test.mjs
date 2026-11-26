@@ -12,7 +12,7 @@ test('closeSession closes the remote session actor and clears local open/pending
 
   // Set up active session state
   f.app.setMessages('s1', [{ id: 'm1', role: 'agent', text: 'Streaming...', streaming: true }]);
-  f.app.updateRuntime('s1', { turn: {}, unread: true, error: 'Temporary error' });
+  f.app.updateRuntime('s1', { running: true, unread: true, error: 'Temporary error' });
 
   assert.equal(f.app.isSessionOpened('s1'), true);
   assert.equal(f.app.isTurnRunning('s1'), true);
@@ -47,13 +47,14 @@ test('closeSession closes the remote session actor and clears local open/pending
   assert.equal(f.app.getMessages('s1')[0].streaming, false);
 });
 
-test('closeSession dismisses pending permissions with error', async () => {
+test('closeSession dismisses pending permissions', async () => {
   const f = documentFixture();
   await f.connect();
   await f.openSession();
 
   f.app.sendPrompt('s1', 'Perform action');
   await tick();
+  f.reply(f.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
 
   f.deliver({
     method: 'agent_permission_request',
@@ -92,7 +93,7 @@ test('closeSession on a pending session cancels creation and resets pending stat
   assert.equal(f.app.sessionsStore.runtimes[sessionId], undefined);
 });
 
-test('re-opening a closed session triggers fresh loadSession sequence', async () => {
+test('re-opening a closed session triggers fresh openSession sequence', async () => {
   const f = documentFixture();
   await f.connect();
   await f.openSession();

@@ -1,4 +1,12 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 use agent_client_protocol::{
     Agent,
@@ -29,7 +37,7 @@ mod lifecycle_tests;
 pub use catalog::custom_agent_list;
 use provision::prepare_agent_command;
 use runtime::{AcpRuntime, AgentConnection, StartedSession};
-use session::run_session_actor;
+use session::{SessionExit, run_session_actor};
 
 fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
     match cwd {
@@ -38,10 +46,73 @@ fn resolve_cwd(cwd: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
+/// Unique epoch string per live `SessionActor` instance, incorporating process
+/// boot time so daemon restarts never collide with previous epochs.
+fn next_epoch() -> String {
+    static BOOT_ID: OnceLock<u128> = OnceLock::new();
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
+    let boot = *BOOT_ID.get_or_init(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    });
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{boot}-{id}")
+}
+
 /// Sends a `(method, params)` notification to one client device.
 pub type Notifier = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
 
-/// A request waiting for the user, sent to the device as the `method`
+/// Push callback used by unattended scheduled task runs when a permission
+/// request or question is raised.
+pub type TaskInputPush = Arc<dyn Fn(&str, &str) + Send + Sync>;
+
+/// A subscribed client peer receiving live events and prompt suggestions for a
+/// session.
+#[derive(Clone)]
+pub struct SessionSubscriber {
+    pub peer_id: u64,
+    pub notifier: Notifier,
+}
+
+/// Session-level state change broadcast to all connected peers (running status,
+/// completion, error, updated metadata).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStateUpdate {
+    pub agent: String,
+    pub session_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    pub running: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub completed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+/// Global observer wired by `AgentService` to broadcast session lifecycle and
+/// user-input events to all connected peers and trigger pushes.
+pub trait SessionObserver: Send + Sync {
+    fn on_state(&self, update: SessionStateUpdate);
+    fn on_user_input(
+        &self,
+        input: &UserInput,
+        originator_peer_id: Option<u64>,
+        task_push: Option<&TaskInputPush>,
+    );
+    fn on_user_input_resolved(&self, agent: &str, session_id: &str, request_id: &str);
+    fn on_session_ended(&self, agent: &str, session_id: &str);
+}
+
+/// A request waiting for the user, sent to devices as the `method`
 /// notification. `params` carry `agent`, `sessionId` and `requestId`.
 #[derive(Debug, Clone)]
 pub enum UserInput {
@@ -78,43 +149,27 @@ impl UserInput {
     }
 }
 
-/// The `(agent, sessionId)` a notification asks the user about, if it is a
-/// permission request or a question.
-pub(crate) fn input_request_session<'a>(
-    method: &str,
-    params: &'a serde_json::Value,
-) -> Option<(&'a str, &'a str)> {
-    if !matches!(
-        method,
-        "agent_permission_request" | "agent_elicitation_request"
-    ) {
-        return None;
-    }
-    Some((
-        params.get("agent")?.as_str()?,
-        params.get("sessionId")?.as_str()?,
-    ))
-}
-
 /// Client-specific setup sent with `session/new` / `session/load`.
 #[derive(Clone, Default)]
 pub struct SessionContext {
     pub system_prompt: Option<String>,
     pub skills: SkillSelection,
-    /// The device creating or loading the session; see
-    /// `SessionActor::notifier`.
-    pub notifier: Option<Notifier>,
     /// Permission requests and questions unanswered for this long are refused
     /// (unattended runs); without it they wait until the turn ends.
-    pub input_timeout: Option<std::time::Duration>,
+    pub input_timeout: Option<Duration>,
     /// Automatically approve permission requests with their allow option
     /// (unattended runs).
     pub auto_approve: bool,
+    /// Push callback for unattended scheduled task runs when a permission
+    /// request or question is raised.
+    pub task_push: Option<TaskInputPush>,
 }
 
-/// Snapshot returned after an ACP session actor is ready.
+/// Snapshot returned after creating a fresh ACP session actor.
 pub struct SessionReady {
     pub session_id: String,
+    pub epoch: String,
+    pub seq: u64,
     /// Human-readable title reported while creating/loading the session.
     pub title: Option<String>,
     /// ISO timestamp reported while creating/loading the session.
@@ -124,6 +179,37 @@ pub struct SessionReady {
     /// Config options the agent supports for this session (for
     /// `set_config_option`).
     pub config_options: Option<serde_json::Value>,
+}
+
+/// Snapshot + coalesced event replay returned by idempotent `open_session`.
+pub struct SessionOpenResult {
+    pub session_id: String,
+    pub epoch: String,
+    pub seq: u64,
+    pub title: Option<String>,
+    pub updated_at: Option<String>,
+    pub modes: Option<serde_json::Value>,
+    pub config_options: Option<serde_json::Value>,
+    pub running: bool,
+    pub user_inputs: Vec<UserInput>,
+    pub suggestion: Option<String>,
+    pub events: Vec<SequencedEvent>,
+    pub full_replay: bool,
+    pub fresh_load: bool,
+}
+
+/// Summary of an active running session returned by `active_sessions`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveSessionInfo {
+    pub agent: String,
+    pub session_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
 }
 
 /// What a starting agent is doing, reported to clients waiting on it.
@@ -138,6 +224,7 @@ pub enum AgentStatus {
 }
 
 /// Extra content sent along with a prompt.
+#[derive(Clone)]
 pub enum Attachment {
     /// Plain text, e.g. the contents of an attached text file.
     Text { text: String },
@@ -173,9 +260,20 @@ impl Attachment {
     }
 }
 
-/// Stream events forwarded to the extension. `update` is the raw ACP session
-/// update payload (text chunks included), with `childSessionId` when it is a
-/// subagent's; `stop` terminates the prompt.
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// A sequenced event stored in `SessionActor`'s authoritative event buffer and
+/// delivered to subscribed clients.
+#[derive(Debug, Clone, Serialize)]
+pub struct SequencedEvent {
+    pub seq: u64,
+    #[serde(flatten)]
+    pub event: AgentEvent,
+}
+
+/// Session events stored in the actor's log and forwarded to subscribers.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum AgentEvent {
@@ -184,18 +282,38 @@ pub enum AgentEvent {
         #[serde(rename = "childSessionId", skip_serializing_if = "Option::is_none")]
         child_session_id: Option<String>,
     },
-    Stop {
-        stop_reason: serde_json::Value,
+    TurnStarted,
+    TurnEnded {
+        #[serde(rename = "stopReason", skip_serializing_if = "Option::is_none")]
+        stop_reason: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
     },
 }
 
-impl AgentEvent {
-    fn update(update: SessionUpdate, child_session_id: Option<String>) -> Self {
-        Self::SessionUpdate {
-            update: update_to_json(update),
-            child_session_id,
-        }
-    }
+/// Parameters for starting a prompt turn on an active session.
+pub struct PromptOptions {
+    pub prompt: String,
+    pub attachments: Vec<Attachment>,
+    pub voice_chat: bool,
+    pub client_message_id: Option<String>,
+    pub timeout_secs: u64,
+    pub originator_peer_id: Option<u64>,
+    pub subscriber: Option<SessionSubscriber>,
+}
+
+/// Outcome of a prompt turn once it settles.
+pub struct PromptCompletion {
+    pub result: Result<String>,
+    pub cancelled: bool,
+}
+
+/// Handle returned immediately by `start_prompt`; `completion` resolves when
+/// the turn finishes (used by `Tasks` and push notification delivery).
+pub struct PromptHandle {
+    pub completion: oneshot::Receiver<PromptCompletion>,
 }
 
 /// A session update of a subagent session, routed to its root session.
@@ -204,19 +322,31 @@ struct ChildUpdate {
     update: SessionUpdate,
 }
 
-pub type SessionEndCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
+/// Error code for ACP errors that the client handles specially.
+pub(crate) fn acp_error_code(err: &agent_client_protocol::Error) -> Option<&'static str> {
+    (err.code == agent_client_protocol::ErrorCode::AuthRequired).then_some("auth_required")
+}
+
+/// Error code extracted from an `anyhow::Error` chain.
+pub(crate) fn anyhow_error_code(err: &anyhow::Error) -> Option<&'static str> {
+    err.chain()
+        .filter_map(|cause| cause.downcast_ref::<agent_client_protocol::Error>())
+        .find_map(acp_error_code)
+}
 
 type SessionMap = Arc<Mutex<HashMap<AgentSessionKey, AgentSession>>>;
 
-const SHUTDOWN_SESSIONS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
-const RUNTIME_SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+const SHUTDOWN_SESSIONS_TIMEOUT: Duration = Duration::from_secs(2);
+const RUNTIME_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
+const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
 #[derive(Clone)]
 pub struct AgentSessionManager {
     sessions: SessionMap,
     /// Created on first use so agents added by the fetched registry can launch.
     runtimes: Arc<std::sync::Mutex<HashMap<String, AcpRuntime>>>,
-    on_end: Option<SessionEndCallback>,
+    observer: Option<Arc<dyn SessionObserver>>,
+    idle_timeout: Duration,
     shutting_down: CancellationToken,
 }
 
@@ -237,11 +367,16 @@ impl AgentSession {
     }
 }
 
-/// Published by the actor for queries that must not wait for it.
-#[derive(Default)]
+/// Published by the actor for lock-free queries (`active_sessions`,
+/// `pending_user_inputs`, concurrent open checks).
+#[derive(Clone, Default)]
 struct SessionStatus {
+    ready: bool,
     /// A prompt turn runs, until the agent ends it.
     busy: bool,
+    cwd: Option<String>,
+    title: Option<String>,
+    updated_at: Option<String>,
     /// Unanswered requests, kept so a reloaded or reconnected device can show
     /// them again.
     pending_inputs: Vec<UserInput>,
@@ -262,23 +397,31 @@ impl AgentSessionKey {
     }
 }
 
-/// A session to load and where its history replay goes.
-type SessionLoad = (SessionId, mpsc::UnboundedSender<AgentEvent>);
-
 struct PromptTurn {
     prompt: String,
     attachments: Vec<Attachment>,
-    event_tx: mpsc::UnboundedSender<AgentEvent>,
-    /// The prompting device, which gets the session's notifications from now
-    /// on.
-    notifier: Option<Notifier>,
-    idle_timeout: std::time::Duration,
-    reply: oneshot::Sender<Result<String>>,
+    voice_chat: bool,
+    client_message_id: Option<String>,
+    originator_peer_id: Option<u64>,
+    subscriber: Option<SessionSubscriber>,
+    idle_timeout: Duration,
+    accepted: oneshot::Sender<Result<()>>,
+    completion: oneshot::Sender<PromptCompletion>,
 }
 
 enum SessionCommand {
     Prompt(PromptTurn),
     Cancel,
+    Subscribe {
+        subscriber: Option<SessionSubscriber>,
+        since_epoch: Option<String>,
+        since_seq: u64,
+        reply: oneshot::Sender<SessionOpenResult>,
+    },
+    Unsubscribe {
+        peer_id: u64,
+    },
+    UnsubscribeAll,
     SetMode {
         mode_id: String,
         reply: oneshot::Sender<Result<(), String>>,
@@ -307,14 +450,26 @@ enum SessionCommand {
     Suggestion(String),
 }
 
+enum StartOutcome {
+    Created(SessionReady),
+    Opened(SessionOpenResult),
+}
+
 impl AgentSessionManager {
-    pub fn new(on_end: Option<SessionEndCallback>) -> Self {
+    pub fn new(observer: Option<Arc<dyn SessionObserver>>) -> Self {
         Self {
             sessions: Arc::default(),
             runtimes: Arc::default(),
-            on_end,
+            observer,
+            idle_timeout: DEFAULT_SESSION_IDLE_TIMEOUT,
             shutting_down: CancellationToken::new(),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_idle_timeout(mut self, idle_timeout: Duration) -> Self {
+        self.idle_timeout = idle_timeout;
+        self
     }
 
     fn runtime(&self, agent: &str) -> AcpRuntime {
@@ -347,40 +502,116 @@ impl AgentSessionManager {
         agent: &str,
         cwd: Option<PathBuf>,
         context: SessionContext,
+        subscriber: Option<SessionSubscriber>,
     ) -> Result<SessionReady> {
-        self.start_session(agent, cwd, None, context).await
+        match self
+            .start_session(agent, cwd, None, context, subscriber)
+            .await?
+        {
+            StartOutcome::Created(ready) => Ok(ready),
+            StartOutcome::Opened(_) => unreachable!("create_session never returns Opened"),
+        }
     }
 
-    /// Resume a persisted session by its ACP session id (requires the agent to
-    /// support `session/load`). Returns a fresh live handle to it. The history
-    /// updates the agent replays on load are streamed to `replay_tx` before the
-    /// session reports ready.
-    pub async fn load_session(
+    /// Idempotently open and subscribe to a session. If a live actor already
+    /// exists, attaches the subscriber and replays coalesced events (either
+    /// incrementally when `since_epoch` matches and `since_seq <= seq`, or
+    /// full replay otherwise). Otherwise loads the session from ACP.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn open_session(
         &self,
         agent: &str,
         session_id: &str,
         cwd: Option<PathBuf>,
         context: SessionContext,
-        replay_tx: mpsc::UnboundedSender<AgentEvent>,
-    ) -> Result<SessionReady> {
-        let load = (SessionId::from(session_id.to_string()), replay_tx);
-        self.start_session(agent, cwd, Some(load), context).await
+        subscriber: Option<SessionSubscriber>,
+        since_epoch: Option<String>,
+        since_seq: u64,
+    ) -> Result<SessionOpenResult> {
+        let key = AgentSessionKey::new(agent, session_id);
+        loop {
+            let existing = {
+                let sessions = self.sessions.lock().await;
+                if self.shutting_down.is_cancelled() {
+                    anyhow::bail!("Daemon is shutting down");
+                }
+                sessions.get(&key).cloned()
+            };
+            if let Some(session) = existing {
+                if session.closing.is_cancelled() {
+                    session.wait_closed().await;
+                    continue;
+                }
+                let (reply, reply_rx) = oneshot::channel();
+                let sent = session
+                    .tx
+                    .send(SessionCommand::Subscribe {
+                        subscriber: subscriber.clone(),
+                        since_epoch: since_epoch.clone(),
+                        since_seq,
+                        reply,
+                    })
+                    .await;
+                if sent.is_ok()
+                    && let Ok(opened) = reply_rx.await
+                {
+                    return Ok(opened);
+                }
+                // The actor closed while we tried to subscribe. Only loop to
+                // reload if it had already been ready (e.g. reclaimed idle);
+                // if an in-flight load failed, propagate an error instead of
+                // triggering a second failing load.
+                let was_ready = session.status.borrow().ready;
+                session.wait_closed().await;
+                if was_ready {
+                    continue;
+                }
+                anyhow::bail!("ACP agent session stopped before it was ready");
+            }
+
+            // Try to claim and load from ACP.
+            match self
+                .start_session(
+                    agent,
+                    cwd.clone(),
+                    Some(SessionId::from(session_id.to_string())),
+                    context.clone(),
+                    subscriber.clone(),
+                )
+                .await
+            {
+                Ok(StartOutcome::Opened(opened)) => return Ok(opened),
+                Ok(StartOutcome::Created(_)) => {
+                    unreachable!("open_session load never returns Created")
+                }
+                Err(err) if err.downcast_ref::<AlreadyActive>().is_some() => {
+                    // Another caller claimed the slot right before us; loop to
+                    // subscribe to it.
+                    continue;
+                }
+                Err(err) => return Err(err),
+            }
+        }
     }
 
     async fn start_session(
         &self,
         agent: &str,
         cwd: Option<PathBuf>,
-        load: Option<SessionLoad>,
+        load: Option<SessionId>,
         context: SessionContext,
-    ) -> Result<SessionReady> {
+        subscriber: Option<SessionSubscriber>,
+    ) -> Result<StartOutcome> {
         if self.shutting_down.is_cancelled() {
             anyhow::bail!("Daemon is shutting down");
         }
         let cwd = resolve_cwd(cwd)?;
-        let (tx, rx) = mpsc::channel(8);
+        let (tx, rx) = mpsc::channel(32);
         let (child_tx, child_rx) = mpsc::unbounded_channel();
-        let (status_tx, status) = watch::channel(SessionStatus::default());
+        let (status_tx, status) = watch::channel(SessionStatus {
+            cwd: Some(cwd.to_string_lossy().into_owned()),
+            ..SessionStatus::default()
+        });
         let (stopped_tx, stopped) = watch::channel(false);
         let handle = AgentSession {
             tx,
@@ -392,22 +623,29 @@ impl AgentSessionManager {
         // A timed-out create/load must not leave a detached actor behind.
         let close_on_drop = handle.closing.clone().drop_guard();
         let creating = load.is_none();
-        if let Some((session_id, _)) = &load {
-            // Claim the session before the agent loads it: a second actor would
-            // close the agent's session on its way out.
-            self.claim(
-                AgentSessionKey::new(agent, &session_id.to_string()),
-                &handle,
-            )
-            .await?;
+        if let Some(session_id) = &load {
+            let key = AgentSessionKey::new(agent, &session_id.to_string());
+            let mut sessions = self.sessions.lock().await;
+            if self.shutting_down.is_cancelled() {
+                anyhow::bail!("Daemon is shutting down");
+            }
+            if sessions.contains_key(&key) {
+                return Err(anyhow::Error::new(AlreadyActive));
+            }
+            sessions.insert(key, handle.clone());
         }
 
         let (ready_tx, ready_rx) = oneshot::channel();
         let runtime = self.runtime(agent);
+        let epoch = next_epoch();
         let actor = run_session_actor(
             cwd,
             load,
             context,
+            subscriber,
+            epoch,
+            self.idle_timeout,
+            self.observer.clone(),
             runtime.clone(),
             rx,
             child_rx,
@@ -416,10 +654,10 @@ impl AgentSessionManager {
             handle.closing.clone(),
         );
         let sessions = self.sessions.clone();
-        let on_end = self.on_end.clone();
+        let observer = self.observer.clone();
         let actor_handle = handle.clone();
         tokio::spawn(async move {
-            let was_ready = actor.await;
+            let exit = actor.await;
             let mut sessions = sessions.lock().await;
             let key = sessions
                 .iter()
@@ -428,12 +666,13 @@ impl AgentSessionManager {
             if let Some(key) = key {
                 sessions.remove(&key);
                 runtime.forget_children(&key.session_id);
-                // Explicit close already has a reply. Do not emit a late ended
-                // notification that could invalidate a reloaded session.
-                if was_ready && !actor_handle.closing.is_cancelled() {
-                    if let Some(on_end) = on_end {
-                        on_end(&key.agent, &key.session_id);
-                    }
+                // Only unexpected runtime/connection failures broadcast
+                // `agent_session_ended`. Explicit close and idle reclamation
+                // exit quietly.
+                if exit == SessionExit::Failed
+                    && let Some(observer) = observer
+                {
+                    observer.on_session_ended(&key.agent, &key.session_id);
                 }
             }
             // Under the lock, so registering a created session sees it.
@@ -441,12 +680,16 @@ impl AgentSessionManager {
         });
 
         // Readiness is bounded by the caller's timeout, not here.
-        let ready = match ready_rx.await {
-            Ok(Ok(ready)) => ready,
+        let outcome = match ready_rx.await {
+            Ok(Ok(outcome)) => outcome,
             Ok(Err(err)) => anyhow::bail!(err),
             Err(_) => anyhow::bail!("ACP agent session stopped before it was ready"),
         };
         if creating {
+            let session_id = match &outcome {
+                StartOutcome::Created(ready) => ready.session_id.clone(),
+                StartOutcome::Opened(opened) => opened.session_id.clone(),
+            };
             // The agent assigned the session id.
             let mut sessions = self.sessions.lock().await;
             if self.shutting_down.is_cancelled() {
@@ -455,81 +698,99 @@ impl AgentSessionManager {
             if *handle.stopped.borrow() {
                 anyhow::bail!("ACP agent session stopped before it was ready");
             }
-            sessions.insert(AgentSessionKey::new(agent, &ready.session_id), handle);
+            sessions.insert(AgentSessionKey::new(agent, &session_id), handle);
         }
         close_on_drop.disarm();
-        Ok(ready)
+        Ok(outcome)
     }
 
-    /// Register a session about to be loaded, after a closing actor of it has
-    /// released it.
-    async fn claim(&self, key: AgentSessionKey, handle: &AgentSession) -> Result<()> {
-        loop {
-            let previous = {
-                let mut sessions = self.sessions.lock().await;
-                if self.shutting_down.is_cancelled() {
-                    anyhow::bail!("Daemon is shutting down");
-                }
-                match sessions.get(&key) {
-                    None => {
-                        sessions.insert(key, handle.clone());
-                        return Ok(());
-                    }
-                    Some(previous) if !previous.closing.is_cancelled() => anyhow::bail!(
-                        "{} ACP session is already active: {}",
-                        key.agent,
-                        key.session_id
-                    ),
-                    Some(previous) => previous.clone(),
-                }
-            };
-            previous.wait_closed().await;
-        }
-    }
-
-    /// Run a prompt turn, streaming its events to `event_tx`. A turn without
-    /// any update for `timeout_secs` is cancelled and fails with a timeout, so
-    /// only a silent agent times out; a long but productive turn never does.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn prompt(
+    /// Start a prompt turn on an active session and return immediately once
+    /// accepted by the actor. Events stream to all subscribed peers; the
+    /// returned `PromptHandle::completion` resolves when the turn finishes.
+    pub async fn start_prompt(
         &self,
         agent: &str,
         session_id: &str,
-        prompt: String,
-        attachments: Vec<Attachment>,
-        timeout_secs: u64,
-        event_tx: mpsc::UnboundedSender<AgentEvent>,
-        notifier: Option<Notifier>,
-    ) -> Result<String> {
-        let (reply, reply_rx) = oneshot::channel();
+        options: PromptOptions,
+    ) -> Result<PromptHandle> {
+        let (accepted, accepted_rx) = oneshot::channel();
+        let (completion, completion_rx) = oneshot::channel();
         self.send_command(
             agent,
             session_id,
             SessionCommand::Prompt(PromptTurn {
-                prompt,
-                attachments,
-                event_tx,
-                notifier,
-                idle_timeout: std::time::Duration::from_secs(timeout_secs),
-                reply,
+                prompt: options.prompt,
+                attachments: options.attachments,
+                voice_chat: options.voice_chat,
+                client_message_id: options.client_message_id,
+                originator_peer_id: options.originator_peer_id,
+                subscriber: options.subscriber,
+                idle_timeout: Duration::from_secs(options.timeout_secs),
+                accepted,
+                completion,
             }),
         )
         .await?;
-        match reply_rx.await {
-            Ok(result) => result,
-            Err(_) => anyhow::bail!("ACP agent session closed before responding"),
+        match accepted_rx.await {
+            Ok(Ok(())) => Ok(PromptHandle {
+                completion: completion_rx,
+            }),
+            Ok(Err(err)) => Err(err),
+            Err(_) => anyhow::bail!("ACP agent session closed before accepting prompt"),
         }
     }
 
-    /// Sessions with a prompt still running, as `(agent, session_id)`. Remote
-    /// clients use it to settle turns whose final reply never reached them.
-    pub async fn running_prompts(&self) -> Vec<(String, String)> {
+    /// Remove `peer_id` from a session's subscribers without closing or
+    /// cancelling the session.
+    pub async fn unsubscribe_session(&self, agent: &str, session_id: &str, peer_id: u64) {
+        let key = AgentSessionKey::new(agent, session_id);
+        let session = self.sessions.lock().await.get(&key).cloned();
+        if let Some(session) = session {
+            let _ = session
+                .tx
+                .send(SessionCommand::Unsubscribe { peer_id })
+                .await;
+        }
+    }
+
+    /// Remove `peer_id` from every active session (called when a peer
+    /// disconnects or reconnects on a fresh socket).
+    pub async fn unsubscribe_peer(&self, peer_id: u64) {
+        let sessions: Vec<AgentSession> = self.sessions.lock().await.values().cloned().collect();
+        for session in sessions {
+            let _ = session
+                .tx
+                .send(SessionCommand::Unsubscribe { peer_id })
+                .await;
+        }
+    }
+
+    /// Clear all subscribers across every active session (called when the host
+    /// loses its relay connection).
+    pub async fn unsubscribe_all_peers(&self) {
+        let sessions: Vec<AgentSession> = self.sessions.lock().await.values().cloned().collect();
+        for session in sessions {
+            let _ = session.tx.send(SessionCommand::UnsubscribeAll).await;
+        }
+    }
+
+    /// Sessions with a prompt currently running, for populating client session
+    /// lists and reconnecting clients.
+    pub async fn active_sessions(&self) -> Vec<ActiveSessionInfo> {
         self.sessions
             .lock()
             .await
             .iter()
-            .filter(|(_, session)| session.status.borrow().busy)
-            .map(|(key, _)| (key.agent.clone(), key.session_id.clone()))
+            .filter_map(|(key, session)| {
+                let status = session.status.borrow();
+                status.busy.then(|| ActiveSessionInfo {
+                    agent: key.agent.clone(),
+                    session_id: key.session_id.clone(),
+                    cwd: status.cwd.clone(),
+                    title: status.title.clone(),
+                    updated_at: status.updated_at.clone(),
+                })
+            })
             .collect()
     }
 
@@ -564,8 +825,8 @@ impl AgentSessionManager {
             && reply_rx.await.unwrap_or(false)
     }
 
-    /// Cancel the in-flight prompt of a session. The prompt settles with the
-    /// partial answer and a `stop` event carrying the cancel reason.
+    /// Cancel the in-flight prompt of a session. The turn settles with the
+    /// partial answer and a `turn_ended` event carrying the cancel reason.
     pub async fn cancel(&self, agent: &str, session_id: &str) -> bool {
         let key = AgentSessionKey::new(agent, session_id);
         let Some(session) = self.sessions.lock().await.get(&key).cloned() else {
@@ -668,7 +929,7 @@ impl AgentSessionManager {
             return false;
         };
         // Keep it registered until the actor has released its ACP handle and
-        // permission state. Concurrent close/load calls wait for the same
+        // permission state. Concurrent close/open calls wait for the same
         // cleanup.
         session.closing.cancel();
         session.wait_closed().await;
@@ -761,6 +1022,9 @@ impl AgentSessionManager {
         if capabilities.session_capabilities.delete.is_none() {
             anyhow::bail!("{agent} does not support deleting sessions");
         }
+        // Release any live actor (and running turn) before asking the agent to
+        // delete storage.
+        self.close_session(agent, session_id).await;
         connection
             .send_request_to(
                 Agent,
@@ -799,6 +1063,17 @@ impl AgentSessionManager {
         Ok(response.session_id.to_string())
     }
 }
+
+#[derive(Debug)]
+struct AlreadyActive;
+
+impl std::fmt::Display for AlreadyActive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ACP session is already active")
+    }
+}
+
+impl std::error::Error for AlreadyActive {}
 
 /// ACP has no fork point yet; claude-agent-acp reads the one JetBrains AIR
 /// sends.
@@ -860,28 +1135,7 @@ fn to_json(value: impl Serialize) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-
-    use super::{input_request_session, runtime::system_prompt_meta, update_to_json};
-
-    #[test]
-    fn input_requests_name_their_session() {
-        let params = json!({ "agent": "claude-acp", "sessionId": "s1", "requestId": "1" });
-        for method in ["agent_permission_request", "agent_elicitation_request"] {
-            assert_eq!(
-                input_request_session(method, &params),
-                Some(("claude-acp", "s1"))
-            );
-        }
-        assert_eq!(input_request_session("agent_session_update", &params), None);
-        assert_eq!(
-            input_request_session(
-                "agent_permission_request",
-                &json!({ "agent": "claude-acp" })
-            ),
-            None
-        );
-    }
+    use super::{runtime::system_prompt_meta, update_to_json};
 
     #[test]
     fn system_prompt_meta_targets_standard_and_antigravity_keys() {

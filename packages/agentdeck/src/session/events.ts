@@ -1,5 +1,6 @@
 import type { AvailableCommand, SessionConfigOption, SessionEvent } from 'src/agent/api';
 import { imageAttachment } from 'src/attachment/message';
+import type { Attachment } from 'src/attachment/types';
 import { i18n } from 'src/i18n';
 import { withCurrentMode } from 'src/session/config-options';
 import type {
@@ -21,6 +22,8 @@ type SessionEventContext = {
   options?: SessionOptions;
   /** Set when these are the messages of subagent session `subagentId`. */
   subagentId?: string;
+  /** Client-generated message IDs already rendered optimistically for this session. */
+  optimisticMessageIds?: ReadonlySet<string>;
 };
 
 export const completeThought = (messages: ChatMessage[]) => {
@@ -36,20 +39,65 @@ export const finishStreaming = (messages: ChatMessage[]) =>
     'role' in message && message.streaming ? { ...message, streaming: false } : message,
   );
 
+const matchesPreviousMessage = (
+  last: ChatMessage | undefined,
+  role: 'user' | 'agent',
+  streaming: boolean,
+  clientMessageId?: string,
+): last is TextMessage => {
+  if (!last || !('role' in last) || last.role !== role) return false;
+  if (role === 'user') {
+    return clientMessageId ? last.id === clientMessageId : !last.streaming;
+  }
+  return last.streaming === streaming;
+};
+
 export const appendContent = (
   messages: ChatMessage[],
   role: 'user' | 'agent',
   text: string,
   streaming: boolean,
   messageId?: string,
+  clientMessageId?: string,
 ) => {
+  const effectiveStreaming = role === 'user' ? false : streaming;
   const next = messages.slice();
   const last = next.at(-1);
   const patch = messageId ? { messageId } : {};
-  if (last && 'role' in last && last.role === role && last.streaming === streaming) {
+  if (matchesPreviousMessage(last, role, effectiveStreaming, clientMessageId)) {
     next[next.length - 1] = { ...last, text: last.text + text, ...patch };
   } else {
-    next.push({ id: crypto.randomUUID(), role, text, streaming, ...patch });
+    next.push({
+      id: (role === 'user' && clientMessageId) || crypto.randomUUID(),
+      role,
+      text,
+      streaming: effectiveStreaming,
+      ...patch,
+    });
+  }
+  return next;
+};
+
+const appendAttachment = (
+  messages: ChatMessage[],
+  role: 'user' | 'agent',
+  attachment: Attachment,
+  streaming: boolean,
+  clientMessageId?: string,
+) => {
+  const effectiveStreaming = role === 'user' ? false : streaming;
+  const next = messages.slice();
+  const last = next.at(-1);
+  if (matchesPreviousMessage(last, role, effectiveStreaming, clientMessageId)) {
+    next[next.length - 1] = { ...last, attachments: [...(last.attachments ?? []), attachment] };
+  } else {
+    next.push({
+      id: (role === 'user' && clientMessageId) || crypto.randomUUID(),
+      role,
+      text: '',
+      attachments: [attachment],
+      streaming: effectiveStreaming,
+    });
   }
   return next;
 };
@@ -59,19 +107,13 @@ export const appendImage = (
   role: 'user' | 'agent',
   content: Record<string, unknown>,
   streaming: boolean,
+  clientMessageId?: string,
 ) => {
   const data = typeof content.data === 'string' ? content.data : '';
   if (!data) return messages;
   const mimeType = typeof content.mimeType === 'string' ? content.mimeType : 'image/png';
   const attachment = imageAttachment(data, mimeType, i18n.get('attachment.imageDefaultName'));
-  const next = messages.slice();
-  const last = next.at(-1);
-  if (last && 'role' in last && last.role === role && last.streaming === streaming) {
-    next[next.length - 1] = { ...last, attachments: [...(last.attachments ?? []), attachment] };
-  } else {
-    next.push({ id: crypto.randomUUID(), role, text: '', attachments: [attachment], streaming });
-  }
-  return next;
+  return appendAttachment(messages, role, attachment, streaming, clientMessageId);
 };
 
 // When codex-acp replays history imported from other agents, tool calls and results are output as text markers; restore them as tool messages to collapse into process groups
@@ -195,7 +237,11 @@ export const reduceSessionEvent = (
   event: SessionEvent,
   context: SessionEventContext,
 ): EventReduction | null => {
-  if (event.event === 'stop') {
+  if (event.event === 'turn_started') {
+    const next = completeThought(current);
+    return next !== current ? { messages: next } : null;
+  }
+  if (event.event === 'turn_ended') {
     return { messages: finishStreaming(current) };
   }
 
@@ -208,18 +254,37 @@ export const reduceSessionEvent = (
     update.content && typeof update.content === 'object' ? (update.content as Record<string, unknown>) : {};
   const role =
     sessionUpdate === 'agent_message_chunk' ? 'agent' : sessionUpdate === 'user_message_chunk' ? 'user' : undefined;
+  const clientMessageId =
+    role === 'user' && typeof update.clientMessageId === 'string' ? update.clientMessageId : undefined;
+
+  if (clientMessageId && context.optimisticMessageIds?.has(clientMessageId)) {
+    return messages !== current ? { messages } : null;
+  }
 
   if (role && content.type === 'text' && typeof content.text === 'string') {
     if (agent === 'claude-acp' && role === 'user' && content.text.trim() === '[Request interrupted by user]') {
       return messages !== current ? { messages } : null;
     }
     const messageId = role === 'agent' && typeof update.messageId === 'string' ? update.messageId : undefined;
-    const next = appendContent(messages, role, content.text, streaming, messageId);
+    const next = appendContent(messages, role, content.text, streaming, messageId, clientMessageId);
     return { messages: agent === 'codex-acp' && role === 'agent' ? extractExternalTools(next) : next };
   }
 
   if (role && content.type === 'image') {
-    return { messages: appendImage(messages, role, content, streaming) };
+    return { messages: appendImage(messages, role, content, streaming, clientMessageId) };
+  }
+
+  if (role && content.type === 'resource_link' && typeof content.uri === 'string' && content.uri) {
+    const name = typeof content.name === 'string' && content.name ? content.name : content.uri;
+    return {
+      messages: appendAttachment(
+        messages,
+        role,
+        { id: content.uri, kind: 'file', name, uri: content.uri },
+        streaming,
+        clientMessageId,
+      ),
+    };
   }
 
   if (thoughtChunk && content.type === 'text' && typeof content.text === 'string') {

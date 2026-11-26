@@ -1,11 +1,17 @@
-import type { AgentApi, PanelContext, SessionConfigOption } from 'agentdeck/agent/api';
+import type {
+  AgentApi,
+  PanelContext,
+  SessionConfigOption,
+  SessionEvent,
+  SessionEventNotification,
+  SessionStateUpdate,
+} from 'agentdeck/agent/api';
 import {
   agentSessionKey,
   type SessionRecord,
   sessionTitleFromPrompt,
   upsertStoredSession,
 } from '../../shared/agent-session-store';
-import { t } from '../../shared/i18n';
 import {
   completeThought,
   DRAFT_SESSION_KEY,
@@ -24,6 +30,9 @@ type SessionControllerOptions = {
 };
 
 type SessionTarget = { agent: string; sessionId: string };
+type OpenSessionOptions = { force?: boolean };
+type BufferedSessionEvent = { epoch: string; event: SessionEvent };
+type PendingOpen = { alive: boolean; events: BufferedSessionEvent[] };
 
 export type SessionController = ReturnType<typeof createSessionController>;
 
@@ -39,8 +48,8 @@ async function getPanelContext(): Promise<PanelContext> {
 }
 
 export function createSessionController({ state, runtime, turns, api }: SessionControllerOptions) {
-  // A cleared record makes a settling load inert after deletion/reconnect.
-  const pendingLoads = new Map<string, { alive: boolean }>();
+  // A cleared record makes a settling open inert after deletion/reconnect.
+  const pendingOpens = new Map<string, PendingOpen>();
 
   const openNewSession = () => {
     if (state.loadingIds.includes(DRAFT_SESSION_KEY)) return;
@@ -70,7 +79,7 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
     const draftState = runtime.getPane(sessionKey);
     if (!draft?.draft || !draftState) return;
     let createdTarget: SessionTarget | null = null;
-    turns.stage(sessionKey, payload);
+    const clientMessageId = turns.stage(sessionKey, payload);
     runtime.setLoading(sessionKey, true);
     try {
       const created = await api.createSession({
@@ -80,13 +89,18 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
       });
       if (!created.sessionId) throw new Error('Missing session id');
       createdTarget = { agent: draft.agent, sessionId: created.sessionId };
+      const liveSessionKey = agentSessionKey(draft.agent, created.sessionId);
+      runtime.setSync(liveSessionKey, {
+        epoch: created.epoch,
+        lastSeq: created.seq ?? 0,
+        subscribed: true,
+      });
       const composerConfigOptions = runtime.getPane(sessionKey)?.configOptions ?? draftState.configOptions;
       const configOptions = await applyComposerConfig(
         createdTarget,
         created.configOptions || [],
         composerConfigOptions,
       );
-      const liveSessionKey = agentSessionKey(draft.agent, created.sessionId);
       const now = new Date().toISOString();
       const session: SessionRecord = {
         key: liveSessionKey,
@@ -105,6 +119,7 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
         queue: stagedPane.queue,
       };
       const isCurrent = state.sessionKey === sessionKey;
+      runtime.moveOptimisticIds(sessionKey, liveSessionKey);
       runtime.deletePane(sessionKey);
       runtime.setCachedPane(liveSessionKey, pane);
       state({ draftSession: null });
@@ -118,10 +133,13 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
         upsertStoredSession(withAgentConfigOptions(storedState, draft.agent, configOptions), session),
       );
       createdTarget = null;
-      turns.run(liveSessionKey, payload, true);
+      turns.run(liveSessionKey, payload, true, clientMessageId);
       await persistence;
     } catch (e) {
-      if (createdTarget) api.closeSession(createdTarget.agent, createdTarget.sessionId).catch(() => {});
+      if (createdTarget) {
+        runtime.deletePane(agentSessionKey(createdTarget.agent, createdTarget.sessionId));
+        api.closeSession(createdTarget.agent, createdTarget.sessionId).catch(() => {});
+      }
       runtime.setError(sessionKey, e.message);
       runtime.setPending(sessionKey, false);
       runtime.setLoading(sessionKey, false);
@@ -154,16 +172,36 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
     runtime.persistAgentDefault(agent);
   };
 
-  const openSession = async (sessionKey: string) => {
+  const applyLiveEvent = (sessionKey: string, epoch: string, event: SessionEvent) => {
+    runtime.applyEvent(sessionKey, event);
+    runtime.setSync(sessionKey, { epoch, lastSeq: event.seq });
+    if (event.event === 'turn_started') {
+      runtime.clearError(sessionKey);
+      runtime.setPending(sessionKey, true);
+    } else if (event.event === 'turn_ended') {
+      turns.handleTurnEnded(sessionKey, {
+        error: event.error,
+        cancelled: event.stopReason === 'cancelled',
+      });
+    }
+  };
+
+  const openSession = async (sessionKey: string, { force = false }: OpenSessionOptions = {}) => {
     const isCurrent = sessionKey === state.sessionKey;
-    if (isCurrent && (runtime.hasCachedPane(sessionKey) || pendingLoads.has(sessionKey))) return;
+    if (!force && isCurrent && (runtime.isSubscribed(sessionKey) || pendingOpens.has(sessionKey))) return;
+    const previousLoad = pendingOpens.get(sessionKey);
+    if (previousLoad && !force) return;
+    if (previousLoad) {
+      previousLoad.alive = false;
+      pendingOpens.delete(sessionKey);
+    }
     if (!isCurrent) runtime.snapshotCurrent();
     const selected = runtime.record(sessionKey);
     if (!selected) return;
     state({ error: '' });
 
     const cached = runtime.getCachedPane(sessionKey);
-    if (cached) {
+    if (!force && cached && runtime.isSubscribed(sessionKey)) {
       runtime.showPane(sessionKey, cached);
       return;
     }
@@ -171,86 +209,227 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
     const target = runtime.target(sessionKey);
     if (!target) return;
     const cwd = selected.cwd || '';
+    const prevSync = runtime.getSync(sessionKey);
+    const hasLocalState = Boolean(cached || (isCurrent && prevSync?.epoch));
 
     runtime.clearError(sessionKey);
-    state({
-      sessionKey,
-      cwd,
-      messages: [],
-      configOptions: [],
-      queue: [],
-    });
-    runtime.setLoading(sessionKey, true);
-    const record = { alive: true };
-    pendingLoads.set(sessionKey, record);
+    if (cached && !isCurrent) {
+      runtime.showPane(sessionKey, cached);
+    } else if (!hasLocalState) {
+      state({
+        sessionKey,
+        cwd,
+        messages: [],
+        configOptions: [],
+        queue: [],
+      });
+      runtime.setLoading(sessionKey, true);
+    }
+
+    const record: PendingOpen = { alive: true, events: [] };
+    pendingOpens.set(sessionKey, record);
+    const replayEvents: SessionEvent[] = [];
+
     try {
-      await api.closeSession(target.agent, target.sessionId).catch(() => {});
-      const { configOptions, title, updatedAt } = await api.loadSession({
+      const opened = await api.openSession({
         ...target,
         cwd,
-        onEvent: (event) => runtime.applyEvent(sessionKey, event),
+        sinceEpoch: prevSync?.epoch,
+        sinceSeq: prevSync?.epoch ? prevSync.lastSeq : undefined,
+        onEvent: (event) => {
+          if (!record.alive) return;
+          replayEvents.push(event);
+        },
         panelContext: await getPanelContext(),
       });
       if (!record.alive) return;
+
+      const fullReplay = opened.fullReplay !== false;
+      const epoch = opened.epoch ?? prevSync?.epoch;
+      const prevSeq = fullReplay ? 0 : (prevSync?.lastSeq ?? 0);
+      if (fullReplay) {
+        runtime.clearOptimisticIds(sessionKey);
+        runtime.setPane(sessionKey, { messages: [] });
+        runtime.setSync(sessionKey, { epoch, lastSeq: 0 });
+      }
+      for (const event of replayEvents) {
+        if (!fullReplay && typeof event.seq === 'number' && event.seq <= prevSeq) continue;
+        runtime.applyEvent(sessionKey, event);
+      }
+
       const defaults = state.defaults.configOptionsByAgent[selected.agent];
-      let loadedOptions = configOptions || [];
-      // Agents reset mode / model on load; re-apply the agent's saved selection
-      if (defaults?.length) {
+      let loadedOptions = opened.configOptions || [];
+      // Re-apply saved agent defaults only when the daemon freshly loaded the session from the agent.
+      if (opened.freshLoad && defaults?.length) {
         try {
           loadedOptions = await applyComposerConfig(target, loadedOptions, defaults);
         } catch (e) {
           runtime.setError(sessionKey, e.message);
         }
         if (!record.alive) return;
-      } else if (loadedOptions.length) {
-        // No selection saved for this agent yet: use the first loaded session as defaults for new sessions
+      } else if (!defaults?.length && loadedOptions.length) {
+        // No selection saved for this agent yet: use the first loaded session as defaults for new sessions.
         await runtime.persistConfigOptions(selected.agent, loadedOptions);
       }
-      runtime.finishThought(sessionKey);
+
+      const running = Boolean(opened.running);
+      if (running) {
+        runtime.setPending(sessionKey, true);
+      } else {
+        runtime.finishThought(sessionKey);
+        runtime.setPending(sessionKey, false);
+        turns.handleTurnEnded(sessionKey, { cancelled: true });
+      }
+      turns.syncSessionPermissions(sessionKey, opened.userInputs || []);
+
+      const { title, updatedAt } = opened;
       if (title || updatedAt) {
         runtime.patchRecord(sessionKey, {
           ...(title && { title }),
           ...(updatedAt && { updatedAt }),
         });
       }
+
       if (state.sessionKey === sessionKey) {
         const pane: Pane = {
-          messages: state.messages,
+          messages: running ? state.messages : completeThought(state.messages),
           configOptions: loadedOptions,
           cwd: state.cwd,
-          queue: [],
+          queue: state.queue,
         };
         runtime.setCachedPane(sessionKey, pane);
         state({ configOptions: pane.configOptions });
       } else {
         const pane = runtime.getCachedPane(sessionKey);
-        if (pane)
+        if (pane) {
           runtime.setCachedPane(sessionKey, {
             ...pane,
-            messages: completeThought(pane.messages),
+            messages: running ? pane.messages : completeThought(pane.messages),
             configOptions: loadedOptions,
           });
+        }
+      }
+
+      const seq = Math.max(opened.seq ?? 0, runtime.getSync(sessionKey)?.lastSeq ?? 0);
+      runtime.setSync(sessionKey, { epoch, lastSeq: seq, subscribed: true });
+
+      const buffered = record.events;
+      record.events = [];
+      for (const item of buffered) {
+        if (epoch && item.epoch !== epoch) continue;
+        if (item.event.seq <= (runtime.getSync(sessionKey)?.lastSeq ?? 0)) continue;
+        applyLiveEvent(sessionKey, item.epoch, item.event);
       }
     } catch (e) {
       if (!record.alive) return;
       runtime.setError(sessionKey, e.message);
-      runtime.deletePane(sessionKey);
+      if (!hasLocalState) runtime.deletePane(sessionKey);
     } finally {
-      if (pendingLoads.get(sessionKey) === record) {
-        pendingLoads.delete(sessionKey);
+      if (pendingOpens.get(sessionKey) === record) {
+        pendingOpens.delete(sessionKey);
         runtime.setLoading(sessionKey, false);
       }
     }
+  };
+
+  const handleSessionEvent = ({ agent, sessionId, epoch, event }: SessionEventNotification) => {
+    const sessionKey = agentSessionKey(agent, sessionId);
+    const pending = pendingOpens.get(sessionKey);
+    if (pending) {
+      pending.events.push({ epoch, event });
+      return;
+    }
+    const sync = runtime.getSync(sessionKey);
+    if (!sync?.subscribed) return;
+    if (sync.epoch && sync.epoch !== epoch) {
+      openSession(sessionKey, { force: true });
+      return;
+    }
+    if (event.seq <= sync.lastSeq) return;
+    if (sync.epoch === epoch && event.seq > sync.lastSeq + 1) {
+      openSession(sessionKey, { force: true });
+      return;
+    }
+    applyLiveEvent(sessionKey, epoch, event);
+  };
+
+  const handleSessionState = (update: SessionStateUpdate) => {
+    const sessionKey = agentSessionKey(update.agent, update.sessionId);
+    if (update.title || update.updatedAt) {
+      runtime.patchRecord(sessionKey, {
+        ...(update.title && { title: update.title }),
+        ...(update.updatedAt && { updatedAt: update.updatedAt }),
+      });
+    }
+    if (!runtime.record(sessionKey) || runtime.isSubscribed(sessionKey)) return;
+    if (update.running) {
+      runtime.clearError(sessionKey);
+      runtime.setPending(sessionKey, true);
+    } else if (state.pendingIds.includes(sessionKey) || update.error) {
+      turns.handleTurnEnded(sessionKey, {
+        error: update.error,
+        cancelled: !update.completed && !update.error,
+      });
+    }
+  };
+
+  const reconcileActiveSessions = async () => {
+    if (!api.listActiveSessions) return;
+    try {
+      const { sessions = [], userInputs = [] } = await api.listActiveSessions();
+      const activeKeys = new Set(sessions.map((item) => agentSessionKey(item.agent, item.sessionId)));
+      for (const sessionKey of [...state.pendingIds]) {
+        if (runtime.record(sessionKey)?.draft || pendingOpens.has(sessionKey) || runtime.isSubscribed(sessionKey)) {
+          continue;
+        }
+        if (!activeKeys.has(sessionKey)) {
+          turns.handleTurnEnded(sessionKey, { cancelled: true });
+        }
+      }
+      for (const sessionKey of activeKeys) {
+        if (!runtime.record(sessionKey) || pendingOpens.has(sessionKey) || runtime.isSubscribed(sessionKey)) continue;
+        runtime.setPending(sessionKey, true);
+      }
+      const activePermissionIds = new Map<string, string>();
+      for (const input of userInputs) {
+        if (input.method !== 'agent_permission_request') continue;
+        const sessionKey = agentSessionKey(input.params.agent, input.params.sessionId);
+        if (!runtime.record(sessionKey)) continue;
+        activePermissionIds.set(sessionKey, input.params.requestId);
+        if (!pendingOpens.has(sessionKey) && !runtime.isSubscribed(sessionKey)) {
+          turns.handleUserInput(input);
+        }
+      }
+      for (const [sessionKey, permission] of Object.entries(state.permissions)) {
+        if (pendingOpens.has(sessionKey) || runtime.isSubscribed(sessionKey)) continue;
+        if (activePermissionIds.get(sessionKey) !== permission.requestId) {
+          turns.syncSessionPermissions(sessionKey, []);
+        }
+      }
+    } catch {
+      // Transient disconnect during reconnect; the next connected cycle reconciles again.
+    }
+  };
+
+  const resyncCurrentSession = () => {
+    const sessionKey = state.sessionKey;
+    const reopen = sessionKey && !runtime.record(sessionKey)?.draft ? openSession(sessionKey, { force: true }) : null;
+    const reconcile = reconcileActiveSessions();
+    return Promise.all([reopen, reconcile]);
+  };
+
+  const markAllUnsubscribed = () => {
+    runtime.markAllUnsubscribed();
   };
 
   const deleteSession = async (sessionKey: string) => {
     if (state.deleting) return;
     let selected = runtime.record(sessionKey);
     if (!selected) return;
-    const loadRecord = pendingLoads.get(sessionKey);
+    const loadRecord = pendingOpens.get(sessionKey);
     if (loadRecord) {
       loadRecord.alive = false;
-      pendingLoads.delete(sessionKey);
+      pendingOpens.delete(sessionKey);
       runtime.setLoading(sessionKey, false);
     }
     if (state.pendingIds.includes(sessionKey)) await turns.abort(sessionKey);
@@ -271,12 +450,10 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
       if (isDraft || !target) {
         state({ draftSession: null });
       } else {
-        if (isCurrent || loadRecord || runtime.hasCachedPane(sessionKey)) {
-          await api.closeSession(target.agent, target.sessionId).catch(() => {});
-        }
         await api.deleteSession(target.agent, target.sessionId).catch(() => {});
         await runtime.removeRecord(sessionKey);
       }
+      turns.clearSession(sessionKey);
       runtime.deletePane(sessionKey);
       runtime.clearError(sessionKey);
       if (isCurrent) {
@@ -306,6 +483,7 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
     if (!sessionKey) return;
     const session = runtime.record(sessionKey);
     if (!session) return;
+    if (!session.draft && !runtime.isSubscribed(sessionKey)) return;
     const previous = runtime.getPane(sessionKey)?.configOptions ?? [];
     runtime.clearError(sessionKey);
     const staged = withConfigValue(previous, configId, value);
@@ -331,14 +509,14 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
 
   const handleSessionEnded = ({ agent, sessionId }: SessionTarget) => {
     const sessionKey = agentSessionKey(agent, sessionId);
-    const record = pendingLoads.get(sessionKey);
+    const record = pendingOpens.get(sessionKey);
     if (record) {
       record.alive = false;
-      pendingLoads.delete(sessionKey);
+      pendingOpens.delete(sessionKey);
       runtime.setLoading(sessionKey, false);
     }
+    turns.clearSession(sessionKey);
     runtime.deletePane(sessionKey);
-    turns.decidePermission(sessionKey, null);
     if (sessionKey === state.sessionKey) {
       state({
         sessionKey: null,
@@ -350,39 +528,17 @@ export function createSessionController({ state, runtime, turns, api }: SessionC
     }
   };
 
-  const handleHostReconnect = () => {
-    turns.declineAllPermissions();
-    for (const record of pendingLoads.values()) record.alive = false;
-    pendingLoads.clear();
-    const draftLoading = runtime.resetPanesForReconnect();
-    const currentSessionKey = state.sessionKey;
-    const currentIsDraft = state.draftSession?.key === currentSessionKey;
-    turns.clearCanceledSessions();
-    state({
-      loadingIds: draftLoading ? [DRAFT_SESSION_KEY] : [],
-      pendingIds: [],
-      permissions: {},
-      sessionErrors: {},
-      ...(!currentIsDraft &&
-        currentSessionKey && {
-          sessionKey: null,
-          messages: [],
-          configOptions: [],
-          queue: [],
-          cwd: '',
-          error: t('devtoolsPanelHostReconnected'),
-        }),
-    });
-  };
-
   return {
     openNewSession,
     startDraftTurn,
     confirmNewSession,
     openSession,
+    handleSessionEvent,
+    handleSessionState,
+    resyncCurrentSession,
+    markAllUnsubscribed,
     deleteSession,
     changeConfig,
     handleSessionEnded,
-    handleHostReconnect,
   };
 }

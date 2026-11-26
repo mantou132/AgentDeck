@@ -10,9 +10,9 @@
 - `shared/agent-storage.ts`：扩展设备 ID（`chrome.storage.local`）；Relay outbox 与游标用 App 的 `agent/relay-store.ts`（IndexedDB）。
 - `shared/agent-session-store.ts`：本地会话状态与配置持久化。
 - **类型**：`agentdeck/*` 经 `tsconfig.json` 的 `paths` 指向 App 源码，API 与附件等类型直接复用 App 定义；`extension-env.d.ts` 由 Extension.js 生成。
-- **通信架构**：直接复用 `agentdeck/agent/transport`（`agentApi` / `startTransport`），经 `relay-client-ts` 接入 Relay 服务与 Daemon 通信。
+- **通信架构**：直接复用 `agentdeck/agent/transport`（`agentApi` / `startTransport`，冷启动传 `ackHead: true`），经 `relay-client-ts` 接入 Relay 服务与 Daemon 通信；使用幂等 `agent_session_open(sinceEpoch, sinceSeq)` 订阅并增量同步当前会话、重连时经 `agent_active_sessions` 对账后台活跃会话与未作答权限、短 RPC `agent_prompt` 发起回合，并响应 `agent_session_event` / `agent_session_state` / `agent_user_input_resolved`。
 - **附件**：读取、线上格式、消息与历史中的附件解析复用 `agentdeck/attachment/*`，粘贴引用复用 `agentdeck/composer/references`（规则见 App 文档）；扩展没有 file-viewer，主机文件只显示为附件条。
-- **等待用户输入**：`agent_permission_request` 显示权限卡片，选择或取消都经 `agent_user_input_respond` 作答；面板卸载时取消所有未作答的权限。面板没有问题卡片，收到 `agent_elicitation_request` 即以 decline 作答（Claude 视为用户跳过，继续执行）。面板不显示子代理会话：带 `childSessionId` 的会话事件直接忽略。
+- **等待用户输入**：`agent_permission_request` 只接本地已有会话并显示权限卡片，选择或取消都经 `agent_user_input_respond` 作答；权限状态由 daemon 持有，面板卸载时不取消远端权限，其他设备作答或回合结束时经 `agent_user_input_resolved` / `turn_ended` 关闭。面板没有问题卡片，仅对当前已订阅的面板会话收到 `agent_elicitation_request` 时以 decline 作答，不干预其他设备的会话。面板不显示子代理会话：带 `childSessionId` 的会话事件直接忽略。
 - **浏览器上下文**：建会话时 `panelContext` 携带当前 tab 的 `tabId` 与 `url`；Daemon 经本机 browser4agent 核实是同一浏览器后才注入浏览器提示词；扩展渲染能力提示词始终注入。
 
 ## 平台与构建约束

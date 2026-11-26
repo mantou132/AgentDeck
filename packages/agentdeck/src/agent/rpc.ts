@@ -1,9 +1,3 @@
-type ResumeCallHandlers = {
-  onEvent?: (event: unknown) => void | Promise<void>;
-  resolve?: (value: unknown) => void;
-  reject?: (error: Error) => void;
-};
-
 export type RpcId = string | number;
 
 export type CallOptions = {
@@ -66,7 +60,6 @@ export class RpcPeer {
     options?: CallOptions,
     callId?: RpcId,
   ) => {
-    // Replies from before an App reload must never match a new call unless explicitly resumed.
     const id = callId ?? crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
       const pending: PendingCall = {
@@ -101,21 +94,8 @@ export class RpcPeer {
     });
   };
 
-  resumeCall = (id: RpcId, handlers: ResumeCallHandlers) => {
-    this.#pending.set(id, {
-      resolve: handlers.resolve ?? (() => {}),
-      reject: handlers.reject ?? (() => {}),
-      onEvent: handlers.onEvent,
-    });
-  };
-
   /** Restart a pending call's timeout, e.g. while frames queued ahead of its reply are still arriving. */
   touch = (id: RpcId) => this.#pending.get(id)?.startTimer?.();
-
-  /** Drop a pending call without settling it; a late reply is then ignored. */
-  forget = (id: RpcId) => {
-    this.#takePending(id);
-  };
 
   handle = (method: string, handler: Handler) => this.#handlers.set(method, handler);
 
@@ -184,7 +164,7 @@ export class RpcPeer {
     for (const id of this.#pending.keys()) this.#takePending(id)?.reject(error);
   };
 
-  /** Fails calls that have a timeout at once, as if it had elapsed; calls without one (e.g. prompts) keep waiting. */
+  /** Fails timed calls at once and runs `#onTimeout` so callers (e.g. Relay outbox) can withdraw them. */
   rejectTimed = (error: Error) => {
     for (const [id, pending] of this.#pending) {
       if (!pending.startTimer) continue;

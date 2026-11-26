@@ -434,6 +434,8 @@ impl AcpRuntime {
                 let (title, updated_at) = session_metadata_from_meta(response.meta.as_ref());
                 let ready = SessionReady {
                     session_id: session_id.to_string(),
+                    epoch: String::new(),
+                    seq: 0,
                     title,
                     updated_at,
                     modes: response.modes.as_ref().map(to_json),
@@ -453,6 +455,8 @@ impl AcpRuntime {
                 let (title, updated_at) = session_metadata_from_meta(session.meta());
                 let ready = SessionReady {
                     session_id: session.session_id().to_string(),
+                    epoch: String::new(),
+                    seq: 0,
                     title,
                     updated_at,
                     modes: session.modes().map(to_json),

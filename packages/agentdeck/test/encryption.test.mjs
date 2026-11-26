@@ -76,6 +76,7 @@ test('creating and using encryption does not read or write localStorage', () => 
 test('encrypted app handshake, prompt, streaming and retry keep plaintext off the wire/outbox', async () => {
   const fixture = documentFixture(undefined, { pairingId: vector.id });
   await fixture.connect();
+  const untrack = fixture.app.trackSessionPage('s1');
   await fixture.openSession();
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
   assert.equal(new URL(fixture.sockets.at(-1).url).searchParams.get('id'), vector.routeId);
@@ -95,18 +96,15 @@ test('encrypted app handshake, prompt, streaming and retry keep plaintext off th
   await fixture.settleHost();
   const replay = fixture.sockets.at(-1).sent.find((f) => f.message_id === request.message_id);
   assert.deepEqual(replay, wire);
-  fixture.deliver({
-    id: request.payload.id,
-    event: {
-      event: 'session_update',
-      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'secret reply' } },
-    },
-    peerId: 1,
-  });
-  fixture.reply(request, { answer: 'secret reply' });
+  fixture.reply(request, { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'secret reply');
   await tick();
-  assert.equal(fixture.app.getMessages('s1').at(-1).text, 'secret reply');
+  assert.deepEqual(
+    Array.from(fixture.app.getMessages('s1'), (message) => message.text),
+    ['secret prompt', 'secret reply'],
+  );
   assert.equal(fixture.app.runningSessionIds().length, 0);
+  untrack();
 });
 
 test('a frame that cannot be decrypted is dropped and acknowledged, keeping the connection', async () => {

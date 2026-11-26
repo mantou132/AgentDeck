@@ -36,19 +36,26 @@ export type LoadStatus = 'idle' | 'loading' | 'loaded' | 'failed';
 
 /** Everything the App holds about one session besides its messages; removing a session drops the whole entry. */
 export type SessionRuntime = {
-  /** Session held locally: pending creation, created or running here, so it is known before the remote list has it. */
+  /** Session held locally: pending creation, created or running on the host, so it is known before the remote list has it. */
   session?: DeckSession;
-  /** `loaded` means opened in this App lifecycle: it is never closed and loaded again. */
   load: LoadStatus;
   loadToken?: number;
-  /** Running turn of this device; `rpcId` is missing while a pending session is being created. */
-  turn?: { rpcId?: string };
+  /** Daemon reports a turn is currently running in this session. */
+  running?: boolean;
+  /** Pending session creation is in flight (before a remote session id exists). */
+  creating?: boolean;
+  /** Whether this client is currently subscribed to live `agent_session_event` frames for this session. */
+  subscribed?: boolean;
+  /** Actor epoch reported by the daemon, used for incremental `openSession` sync. */
+  epoch?: string;
+  /** Highest `seq` applied within `epoch`. */
+  lastSeq?: number;
   unread?: boolean;
   deleting?: boolean;
   error?: string;
   options?: SessionOptions;
   permission?: PermissionRequest;
-  /** Form elicitations of this device's turns, kept read-only once answered; memory only. */
+  /** Form elicitations of this session's turns, kept read-only once answered; memory only. */
   elicitations?: Elicitation[];
   /** Agent-predicted next prompt, shown as the composer placeholder until the next turn. */
   suggestion?: string;
@@ -104,17 +111,21 @@ const idleRuntime: SessionRuntime = { load: 'idle' };
 export const getRuntime = (sessionId: string): SessionRuntime => sessionsStore.runtimes[sessionId] ?? idleRuntime;
 
 export const updateRuntime = (sessionId: string, patch: Partial<SessionRuntime>) => {
-  if ('unread' in patch && patch.unread !== getRuntime(sessionId).unread) {
-    saveSessionMeta(sessionId, { unread: Boolean(patch.unread) });
+  const nextPatch = patch.running ? { ...patch, unread: false } : patch;
+  if ('unread' in nextPatch && nextPatch.unread !== getRuntime(sessionId).unread) {
+    saveSessionMeta(sessionId, { unread: Boolean(nextPatch.unread) });
   }
-  sessionsStore({ runtimes: { ...sessionsStore.runtimes, [sessionId]: { ...getRuntime(sessionId), ...patch } } });
+  sessionsStore({ runtimes: { ...sessionsStore.runtimes, [sessionId]: { ...getRuntime(sessionId), ...nextPatch } } });
 };
 
-export const isTurnRunning = (sessionId: string) => Boolean(getRuntime(sessionId).turn);
+export const isTurnRunning = (sessionId: string) => {
+  const runtime = getRuntime(sessionId);
+  return Boolean(runtime.running || runtime.creating);
+};
 
 export const runningSessionIds = () =>
   Object.entries(sessionsStore.runtimes)
-    .filter(([, runtime]) => runtime.turn)
+    .filter(([, runtime]) => runtime.running || runtime.creating)
     .map(([sessionId]) => sessionId);
 
 export const getMessages = (sessionId: string): ChatMessage[] => messagesStore.bySession[sessionId] ?? [];

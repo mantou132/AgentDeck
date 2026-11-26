@@ -1,4 +1,4 @@
-import type { LoadedSession, RemoteSession } from 'src/agent/api';
+import type { OpenedSession, RemoteSession } from 'src/agent/api';
 import type { Attachment } from 'src/attachment/types';
 
 export type DeckSession = RemoteSession & {
@@ -73,4 +73,4 @@ export type Subagent = {
   cancellable?: boolean;
 };
 
-export type SessionOptions = Pick<LoadedSession, 'modes' | 'configOptions'>;
+export type SessionOptions = Pick<OpenedSession, 'modes' | 'configOptions'>;

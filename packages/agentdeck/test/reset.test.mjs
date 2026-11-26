@@ -3,11 +3,11 @@ import { test } from 'node:test';
 import { deviceKey, documentFixture, relayId, resetKey, settingsKey, tick } from './helpers/app-fixture.mjs';
 
 for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
-  test(`reset during ${operation} reloads a clean App that can close/load and prompt again`, async () => {
+  test(`reset during ${operation} reloads a clean App that can open and prompt again`, async () => {
     const old = documentFixture();
     await old.connect();
     if (operation === 'loading') {
-      old.heldMethods.add('agent_session_load');
+      old.heldMethods.add('agent_session_open');
       old.app.ensureSessionLoaded('s1');
       await old.settleHost();
       assert.equal(old.app.getRuntime('s1').load === 'loading', true);
@@ -68,31 +68,24 @@ for (const operation of ['loading', 'creating', 'prompt', 'permission']) {
       false,
     );
 
-    // A live old host may still emit replies and permission requests after reset.
-    fresh.reply(staleRequest, { answer: 'old answer', sessionId: 'old-created' });
-    fresh.deliver({
-      method: 'agent_permission_request',
-      params: { agent: 'codex', sessionId: 's1', requestId: 'p2' },
-      peerId: 1,
-    });
+    // Late RPC replies for pre-reset requests are ignored cleanly.
+    fresh.reply(staleRequest, { ok: true, sessionId: 'old-created' });
     await tick();
     assert.equal(Object.keys(fresh.app.messagesStore.bySession).length, 0);
-    assert.equal(
-      Object.keys(fresh.app.sessionsStore.runtimes).filter((id) => fresh.app.getRuntime(id).permission).length,
-      0,
-    );
 
     await fresh.openSession();
     const methods = fresh.requests.map((request) => request.payload.method);
-    assert.ok(methods.indexOf('agent_session_close') < methods.indexOf('agent_session_load'));
+    assert.ok(methods.includes('agent_session_open'));
+    assert.equal(methods.includes('agent_session_close'), false);
     assert.equal(fresh.app.sendPrompt('s1', 'new task'), true);
     await tick();
     const newPrompt = fresh.requests.find((request) => request.payload.method === 'agent_prompt');
     assert.notEqual(newPrompt.payload.id, staleRequest.payload.id);
-    fresh.reply(staleRequest, { answer: 'another old answer' });
+    fresh.reply(staleRequest, { ok: true });
     await tick();
     assert.equal(fresh.app.isTurnRunning('s1'), true);
-    fresh.reply(newPrompt, { answer: 'new answer' });
+    fresh.reply(newPrompt, { ok: true, agent: 'codex', sessionId: 's1' });
+    fresh.emitTurnAnswer('s1', 'new answer');
     await tick();
     assert.equal(fresh.app.runningSessionIds().length, 0);
     assert.equal(fresh.app.getMessages('s1').at(-1).text, 'new answer');

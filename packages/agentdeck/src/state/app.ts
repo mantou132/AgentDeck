@@ -25,16 +25,18 @@ import {
 } from 'src/config';
 import { i18n } from 'src/i18n';
 import { loadSkills, skillGroups, skillsHash } from 'src/skills';
-import { clearAllInFlight, getAllInFlight, hasActiveInFlightMarker } from 'src/state/in-flight';
 import {
-  applySessionEvent,
   endSession,
+  handleSessionEvent,
+  handleSessionState,
+  handleUserInputResolved,
+  markAllUnsubscribed,
   refreshSessions,
   resetRemoteState,
   resetSessionList,
-  resumeInFlightTurn,
-  settleLostTurns,
+  resyncOpenSessions,
   showUserInput,
+  syncActiveSessions,
 } from 'src/state/sessions';
 import { agentdeckStore, isSkillEnabled, isTurnRunning, sessionsStore, updateRuntime } from 'src/state/store';
 import { refreshTasks, resetTasks } from 'src/state/tasks';
@@ -102,17 +104,27 @@ const handleTransportMessage = (message: TransportMessage) => {
         recordPairing({ hostname, home, customAgents, restrictedFeatures });
         refreshSessions();
         refreshTasks();
-        // Older daemon has no reconciliation endpoint; stay waiting if it fails
-        settleLostTurns().catch(console.error);
+        syncActiveSessions().catch(console.error);
+        resyncOpenSessions();
         if (!daemonVersionChecked) {
           daemonVersionChecked = true;
           if (isDaemonOutdated(hostVersion)) Toast.open('warning', i18n.get('error.daemonOutdated'));
         }
+      } else {
+        markAllUnsubscribed();
       }
       break;
     }
     case 'session_event': {
-      applySessionEvent(message.sessionId, message.event);
+      handleSessionEvent(message.sessionId, message.epoch, message.event);
+      break;
+    }
+    case 'session_state': {
+      handleSessionState(message.state);
+      break;
+    }
+    case 'user_input_resolved': {
+      handleUserInputResolved(message.sessionId, message.requestId);
       break;
     }
     case 'session_ended': {
@@ -128,14 +140,11 @@ const handleTransportMessage = (message: TransportMessage) => {
 };
 
 export const startApp = async () => {
-  // The Relay store moved to IndexedDB; drop the old localStorage copy.
+  // The Relay store moved to IndexedDB and in-flight state moved to the daemon; drop legacy local copies.
   localStorage.removeItem(DEFAULT_STORAGE_KEY);
-  let resetWasPending = false;
+  if (typeof indexedDB?.deleteDatabase === 'function') indexedDB.deleteDatabase('agentdeck-in-flight');
   try {
     if (sessionStorage.getItem(RESET_PENDING_KEY)) {
-      resetWasPending = true;
-      // Clear after reload: callbacks in the old document can no longer refill the outbox.
-      clearAllInFlight();
       clearDrafts().catch(console.error);
       // The transport must not start before the old outbox is gone, or it would replay it.
       await clearTransportStorage();
@@ -152,28 +161,13 @@ export const startApp = async () => {
     return;
   }
 
-  const restoreInFlights = getAllInFlight()
-    .then((inFlights) => {
-      for (const item of inFlights) {
-        const updatedAt =
-          item.session.updatedAt ||
-          (item.updatedAt ? new Date(item.updatedAt).toISOString() : new Date().toISOString());
-        resumeInFlightTurn({ ...item, session: { ...item.session, updatedAt } });
-      }
-    })
-    .catch((error) => {
-      console.error('Failed to restore in-flight sessions:', error);
-    });
-
-  const shouldAckHead = resetWasPending || !hasActiveInFlightMarker();
   initTransport({
     initialRelayId: agentdeckStore.settings.relayId,
     initialRelayUrl: agentdeckStore.settings.relayUrl,
-    ackHead: shouldAckHead,
+    ackHead: true,
     skills: clientSkills(),
     onUserInput: showUserInput,
     onMessage: handleTransportMessage,
-    onBeforePayload: () => restoreInFlights,
   });
 };
 
@@ -192,6 +186,7 @@ export const setLanguage = async (language: AppLanguage) => {
   await (language ? i18n.setLanguage(language) : i18n.resetLanguage());
 };
 
+/** Saves settings and switches transport when needed. Returns whether the host/relay changed. */
 export const saveSettings = (settings: AppSettings) => {
   const next = { relayId: settings.relayId.trim(), agent: settings.agent.trim(), relayUrl: settings.relayUrl || '' };
   if (!isPairingId(next.relayId)) throw new Error(i18n.get('error.invalidRelayId'));
@@ -215,13 +210,17 @@ export const saveSettings = (settings: AppSettings) => {
   } else if (agentChanged) resetSessionList();
   const { relayUrl } = next;
   if (relayChanged) startTransport(next.relayId, { ackHead: true, relayUrl, skills: clientSkills() });
-  else if (notConnected) startTransport(next.relayId, { relayUrl, skills: clientSkills() });
-  else if (agentChanged && agentdeckStore.connection === 'connected') refreshSessions();
+  else if (notConnected) startTransport(next.relayId, { ackHead: true, relayUrl, skills: clientSkills() });
+  else if (agentChanged && agentdeckStore.connection === 'connected') {
+    refreshSessions();
+    syncActiveSessions().catch(console.error);
+  }
+  return relayChanged;
 };
 
 /**
  * Reloads the entire App, terminating connections, callbacks, pending permissions, and Stack pages in the old document.
- * Pairing settings are preserved; Relay cache and unresolved sessions are cleared upon restart without waiting for remote cancellation or closure.
+ * Pairing settings are preserved; Relay cache is cleared upon restart without cancelling or closing remote sessions.
  */
 export const hardResetApp = () => {
   sessionStorage.setItem(RESET_PENDING_KEY, 'true');

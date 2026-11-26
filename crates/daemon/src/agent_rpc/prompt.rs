@@ -91,9 +91,9 @@ pub(super) fn message_timeout_secs(params: &Value) -> u64 {
 }
 
 /// Marks prompts sent from the client's voice chat; the `remote_app` system
-/// prompt asks for a spoken summary after it. The client strips it from
-/// replayed user messages.
-pub(super) const VOICE_CHAT_MARKER: &str = "<agentdeck-voice-chat/>";
+/// prompt asks for a spoken summary after it. Only appended to the ACP request,
+/// never recorded in the daemon's event buffer.
+pub(crate) const VOICE_CHAT_MARKER: &str = "<agentdeck-voice-chat/>";
 
 pub(super) fn message_voice_chat(params: &Value) -> bool {
     params

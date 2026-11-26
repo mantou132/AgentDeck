@@ -8,13 +8,14 @@ async function running() {
   await fixture.openSession();
   fixture.app.sendPrompt('s1', 'Review permissions');
   await tick();
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  await tick();
   return fixture;
 }
 
 for (const outcome of ['completed', 'failed']) {
   test(`a ${outcome} task dismisses its pending permission and allows a new task`, async () => {
     const f = await running();
-    const prompt = f.requests.at(-1);
     f.deliver({
       method: 'agent_permission_request',
       peerId: 1,
@@ -27,8 +28,8 @@ for (const outcome of ['completed', 'failed']) {
     });
     await tick();
     assert.ok(f.app.getRuntime('s1').permission);
-    if (outcome === 'failed') f.deliver({ id: prompt.payload.id, peerId: 1, error: 'Agent stopped' });
-    else f.reply(prompt, { answer: 'Done' });
+    if (outcome === 'failed') f.emitEvent('s1', { event: 'turn_ended', error: 'Agent stopped' });
+    else f.emitTurnAnswer('s1', 'Done');
     await tick();
     assert.equal(f.app.getRuntime('s1').permission, undefined);
     // The host settles the request with the turn; nothing is answered.
@@ -39,7 +40,8 @@ for (const outcome of ['completed', 'failed']) {
     assert.equal(f.app.runningSessionIds().length, 0);
     assert.equal(f.app.sendPrompt('s1', 'Next task'), true);
     await tick();
-    f.reply(f.requests.at(-1), { answer: 'Next answer' });
+    f.reply(f.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+    f.emitTurnAnswer('s1', 'Next answer');
     await tick();
     assert.equal(f.app.getMessages('s1').at(-1).text, 'Next answer');
   });
@@ -59,7 +61,8 @@ test('cancelling an unknown remote task shows the reset recovery path', async ()
   await fresh.openSession();
   assert.equal(fresh.app.sendPrompt('s1', 'Recovered task'), true);
   await tick();
-  fresh.reply(fresh.requests.at(-1), { answer: 'Recovered' });
+  fresh.reply(fresh.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  fresh.emitTurnAnswer('s1', 'Recovered');
   await tick();
   assert.equal(fresh.app.runningSessionIds().length, 0);
 });
@@ -67,7 +70,7 @@ test('cancelling an unknown remote task shows the reset recovery path', async ()
 test('completed responses stay unread across list refreshes until read or a new prompt starts', async () => {
   const f = await running();
   assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
-  f.reply(f.requests.at(-1), { answer: 'Done' });
+  f.emitTurnAnswer('s1', 'Done');
   await tick();
   assert.ok(Boolean(f.app.getRuntime('s1').unread));
 
@@ -80,7 +83,8 @@ test('completed responses stay unread across list refreshes until read or a new 
   assert.equal(Object.values(f.app.sessionsStore.runtimes).filter((runtime) => runtime.unread).length, 0);
   assert.equal(f.app.sendPrompt('s1', 'Next task'), true);
   await tick();
-  f.reply(f.requests.at(-1), { answer: 'Next answer' });
+  f.reply(f.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  f.emitTurnAnswer('s1', 'Next answer');
   await tick();
   assert.ok(Boolean(f.app.getRuntime('s1').unread));
   assert.equal(f.app.sendPrompt('s1', 'One more task'), true);
@@ -90,19 +94,15 @@ test('completed responses stay unread across list refreshes until read or a new 
 for (const outcome of ['failed', 'cancelled', 'ended']) {
   test(`${outcome} responses do not create an unread completion reminder`, async () => {
     const f = await running();
-    const prompt = f.requests.at(-1);
     if (outcome === 'failed') {
-      f.deliver({ id: prompt.payload.id, peerId: 1, error: 'Agent stopped' });
+      f.emitEvent('s1', { event: 'turn_ended', error: 'Agent stopped' });
+    } else if (outcome === 'cancelled') {
+      f.app.cancelTurn('s1');
+      await tick();
+      f.reply(f.requests.at(-1), { cancelled: true });
+      f.emitEvent('s1', { event: 'turn_ended', stopReason: 'cancelled' });
     } else {
-      if (outcome === 'cancelled') {
-        f.app.cancelTurn('s1');
-        await tick();
-        f.reply(f.requests.at(-1), { cancelled: true });
-        f.deliver({ id: prompt.payload.id, peerId: 1, event: { event: 'stop', stop_reason: 'cancelled' } });
-      } else {
-        f.deliver({ method: 'agent_session_ended', params: { agent: 'codex', sessionId: 's1' } });
-      }
-      f.reply(prompt, { answer: 'Partial response' });
+      f.deliver({ method: 'agent_session_ended', params: { agent: 'codex', sessionId: 's1' } });
     }
     await tick();
     assert.equal(f.app.runningSessionIds().length, 0);
@@ -117,7 +117,8 @@ test('completion reminders of new sessions are saved locally until read', async 
   const creating = f.app.promotePendingSession(pendingSession, 'First task');
   await f.settleHost();
   const session = await creating;
-  f.reply(f.requests.at(-1), { answer: 'Done' });
+  f.reply(f.requests.at(-1), { ok: true, agent: 'codex', sessionId: session.sessionId });
+  f.emitTurnAnswer(session.sessionId, 'Done', { epoch: 'ep-created' });
   await tick();
   assert.ok(Boolean(f.app.getRuntime(session.sessionId).unread));
   f.app.resetRemoteState();
@@ -153,13 +154,13 @@ test('pending permission requests expose active permission status for session li
   assert.equal(f.app.isTurnRunning('s1'), true);
 });
 
-test('createSession and loadSession pass remote_app panelContext', async () => {
+test('createSession and openSession pass remote_app panelContext', async () => {
   const f = documentFixture();
   await f.connect();
   await f.openSession();
-  const loadReq = f.requests.find((r) => r.payload.method === 'agent_session_load');
-  assert.ok(loadReq);
-  assert.deepEqual(loadReq.payload.params.panelContext, { surface: 'remote_app' });
+  const openReq = f.requests.find((r) => r.payload.method === 'agent_session_open');
+  assert.ok(openReq);
+  assert.deepEqual(openReq.payload.params.panelContext, { surface: 'remote_app' });
 
   const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
   const creating = f.app.promotePendingSession(pendingSession, 'First task');
@@ -194,7 +195,7 @@ test('a creation cancelled and sent again keeps only the later turn', async () =
   const [firstCreate, secondCreate] = f.requests.filter((r) => r.payload.method === 'agent_session_create');
   f.heldMethods.clear();
 
-  f.reply(firstCreate, { sessionId: 'stale', agent: 'codex' });
+  f.reply(firstCreate, { sessionId: 'stale', agent: 'codex', epoch: 'ep-stale', seq: 0 });
   assert.equal(await cancelled, null);
   await f.settleHost();
   assert.equal(
@@ -203,7 +204,7 @@ test('a creation cancelled and sent again keeps only the later turn', async () =
   );
   assert.equal(f.app.isTurnRunning(pendingSession.sessionId), true);
 
-  f.reply(secondCreate, { sessionId: 'created', agent: 'codex' });
+  f.reply(secondCreate, { sessionId: 'created', agent: 'codex', epoch: 'ep-created', seq: 0 });
   assert.equal((await resent).sessionId, 'created');
   await tick();
   const prompts = f.requests.filter((r) => r.payload.method === 'agent_prompt');
@@ -215,7 +216,7 @@ test('a creation cancelled and sent again keeps only the later turn', async () =
 
 test('an expired agent login shows a sign-in hint instead of the agent error', async () => {
   const f = await running();
-  f.deliver({ id: f.requests.at(-1).payload.id, peerId: 1, error: 'Authentication required', code: 'auth_required' });
+  f.emitEvent('s1', { event: 'turn_ended', error: 'Authentication required', code: 'auth_required' });
   await tick();
   assert.equal(
     f.app.getRuntime('s1').error,
@@ -224,7 +225,8 @@ test('an expired agent login shows a sign-in hint instead of the agent error', a
 
   assert.equal(f.app.sendPrompt('s1', 'Retry'), true);
   await tick();
-  f.deliver({ id: f.requests.at(-1).payload.id, peerId: 1, error: 'Agent stopped' });
+  f.reply(f.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  f.emitEvent('s1', { event: 'turn_ended', error: 'Agent stopped' });
   await tick();
   assert.equal(f.app.getRuntime('s1').error, 'Agent stopped');
 });

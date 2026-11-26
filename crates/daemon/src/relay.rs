@@ -293,7 +293,7 @@ impl RemotePeerManager {
         (peer, skills)
     }
 
-    pub(crate) fn stop_streams_for_device(&self, device_id: &str) {
+    pub(crate) fn on_device_connection_reset(&self, device_id: &str) {
         let peer_id = self
             .devices
             .lock()
@@ -302,6 +302,7 @@ impl RemotePeerManager {
             .map(|device| device.peer_id);
         if let Some(peer_id) = peer_id {
             self.service.stop_screen_streams(peer_id);
+            self.service.unsubscribe_peer(peer_id);
         }
     }
 
@@ -483,13 +484,13 @@ impl ClientHandler for Handler {
 
     fn on_peer_connected(&self, device_id: &str) {
         // A reconnecting or socket-replacing peer already dropped its ephemeral
-        // calls on the client side; stop any stale streams from its previous
-        // connection.
-        self.manager.stop_streams_for_device(device_id);
+        // calls and will re-open its active session; stop any stale streams and
+        // clear old subscriptions from its previous connection.
+        self.manager.on_device_connection_reset(device_id);
     }
 
     fn on_peer_disconnected(&self, device_id: &str) {
-        self.manager.stop_streams_for_device(device_id);
+        self.manager.on_device_connection_reset(device_id);
     }
 
     fn on_connected(&self) {
@@ -513,10 +514,12 @@ impl ClientHandler for Handler {
         // Relay client reconnects indefinitely in the background; do not log
         // disconnects or connection errors to avoid flooding logs or disk.
         self.manager.service.stop_all_screen_streams();
+        self.manager.service.unsubscribe_all_peers();
     }
 
     fn on_preempted(&self) {
         self.manager.service.stop_all_screen_streams();
+        self.manager.service.unsubscribe_all_peers();
         tracing::info!("Relay connection preempted: another host connection opened");
     }
 }
@@ -596,22 +599,20 @@ pub fn start(
     Ok(manager)
 }
 
-/// Scheduled runs have no device: their notifications go to every device, and
-/// permission requests and questions also push to every device.
+/// Scheduled runs have no originating device: notifications are broadcast by
+/// `ServiceObserver`, and permission requests/questions push to every recently
+/// attached device with the task id.
 impl crate::tasks::TaskHost for RemotePeerManager {
-    fn notifier(&self, task_id: &str) -> acp_agent::Notifier {
+    fn input_push(&self, task_id: &str) -> acp_agent::TaskInputPush {
         let broadcaster = self.broadcaster();
         let task_id = task_id.to_owned();
-        Arc::new(move |method, params| {
-            if let Some((agent, session_id)) = acp_agent::input_request_session(method, &params) {
-                broadcaster.push(
-                    push::PushKind::InputRequest,
-                    agent,
-                    session_id,
-                    Some(&task_id),
-                );
-            }
-            broadcaster.notify(method, &params);
+        Arc::new(move |agent, session_id| {
+            broadcaster.push(
+                push::PushKind::InputRequest,
+                agent,
+                session_id,
+                Some(&task_id),
+            );
         })
     }
 
@@ -772,7 +773,7 @@ mod tests {
         assert_eq!(target.as_deref(), Some("test-phone"));
         handler.on_payload(vector["wrongPeerFrame"].clone());
         handler.on_payload(vector["wrongDeviceFrame"].clone());
-        handler.on_payload(json!({"id":"plain", "method":"agent_prompts_running", "peerId":1}));
+        handler.on_payload(json!({"id":"plain", "method":"agent_active_sessions", "peerId":1}));
         tokio::task::yield_now().await;
         assert!(outbound_rx.try_recv().is_err());
     }
@@ -782,7 +783,7 @@ mod tests {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let manager = RemotePeerManager::with_devices(AgentService::new(), tx, HashMap::new());
 
-        let request = json!({ "peerId": 1, "id": "e", "method": "agent_prompts_running", "params": {}, "ephemeral": true });
+        let request = json!({ "peerId": 1, "id": "e", "method": "agent_active_sessions", "params": {}, "ephemeral": true });
         manager.dispatch(request).await;
         let reply = rx.recv().await.unwrap();
         assert!(reply.ephemeral);
@@ -791,7 +792,7 @@ mod tests {
 
         manager
             .dispatch(
-                json!({ "peerId": 1, "id": "d", "method": "agent_prompts_running", "params": {} }),
+                json!({ "peerId": 1, "id": "d", "method": "agent_active_sessions", "params": {} }),
             )
             .await;
         assert!(!rx.recv().await.unwrap().ephemeral);
@@ -890,12 +891,12 @@ mod tests {
             Some(2)
         );
 
-        // Phone A calls agent_prompts_running with peerId 1
+        // Phone A calls agent_active_sessions with peerId 1
         manager
             .dispatch(json!({
                 "peerId": 1,
                 "id": "req-a2",
-                "method": "agent_prompts_running",
+                "method": "agent_active_sessions",
                 "params": {}
             }))
             .await;
@@ -907,7 +908,7 @@ mod tests {
         } = outbound_rx
             .recv()
             .await
-            .expect("Phone A agent_prompts_running");
+            .expect("Phone A agent_active_sessions");
         assert_eq!(target_running, Some("device-phone-a".to_string()));
         assert_eq!(res_running.get("peerId").and_then(Value::as_u64), Some(1));
         assert_eq!(

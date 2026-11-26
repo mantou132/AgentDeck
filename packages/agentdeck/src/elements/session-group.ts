@@ -133,7 +133,7 @@ export class DeckSessionGroupElement extends GemElement {
                           ${i18n.get('session.running')}
                         </span>
                         <span
-                          v-if=${isUnread}
+                          v-else-if=${isUnread}
                           class="inline-flex shrink-0 items-center gap-1 rounded-full bg-positive/10 px-2 py-0.5 font-semibold text-positive"
                           title=${i18n.get('session.completedUnreadTip')}
                         >

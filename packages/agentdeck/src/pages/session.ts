@@ -31,6 +31,7 @@ import {
   promotePendingSession,
   retrySessionLoad,
   sendPrompt,
+  trackSessionPage,
 } from 'src/state/sessions';
 import { shareStore } from 'src/state/share';
 import {
@@ -125,6 +126,9 @@ export class AgentDeckSessionPageElement extends GemElement {
     openSession(forked.sessionId);
   };
 
+  @effect((instance) => [instance.sessionId])
+  #trackPage = () => trackSessionPage(this.sessionId);
+
   // Also runs once connected: a session opened while reconnecting loads then. A session opened from a push may also
   // wait for the list to have it.
   @effect((instance) => [
@@ -210,7 +214,7 @@ export class AgentDeckSessionPageElement extends GemElement {
         accepted = sendPrompt(session.sessionId, text, attachments, onFailed, voiceChat);
       }
 
-      // Once submission is accepted and in-flight persistence takes over input, the original draft can be deleted.
+      // Once submission is accepted, the original draft can be deleted.
       if (accepted) await removeDraft(originalDraftKey);
     } catch {
       failed = true;
@@ -379,12 +383,13 @@ export class AgentDeckSessionPageElement extends GemElement {
     const messages = getMessages(session.sessionId);
     const loading = this.#loading;
     const loaded = runtime.load === 'loaded';
-    const pending = Boolean(runtime.turn);
+    const pending = isTurnRunning(session.sessionId);
     const error =
       runtime.error ||
       (isConnecting() ? '' : agentdeckStore.connectionError) ||
       (!loaded && !loading ? i18n.get('session.notLoaded') : '');
     const connected = agentdeckStore.connection === 'connected';
+    const ready = connected && loaded && (Boolean(session.pendingCreation) || Boolean(runtime.subscribed));
     const questionPending = hasPendingElicitation(runtime.elicitations);
     return html`
       <tap-page ${this.#pageRef} class="bg-bg text-text" .trackVisibility=${false} @full-show=${() => this.#state({ entered: true })}>
@@ -454,7 +459,7 @@ export class AgentDeckSessionPageElement extends GemElement {
             >
               <span class="select-text min-w-0 flex-1">${error}</span>
               <button
-                v-if=${!connected || (!loaded && !loading)}
+                v-if=${!connected || (!loading && (!loaded || !ready))}
                 class="shrink-0 cursor-pointer rounded-lg border border-negative/25 bg-bg-light px-2.5 py-1.5 font-semibold text-negative disabled:cursor-default disabled:opacity-45"
                 @click=${this.#retryLoad}
               >
@@ -489,12 +494,12 @@ export class AgentDeckSessionPageElement extends GemElement {
             .draftKey=${draftKey(session)}
             config-label=${getConfigLabel(getConfigSelects(runtime.options))}
             @config-open=${() => openSessionConfig(session.sessionId)}
-            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : loaded ? i18n.get(questionPending ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : i18n.get('session.placeholderLoad')}
-            .suggestion=${connected && loaded ? (runtime.suggestion ?? '') : ''}
+            .placeholder=${loading ? i18n.get('session.placeholderHistory') : !connected ? getConnectionLabel(agentdeckStore.connection) : ready ? i18n.get(questionPending ? 'session.placeholderQuestion' : 'session.placeholderPrompt') : loaded ? i18n.get('session.placeholderHistory') : i18n.get('session.placeholderLoad')}
+            .suggestion=${ready ? (runtime.suggestion ?? '') : ''}
             .commands=${agentdeckStore.commandsByAgent[session.agent] ?? []}
             .submit=${this.#send}
             ?disabled=${!loaded}
-            ?ready=${connected && loaded}
+            ?ready=${ready}
             ?pending=${pending}
             @cancel=${() => cancelTurn(this.sessionId)}
             @preview=${this.#previewAttachment}
@@ -512,7 +517,7 @@ export class AgentDeckSessionPageElement extends GemElement {
           <deck-voice-chat
             .sessionId=${this.sessionId}
             .submit=${this.#send}
-            ?ready=${connected && loaded}
+            ?ready=${ready}
             ?active=${this.#state.voiceChat}
           ></deck-voice-chat>
         `}

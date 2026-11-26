@@ -1,5 +1,5 @@
 import { type OutboundMessage, RelayClient, type RelayConnectionState, type RelayStore } from 'relay-client-ts';
-import { AgentApi, type ClientSkills, type SessionEvent, type UserInput } from 'src/agent/api';
+import { AgentApi, type ClientSkills, type SessionEvent, type SessionStateUpdate, type UserInput } from 'src/agent/api';
 import { isPairingId } from 'src/agent/encryption';
 import { RelayCodec } from 'src/agent/relay-codec';
 import { clearRelayStore, indexedDbRelayStore } from 'src/agent/relay-store';
@@ -24,7 +24,6 @@ type InitTransportOptions = {
   initialRelayUrl?: string;
   onUserInput: (input: UserInput) => void;
   onMessage: MessageHandler;
-  onBeforePayload?: () => Promise<unknown> | undefined;
   ackHead?: boolean;
   skills?: ClientSkills;
 };
@@ -44,7 +43,9 @@ export type TransportMessage =
       restrictedFeatures?: string[];
     }
   | { type: 'delivery_error'; error: string }
-  | { type: 'session_event'; sessionId: string; event: SessionEvent }
+  | { type: 'session_event'; agent: string; sessionId: string; epoch: string; event: SessionEvent }
+  | { type: 'session_state'; state: SessionStateUpdate }
+  | { type: 'user_input_resolved'; agent: string; sessionId: string; requestId: string }
   | { type: 'session_ended'; sessionId: string }
   | { type: 'prompt_suggestion'; sessionId: string; suggestion: string };
 
@@ -301,7 +302,6 @@ class AgentTransport {
 
   #connectTimer: ReturnType<typeof setTimeout> | undefined;
   #retryTimer: ReturnType<typeof setTimeout> | undefined;
-  #beforePayloadHook: (() => Promise<unknown> | undefined) | undefined;
 
   constructor() {
     this.agentApi = new AgentApi(
@@ -340,6 +340,10 @@ class AgentTransport {
         await this.#outboxStore?.withdrawRpc(id);
       },
     );
+    // With presence, `peer_connected` already re-attaches.
+    this.agentApi.setHostReconnectedHandler(() => {
+      if (!this.hasPresence) this.syncHostConnection();
+    });
   }
 
   getDeviceId(): string {
@@ -360,10 +364,6 @@ class AgentTransport {
     return () => {
       this.#messageHandlers.delete(handler);
     };
-  }
-
-  setBeforePayloadHook(hook: (() => Promise<unknown> | undefined) | undefined) {
-    this.#beforePayloadHook = hook;
   }
 
   dispatchMessage(message: TransportMessage) {
@@ -561,11 +561,6 @@ class AgentTransport {
   }
 
   async #receive(message: RpcMessage) {
-    if (this.#beforePayloadHook) {
-      try {
-        await this.#beforePayloadHook();
-      } catch {}
-    }
     if (!this.hostSession.isPayloadAllowed(message as Record<string, unknown>)) return;
     // After a reconnect the Relay replays the host's backlog first and the attach reply comes after it.
     const { attachId } = this.hostSession;
@@ -629,25 +624,20 @@ export const clearTransportStorage = clearRelayStore;
 let transportInitialized = false;
 export const initTransport = (options: InitTransportOptions) => {
   transport.addMessageHandler(options.onMessage);
-  transport.setBeforePayloadHook(options.onBeforePayload);
   if (transportInitialized) return;
   transportInitialized = true;
   agentApi.setUserInputHandler(options.onUserInput);
+  agentApi.setUserInputResolvedHandler(({ agent, sessionId, requestId }) =>
+    transport.dispatchMessage({ type: 'user_input_resolved', agent, sessionId, requestId }),
+  );
   agentApi.setSessionEndedHandler(({ sessionId }) => transport.dispatchMessage({ type: 'session_ended', sessionId }));
   agentApi.setPromptSuggestionHandler(({ sessionId, suggestion }) =>
     transport.dispatchMessage({ type: 'prompt_suggestion', sessionId, suggestion }),
   );
-  agentApi.setSessionUpdateHandler(({ sessionId, childSessionId, update }) =>
-    transport.dispatchMessage({
-      type: 'session_event',
-      sessionId,
-      event: { event: 'session_update', update, childSessionId },
-    }),
+  agentApi.setSessionEventHandler(({ agent, sessionId, epoch, event }) =>
+    transport.dispatchMessage({ type: 'session_event', agent, sessionId, epoch, event }),
   );
-  // With presence, `peer_connected` already re-attaches.
-  agentApi.setHostReconnectedHandler(() => {
-    if (!transport.hasPresence) syncHostConnection();
-  });
+  agentApi.setSessionStateHandler((state) => transport.dispatchMessage({ type: 'session_state', state }));
   if (isPairingId(options.initialRelayId))
     startTransport(options.initialRelayId, {
       ackHead: options.ackHead,

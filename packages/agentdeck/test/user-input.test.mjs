@@ -103,6 +103,7 @@ const permissionRequest = (requestId = 'p1') => ({
 test('a question of a running turn is shown once, answered through the host and settled with the turn', async () => {
   const f = await running();
   const prompt = f.requests.find((request) => request.payload.method === 'agent_prompt');
+  f.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
   for (let i = 0; i < 2; i++) f.deliver({ method: 'agent_elicitation_request', peerId: 1, params: askRequest() });
   await tick();
   assert.equal(f.app.getRuntime('s1').elicitations.length, 1);
@@ -124,7 +125,7 @@ test('a question of a running turn is shown once, answered through the host and 
   await answering;
   assert.equal(f.app.getRuntime('s1').elicitations[0].response, undefined, 'answerable again when not taken');
 
-  f.reply(prompt, { answer: 'Done' });
+  f.emitTurnAnswer('s1', 'Done');
   await tick();
   assert.equal(f.app.getRuntime('s1').elicitations[0].response.action, 'cancel');
 });
@@ -148,15 +149,27 @@ test('a permission is answered through the host and comes back when the answer i
   assert.deepEqual(plain(cancel.payload.params.response), {});
 });
 
-test('requests are ignored once the turn is not running', async () => {
-  const f = documentFixture();
-  await f.connect();
-  await f.openSession();
-  f.deliver({ method: 'agent_elicitation_request', peerId: 1, params: askRequest() });
-  f.deliver({ method: 'agent_permission_request', peerId: 1, params: permissionRequest() });
+test('agent_user_input_resolved dismisses pending permissions and elicitations answered elsewhere', async () => {
+  const f = await running();
+  f.deliver({ method: 'agent_elicitation_request', peerId: 1, params: askRequest('r1') });
+  f.deliver({ method: 'agent_permission_request', peerId: 1, params: permissionRequest('p1') });
   await tick();
-  assert.equal(f.app.getRuntime('s1').elicitations, undefined);
+  assert.equal(f.app.getRuntime('s1').elicitations.length, 1);
+  assert.equal(f.app.getRuntime('s1').permission.requestId, 'p1');
+
+  f.deliver({
+    method: 'agent_user_input_resolved',
+    peerId: 1,
+    params: { agent: 'codex', sessionId: 's1', requestId: 'p1' },
+  });
+  f.deliver({
+    method: 'agent_user_input_resolved',
+    peerId: 1,
+    params: { agent: 'codex', sessionId: 's1', requestId: 'r1' },
+  });
+  await tick();
   assert.equal(f.app.getRuntime('s1').permission, undefined);
+  assert.equal(f.app.getRuntime('s1').elicitations.length, 0);
 });
 
 for (const [method, params, read] of [
@@ -168,9 +181,14 @@ for (const [method, params, read] of [
     fixture.deliver({ method, peerId: 1, params });
     await tick();
     const fresh = documentFixture(fixture);
+    fresh.heldMethods.add('agent_active_sessions');
     await fresh.connect();
-    const query = fresh.requests.find((request) => request.payload.method === 'agent_prompts_running');
-    fresh.reply(query, { sessions: [{ agent: 'codex', sessionId: 's1' }], userInputs: [{ method, params }] });
+    const query = fresh.requests.find((request) => request.payload.method === 'agent_active_sessions');
+    assert.ok(query, 'queries active sessions after connecting');
+    fresh.reply(query, {
+      sessions: [{ agent: 'codex', sessionId: 's1', cwd: '/tmp' }],
+      userInputs: [{ method, params }],
+    });
     await fresh.settleHost();
     assert.equal(read(fresh.app).requestId, params.requestId);
   });

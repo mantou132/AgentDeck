@@ -11,7 +11,7 @@ import type { PanelStore } from './types';
 export async function startExtensionTransport(relayId: string) {
   // The Relay store moved to IndexedDB (shared with the App); drop the old chrome.storage copy.
   chrome.storage.local.remove(DEFAULT_STORAGE_KEY).catch(console.error);
-  startTransport(relayId, { deviceId: await getExtensionDeviceId() });
+  startTransport(relayId, { deviceId: await getExtensionDeviceId(), ackHead: true });
 }
 
 /** Load the data required before the panel leaves its initial full-page loader. */
@@ -62,8 +62,10 @@ type MountAgentApiOptions = {
 
 export function mountAgentApi({ sessions, turns, state }: MountAgentApiOptions) {
   agentApi.setUserInputHandler(turns.handleUserInput);
+  agentApi.setUserInputResolvedHandler(turns.handleUserInputResolved);
+  agentApi.setSessionEventHandler(sessions.handleSessionEvent);
+  agentApi.setSessionStateHandler(sessions.handleSessionState);
   agentApi.setSessionEndedHandler(sessions.handleSessionEnded);
-  agentApi.setHostReconnectedHandler(sessions.handleHostReconnect);
 
   const unsubscribeTransport = addTransportMessageHandler((message) => {
     if (message.type === 'delivery_error') {
@@ -72,17 +74,22 @@ export function mountAgentApi({ sessions, turns, state }: MountAgentApiOptions) 
       const { connection, error, home } = message;
       if (connection === 'connected') {
         state({ error: '', ...(home && { home }) });
-      } else if (error && ['unavailable', 'disconnected', 'preempted'].includes(connection)) {
-        state({ error });
+        sessions.resyncCurrentSession();
+      } else {
+        sessions.markAllUnsubscribed();
+        if (error && ['unavailable', 'disconnected', 'preempted'].includes(connection)) {
+          state({ error });
+        }
       }
     }
   });
 
   return () => {
     unsubscribeTransport();
-    turns.declineAllPermissions();
     agentApi.setUserInputHandler(null);
+    agentApi.setUserInputResolvedHandler(null);
+    agentApi.setSessionEventHandler(null);
+    agentApi.setSessionStateHandler(null);
     agentApi.setSessionEndedHandler(null);
-    agentApi.setHostReconnectedHandler(null);
   };
 }

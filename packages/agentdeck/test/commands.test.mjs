@@ -13,14 +13,9 @@ test('commands announced between turns are kept per agent across restarts', asyn
   const f = documentFixture();
   await f.connect();
   await f.openSession();
-  f.deliver({
-    method: 'agent_session_update',
-    params: {
-      agent: 'codex',
-      sessionId: 's1',
-      update: { sessionUpdate: 'available_commands_update', availableCommands },
-    },
-    peerId: 1,
+  f.emitEvent('s1', {
+    event: 'session_update',
+    update: { sessionUpdate: 'available_commands_update', availableCommands },
   });
   await tick();
   assert.deepEqual(plain(f.app.agentdeckStore.commandsByAgent.codex), availableCommands);

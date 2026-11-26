@@ -49,7 +49,8 @@ test('token refresh preserves a live prompt, allows RPCs and coalesces concurren
   const listing = f.transport.agentApi.listSessions('codex');
   await f.settleHost();
   await listing;
-  f.reply(prompt, { answer: 'done' });
+  f.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
+  f.emitTurnAnswer('s1', 'done');
   await tick();
   assert.equal(f.app.getMessages('s1').at(-1).text, 'done');
   assert.equal(f.app.runningSessionIds().length, 0);

@@ -67,7 +67,8 @@ test('mixed attachments reach the host, survive rejection, and can be sent again
   assert.equal(fixture.app.sendPrompt('s1', message.text, message.attachments), true);
   await tick();
   assert.deepEqual(fixture.requests.at(-1).payload.params.attachments, request.payload.params.attachments);
-  fixture.reply(fixture.requests.at(-1), { answer: 'received' });
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'received');
   await tick();
   assert.equal(fixture.app.getRuntime('s1').error, '');
   assert.equal(fixture.app.getMessages('s1').at(-1).text, 'received');
@@ -86,14 +87,16 @@ test('attachment-only prompts work in both a pending session and an existing ses
   const request = fixture.requests.at(-1);
   assert.equal(request.payload.params.prompt, '');
   assert.equal(request.payload.params.attachments.length, 1);
-  fixture.reply(request, { answer: 'created and received' });
+  fixture.reply(request, { ok: true, agent: 'codex', sessionId: session.sessionId });
+  fixture.emitTurnAnswer(session.sessionId, 'created and received', { epoch: 'ep-created' });
   await tick();
   assert.equal(fixture.app.sendPrompt(session.sessionId, '', [image]), true);
   await tick();
   assert.deepEqual(fixture.requests.at(-1).payload.params.attachments, [
     { type: 'image', data: image.data, mimeType: image.mimeType },
   ]);
-  fixture.reply(fixture.requests.at(-1), { answer: 'image received' });
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: session.sessionId });
+  fixture.emitTurnAnswer(session.sessionId, 'image received', { epoch: 'ep-created' });
   await tick();
   assert.equal(fixture.app.runningSessionIds().length, 0);
   assert.equal(fixture.app.sendPrompt(session.sessionId, '', []), false);

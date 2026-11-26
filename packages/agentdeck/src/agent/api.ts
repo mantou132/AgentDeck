@@ -9,10 +9,12 @@ type CreateSessionOptions = {
   panelContext?: PanelContext | unknown;
 };
 
-type LoadSessionOptions = {
+type OpenSessionOptions = {
   agent: string;
   sessionId: string;
   cwd?: string;
+  sinceEpoch?: string;
+  sinceSeq?: number;
   onEvent?: (event: SessionEvent) => void;
   panelContext?: PanelContext | unknown;
 };
@@ -24,10 +26,13 @@ type ForkSessionOptions = {
   messageId: string;
 };
 
-type ResumePromptHandlers = {
-  onEvent?: (event: SessionEvent) => void | Promise<void>;
-  resolve?: (value: { answer?: string }) => void;
-  reject?: (error: Error) => void;
+export type PromptOptions = {
+  agent: string;
+  sessionId: string;
+  prompt: string;
+  attachments?: PromptAttachment[];
+  voiceChat?: boolean;
+  clientMessageId?: string;
 };
 
 export type RemoteFile = { path: string } & (
@@ -171,8 +176,9 @@ export type AvailableCommand = { name: string; description: string; input?: { hi
 
 /** `childSessionId` marks an update of a subagent session (ACP Subagent Sessions RFD) of the session. */
 export type SessionEvent =
-  | { event: 'session_update'; update: Record<string, unknown>; childSessionId?: string }
-  | { event: 'stop'; stop_reason?: string };
+  | { seq: number; event: 'session_update'; update: Record<string, unknown>; childSessionId?: string }
+  | { seq: number; event: 'turn_started' }
+  | { seq: number; event: 'turn_ended'; stopReason?: string; error?: string; code?: string };
 
 export type SessionModes = {
   currentModeId: string;
@@ -194,13 +200,28 @@ export type SessionConfigOption = {
   | { type: 'boolean'; currentValue: boolean }
 );
 
-export type LoadedSession = {
+export type OpenedSession = {
   agent: string;
   sessionId: string;
+  epoch: string;
+  seq: number;
   title?: string;
   updatedAt?: string;
   modes?: SessionModes | null;
   configOptions?: SessionConfigOption[] | null;
+  running: boolean;
+  userInputs: UserInput[];
+  suggestion?: string | null;
+  fullReplay: boolean;
+  freshLoad: boolean;
+};
+
+export type ActiveSessionInfo = {
+  agent: string;
+  sessionId: string;
+  cwd?: string;
+  title?: string;
+  updatedAt?: string;
 };
 
 export type PermissionRequest = {
@@ -255,6 +276,8 @@ export type UserInput =
 export type CreatedSession = {
   agent?: string;
   sessionId?: string;
+  epoch?: string;
+  seq?: number;
   title?: string;
   updatedAt?: string;
   modes?: SessionModes | null;
@@ -289,11 +312,29 @@ export type ScreenFrame =
 
 export type ScreenCapture = { width: number; height: number; frame: ScreenFrame };
 
-export type SessionUpdateNotification = {
+export type SessionEventNotification = {
   agent: string;
   sessionId: string;
-  childSessionId?: string;
-  update: Record<string, unknown>;
+  epoch: string;
+  event: SessionEvent;
+};
+
+export type SessionStateUpdate = {
+  agent: string;
+  sessionId: string;
+  cwd?: string;
+  title?: string;
+  updatedAt?: string;
+  running: boolean;
+  completed?: boolean;
+  error?: string;
+  code?: string;
+};
+
+export type UserInputResolvedNotification = {
+  agent: string;
+  sessionId: string;
+  requestId: string;
 };
 
 export type PromptSuggestion = { agent: string; sessionId: string; suggestion: string };
@@ -345,16 +386,23 @@ export class AgentApi {
     }
   };
 
+  setUserInputResolvedHandler = (handler?: ((params: UserInputResolvedNotification) => void) | null) =>
+    this.#peer.onNotify('agent_user_input_resolved', (params) => handler?.(params as UserInputResolvedNotification));
+
   setSessionEndedHandler = (handler?: ((params: { agent: string; sessionId: string }) => void) | null) =>
     this.#peer.onNotify('agent_session_ended', (params) => handler?.(params as { agent: string; sessionId: string }));
 
-  /** Claude's predicted next prompt, sent after a turn to the device that started it. */
+  /** Claude's predicted next prompt, sent after a turn to subscribed peers. */
   setPromptSuggestionHandler = (handler?: ((params: PromptSuggestion) => void) | null) =>
     this.#peer.onNotify('agent_prompt_suggestion', (params) => handler?.(params as PromptSuggestion));
 
-  /** Session updates the agent sends between turns (e.g. available commands), to the device that created or loaded it. */
-  setSessionUpdateHandler = (handler?: ((params: SessionUpdateNotification) => void) | null) =>
-    this.#peer.onNotify('agent_session_update', (params) => handler?.(params as SessionUpdateNotification));
+  /** Sequenced session events sent to subscribed peers. */
+  setSessionEventHandler = (handler?: ((params: SessionEventNotification) => void) | null) =>
+    this.#peer.onNotify('agent_session_event', (params) => handler?.(params as SessionEventNotification));
+
+  /** Broadcast session lifecycle updates (turn started/ended, metadata changes). */
+  setSessionStateHandler = (handler?: ((params: SessionStateUpdate) => void) | null) =>
+    this.#peer.onNotify('agent_session_state', (params) => handler?.(params as SessionStateUpdate));
 
   /** The host reports `status` while starting `agent` for a session call; `undefined` once that call settles. */
   setAgentStatusHandler = (handler?: ((agent: string, status?: AgentStatus) => void) | null) => {
@@ -585,20 +633,26 @@ export class AgentApi {
     return sessions;
   };
 
-  loadSession = ({ agent, sessionId, cwd, onEvent, panelContext }: LoadSessionOptions) =>
-    this.#agentCall<LoadedSession>(
+  openSession = ({ agent, sessionId, cwd, sinceEpoch, sinceSeq, onEvent, panelContext }: OpenSessionOptions) =>
+    this.#agentCall<OpenedSession>(
       agent,
-      'agent_session_load',
+      'agent_session_open',
       {
         sessionId,
         ...(cwd ? { cwd } : {}),
-        stream: true,
+        ...(sinceEpoch ? { sinceEpoch, sinceSeq: sinceSeq ?? 0 } : {}),
         timeoutSeconds: sessionTimeoutSeconds,
         ...(panelContext ? { panelContext } : {}),
       },
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
       onEvent ? (event) => onEvent(event as SessionEvent) : undefined,
     );
+
+  unsubscribeSession = (agent: string, sessionId: string) =>
+    this.#peer.call<{ ok: boolean }>('agent_session_unsubscribe', { agent, sessionId }, undefined, {
+      timeoutMs: 10_000,
+      timeoutMessage: 'Unsubscribe session timeout',
+    });
 
   /** Fork up to and including the agent message `messageId`; the new session is loaded like any other. */
   forkSession = ({ agent, sessionId, cwd, messageId }: ForkSessionOptions) =>
@@ -626,38 +680,30 @@ export class AgentApi {
       },
     );
 
-  prompt = (
-    sessionId: string,
-    agent: string,
-    prompt: string,
-    onEvent: (event: SessionEvent) => void | Promise<void>,
-    attachments: PromptAttachment[] = [],
-    callId?: RpcId,
-    voiceChat?: boolean,
-  ) =>
-    this.#peer.call<{ answer?: string }>(
+  prompt = ({ agent, sessionId, prompt, attachments = [], voiceChat, clientMessageId }: PromptOptions) =>
+    this.#peer.call<{ ok: boolean; agent: string; sessionId: string }>(
       'agent_prompt',
-      { agent, sessionId, prompt, attachments, voiceChat, stream: true },
-      (event) => onEvent(event as SessionEvent),
+      {
+        agent,
+        sessionId,
+        prompt,
+        attachments,
+        ...(voiceChat ? { voiceChat: true } : {}),
+        ...(clientMessageId ? { clientMessageId } : {}),
+      },
       undefined,
-      callId,
+      {
+        timeoutMs: 30_000,
+        timeoutMessage: i18n.get('error.sendMessageFailed'),
+      },
     );
 
-  resumePrompt = (rpcId: RpcId, handlers: ResumePromptHandlers) =>
-    this.#peer.resumeCall(rpcId, {
-      onEvent: (event) => handlers.onEvent?.(event as SessionEvent),
-      resolve: (value) => handlers.resolve?.(value as { answer?: string }),
-      reject: handlers.reject,
-    });
-
-  forgetPrompt = (rpcId: RpcId) => this.#peer.forget(rpcId);
-
-  listRunningPrompts = () =>
-    this.#peer.call<{ sessions: { agent: string; sessionId: string }[]; userInputs?: UserInput[] }>(
-      'agent_prompts_running',
+  listActiveSessions = () =>
+    this.#peer.call<{ sessions: ActiveSessionInfo[]; userInputs?: UserInput[] }>(
+      'agent_active_sessions',
       {},
       undefined,
-      { timeoutMs: 10_000, timeoutMessage: 'List running prompts timeout' },
+      { timeoutMs: 10_000, timeoutMessage: 'List active sessions timeout' },
     );
 
   respondUserInput = (

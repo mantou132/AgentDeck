@@ -30,6 +30,7 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
   fixture.transport.reconnectTransport(true);
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
+  await fixture.openSession();
   assert.equal(fixture.requests.filter((request) => request.message_id === prompt.message_id).length, 1);
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
@@ -37,7 +38,8 @@ test('rejected prompt settles only its call, is not replayed, and can be retried
   assert.notEqual(retry.message_id, prompt.message_id);
   await reject(fixture, prompt);
   assert.equal(fixture.app.isTurnRunning('s1'), true);
-  fixture.reply(retry, { answer: 'done' });
+  fixture.reply(retry, { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'done');
   await tick();
   assert.equal(fixture.app.runningSessionIds().length, 0);
   assert.equal(fixture.app.getMessages('s1').at(-1).text, 'done');
@@ -90,7 +92,8 @@ test('rejected session list and pending session creation both leave a usable ret
   assert.equal((await created).sessionId, 'created');
   fixture.app.discardPendingSession(pendingSession.sessionId);
   const prompt = fixture.requests.at(-1);
-  fixture.reply(prompt, { answer: 'created and sent' });
+  fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 'created' });
+  fixture.emitTurnAnswer('created', 'created and sent', { epoch: 'ep-created' });
   await tick();
   assert.equal(fixture.app.runningSessionIds().length, 0);
 });
@@ -108,7 +111,8 @@ test('oversized UTF-8 frames fail before enqueue or send and a smaller prompt wo
   assert.match(fixture.app.getRuntime('s1').error, /too large/i);
   assert.equal(fixture.app.sendPrompt('s1', 'smaller prompt'), true);
   await tick();
-  fixture.reply(fixture.requests.at(-1), { answer: 'done' });
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'done');
   await tick();
   assert.equal(fixture.app.runningSessionIds().length, 0);
 });
@@ -126,7 +130,8 @@ test('local storage failure does not silently strand a prompt', async () => {
   assert.match(fixture.app.getRuntime('s1').error, /Failed to store pending message/);
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
-  fixture.reply(fixture.requests.at(-1), { answer: 'done' });
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'done');
   await tick();
   assert.equal(fixture.app.runningSessionIds().length, 0);
 });
@@ -148,7 +153,8 @@ test('WebSocket send failure reaches the prompt and removes its queued message',
   socket.send = send;
   assert.equal(fixture.app.sendPrompt('s1', 'retry'), true);
   await tick();
-  fixture.reply(fixture.requests.at(-1), { answer: 'done' });
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'done');
   await tick();
   assert.equal(fixture.app.runningSessionIds().length, 0);
 });
@@ -181,7 +187,8 @@ test('rejected permission reply is visible and reset restores the normal session
   await fresh.openSession();
   assert.equal(fresh.app.sendPrompt('s1', 'new task'), true);
   await tick();
-  fresh.reply(fresh.requests.at(-1), { answer: 'recovered' });
+  fresh.reply(fresh.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
+  fresh.emitTurnAnswer('s1', 'recovered');
   await tick();
   assert.equal(fresh.app.runningSessionIds().length, 0);
 });
@@ -198,7 +205,8 @@ test('late rejection after stored or pairing change cannot fail another call', a
   await reject(fixture, prompt);
   assert.equal(fixture.app.isTurnRunning('s1'), true);
   assert.equal(fixture.app.getRuntime('s1').error, '');
-  fixture.reply(prompt, { answer: 'done' });
+  fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'done');
   await tick();
   const oldSocket = fixture.sockets.at(-1);
   const cwd = fixture.app.agentApi.browseFiles('/tmp');

@@ -300,6 +300,7 @@ export function documentFixture(previous, options = {}) {
       'lib/speech-recognition',
       'lib/speech-synthesis',
     ].map((name) => load(path.join(root, `src/${name}.ts`))),
+    { isSessionOpened: (sessionId) => app.getRuntime(sessionId).load === 'loaded' },
   );
   const remoteSession = { sessionId: 's1', cwd: '/tmp', agent: 'codex', title: 'Reset test' };
   const encryption = load(path.join(root, 'src/agent/encryption.ts'));
@@ -309,6 +310,13 @@ export function documentFixture(previous, options = {}) {
     outgoingEncryption = new encryption.RelayEncryption(pairingId, 'app', 'unused');
   }
   const processed = new Set();
+  const sessionSeqs = new Map();
+  const sessionEpochs = new Map();
+  const nextSeq = (sessionId) => {
+    const seq = (sessionSeqs.get(sessionId) ?? 0) + 1;
+    sessionSeqs.set(sessionId, seq);
+    return seq;
+  };
   const deliver = (payload) => {
     const sequence = ++host.sequence;
     sockets.at(-1).frame({
@@ -319,21 +327,87 @@ export function documentFixture(previous, options = {}) {
     });
   };
   const reply = (request, result) => deliver({ id: request.payload.id, result, peerId: 1 });
+  const emitEvent = (sessionId, event, { agent = 'codex', epoch } = {}) => {
+    const resolvedEpoch = epoch ?? sessionEpochs.get(sessionId) ?? 'ep-1';
+    sessionEpochs.set(sessionId, resolvedEpoch);
+    const seq = event.seq ?? nextSeq(sessionId);
+    if (seq > (sessionSeqs.get(sessionId) ?? 0)) sessionSeqs.set(sessionId, seq);
+    deliver({
+      method: 'agent_session_event',
+      peerId: 1,
+      params: { agent, sessionId, epoch: resolvedEpoch, event: { ...event, seq } },
+    });
+    return seq;
+  };
+  const emitTurnAnswer = (sessionId, text, { agent = 'codex', epoch, stopReason = 'end_turn', error, code } = {}) => {
+    if (text) {
+      emitEvent(
+        sessionId,
+        {
+          event: 'session_update',
+          update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
+        },
+        { agent, epoch },
+      );
+    }
+    emitEvent(
+      sessionId,
+      {
+        event: 'turn_ended',
+        ...(error ? { error, ...(code ? { code } : {}) } : { stopReason }),
+      },
+      { agent, epoch },
+    );
+  };
+  const emitSessionState = (state) => {
+    deliver({ method: 'agent_session_state', peerId: 1, params: state });
+  };
+  let nextEpochCounter = 0;
   async function settleHost() {
     for (let pass = 0; pass < 12; pass++) {
       await tick();
       for (const request of [...requests]) {
-        const { method } = request.payload;
+        const { method, params } = request.payload;
         if (!method || processed.has(request.message_id) || heldMethods.has(method)) continue;
+        const sessionId = params?.sessionId ?? 's1';
+        const agent = params?.agent ?? 'codex';
+        let openResult;
+        if (method === 'agent_session_open') {
+          const existingEpoch = sessionEpochs.get(sessionId);
+          const freshLoad = !existingEpoch;
+          const epoch = existingEpoch ?? `ep-${++nextEpochCounter}`;
+          const seq = sessionSeqs.get(sessionId) ?? 0;
+          const incremental = !freshLoad && params?.sinceEpoch === epoch && (params?.sinceSeq ?? 0) <= seq;
+          sessionEpochs.set(sessionId, epoch);
+          openResult = {
+            sessionId,
+            agent,
+            epoch,
+            seq,
+            running: false,
+            userInputs: [],
+            fullReplay: !incremental,
+            freshLoad,
+          };
+        }
         const results = {
           peer_attach: { peerId: 1, customAgents: [] },
           agent_session_list: { sessions: [remoteSession] },
+          agent_active_sessions: { sessions: [], userInputs: [] },
           agent_session_close: { closed: true },
-          agent_session_load: { sessionId: 's1', agent: 'codex' },
-          agent_session_create: { sessionId: 'created', agent: 'codex' },
+          agent_session_unsubscribe: { ok: true },
+          ...(openResult ? { agent_session_open: openResult } : {}),
+          agent_session_create: { sessionId: 'created', agent, epoch: 'ep-created', seq: 0 },
           task_list: { tasks: [] },
         };
         if (!(method in results)) continue;
+        if (method === 'agent_session_close') {
+          sessionEpochs.delete(sessionId);
+          sessionSeqs.delete(sessionId);
+        } else if (method === 'agent_session_create') {
+          sessionEpochs.set('created', 'ep-created');
+          sessionSeqs.set('created', 0);
+        }
         processed.add(request.message_id);
         sockets.at(-1).frame({ type: 'stored', message_id: request.message_id });
         reply(request, results[method]);
@@ -346,11 +420,11 @@ export function documentFixture(previous, options = {}) {
     sockets.at(-1).open();
     await settleHost();
   }
-  async function openSession() {
-    const loading = app.ensureSessionLoaded('s1');
+  async function openSession(sessionId = 's1') {
+    const loading = app.ensureSessionLoaded(sessionId);
     await settleHost();
     await loading;
-    assert.equal(app.isSessionOpened('s1'), true);
+    assert.equal(app.isSessionOpened(sessionId), true);
   }
 
   return {
@@ -395,6 +469,9 @@ export function documentFixture(previous, options = {}) {
     ttsCalls,
     deliver,
     reply,
+    emitEvent,
+    emitTurnAnswer,
+    emitSessionState,
     connect,
     openSession,
     settleHost,

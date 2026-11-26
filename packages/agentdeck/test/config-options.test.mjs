@@ -38,11 +38,21 @@ const configOptions = [
 
 async function opened(options = { modes }) {
   const fixture = documentFixture();
-  fixture.heldMethods.add('agent_session_load');
+  fixture.heldMethods.add('agent_session_open');
   await fixture.connect();
   const loading = fixture.app.ensureSessionLoaded('s1');
   await fixture.settleHost();
-  fixture.reply(fixture.requests.at(-1), { sessionId: 's1', ...options });
+  fixture.reply(fixture.requests.at(-1), {
+    sessionId: 's1',
+    agent: 'codex',
+    epoch: 'ep-1',
+    seq: 0,
+    running: false,
+    userInputs: [],
+    fullReplay: true,
+    freshLoad: true,
+    ...options,
+  });
   await loading;
   return fixture;
 }
@@ -56,6 +66,10 @@ const ids = (f, options) =>
 const changeMode = (f, session, value) => f.app.changeSessionConfig(session, selection(f, session.sessionId).id, value);
 const request = (f, method) => f.requests.findLast((r) => r.payload.method === method);
 const failed = (f, req) => f.deliver({ id: req.payload.id, error: 'mode rejected', peerId: 1 });
+const finishPromptRpc = (f, req, answer, { sessionId = 's1', epoch } = {}) => {
+  f.reply(req, { ok: true, agent: 'codex', sessionId });
+  f.emitTurnAnswer(sessionId, answer, { epoch });
+};
 
 async function creating(f) {
   const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
@@ -74,10 +88,11 @@ test('mode selection uses reported capabilities; current-mode and config events 
   const f = await opened({ modes, configOptions });
   assert.equal(selection(f).legacyMode, true);
   assert.equal(ids(f, f.app.getRuntime('s1').options), 'mode,model');
-  f.app.applySessionEvent('s1', {
+  f.emitEvent('s1', {
     event: 'session_update',
     update: { sessionUpdate: 'current_mode_update', currentModeId: 'plan' },
   });
+  await tick();
   assert.equal(selection(f).currentValue, 'plan');
   assert.equal(f.app.getRuntime('s1').options.configOptions[0].currentValue, 'plan');
   assert.equal(f.app.getRuntime('s1').options.configOptions[1].currentValue, 'model-a');
@@ -112,7 +127,7 @@ test('mode change shows at once; rejection and timeout roll back', async () => {
   assert.equal(selection(f).currentValue, 'plan');
   assert.equal(f.app.sendPrompt('s1', 'now ready'), true);
   await tick();
-  f.reply(request(f, 'agent_prompt'), { answer: 'done' });
+  finishPromptRpc(f, request(f, 'agent_prompt'), 'done');
   await tick();
 });
 
@@ -140,6 +155,7 @@ for (const options of [{ modes }, { configOptions }]) {
       assert.equal(fixture.app.sendPrompt('s1', 'First task'), true);
       await tick();
       const prompt = request(fixture, 'agent_prompt');
+      fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
       const change = changeMode(fixture, session, 'plan');
       await tick();
       const method = options.modes ? 'agent_session_set_mode' : 'agent_session_set_config_option';
@@ -161,7 +177,7 @@ for (const options of [{ modes }, { configOptions }]) {
         assert.equal(selection(fixture).currentValue, 'plan');
       };
       const finishPrompt = async () => {
-        fixture.reply(prompt, { answer: 'Done' });
+        fixture.emitTurnAnswer('s1', 'Done');
         await tick();
         assert.equal(fixture.app.runningSessionIds().length, 0);
       };
@@ -178,7 +194,7 @@ for (const options of [{ modes }, { configOptions }]) {
       assert.deepEqual(nextPrompt.payload.params.attachments, [
         { type: 'text', text: '<attachment name="notes.txt">\nNext task notes\n</attachment>' },
       ]);
-      fixture.reply(nextPrompt, { answer: 'Next answer' });
+      finishPromptRpc(fixture, nextPrompt, 'Next answer');
       await tick();
     });
   }
@@ -190,6 +206,7 @@ test('rejected mode changes during a prompt leave the running task intact and pe
   assert.equal(fixture.app.sendPrompt('s1', 'Running task'), true);
   await tick();
   const prompt = request(fixture, 'agent_prompt');
+  fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
   let change = changeMode(fixture, session, 'plan');
   await tick();
   failed(fixture, request(fixture, 'agent_session_set_mode'));
@@ -201,7 +218,7 @@ test('rejected mode changes during a prompt leave the running task intact and pe
   await tick();
   fixture.reply(request(fixture, 'agent_session_set_mode'), {});
   assert.equal(await change, true);
-  fixture.reply(prompt, { answer: 'Done' });
+  fixture.emitTurnAnswer('s1', 'Done');
   await tick();
   assert.equal(fixture.app.getMessages('s1').at(-1).text, 'Done');
 });
@@ -223,17 +240,18 @@ test('config-only mode uses its reported ID and the server response; unrelated o
   assert.equal(await change, true);
   assert.equal(selection(f).currentValue, 'plan');
   assert.equal(f.app.getRuntime('s1').options.configOptions[1].currentValue, 'model-a');
-  f.app.applySessionEvent('s1', {
+  f.emitEvent('s1', {
     event: 'session_update',
     update: { sessionUpdate: 'config_option_update', configOptions },
   });
+  await tick();
   assert.equal(selection(f).currentValue, 'default');
 });
 
 test('pending session mode is applied after create and before the first prompt', async () => {
   const f = await opened();
   const { promotion, creation } = await creating(f);
-  f.reply(creation, { sessionId: 'created', modes });
+  f.reply(creation, { sessionId: 'created', epoch: 'ep-created', seq: 0, modes });
   await tick();
   assert.equal(request(f, 'agent_prompt'), undefined);
   assert.equal(request(f, 'agent_session_set_mode').payload.params.sessionId, 'created');
@@ -242,14 +260,14 @@ test('pending session mode is applied after create and before the first prompt',
   await tick();
   assert.equal(selection(f, live.sessionId).currentValue, 'plan');
   assert.equal(request(f, 'agent_prompt').payload.params.prompt, 'First task');
-  f.reply(request(f, 'agent_prompt'), { answer: 'planned' });
+  finishPromptRpc(f, request(f, 'agent_prompt'), 'planned', { sessionId: 'created', epoch: 'ep-created' });
   await tick();
 });
 
 test('pending session mode rejected keeps the created session and input recoverable without sending', async () => {
   const f = await opened();
   const { pendingSession, promotion, creation } = await creating(f);
-  f.reply(creation, { sessionId: 'created', modes });
+  f.reply(creation, { sessionId: 'created', epoch: 'ep-created', seq: 0, modes });
   await tick();
   failed(f, request(f, 'agent_session_set_mode'));
   const live = await promotion;
@@ -264,7 +282,7 @@ test('pending session mode rejected keeps the created session and input recovera
   assert.ok(f.app.getRuntime('created').error);
   assert.equal(f.app.sendPrompt('created', message.text, message.attachments), true);
   await tick();
-  f.reply(request(f, 'agent_prompt'), { answer: 'retry' });
+  finishPromptRpc(f, request(f, 'agent_prompt'), 'retry', { sessionId: 'created', epoch: 'ep-created' });
   await tick();
   assert.equal(f.requests.filter((r) => r.payload.method === 'agent_session_create').length, 1);
 });
@@ -278,23 +296,26 @@ test('pending selections the created session no longer supports are skipped', as
   await f.settleHost();
   f.reply(request(f, 'agent_session_create'), {
     sessionId: 'created',
+    epoch: 'ep-created',
+    seq: 0,
     configOptions: [{ ...configOptions[1], options: [{ value: 'model-b', name: 'Model B' }] }],
   });
   await promotion;
   await tick();
   assert.equal(request(f, 'agent_session_set_config_option'), undefined);
   assert.equal(request(f, 'agent_prompt').payload.params.sessionId, 'created');
-  f.reply(request(f, 'agent_prompt'), { answer: 'done' });
+  finishPromptRpc(f, request(f, 'agent_prompt'), 'done', { sessionId: 'created', epoch: 'ep-created' });
   await tick();
 });
 
 test('chosen settings persist per agent and are applied to new sessions after restart', async () => {
   const f = await opened({ configOptions });
   const model = { ...configOptions[1], options: [...configOptions[1].options, { value: 'model-b', name: 'Model B' }] };
-  f.app.applySessionEvent('s1', {
+  f.emitEvent('s1', {
     event: 'session_update',
     update: { sessionUpdate: 'config_option_update', configOptions: [configOptions[0], model] },
   });
+  await tick();
   const change = f.app.changeSessionConfig(f.app.getSession('s1'), 'model', 'model-b');
   await tick();
   f.reply(request(f, 'agent_session_set_config_option'), {
@@ -313,6 +334,8 @@ test('chosen settings persist per agent and are applied to new sessions after re
   await restarted.settleHost();
   restarted.reply(request(restarted, 'agent_session_create'), {
     sessionId: 'created',
+    epoch: 'ep-created',
+    seq: 0,
     configOptions: [configOptions[0], model],
   });
   await tick();
@@ -334,11 +357,11 @@ test('chosen settings persist per agent and are applied to new sessions after re
   await tick();
   assert.equal(request(restarted, 'agent_prompt').payload.params.sessionId, 'created');
   assert.equal(selects(restarted, 'created')[1].currentValue, 'model-b');
-  restarted.reply(request(restarted, 'agent_prompt'), { answer: 'done' });
+  finishPromptRpc(restarted, request(restarted, 'agent_prompt'), 'done', { sessionId: 'created', epoch: 'ep-created' });
   await tick();
 });
 
-test('a reopened session re-applies the agent selection after load', async () => {
+test('a freshly loaded session re-applies the agent selection, while a live session keeps its active config', async () => {
   const model = { ...configOptions[1], options: [...configOptions[1].options, { value: 'model-b', name: 'Model B' }] };
   const f = await opened({ configOptions: [configOptions[0], model] });
   const session = f.app.getSession('s1');
@@ -360,12 +383,19 @@ test('a reopened session re-applies the agent selection after load', async () =>
   }
 
   const restarted = documentFixture(f);
-  restarted.heldMethods.add('agent_session_load');
+  restarted.heldMethods.add('agent_session_open');
   await restarted.connect();
   const loading = restarted.app.ensureSessionLoaded('s1');
   await restarted.settleHost();
-  restarted.reply(request(restarted, 'agent_session_load'), {
+  restarted.reply(request(restarted, 'agent_session_open'), {
     sessionId: 's1',
+    agent: 'codex',
+    epoch: 'ep-2',
+    seq: 0,
+    running: false,
+    userInputs: [],
+    fullReplay: true,
+    freshLoad: true,
     configOptions: [configOptions[0], model],
   });
   await tick();
@@ -400,18 +430,18 @@ test('first pending session uses agent default and captures capabilities; cancel
   f.heldMethods.add('agent_session_create');
   let promotion = f.app.promotePendingSession(pendingSession, 'default');
   await tick();
-  f.reply(request(f, 'agent_session_create'), { sessionId: 'created', modes });
+  f.reply(request(f, 'agent_session_create'), { sessionId: 'created', epoch: 'ep-created', seq: 0, modes });
   await promotion;
   await tick();
   assert.equal(selection(f, 'created').currentValue, 'default');
   assert.equal(request(f, 'agent_session_set_mode'), undefined);
-  f.reply(request(f, 'agent_prompt'), { answer: 'done' });
+  finishPromptRpc(f, request(f, 'agent_prompt'), 'done', { sessionId: 'created', epoch: 'ep-created' });
   await tick();
   const next = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
   await changeMode(f, next, 'plan');
   promotion = f.app.promotePendingSession(next, 'cancel');
   await tick();
-  f.reply(request(f, 'agent_session_create'), { sessionId: 'next', modes });
+  f.reply(request(f, 'agent_session_create'), { sessionId: 'next', epoch: 'ep-next', seq: 0, modes });
   await tick();
   f.app.cancelTurn(next.sessionId);
   f.reply(request(f, 'agent_session_set_mode'), {});

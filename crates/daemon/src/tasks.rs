@@ -16,11 +16,10 @@ use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    acp_agent::{AgentSessionManager, Notifier, SessionContext},
+    acp_agent::{AgentSessionManager, PromptOptions, SessionContext, TaskInputPush},
     app_data::{self, AppPaths},
     push::PushKind,
     render_skills::SkillSelection,
@@ -123,9 +122,9 @@ pub struct Run {
 
 /// What the scheduler needs from the connection to the devices.
 pub trait TaskHost: Send + Sync {
-    /// Sends the notifications of a run of `task_id` to every connected device;
-    /// its pushes name the task, where the run's requests are answered.
-    fn notifier(&self, task_id: &str) -> Notifier;
+    /// Pushes permission requests/questions of a run of `task_id` to every
+    /// recently attached device.
+    fn input_push(&self, task_id: &str) -> TaskInputPush;
     /// Pushes to every device with a push token.
     fn push(&self, kind: PushKind, agent: &str, session_id: &str);
     /// Notifies every connected device.
@@ -339,12 +338,12 @@ impl Tasks {
                 crate::agent_rpc::remote_app_system_prompt()
             )),
             skills: host.skills(),
-            notifier: Some(host.notifier(&task.id)),
             input_timeout: Some(APPROVAL_TIMEOUT),
             auto_approve: true,
+            task_push: Some(host.input_push(&task.id)),
         };
         let created = tokio::select! {
-            created = self.sessions.create_session(&task.agent, Some(PathBuf::from(&task.cwd)), context) => created,
+            created = self.sessions.create_session(&task.agent, Some(PathBuf::from(&task.cwd)), context, None) => created,
             _ = cancel.cancelled() => return run,
         };
         let session_id = match created {
@@ -390,25 +389,39 @@ impl Tasks {
             }
         }
 
-        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
-        tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
-        let prompt = self.sessions.prompt(
-            &task.agent,
-            &session_id,
-            task.prompt.clone(),
-            Vec::new(),
-            IDLE_TIMEOUT_SECS,
-            event_tx,
-            Some(host.notifier(&task.id)),
-        );
-        tokio::pin!(prompt);
+        let handle = match self
+            .sessions
+            .start_prompt(
+                &task.agent,
+                &session_id,
+                PromptOptions {
+                    prompt: task.prompt.clone(),
+                    attachments: Vec::new(),
+                    voice_chat: false,
+                    client_message_id: None,
+                    timeout_secs: IDLE_TIMEOUT_SECS,
+                    originator_peer_id: None,
+                    subscriber: None,
+                },
+            )
+            .await
+        {
+            Ok(handle) => handle,
+            Err(err) => {
+                run.summary = err.to_string();
+                self.finish(task, &session_id, &mut run).await;
+                return run;
+            }
+        };
+        let mut completion = handle.completion;
         let limit = Duration::from_secs(u64::from(task.timeout_minutes.max(1)) * 60);
-        let result = tokio::select! {
-            outcome = tokio::time::timeout(limit, &mut prompt) => match outcome {
-                Ok(result) => result,
+        let outcome = tokio::select! {
+            outcome = tokio::time::timeout(limit, &mut completion) => match outcome {
+                Ok(Ok(done)) => done.result,
+                Ok(Err(_)) => Err(anyhow::anyhow!("ACP agent session closed before responding")),
                 Err(_) => {
                     self.sessions.cancel(&task.agent, &session_id).await;
-                    let _ = prompt.await;
+                    let _ = completion.await;
                     run.status = RunStatus::Timeout;
                     run.summary = format!("Timed out after {} minutes", task.timeout_minutes);
                     self.finish(task, &session_id, &mut run).await;
@@ -420,7 +433,7 @@ impl Tasks {
                 return run;
             }
         };
-        match result {
+        match outcome {
             Ok(answer) => {
                 run.status = RunStatus::Success;
                 run.summary = summary_of(&answer);

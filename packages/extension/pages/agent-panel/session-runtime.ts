@@ -15,12 +15,31 @@ const CLAUDE_INTERRUPTED_USER_MESSAGE = '[Request interrupted by user]';
 
 type TextMessage = Extract<PanelMessage, { role: string }>;
 
-type ChunkContent = { type?: string; text?: string; data?: string; mimeType?: string };
+type ChunkContent = {
+  type?: string;
+  text?: string;
+  data?: string;
+  mimeType?: string;
+  uri?: string;
+  name?: string;
+};
 
 type SessionEventReduction = {
   pane?: Partial<Pane>;
   session?: Pick<SessionRecord, 'title' | 'updatedAt'>;
 } | null;
+
+type ReduceSessionEventOptions = {
+  agent?: string;
+  optimisticMessageIds?: ReadonlySet<string>;
+};
+
+export type SessionSyncState = {
+  epoch?: string;
+  lastSeq: number;
+  subscribed: boolean;
+  optimisticIds: Set<string>;
+};
 
 /** Keep the `mode` config option in sync with a `current_mode_update`. */
 export function withCurrentMode(configOptions: SessionConfigOption[], currentModeId: string) {
@@ -79,13 +98,12 @@ export function completeThought(messages: PanelMessage[]) {
 export function reduceSessionEvent(
   state: Partial<Pane> | undefined,
   event: SessionEvent,
-  { agent }: { agent?: string } = {},
+  { agent, optimisticMessageIds }: ReduceSessionEventOptions = {},
 ): SessionEventReduction {
   const messages = state?.messages ?? [];
   // Subagent sessions are shown only in the App.
   if (event.event === 'session_update' && event.childSessionId) return null;
-  if (event.event !== 'session_update') {
-    if (event.event !== 'stop') return null;
+  if (event.event === 'turn_started' || event.event === 'turn_ended') {
     const completed = completeThought(messages);
     return completed === messages ? null : { pane: { messages: completed } };
   }
@@ -101,8 +119,19 @@ export function reduceSessionEvent(
       : update.sessionUpdate === 'user_message_chunk'
         ? 'user'
         : null;
-  const isRoleMessage = (message?: PanelMessage): message is TextMessage =>
-    message?.type === undefined && message?.role === role;
+  const clientMessageId =
+    role === 'user' && typeof update.clientMessageId === 'string' ? update.clientMessageId : undefined;
+
+  if (clientMessageId && optimisticMessageIds?.has(clientMessageId)) {
+    return currentMessages === messages ? null : { pane: { messages: currentMessages } };
+  }
+
+  const isRoleMessage = (message?: PanelMessage): message is TextMessage => {
+    if (message?.type !== undefined || message?.role !== role) return false;
+    if (role === 'user' && clientMessageId) return message.id === clientMessageId;
+    return true;
+  };
+  const messageIdPatch = clientMessageId ? { id: clientMessageId } : {};
 
   if (role && content?.type === 'text') {
     if (agent === 'claude-acp' && role === 'user' && text.trim() === CLAUDE_INTERRUPTED_USER_MESSAGE) {
@@ -111,7 +140,7 @@ export function reduceSessionEvent(
     return {
       pane: {
         messages: appendChunk(currentMessages, isRoleMessage, (last) =>
-          last ? { ...last, text: last.text + text } : { role, text },
+          last ? { ...last, text: last.text + text } : { ...messageIdPatch, role, text },
         ),
       },
     };
@@ -128,7 +157,25 @@ export function reduceSessionEvent(
         messages: appendChunk(currentMessages, isRoleMessage, (last) =>
           last
             ? { ...last, attachments: [...(last.attachments || []), attachment] }
-            : { role, text: '', attachments: [attachment] },
+            : { ...messageIdPatch, role, text: '', attachments: [attachment] },
+        ),
+      },
+    };
+  }
+
+  if (role && content?.type === 'resource_link' && content.uri) {
+    const attachment = {
+      id: content.uri,
+      kind: 'file' as const,
+      name: content.name || content.uri,
+      uri: content.uri,
+    };
+    return {
+      pane: {
+        messages: appendChunk(currentMessages, isRoleMessage, (last) =>
+          last
+            ? { ...last, attachments: [...(last.attachments || []), attachment] }
+            : { ...messageIdPatch, role, text: '', attachments: [attachment] },
         ),
       },
     };
@@ -191,9 +238,49 @@ export function reduceSessionEvent(
 export type SessionRuntime = ReturnType<typeof createSessionRuntime>;
 
 /** State access shared by session and turn controllers. It owns the pane cache
- * but not any ACP request lifecycle. */
+ * and event-sequence sync cursors, but not any ACP request lifecycle. */
 export function createSessionRuntime(state: PanelStore) {
   const paneCache = new Map<string, Pane>();
+  const syncMap = new Map<string, SessionSyncState>();
+
+  const ensureSync = (sessionKey: string): SessionSyncState => {
+    let sync = syncMap.get(sessionKey);
+    if (!sync) {
+      sync = { lastSeq: 0, subscribed: false, optimisticIds: new Set() };
+      syncMap.set(sessionKey, sync);
+    }
+    return sync;
+  };
+
+  const getSync = (sessionKey: string) => syncMap.get(sessionKey);
+
+  const setSync = (sessionKey: string, patch: Partial<Omit<SessionSyncState, 'optimisticIds'>>) => {
+    const sync = ensureSync(sessionKey);
+    if ('epoch' in patch) sync.epoch = patch.epoch;
+    if (typeof patch.lastSeq === 'number') sync.lastSeq = patch.lastSeq;
+    if (typeof patch.subscribed === 'boolean') sync.subscribed = patch.subscribed;
+    return sync;
+  };
+
+  const addOptimisticId = (sessionKey: string, clientMessageId: string) => {
+    ensureSync(sessionKey).optimisticIds.add(clientMessageId);
+  };
+
+  const moveOptimisticIds = (fromKey: string, toKey: string) => {
+    const from = syncMap.get(fromKey);
+    if (!from?.optimisticIds.size) return;
+    const targetSync = ensureSync(toKey);
+    for (const id of from.optimisticIds) targetSync.optimisticIds.add(id);
+    from.optimisticIds.clear();
+  };
+
+  const clearOptimisticIds = (sessionKey: string) => {
+    syncMap.get(sessionKey)?.optimisticIds.clear();
+  };
+
+  const markAllUnsubscribed = () => {
+    for (const sync of syncMap.values()) sync.subscribed = false;
+  };
 
   const record = (sessionKey: string | null) =>
     state.draftSession?.key === sessionKey
@@ -281,23 +368,35 @@ export function createSessionRuntime(state: PanelStore) {
   };
 
   const applyEvent = (sessionKey: string, event: SessionEvent) => {
-    const result = reduceSessionEvent(getPane(sessionKey), event, { agent: record(sessionKey)?.agent });
+    const sync = syncMap.get(sessionKey);
+    const result = reduceSessionEvent(getPane(sessionKey), event, {
+      agent: record(sessionKey)?.agent,
+      optimisticMessageIds: sync?.optimisticIds,
+    });
     if (result?.pane) setPane(sessionKey, result.pane);
     if (result?.session) patchRecord(sessionKey, result.session);
+    if (typeof event.seq === 'number') {
+      const targetSync = ensureSync(sessionKey);
+      if (event.seq > targetSync.lastSeq) targetSync.lastSeq = event.seq;
+    }
   };
 
-  const resetPanesForReconnect = () => {
-    const draftPane = state.draftSession && paneCache.get(DRAFT_SESSION_KEY);
-    const draftLoading = Boolean(draftPane && state.loadingIds.includes(DRAFT_SESSION_KEY));
-    paneCache.clear();
-    if (draftPane) paneCache.set(DRAFT_SESSION_KEY, draftPane);
-    return draftLoading;
+  const deletePane = (sessionKey: string) => {
+    paneCache.delete(sessionKey);
+    syncMap.delete(sessionKey);
   };
 
   return {
     record,
     list,
     target,
+    getSync,
+    setSync,
+    addOptimisticId,
+    moveOptimisticIds,
+    clearOptimisticIds,
+    markAllUnsubscribed,
+    isSubscribed: (sessionKey: string) => Boolean(syncMap.get(sessionKey)?.subscribed),
     getPane,
     setPane,
     showPane,
@@ -305,8 +404,7 @@ export function createSessionRuntime(state: PanelStore) {
     hasCachedPane: (sessionKey: string) => paneCache.has(sessionKey),
     getCachedPane: (sessionKey: string) => paneCache.get(sessionKey),
     setCachedPane: (sessionKey: string, pane: Pane) => paneCache.set(sessionKey, pane),
-    deletePane: (sessionKey: string) => paneCache.delete(sessionKey),
-    resetPanesForReconnect,
+    deletePane,
     setLoading: (sessionKey: string, loading: boolean) => setSessionFlag('loadingIds', sessionKey, loading),
     setPending: (sessionKey: string, pending: boolean) => setSessionFlag('pendingIds', sessionKey, pending),
     setError,

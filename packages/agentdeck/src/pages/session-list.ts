@@ -130,7 +130,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
     const sessionSet = (has: (runtime: SessionRuntime) => unknown) =>
       new Set(runtimeEntries.filter(([, runtime]) => has(runtime)).map(([sessionId]) => sessionId));
     const unreadSessionSet = sessionSet((runtime) => runtime.unread);
-    const pendingSessionSet = sessionSet((runtime) => runtime.turn);
+    const pendingSessionSet = sessionSet((runtime) => runtime.running || runtime.creating);
     const permissionSessionSet = sessionSet(
       (runtime) => runtime.permission || hasPendingElicitation(runtime.elicitations),
     );

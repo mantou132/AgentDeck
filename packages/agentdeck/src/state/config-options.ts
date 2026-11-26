@@ -79,7 +79,8 @@ export const changeSessionConfig = async (session: DeckSession, configId: string
   if (!select) return false;
   if (select.currentValue === value) return true;
   if (!session.pendingCreation) {
-    if (agentdeckStore.connection !== 'connected' || getRuntime(sessionId).load !== 'loaded') return false;
+    const runtime = getRuntime(sessionId);
+    if (agentdeckStore.connection !== 'connected' || runtime.load !== 'loaded' || !runtime.subscribed) return false;
   }
   const next = withConfigValue(sessionOptions(sessionId), select, value);
   updateSessionOptions(sessionId, next);

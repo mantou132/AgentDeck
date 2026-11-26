@@ -53,9 +53,6 @@
   "devtoolsPanelEnqueue": {
     "message": "Add to queue"
   },
-  "devtoolsPanelHostReconnected": {
-    "message": "Native host reconnected — the current session is stale; reopen or create a session"
-  },
   "devtoolsPanelImageAttachment": {
     "message": "Image"
   },

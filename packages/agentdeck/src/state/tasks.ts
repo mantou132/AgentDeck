@@ -45,7 +45,7 @@ export const refreshTasks = async () => {
   const request = ++tasksRequest;
   try {
     const tasks = await agentApi.listTasks();
-    const { userInputs = [] } = runningSessionIds(tasks).size ? await agentApi.listRunningPrompts() : {};
+    const { userInputs = [] } = runningSessionIds(tasks).size ? await agentApi.listActiveSessions() : {};
     if (request === tasksRequest) tasksStore({ tasks, permissions: runPermissions(userInputs, tasks), loaded: true });
   } catch (error) {
     console.error('Failed to list tasks:', error);
@@ -76,6 +76,12 @@ export const showTaskPermission = (request: PermissionRequest) => {
   if (!permissions.some((item) => item.requestId === request.requestId))
     tasksStore({ permissions: [...permissions, request] });
   return true;
+};
+
+/** Drops a task permission request resolved on any device or cancelled by the host. */
+export const clearTaskPermission = (requestId: string) => {
+  if (!tasksStore.permissions.some((item) => item.requestId === requestId)) return;
+  tasksStore({ permissions: tasksStore.permissions.filter((item) => item.requestId !== requestId) });
 };
 
 export const getTaskPermission = (task: TaskListItem) =>

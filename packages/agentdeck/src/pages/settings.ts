@@ -104,8 +104,14 @@ export class AgentDeckSettingsPageElement extends GemElement {
 
   #save = () => {
     try {
-      saveSettings({ relayId: this.#state.relayId, agent: this.#agent, relayUrl: this.#state.relayUrl });
-      if (this.canGoBack) {
+      const relayChanged = saveSettings({
+        relayId: this.#state.relayId,
+        agent: this.#agent,
+        relayUrl: this.#state.relayUrl,
+      });
+      if (relayChanged) {
+        Stack.pop({ keep: 1 });
+      } else if (this.canGoBack) {
         Stack.pop();
       }
     } catch (error) {

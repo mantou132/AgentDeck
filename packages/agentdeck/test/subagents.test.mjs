@@ -11,8 +11,8 @@ async function running() {
   fixture.app.sendPrompt('s1', 'Delegate it');
   await fixture.settleHost();
   const prompt = fixture.requests.find((request) => request.payload.method === 'agent_prompt');
-  const send = (update, childSessionId) =>
-    fixture.deliver({ id: prompt.payload.id, event: { event: 'session_update', update, childSessionId }, peerId: 1 });
+  fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
+  const send = (update, childSessionId) => fixture.emitEvent('s1', { event: 'session_update', update, childSessionId });
   return { fixture, prompt, send };
 }
 
@@ -141,17 +141,27 @@ test('a nested subagent is kept under the root session, its card where it was an
   assert.deepEqual(kinds(fixture.app.getMessages('child')), ['user', 'tool', 'subagent:grandchild']);
 });
 
-test('loading the root session again drops its subagents until the agent replays them', async () => {
-  const { fixture, prompt, send } = await running();
+test('incremental resync preserves subagents while a full reload drops them until the agent replays them', async () => {
+  const { fixture, send } = await running();
   launch(send);
-  fixture.reply(prompt, { answer: 'Done' });
+  fixture.emitTurnAnswer('s1', 'Done');
   await fixture.settleHost();
   assert.ok(fixture.app.getRuntime('s1').subagents.child);
 
-  const loading = fixture.app.retrySessionLoad('s1');
+  // Incremental re-open with matching epoch keeps subagents intact.
+  const resync = fixture.app.retrySessionLoad('s1');
+  await fixture.settleHost();
+  await resync;
+  assert.ok(fixture.app.getRuntime('s1').subagents.child);
+
+  // Closing and re-opening triggers a full replay that drops old subagents.
+  const closing = fixture.app.closeSession('s1');
+  await fixture.settleHost();
+  await closing;
+  const reloading = fixture.app.ensureSessionLoaded('s1');
+  await fixture.settleHost();
+  await reloading;
   assert.equal(fixture.app.getRuntime('s1').subagents, undefined);
   assert.equal(fixture.app.getMessages('child').length, 0);
-  await fixture.settleHost();
-  await loading;
   assert.equal(fixture.app.isSessionOpened('s1'), true);
 });

@@ -11,7 +11,7 @@ export type AcpUpdate = Partial<ToolCallData> & {
 };
 
 export type PanelMessage =
-  | { type?: undefined; role: 'user' | 'agent'; text: string; attachments?: Attachment[] }
+  | { type?: undefined; id?: string; role: 'user' | 'agent'; text: string; attachments?: Attachment[] }
   | { type: 'thought'; text: string; pending: boolean }
   | { type: 'tool'; data: AcpUpdate }
   /** Raw updates, only shown with `show-events`. */

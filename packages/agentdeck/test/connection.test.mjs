@@ -4,14 +4,16 @@ import { documentFixture, tick } from './helpers/app-fixture.mjs';
 
 const outbox = (fixture) => fixture.relayState().outbox;
 
-test('foreground and online keep a live connection; manual reconnect preserves prompt replies', async () => {
+test('foreground and online keep a live connection; manual reconnect resyncs open session', async () => {
   const fixture = documentFixture();
   await fixture.connect();
+  const untrack = fixture.app.trackSessionPage('s1');
   await fixture.openSession();
   fixture.app.sendPrompt('s1', 'long task');
   await tick();
   const prompt = fixture.requests.find((request) => request.payload.method === 'agent_prompt');
   fixture.sockets.at(-1).frame({ type: 'stored', message_id: prompt.message_id });
+  fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
   await tick();
   const socket = fixture.sockets.at(-1);
   fixture.window.dispatchEvent(new Event('online'));
@@ -21,33 +23,42 @@ test('foreground and online keep a live connection; manual reconnect preserves p
   assert.equal(socket.readyState, socket.constructor.OPEN);
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 
+  fixture.heldMethods.add('agent_session_open');
+  fixture.heldMethods.add('agent_active_sessions');
   fixture.transport.reconnectTransport(true);
   await tick();
   assert.equal(new URL(fixture.sockets.at(-1).url).searchParams.has('ack_head'), false);
   assert.equal(fixture.app.isTurnRunning('s1'), true);
   fixture.sockets.at(-1).open();
   await fixture.settleHost();
-  fixture.deliver({
-    id: prompt.payload.id,
-    event: {
-      event: 'session_update',
-      update: {
-        sessionUpdate: 'agent_message_chunk',
-        content: { type: 'text', text: 'missed response' },
-      },
-    },
-    peerId: 1,
+  const activeReq = fixture.requests.findLast((r) => r.payload.method === 'agent_active_sessions');
+  fixture.reply(activeReq, { sessions: [{ agent: 'codex', sessionId: 's1' }], userInputs: [] });
+  const reopen = fixture.requests.findLast((r) => r.payload.method === 'agent_session_open');
+  assert.equal(reopen.payload.params.sinceEpoch, 'ep-1');
+  assert.equal(reopen.payload.params.sinceSeq, 0);
+  fixture.reply(reopen, {
+    sessionId: 's1',
+    agent: 'codex',
+    epoch: 'ep-1',
+    seq: 0,
+    running: true,
+    userInputs: [],
+    fullReplay: false,
+    freshLoad: false,
   });
-  fixture.reply(prompt, { answer: 'missed response' });
+  await tick();
+  fixture.emitTurnAnswer('s1', 'missed response');
   await tick();
   assert.equal(fixture.app.isTurnRunning('s1'), false);
   assert.equal(fixture.app.getMessages('s1').at(-1).text, 'missed response');
   assert.equal(fixture.requests.filter((request) => request.payload.method === 'agent_prompt').length, 1);
+  untrack();
 });
 
 test('automatic SDK reconnect also keeps the receive cursor and unacknowledged request ID', async () => {
   const fixture = documentFixture();
   await fixture.connect();
+  const untrack = fixture.app.trackSessionPage('s1');
   await fixture.openSession();
   fixture.app.sendPrompt('s1', 'task');
   await tick();
@@ -62,9 +73,15 @@ test('automatic SDK reconnect also keeps the receive cursor and unacknowledged r
   await fixture.settleHost();
   const replay = socket.sent.find((frame) => frame.payload?.method === 'agent_prompt');
   assert.equal(replay.message_id, prompt.message_id);
-  fixture.reply(prompt, { answer: 'done' });
+  fixture.reply(prompt, { ok: true, agent: 'codex', sessionId: 's1' });
+  fixture.emitTurnAnswer('s1', 'done');
   await tick();
+  assert.deepEqual(
+    Array.from(fixture.app.getMessages('s1'), (message) => message.text),
+    ['task', 'done'],
+  );
   assert.equal(fixture.app.runningSessionIds().length, 0);
+  untrack();
 });
 
 test('Relay ready does not enable App until host attach succeeds; timeout can be retried', async () => {
@@ -145,7 +162,7 @@ test('with Relay presence an offline host shows at once and attaches when it com
   assert.equal(attaches(fixture), 1);
 });
 
-test('with Relay presence a leaving host fails timed calls at once and keeps prompts waiting', async () => {
+test('with Relay presence a leaving host fails timed calls at once and keeps running turns intact', async () => {
   const fixture = documentFixture();
   await fixture.app.startApp();
   fixture.sockets.at(-1).open(['host']);
@@ -153,6 +170,8 @@ test('with Relay presence a leaving host fails timed calls at once and keeps pro
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
   await fixture.openSession();
   fixture.app.sendPrompt('s1', 'long task');
+  await tick();
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
   const browse = fixture.transport.agentApi.browseFiles('/tmp');
   await tick();
   fixture.sockets.at(-1).frame({ type: 'peer_disconnected', device_id: 'host' });
@@ -234,44 +253,37 @@ test('manual retry does not restart a connection in progress, but skips the back
   assert.equal(fixture.app.agentdeckStore.connection, 'connected');
 });
 
-test('a timed-out close does not proceed to load; a timed-out load can be retried', async () => {
+test('opening a session skips close; a timed-out open can be retried and ignores stale replies', async () => {
   const fixture = documentFixture();
   await fixture.connect();
-  fixture.heldMethods.add('agent_session_close');
+  fixture.heldMethods.add('agent_session_open');
   const first = fixture.app.ensureSessionLoaded('s1');
   await fixture.settleHost();
-  await fixture.advance(10_000);
-  await first;
-  assert.match(fixture.app.getRuntime('s1').error, /Closing session timed out/);
   assert.equal(
-    fixture.requests.some((request) => request.payload.method === 'agent_session_load'),
+    fixture.requests.some((request) => request.payload.method === 'agent_session_close'),
     false,
   );
-  fixture.heldMethods.delete('agent_session_close');
-  fixture.heldMethods.add('agent_session_load');
-  const second = fixture.app.retrySessionLoad('s1');
-  await fixture.settleHost();
-  const oldLoad = fixture.requests.find((request) => request.payload.method === 'agent_session_load');
+  const oldOpen = fixture.requests.find((request) => request.payload.method === 'agent_session_open');
   await fixture.advance(65_000);
-  await second;
+  await first;
   assert.match(fixture.app.getRuntime('s1').error, /Loading session timed out/);
   assert.equal(
     Object.values(fixture.app.sessionsStore.runtimes).filter((runtime) => runtime.load === 'loading').length,
     0,
   );
   assert.equal(
-    outbox(fixture).some((request) => request.payload.id === oldLoad.payload.id),
+    outbox(fixture).some((request) => request.payload.id === oldOpen.payload.id),
     false,
   );
-  fixture.heldMethods.delete('agent_session_load');
-  const third = fixture.app.retrySessionLoad('s1');
-  fixture.reply(oldLoad, { sessionId: 'stale' });
+  fixture.heldMethods.delete('agent_session_open');
+  const retry = fixture.app.retrySessionLoad('s1');
+  fixture.reply(oldOpen, { sessionId: 'stale' });
   await fixture.settleHost();
-  await third;
+  await retry;
   assert.equal(fixture.app.isSessionOpened('s1'), true);
 });
 
-test('directory and session-list requests end at their deadlines, but prompt has no short deadline', async () => {
+test('directory and session-list requests end at their deadlines, while an accepted turn runs without a short deadline', async () => {
   const fixture = documentFixture();
   await fixture.connect();
   await fixture.openSession();
@@ -287,6 +299,8 @@ test('directory and session-list requests end at their deadlines, but prompt has
   assert.equal(fixture.app.sessionsStore.sessionsLoading, false);
   assert.match(fixture.app.sessionsStore.sessionsError, /Reading session list timed out/);
   fixture.app.sendPrompt('s1', 'long task');
+  await tick();
+  fixture.reply(fixture.requests.at(-1), { ok: true, agent: 'codex', sessionId: 's1' });
   await tick();
   await fixture.advance(120_000);
   assert.equal(fixture.app.isTurnRunning('s1'), true);

@@ -9,7 +9,7 @@ patchedDependencies:
     hash: c5259d3fd19b4ccdce955afc2fd75ea8943e83af14ee3b7c4679c8cceff13223
     path: patches/@gem-bind__mermaid@0.0.6.patch
   '@mantou/tap-ui@0.2.3':
-    hash: 773e0252a834787a4811bd808f1319f2443ac1931fa35914003577bfd93a3f49
+    hash: 42ab0b61f95a77f547b337dc7dffddb59fd910dabd8ad9ac58b1f1cac5c0caa7
     path: patches/@mantou__tap-ui@0.2.3.patch
   tailwindcss:
     hash: 3ca51868dda3a67e24cb085a2743934040e76ca2caa3ee5eb7b0095bf136f882
@@ -63,7 +63,7 @@ importers:
         version: 2.3.3
       '@mantou/tap-ui':
         specifier: ^0.2.3
-        version: 0.2.3(patch_hash=773e0252a834787a4811bd808f1319f2443ac1931fa35914003577bfd93a3f49)(@mantou/gem@2.3.3)
+        version: 0.2.3(patch_hash=42ab0b61f95a77f547b337dc7dffddb59fd910dabd8ad9ac58b1f1cac5c0caa7)(@mantou/gem@2.3.3)
       '@mantou/tauri-plugin-fcm':
         specifier: ^0.2.0
         version: 0.2.0
@@ -5660,7 +5660,7 @@ snapshots:
       - vite
       - webpack
 
-  '@mantou/tap-ui@0.2.3(patch_hash=773e0252a834787a4811bd808f1319f2443ac1931fa35914003577bfd93a3f49)(@mantou/gem@2.3.3)':
+  '@mantou/tap-ui@0.2.3(patch_hash=42ab0b61f95a77f547b337dc7dffddb59fd910dabd8ad9ac58b1f1cac5c0caa7)(@mantou/gem@2.3.3)':
     dependencies:
       '@mantou/gem': 2.3.3
 
@@ -7418,7 +7418,7 @@ snapshots:
   duoyun-ui@2.3.2(@mantou/gem@2.3.3):
     dependencies:
       '@mantou/gem': 2.3.3
-      '@mantou/tap-ui': 0.2.3(patch_hash=773e0252a834787a4811bd808f1319f2443ac1931fa35914003577bfd93a3f49)(@mantou/gem@2.3.3)
+      '@mantou/tap-ui': 0.2.3(patch_hash=42ab0b61f95a77f547b337dc7dffddb59fd910dabd8ad9ac58b1f1cac5c0caa7)(@mantou/gem@2.3.3)
       deep-query-selector: 1.0.2
 
   earcut@3.2.4: {}

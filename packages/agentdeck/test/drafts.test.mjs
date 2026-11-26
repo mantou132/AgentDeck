@@ -214,10 +214,15 @@ test('loading a saved draft restores attachments without writing it back or losi
   assert.equal(f.saves.length, 0);
 });
 
-test('shared database supports existing in-flight inline keys and atomic message updates', async () => {
+test('shared database supports inline keys and atomic message updates', async () => {
   const exports = {};
   vm.runInNewContext(databaseOutput, { exports, indexedDB: storage(), setTimeout, clearTimeout });
-  const records = exports.createDatabaseStore(config.DATABASES.inFlight);
+  const records = exports.createDatabaseStore({
+    name: 'test-inline',
+    version: 1,
+    storeName: 'records',
+    keyPath: 'sessionId',
+  });
   await records.set('s1', { sessionId: 's1', messages: [] });
   await records.update('s1', (record) => ({ ...record, messages: ['answer'] }));
   await records.update('missing', () => undefined);
