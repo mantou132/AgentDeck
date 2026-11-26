@@ -550,10 +550,7 @@ impl AgentService {
                 .await
                 {
                     Ok(Ok(opened)) => {
-                        for event in &opened.events {
-                            let value = serde_json::to_value(event).unwrap_or(Value::Null);
-                            ctx.emit(value);
-                        }
+                        emit_open_events(&ctx, &opened.events);
                         Ok(json!({
                             "agent": agent,
                             "sessionId": opened.session_id,
@@ -914,4 +911,88 @@ async fn session_context(params: &Value, skills: &PeerSkills) -> Result<SessionC
         auto_approve: false,
         task_push: None,
     })
+}
+
+/// Target JSON byte budget per batched `agent_session_open` replay frame.
+/// Keeps replay to 1–2 reliable Relay messages for typical sessions while
+/// staying well below the 10 MiB frame limit even with large tool outputs.
+const OPEN_REPLAY_BATCH_BYTES: usize = 256 * 1024;
+
+fn emit_open_events(ctx: &CallCtx, events: &[acp_agent::SequencedEvent]) {
+    emit_open_events_with_limit(events, OPEN_REPLAY_BATCH_BYTES, |batch| ctx.emit(batch));
+}
+
+fn emit_open_events_with_limit(
+    events: &[acp_agent::SequencedEvent],
+    max_bytes: usize,
+    mut emit: impl FnMut(Value),
+) {
+    let mut batch = Vec::new();
+    let mut batch_bytes = 0usize;
+    for event in events {
+        let value = serde_json::to_value(event).unwrap_or(Value::Null);
+        let size = serde_json::to_string(&value).map_or(0, |s| s.len()) + 1;
+        if !batch.is_empty() && batch_bytes + size > max_bytes {
+            emit(json!({ "events": std::mem::take(&mut batch) }));
+            batch_bytes = 0;
+        }
+        batch_bytes += size;
+        batch.push(value);
+    }
+    if !batch.is_empty() {
+        emit(json!({ "events": batch }));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::acp_agent::{AgentEvent, SequencedEvent};
+
+    fn text_event(seq: u64, text: &str) -> SequencedEvent {
+        SequencedEvent {
+            seq,
+            event: AgentEvent::SessionUpdate {
+                update: json!({
+                    "sessionUpdate": "agent_message_chunk",
+                    "content": { "type": "text", "text": text }
+                }),
+                child_session_id: None,
+            },
+        }
+    }
+
+    #[test]
+    fn emit_open_events_packs_and_splits_by_byte_budget() {
+        let events = vec![
+            text_event(1, "hello"),
+            text_event(2, "world"),
+            text_event(3, &"x".repeat(300)),
+            text_event(4, "tail"),
+        ];
+        let mut frames = Vec::new();
+        emit_open_events_with_limit(&events, 260, |frame| frames.push(frame));
+
+        // Events 1+2 fit together; event 3 exceeds budget on its own and gets
+        // its own 1-element batch; event 4 lands in the final batch.
+        let seqs: Vec<Vec<u64>> = frames
+            .iter()
+            .map(|frame| {
+                frame["events"]
+                    .as_array()
+                    .expect("batch events array")
+                    .iter()
+                    .map(|item| item["seq"].as_u64().unwrap())
+                    .collect()
+            })
+            .collect();
+        assert_eq!(seqs, vec![vec![1, 2], vec![3], vec![4]]);
+    }
+
+    #[test]
+    fn emit_open_events_emits_nothing_for_empty_log() {
+        let mut frames = Vec::new();
+        emit_open_events_with_limit(&[], OPEN_REPLAY_BATCH_BYTES, |frame| frames.push(frame));
+        assert!(frames.is_empty());
+    }
 }

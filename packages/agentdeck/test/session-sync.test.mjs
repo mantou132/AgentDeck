@@ -76,24 +76,23 @@ test('switching hosts while a session is running never closes or cancels it, and
   fixture.deliver({
     id: openReq.payload.id,
     peerId: 1,
-    event: { seq: 1, event: 'turn_started' },
-  });
-  fixture.deliver({
-    id: openReq.payload.id,
-    peerId: 1,
     event: {
-      seq: 2,
-      event: 'session_update',
-      update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Write a hello world script' } },
-    },
-  });
-  fixture.deliver({
-    id: openReq.payload.id,
-    peerId: 1,
-    event: {
-      seq: 3,
-      event: 'session_update',
-      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Part 1 + Part 2' } },
+      events: [
+        { seq: 1, event: 'turn_started' },
+        {
+          seq: 2,
+          event: 'session_update',
+          update: {
+            sessionUpdate: 'user_message_chunk',
+            content: { type: 'text', text: 'Write a hello world script' },
+          },
+        },
+        {
+          seq: 3,
+          event: 'session_update',
+          update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Part 1 + Part 2' } },
+        },
+      ],
     },
   });
   fixture.reply(openReq, {

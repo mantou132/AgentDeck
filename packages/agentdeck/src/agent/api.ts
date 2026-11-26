@@ -645,7 +645,15 @@ export class AgentApi {
         ...(panelContext ? { panelContext } : {}),
       },
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.loadSessionTimeout') },
-      onEvent ? (event) => onEvent(event as SessionEvent) : undefined,
+      onEvent
+        ? (frame) => {
+            if (frame && typeof frame === 'object' && Array.isArray((frame as { events?: unknown }).events)) {
+              for (const event of (frame as { events: SessionEvent[] }).events) onEvent(event);
+            } else {
+              onEvent(frame as SessionEvent);
+            }
+          }
+        : undefined,
     );
 
   unsubscribeSession = (agent: string, sessionId: string) =>
