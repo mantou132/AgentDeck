@@ -476,7 +476,14 @@ export class AgentComposerElement extends GemElement {
           </div>
         </div>
       </dy-drop-area>
-      <input ${this.#fileInputRef} class="hidden" type="file" multiple @change=${this.#onFileInputChange} />
+      <input
+        ${this.#fileInputRef}
+        class="hidden"
+        type="file"
+        multiple
+        @change=${this.#onFileInputChange}
+        @cancel=${(e: Event) => e.stopPropagation()}
+      />
     `;
   };
 }

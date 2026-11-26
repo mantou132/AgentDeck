@@ -14,7 +14,7 @@ import {
   syncPasteReferences,
 } from 'src/composer/references';
 import { i18n } from 'src/i18n';
-import { hapticSelection } from 'src/lib/haptics';
+import { hapticSelection, hapticWarning } from 'src/lib/haptics';
 import { isMobileApp } from 'src/lib/platform';
 import { ensureRecognitionPermission, startRecognitionSession } from 'src/lib/speech-recognition';
 import { icons } from 'src/styles/icons';
@@ -461,7 +461,15 @@ export class DeckComposerElement extends GemElement {
               ></textarea>
               <div class="flex min-h-11 items-center justify-between gap-2.5 px-2 pt-1 pb-2">
                 <div class="flex min-w-0 items-center gap-2 text-sm font-medium text-describe">
-                  <input ${this.#fileInputRef} type="file" multiple hidden aria-label=${i18n.get('composer.inputFileAria')} @change=${this.#readFiles} />
+                  <input
+                    ${this.#fileInputRef}
+                    type="file"
+                    multiple
+                    hidden
+                    aria-label=${i18n.get('composer.inputFileAria')}
+                    @change=${this.#readFiles}
+                    @cancel=${(event: Event) => event.stopPropagation()}
+                  />
                   <button
                     type="button"
                     class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-describe active:bg-bg-hover disabled:cursor-default disabled:opacity-45"
@@ -503,7 +511,10 @@ export class DeckComposerElement extends GemElement {
                     v-if=${this.pending}
                     class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-primary text-white transition-transform duration-150 active:scale-[0.92]"
                     aria-label=${i18n.get('composer.stopAria')}
-                    @click=${() => this.cancel()}
+                    @click=${() => {
+                      hapticWarning();
+                      this.cancel();
+                    }}
                   >
                     <span class="size-2.5 rounded-[3px] bg-current"></span>
                   </button>
@@ -513,6 +524,7 @@ export class DeckComposerElement extends GemElement {
                     ?disabled=${!this.ready || this.#state.loadingDraft || this.#state.submitting}
                     aria-label=${i18n.get('composer.voiceChatAria')}
                     @click=${() => {
+                      hapticSelection();
                       this.#stopDictation();
                       this.voiceChat();
                     }}

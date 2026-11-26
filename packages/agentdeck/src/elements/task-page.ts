@@ -99,7 +99,7 @@ export class DeckTaskPageElement extends GemElement {
     return html`
       <button
         type="button"
-        class="flex w-full items-start gap-3 border-0 border-b border-solid border-border/70 bg-bg-light p-4 text-left last:border-b-0 enabled:cursor-pointer enabled:active:bg-bg-hover disabled:cursor-default"
+        class="flex w-full items-start gap-3 border-0 border-b border-solid border-border/70 bg-bg-light p-4 text-left last:border-b-0 enabled:cursor-pointer disabled:cursor-default"
         ?disabled=${!sessionId}
         @click=${() => sessionId && openAgentSession(agent, sessionId, cwd)}
       >

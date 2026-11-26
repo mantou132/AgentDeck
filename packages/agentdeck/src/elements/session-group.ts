@@ -2,6 +2,7 @@ import type { Emitter } from '@mantou/gem/lib/decorators';
 import { repeat } from '@mantou/gem/lib/element';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from 'src/i18n';
+import { hapticSelection } from 'src/lib/haptics';
 import { displayPath } from 'src/lib/path';
 import { scratchWorkspacesRoot } from 'src/session/groups';
 import type { DeckSession } from 'src/session/types';
@@ -37,6 +38,8 @@ export class DeckSessionGroupElement extends GemElement {
   #state = createState({ expanded: false });
 
   #toggleExpand = () => {
+    if (this.sessions.length <= 5) return;
+    hapticSelection();
     this.#state({ expanded: !this.#state.expanded });
   };
 

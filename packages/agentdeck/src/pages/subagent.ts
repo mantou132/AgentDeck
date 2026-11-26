@@ -4,6 +4,7 @@ import type { Attachment } from 'src/attachment/types';
 import { getSubagentStatus, getSubagentTitle, isSubagentActive } from 'src/elements/subagent-card';
 import { i18n } from 'src/i18n';
 import { followBottom } from 'src/lib/follow-bottom';
+import { hapticWarning } from 'src/lib/haptics';
 import { openAttachment } from 'src/navigation';
 import { style } from 'src/pages/session';
 import { cancelSubagent, getSession } from 'src/state/sessions';
@@ -91,7 +92,10 @@ export class AgentDeckSubagentPageElement extends GemElement {
             v-if=${active && !!subagent?.cancellable}
             type="button"
             class="mx-auto mt-2 flex min-h-11 w-full max-w-[760px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-bg-light text-sm font-semibold text-negative active:scale-[0.98]"
-            @click=${() => cancelSubagent(this.sessionId, this.subagentId)}
+            @click=${() => {
+              hapticWarning();
+              cancelSubagent(this.sessionId, this.subagentId);
+            }}
           >
             <tap-use class="size-4" .element=${icons.stop}></tap-use>
             ${i18n.get('subagent.stop')}
