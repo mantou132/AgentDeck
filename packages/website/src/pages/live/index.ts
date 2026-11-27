@@ -116,12 +116,19 @@ const style = css`
   .prompter-status-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     font-size: 12px;
     font-weight: 600;
     color: #56d364;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+  .prompter-status-badge::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
   }
   .prompter-status-badge.disconnected {
     color: #f85149;
@@ -567,7 +574,7 @@ export default class LivePage extends GemElement {
       <div class="prompter-wrap">
         <div class="prompter-header">
           <span class="prompter-status-badge ${presenterConnected ? '' : 'disconnected'}">
-            ${presenterConnected ? `🟢 ${i18n.get('presenterConnected')}` : `🔴 ${i18n.get('presenterConnecting')}`}
+            ${i18n.get(presenterConnected ? 'presenterConnected' : 'presenterConnecting')}
           </span>
           <div class="prompter-meta">
             <span class="prompter-page-text">${totalSlides > 0 ? `${currentSlide + 1} / ${totalSlides}` : '- / -'}</span>
