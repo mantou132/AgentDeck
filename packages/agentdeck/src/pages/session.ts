@@ -68,7 +68,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   /** Sent as soon as the page opens. */
   @property initialPrompt?: string;
 
-  #state = createState({ followMessages: true, deferTimeline: false, entered: false, voiceChat: false });
+  #state = createState({ showJumpToLatest: false, deferTimeline: false, entered: false, voiceChat: false });
   #pageRef = createRef<TapPageElement>();
   #messagesContentRef = createRef<HTMLElement>();
   #composerRef = createRef<DeckComposerElement>();
@@ -158,7 +158,7 @@ export class AgentDeckSessionPageElement extends GemElement {
   @effect((i) => [i.sessionId, i.#pageRef.value, i.#messagesContentRef.value])
   #followMessages = () => {
     this.#following = followBottom(this.#pageRef.value?.scrollElement, this.#messagesContentRef.value, {
-      onFollowingChange: (followMessages) => this.#state({ followMessages }),
+      onAwayChange: (showJumpToLatest) => this.#state({ showJumpToLatest }),
     });
     return this.#following?.disconnect;
   };
@@ -215,8 +215,11 @@ export class AgentDeckSessionPageElement extends GemElement {
         accepted = sendPrompt(session.sessionId, text, attachments, onFailed, voiceChat);
       }
 
-      // Once submission is accepted, the original draft can be deleted.
-      if (accepted) await removeDraft(originalDraftKey);
+      // Once submission is accepted, scroll back to the latest message and delete the original draft.
+      if (accepted) {
+        this.#following?.resume(true);
+        await removeDraft(originalDraftKey);
+      }
     } catch {
       failed = true;
     } finally {
@@ -436,21 +439,21 @@ export class AgentDeckSessionPageElement extends GemElement {
 
         <footer slot="footer" class="relative bg-bg/75 backdrop-blur-lg">
           <button
-            v-if=${!this.#state.followMessages && questionPending}
+            v-if=${this.#state.showJumpToLatest && questionPending}
             type="button"
             class="absolute bottom-full mb-3 left-1/2 flex h-10 -translate-x-1/2 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/20 bg-primary-soft pr-3 pl-4 text-sm font-semibold text-primary-strong shadow-float active:bg-bg-light"
-            @click=${() => this.#following?.resume()}
+            @click=${() => this.#following?.resume(true)}
           >
             ${i18n.get('session.questionBelow')}
             <tap-use class="size-5" .element=${icons.arrowDown}></tap-use>
           </button>
           <button
-            v-else-if=${!this.#state.followMessages}
+            v-else-if=${this.#state.showJumpToLatest}
             type="button"
             class="absolute bottom-full mb-3 left-1/2 grid size-10 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-primary/20 bg-bg-light text-primary-strong shadow-float active:bg-primary-soft"
             aria-label=${i18n.get('session.scrollToLatest')}
             title=${i18n.get('session.scrollToLatest')}
-            @click=${() => this.#following?.resume()}
+            @click=${() => this.#following?.resume(true)}
           >
             <tap-use class="size-5" .element=${icons.arrowDown}></tap-use>
           </button>
