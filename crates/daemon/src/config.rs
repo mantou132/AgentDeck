@@ -58,6 +58,10 @@ impl DaemonConfig {
         Ok(config)
     }
 
+    pub fn pairing_id(&self) -> Option<&str> {
+        self.relay_id.as_deref().filter(|id| !id.trim().is_empty())
+    }
+
     pub fn relay_id(&self) -> &str {
         self.relay_id.as_deref().expect("initialized pairing ID")
     }
