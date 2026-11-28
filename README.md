@@ -4,7 +4,7 @@
 
 [![AgentDeck Demo](https://img.youtube.com/vi/XVVrMgwf2YA/maxresdefault.jpg)](https://www.youtube.com/watch?v=XVVrMgwf2YA)
 
-<a href="https://apps.apple.com/app/id6821905390"><img alt="Download on the App Store" src="https://tools.applemarketingtools.com/api/badges/download-on-the-app-store/black/en-us" height="40"></a>
+<a href="https://apps.apple.com/app/id6821905390"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" height="40"></a>
 <a href="https://play.google.com/store/apps/details?id=com.mantou.agentdeck"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60"></a>
 
 No Google Play? Download the APK from the [latest release](https://github.com/mantou132/AgentDeck/releases/latest).
