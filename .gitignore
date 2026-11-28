@@ -28,3 +28,7 @@ target/
 # Playwright
 test-results/
 playwright-report/
+
+# Store screenshots generated output (run `node distribution/screenshots/generate.mjs`)
+distribution/screenshots/raw/
+distribution/screenshots/out/
