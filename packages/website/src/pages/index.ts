@@ -722,7 +722,9 @@ export default class HomePage extends GemElement {
           </h1>
           <p class="lead">${i18n.get('heroLead')}</p>
           <app-stores></app-stores>
-          <p class="apk">${i18n.get('apk', link(`${GITHUB}/releases/latest`))}</p>
+          <p class="apk">
+            ${i18n.get('apk', link(`${GITHUB}/releases/latest`), link('https://testflight.apple.com/join/RWqpYgwm'))}
+          </p>
         </div>
 
         <div class="phone" aria-hidden="true">

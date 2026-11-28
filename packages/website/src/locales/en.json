@@ -8,7 +8,7 @@
   "eyebrow": "$1<Open source> · iOS & Android · End-to-end encrypted",
   "heroTitle": "Your agents,$1$2<in your pocket.>",
   "heroLead": "Run Claude Code, Codex, Cursor or any ACP agent on your own computer. Start, steer and approve it from your phone, wherever you are.",
-  "apk": "No Google Play? $1<Download the APK>",
+  "apk": "No Google Play? $1<Download the APK> · iOS public beta on $2<TestFlight>",
   "appStoreSmall": "Download on the",
   "googlePlaySmall": "Get it on",
   "mockTitle": "Fix flaky login test",

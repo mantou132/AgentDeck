@@ -8,7 +8,7 @@
   "eyebrow": "$1<开源> · iOS 和 Android · 端到端加密",
   "heroTitle": "你的 Agent，$1$2<装进口袋。>",
   "heroLead": "在自己的电脑上运行 Claude Code、Codex、Cursor 或任意 ACP Agent，无论身在何处，都能用手机启动、引导和审批。",
-  "apk": "没有 Google Play？$1<下载 APK>",
+  "apk": "没有 Google Play？$1<下载 APK> · iOS 公测版 $2<TestFlight>",
   "appStoreSmall": "下载于",
   "googlePlaySmall": "下载于",
   "mockTitle": "修复不稳定的登录测试",
