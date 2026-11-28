@@ -4,8 +4,8 @@
 
 [![AgentDeck Demo](https://img.youtube.com/vi/XVVrMgwf2YA/maxresdefault.jpg)](https://www.youtube.com/watch?v=XVVrMgwf2YA)
 
-<a href="https://apps.apple.com/app/id6821905390"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" height="40"></a>
-<a href="https://play.google.com/store/apps/details?id=com.mantou.agentdeck"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60"></a>
+<a href="https://apps.apple.com/app/id6821905390"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" height="40" align="middle"></a>
+<a href="https://play.google.com/store/apps/details?id=com.mantou.agentdeck"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60" align="middle"></a>
 
 No Google Play? Download the APK from the [latest release](https://github.com/mantou132/AgentDeck/releases/latest).
 
@@ -17,6 +17,9 @@ No Google Play? Download the APK from the [latest release](https://github.com/ma
 npm install -g agentdeckd          # Node.js 22+, macOS / Linux x64 / Windows x64
 brew install mantou132/tap/agentdeckd   # or Homebrew
 ```
+
+> [!NOTE]
+> `1.0.x` is not compatible with `0.9.x`. If your app is `0.9.x`, install the matching daemon with `npm install -g agentdeckd@0.9`.
 
 **2. Start it:**
 
@@ -128,9 +131,9 @@ An entry with only an `id` adds that agent from the [ACP registry](https://agent
 ## Troubleshooting
 
 - **Cannot connect:** check `agentdeckd status` and make sure the app uses the same Pairing ID and relay. Then try `agentdeckd restart`, and confirm that your network allows WebSocket connections to the relay.
+- **`method unknown` error:** check the daemon version with `agentdeckd --version`; the app and daemon may be incompatible (`1.0.x` and `0.9.x` are not compatible). Upgrade to `1.0.x` on both sides, or install the matching daemon version (for `0.9.x` apps: `agentdeckd stop && npm install -g agentdeckd@0.9 && agentdeckd start`).
 - **Still stuck:** run `agentdeckd reset`, then tap **Reset App** in the app's Settings and scan the code again.
 - **Connection preempted:** close any other client that shares the same device identity.
-- **Session keeps loading, then times out:** the agent may still be installing or updating on the computer, which can take a while the first time it is used or after a new release. Wait a moment and retry.
 - **Connected, but an agent fails:** check that the agent's CLI works locally, and look at the daemon logs.
 - **Agent says its login expired** (for example Claude Code's `OAuth session expired and could not be refreshed`): agents use their own CLI's sign-in on the computer. Being signed in to a vendor's desktop app doesn't always mean the CLI is signed in too. Sign in again in a terminal (for Claude Code: `claude auth login`, then check with `claude auth status`) and start a new session in the app.
 
