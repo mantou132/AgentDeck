@@ -21,8 +21,8 @@ use self::{
 };
 use crate::{
     acp_agent::{
-        self, AgentSessionManager, PromptOptions, SessionContext, SessionObserver,
-        SessionStateUpdate, SessionSubscriber, TaskInputPush, UserInput,
+        self, AgentSessionManager, PromptOptions, SessionContext, SessionMetaStore,
+        SessionObserver, SessionStateUpdate, SessionSubscriber, TaskInputPush, UserInput,
     },
     app_data::AppPaths,
     peer::{CallCtx, Peer, RpcError},
@@ -146,6 +146,20 @@ impl SessionObserver for ServiceObserver {
             json!({ "agent": agent, "sessionId": session_id }),
         );
     }
+
+    fn on_session_deleted(&self, agent: &str, session_id: &str) {
+        self.broadcast(
+            "agent_session_deleted",
+            json!({ "agent": agent, "sessionId": session_id }),
+        );
+    }
+
+    fn on_session_unread(&self, agent: &str, session_id: &str, unread: bool) {
+        self.broadcast(
+            "agent_session_unread",
+            json!({ "agent": agent, "sessionId": session_id, "unread": unread }),
+        );
+    }
 }
 
 /// Central host service managing ACP agent sessions and exposing RPC routes.
@@ -166,12 +180,20 @@ impl Default for AgentService {
 
 impl AgentService {
     pub fn new() -> Self {
+        Self::with_meta(SessionMetaStore::in_memory())
+    }
+
+    pub fn with_paths(paths: &AppPaths) -> Self {
+        Self::with_meta(SessionMetaStore::load(paths.session_meta_file()))
+    }
+
+    fn with_meta(meta: Arc<SessionMetaStore>) -> Self {
         let peers: Arc<Mutex<HashMap<u64, PeerEntry>>> = Arc::default();
         let observer = Arc::new(ServiceObserver {
             peers: peers.clone(),
         });
         Self {
-            sessions: Arc::new(AgentSessionManager::new(Some(observer))),
+            sessions: Arc::new(AgentSessionManager::with_meta(Some(observer), meta)),
             peers,
             tasks: Arc::default(),
             screen_streams: screen_capture::ScreenStreamManager::default(),
@@ -643,6 +665,23 @@ impl AgentService {
             }
         });
 
+        let unread_sessions = sessions.clone();
+        peer.handle("agent_session_set_unread", move |params, _ctx| {
+            let sessions = unread_sessions.clone();
+            async move {
+                let (agent, session_id) =
+                    required_agent_session(&params, "agent_session_set_unread")?;
+                let unread = params
+                    .get("unread")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        "Missing unread boolean for agent_session_set_unread".to_string()
+                    })?;
+                sessions.set_session_unread(agent, session_id, unread);
+                Ok(json!({ "ok": true }))
+            }
+        });
+
         let fork_sessions = sessions.clone();
         peer.handle("agent_session_fork", move |params, _ctx| {
             let sessions = fork_sessions.clone();
@@ -657,7 +696,12 @@ impl AgentService {
                 )
                 .await
                 {
-                    Ok(Ok(forked)) => Ok(json!({ "agent": agent, "sessionId": forked })),
+                    Ok(Ok(forked)) => Ok(json!({
+                        "agent": agent,
+                        "sessionId": forked.session_id,
+                        "title": forked.title,
+                        "updatedAt": forked.updated_at,
+                    })),
                     Ok(Err(err)) => Err(err.to_string()),
                     Err(_) => Err("Timeout forking ACP agent session".to_string()),
                 }

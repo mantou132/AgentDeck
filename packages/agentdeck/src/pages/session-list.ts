@@ -6,7 +6,13 @@ import { getConnectionLabel, i18n } from 'src/i18n';
 import { hapticWarning } from 'src/lib/haptics';
 import { openSettings, selectSession } from 'src/navigation';
 import { hasPendingElicitation } from 'src/session/elicitation';
-import { createPendingSession, deleteSession, getAgentStatusText, refreshSessions } from 'src/state/sessions';
+import {
+  createPendingSession,
+  deleteSession,
+  getAgentStatusText,
+  refreshSessions,
+  setSessionUnread,
+} from 'src/state/sessions';
 import { clearShare, shareStore } from 'src/state/share';
 import {
   agentdeckStore,
@@ -15,7 +21,6 @@ import {
   isConnecting,
   type SessionRuntime,
   sessionsStore,
-  updateRuntime,
 } from 'src/state/store';
 import { tasksStore } from 'src/state/tasks';
 import { icons } from 'src/styles/icons';
@@ -226,7 +231,7 @@ export class AgentDeckSessionListPageElement extends GemElement {
                   @select=${(event: CustomEvent<string>) => selectSession(event.detail)}
                   @request-delete=${(event: CustomEvent<string>) => deleteSession(event.detail)}
                   @toggle-unread=${({ detail }: CustomEvent<string>) =>
-                    updateRuntime(detail, { unread: !getRuntime(detail).unread })}
+                    setSessionUnread(detail, !getRuntime(detail).unread)}
                 ></deck-session-group>
               `,
             )}

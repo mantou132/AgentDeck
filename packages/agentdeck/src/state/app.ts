@@ -27,8 +27,10 @@ import { i18n } from 'src/i18n';
 import { loadSkills, skillGroups, skillsHash } from 'src/skills';
 import {
   endSession,
+  handleSessionDeleted,
   handleSessionEvent,
   handleSessionState,
+  handleSessionUnread,
   handleUserInputResolved,
   markAllUnsubscribed,
   refreshSessions,
@@ -131,6 +133,14 @@ const handleTransportMessage = (message: TransportMessage) => {
       endSession(message.sessionId);
       break;
     }
+    case 'session_deleted': {
+      handleSessionDeleted(message.sessionId);
+      break;
+    }
+    case 'session_unread': {
+      handleSessionUnread(message.agent, message.sessionId, message.unread);
+      break;
+    }
     case 'prompt_suggestion': {
       // Suggestions arriving after turn completion are not needed by any newly started turn
       if (!isTurnRunning(message.sessionId)) updateRuntime(message.sessionId, { suggestion: message.suggestion });
@@ -140,8 +150,9 @@ const handleTransportMessage = (message: TransportMessage) => {
 };
 
 export const startApp = async () => {
-  // The Relay store moved to IndexedDB and in-flight state moved to the daemon; drop legacy local copies.
+  // The Relay store moved to IndexedDB; in-flight state and session metadata moved to the daemon.
   localStorage.removeItem(DEFAULT_STORAGE_KEY);
+  localStorage.removeItem('agentdeck.meta.v1');
   if (typeof indexedDB?.deleteDatabase === 'function') indexedDB.deleteDatabase('agentdeck-in-flight');
   try {
     if (sessionStorage.getItem(RESET_PENDING_KEY)) {

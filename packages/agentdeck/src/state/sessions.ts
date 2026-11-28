@@ -24,13 +24,6 @@ import {
   setAgentCommands,
 } from 'src/state/config-options';
 import {
-  getSessionMeta,
-  isSessionDeleted,
-  markSessionDeleted,
-  saveSessionMeta,
-  unreadRuntimes,
-} from 'src/state/session-meta';
-import {
   agentdeckStore,
   getMessages,
   getRuntime,
@@ -193,14 +186,11 @@ export const handleSessionEvent = (sessionId: string, epoch: string, event: Sess
 
 /** Applies a broadcast `agent_session_state` notification (turn start/end or metadata change). */
 export const handleSessionState = (state: SessionStateUpdate) => {
-  const { sessionId, agent } = state;
-  if (isSessionDeleted(sessionId) || getRunningTask(sessionId)) return;
+  const { sessionId, agent, title, updatedAt } = state;
+  if (getRunningTask(sessionId)) return;
 
   const prev = getRuntime(sessionId);
   const existing = getSession(sessionId);
-  const meta = getSessionMeta(sessionId);
-  const title = resolveSessionTitle(state.title, meta?.title);
-  const updatedAt = state.updatedAt || meta?.updatedAt;
 
   if (!existing && agent === agentdeckStore.settings.agent && state.cwd) {
     const nextSession: DeckSession = {
@@ -297,7 +287,7 @@ export const resetRemoteState = () => {
     sessionsLoading: false,
     sessionsLoaded: false,
     sessionsError: '',
-    runtimes: unreadRuntimes(),
+    runtimes: {},
   });
   messagesStore({ bySession: {} });
 };
@@ -344,33 +334,6 @@ const runningLocalSessions = () =>
     session && running && !session.pendingCreation && session.agent === agentdeckStore.settings.agent ? [session] : [],
   );
 
-export const isPlaceholderTitle = (title?: string) => {
-  const lower = title?.trim().toLowerCase();
-  if (!lower) return true;
-
-  // Generic untitled / default titles
-  if (
-    lower === 'untitled' ||
-    lower === 'untitled session' ||
-    lower === 'default session' ||
-    lower === '未命名' ||
-    lower === '未命名会话' ||
-    lower === '新建会话'
-  ) {
-    return true;
-  }
-
-  // Matches "Session", "Session 123", "Session #1", "Session: <id>", "Session <hex/uuid>"
-  if (/^session([:_\s#-]+([0-9a-f]{4,}(-?[0-9a-f]+)*|\d+))?$/i.test(lower)) {
-    return true;
-  }
-
-  return false;
-};
-
-const resolveSessionTitle = (title?: string, savedTitle?: string) =>
-  isPlaceholderTitle(title) && savedTitle ? savedTitle : title || savedTitle;
-
 agentApi.setAgentStatusHandler((agent, status) => {
   const { [agent]: _, ...rest } = sessionsStore.agentStatus;
   sessionsStore({ agentStatus: status ? { ...rest, [agent]: status } : rest });
@@ -398,25 +361,29 @@ export const refreshSessions = async () => {
   try {
     const sessions = await agentApi.listSessions(agent);
     if (request !== sessionsRequest || agent !== agentdeckStore.settings.agent) return;
-    const normalized = sessions
-      .filter((session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string')
-      .filter((session) => !isSessionDeleted(session.sessionId))
-      .map((session) => {
-        const meta = getSessionMeta(session.sessionId);
-        return {
-          ...session,
-          agent,
-          title: resolveSessionTitle(session.title, meta?.title),
-          updatedAt: session.updatedAt || meta?.updatedAt,
-        };
-      });
+    const valid = sessions.filter(
+      (session) => typeof session.sessionId === 'string' && typeof session.cwd === 'string',
+    );
+    const normalized = valid.map(({ unread: _, ...session }) => ({ ...session, agent }));
     const merged = mergeSessionsWithActive(normalized, runningLocalSessions());
     const prevGroups = sessionsStore.sessionsLoaded ? sessionsStore.sessionGroups : [];
+    const runtimes = { ...sessionsStore.runtimes };
+    let runtimesChanged = false;
+    for (const session of valid) {
+      if (isTurnRunning(session.sessionId)) continue;
+      const nextUnread = Boolean(session.unread);
+      const current = runtimes[session.sessionId];
+      if (Boolean(current?.unread) !== nextUnread) {
+        runtimes[session.sessionId] = { ...(current ?? { load: 'idle' }), unread: nextUnread };
+        runtimesChanged = true;
+      }
+    }
     sessionsStore({
       sessions: merged,
       sessionGroups: getSortedSessionGroups(merged, prevGroups),
       sessionsLoaded: true,
       sessionsLoading: false,
+      ...(runtimesChanged ? { runtimes } : {}),
     });
   } catch (error) {
     if (request !== sessionsRequest) return;
@@ -444,21 +411,21 @@ export const syncActiveSessions = async () => {
   const { sessions, userInputs = [] } = await agentApi.listActiveSessions();
   if (generation !== remoteGeneration) return;
 
+  let settled = false;
   const activeIds = new Set(sessions.map((item) => item.sessionId));
   for (const sessionId of runningSessionIds()) {
     const runtime = getRuntime(sessionId);
     if (runtime.creating || activeIds.has(sessionId)) continue;
     settleUserInput(sessionId);
     finishSessionTree(sessionId);
-    updateRuntime(sessionId, { running: false, unread: true });
+    updateRuntime(sessionId, { running: false });
+    settled = true;
   }
 
   const currentAgentActive: DeckSession[] = [];
   for (const active of sessions) {
-    if (isSessionDeleted(active.sessionId) || getRunningTask(active.sessionId)) continue;
-    const meta = getSessionMeta(active.sessionId);
-    const title = resolveSessionTitle(active.title, meta?.title);
-    const updatedAt = active.updatedAt || meta?.updatedAt;
+    if (getRunningTask(active.sessionId)) continue;
+    const { title, updatedAt } = active;
     const existing = getSession(active.sessionId);
     const session: DeckSession | undefined = existing
       ? { ...existing, ...(title ? { title } : {}), ...(updatedAt ? { updatedAt } : {}) }
@@ -486,10 +453,52 @@ export const syncActiveSessions = async () => {
   }
 
   for (const input of userInputs) showUserInput(input);
+  // If `refreshSessions` already returned before we cleared a finished turn, re-fetch so its
+  // daemon-persisted `unread` / `updatedAt` are not skipped by the `isTurnRunning` guard.
+  if (settled && !sessionsStore.sessionsLoading) refreshSessions();
 };
 
 export const getSession = (sessionId: string): DeckSession | undefined =>
   sessionsStore.sessions.find((session) => session.sessionId === sessionId) ?? getRuntime(sessionId).session;
+
+const removeSessionLocally = (sessionId: string) => {
+  const session = getSession(sessionId);
+  clearSessionTransient(sessionId);
+  openPages.delete(sessionId);
+  if (session) removeDraft(draftKey(session)).catch(console.error);
+  removeRuntime(sessionId);
+  const sessions = sessionsStore.sessions.filter((item) => item.sessionId !== sessionId);
+  sessionsStore({
+    sessions,
+    sessionGroups: getSortedSessionGroups(sessions, sessionsStore.sessionGroups),
+    sessionsLoading: false,
+  });
+};
+
+/** Removes a session deleted on another device or by a scheduled task cleanup. */
+export const handleSessionDeleted = (sessionId: string) => {
+  if (!getSession(sessionId)) return;
+  sessionsRequest += 1;
+  removeSessionLocally(sessionId);
+};
+
+/** Applies an `agent_session_unread` broadcast from the daemon (synced across devices). */
+export const handleSessionUnread = (agent: string, sessionId: string, unread: boolean) => {
+  if (agent !== agentdeckStore.settings.agent) return;
+  if (unread && isTurnRunning(sessionId)) return;
+  if (Boolean(getRuntime(sessionId).unread) === unread) return;
+  updateRuntime(sessionId, { unread });
+};
+
+/** Marks a session read or unread locally and persists the change on the daemon. */
+export const setSessionUnread = (sessionId: string, unread: boolean) => {
+  if (unread && isTurnRunning(sessionId)) return;
+  updateRuntime(sessionId, { unread });
+  const session = getSession(sessionId);
+  if (session && !session.pendingCreation && agentdeckStore.connection === 'connected') {
+    agentApi.setSessionUnread(session.agent, sessionId, unread).catch(() => {});
+  }
+};
 
 export const deleteSession = async (sessionId: string) => {
   const session = getSession(sessionId);
@@ -510,20 +519,9 @@ export const deleteSession = async (sessionId: string) => {
 
     if (!isCurrentHost()) return;
 
-    markSessionDeleted(sessionId);
-
     // A list request started before deletion must not restore the removed row.
     sessionsRequest += 1;
-    clearSessionTransient(sessionId);
-    openPages.delete(sessionId);
-    removeDraft(draftKey(session)).catch(console.error);
-    removeRuntime(sessionId);
-    const sessions = sessionsStore.sessions.filter((item) => item.sessionId !== sessionId);
-    sessionsStore({
-      sessions,
-      sessionGroups: getSortedSessionGroups(sessions, sessionsStore.sessionGroups),
-      sessionsLoading: false,
-    });
+    removeSessionLocally(sessionId);
   } catch (error) {
     if (isCurrentHost()) {
       Toast.open('error', error instanceof Error ? error.message : String(error));
@@ -740,12 +738,9 @@ export const ensureSessionLoaded = async (sessionId: string, options?: { force?:
       unsubscribeSession(sessionId);
     }
 
-    const meta = getSessionMeta(sessionId);
-    const title = resolveSessionTitle(opened.title, meta?.title);
-    const updatedAt = opened.updatedAt || meta?.updatedAt;
     patchSession(sessionId, {
-      ...(title ? { title } : {}),
-      ...(updatedAt ? { updatedAt } : {}),
+      ...(opened.title ? { title: opened.title } : {}),
+      ...(opened.updatedAt ? { updatedAt: opened.updatedAt } : {}),
     });
 
     // Agents reset mode / model on a fresh ACP `session/load`; re-apply the agent's saved selection only then.
@@ -881,18 +876,13 @@ export const promotePendingSession = async (
   }
 
   const now = new Date().toISOString();
-  const createdTitle = isPlaceholderTitle(created.title) ? undefined : created.title;
   const liveSession: DeckSession = {
     agent: pendingSession.agent,
     sessionId,
     cwd: pendingSession.cwd,
-    title: createdTitle || text.slice(0, 30) || attachments[0]?.name,
+    title: created.title || text.slice(0, 30) || attachments[0]?.name,
     updatedAt: typeof created.updatedAt === 'string' && created.updatedAt ? created.updatedAt : now,
   };
-  saveSessionMeta(sessionId, {
-    title: liveSession.title,
-    updatedAt: liveSession.updatedAt,
-  });
 
   let options: SessionOptions = { modes: created.modes, configOptions: created.configOptions };
   // The daemon subscribed this device on `createSession`; track `(epoch, seq)` before applying config
@@ -949,22 +939,20 @@ export const forkSession = async (session: DeckSession, messageId: string): Prom
     Toast.open('error', i18n.get('error.remoteNotConnected'));
     return null;
   }
-  let sessionId: string;
+  let forkedResult: { sessionId: string; title?: string; updatedAt?: string };
   try {
-    ({ sessionId } = await agentApi.forkSession({ ...session, messageId }));
+    forkedResult = await agentApi.forkSession({ ...session, messageId });
   } catch (error) {
     Toast.open('error', error instanceof Error ? error.message : i18n.get('error.forkSessionFailed'));
     return null;
   }
   const forked: DeckSession = {
     agent: session.agent,
-    sessionId,
+    sessionId: forkedResult.sessionId,
     cwd: session.cwd,
-    // Same title claude-agent-acp derives, so a list refresh keeps it.
-    title: session.title && `${session.title} (fork)`,
-    updatedAt: new Date().toISOString(),
+    title: forkedResult.title || (session.title && `${session.title} (fork)`),
+    updatedAt: forkedResult.updatedAt || new Date().toISOString(),
   };
-  saveSessionMeta(sessionId, { title: forked.title, updatedAt: forked.updatedAt });
   const sessions = [forked, ...sessionsStore.sessions];
   sessionsStore({ sessions, sessionGroups: getSortedSessionGroups(sessions, sessionsStore.sessionGroups) });
   return forked;

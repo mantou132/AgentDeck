@@ -196,7 +196,7 @@ async fn run_daemon(paths: &AppPaths, options: &ConfigOptions) -> Result<()> {
     let _awake_monitor = awake::Monitor::start(paths)?;
     let relay_id = config.relay_id();
 
-    let service = Arc::new(AgentService::new());
+    let service = Arc::new(AgentService::with_paths(paths));
 
     tracing::info!("Connecting to Relay");
 

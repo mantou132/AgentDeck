@@ -27,6 +27,7 @@ use tokio_util::sync::CancellationToken;
 use crate::render_skills::SkillSelection;
 
 mod catalog;
+mod meta;
 mod provision;
 mod runtime;
 mod session;
@@ -35,6 +36,7 @@ mod session;
 mod lifecycle_tests;
 
 pub use catalog::custom_agent_list;
+pub(crate) use meta::SessionMetaStore;
 use provision::prepare_agent_command;
 use runtime::{AcpRuntime, AgentConnection, StartedSession};
 use session::{SessionExit, run_session_actor};
@@ -110,6 +112,8 @@ pub trait SessionObserver: Send + Sync {
     );
     fn on_user_input_resolved(&self, agent: &str, session_id: &str, request_id: &str);
     fn on_session_ended(&self, agent: &str, session_id: &str);
+    fn on_session_deleted(&self, agent: &str, session_id: &str);
+    fn on_session_unread(&self, agent: &str, session_id: &str, unread: bool);
 }
 
 /// A request waiting for the user, sent to devices as the `method`
@@ -210,6 +214,14 @@ pub struct ActiveSessionInfo {
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
+}
+
+/// Metadata for a newly forked session returned by `fork_session`.
+#[derive(Debug, Clone)]
+pub struct ForkedSession {
+    pub session_id: String,
+    pub title: Option<String>,
+    pub updated_at: String,
 }
 
 /// What a starting agent is doing, reported to clients waiting on it.
@@ -346,6 +358,7 @@ pub struct AgentSessionManager {
     /// Created on first use so agents added by the fetched registry can launch.
     runtimes: Arc<std::sync::Mutex<HashMap<String, AcpRuntime>>>,
     observer: Option<Arc<dyn SessionObserver>>,
+    meta: Arc<SessionMetaStore>,
     idle_timeout: Duration,
     shutting_down: CancellationToken,
 }
@@ -456,11 +469,20 @@ enum StartOutcome {
 }
 
 impl AgentSessionManager {
+    #[cfg(test)]
     pub fn new(observer: Option<Arc<dyn SessionObserver>>) -> Self {
+        Self::with_meta(observer, SessionMetaStore::in_memory())
+    }
+
+    pub(crate) fn with_meta(
+        observer: Option<Arc<dyn SessionObserver>>,
+        meta: Arc<SessionMetaStore>,
+    ) -> Self {
         Self {
             sessions: Arc::default(),
             runtimes: Arc::default(),
             observer,
+            meta,
             idle_timeout: DEFAULT_SESSION_IDLE_TIMEOUT,
             shutting_down: CancellationToken::new(),
         }
@@ -646,6 +668,7 @@ impl AgentSessionManager {
             epoch,
             self.idle_timeout,
             self.observer.clone(),
+            self.meta.clone(),
             runtime.clone(),
             rx,
             child_rx,
@@ -1010,29 +1033,52 @@ impl AgentSessionManager {
             .send_request_to(Agent, request)
             .block_task()
             .await?;
-        Ok(to_json(response))
+        Ok(self.meta.annotate_list(agent, to_json(response)))
     }
 
     pub async fn delete_session(&self, agent: &str, session_id: &str) -> Result<()> {
-        let AgentConnection {
-            connection,
-            capabilities,
-            ..
-        } = self.runtime(agent).connection().await?;
-        if capabilities.session_capabilities.delete.is_none() {
-            anyhow::bail!("{agent} does not support deleting sessions");
-        }
         // Release any live actor (and running turn) before asking the agent to
         // delete storage.
         self.close_session(agent, session_id).await;
-        connection
-            .send_request_to(
-                Agent,
-                DeleteSessionRequest::new(SessionId::from(session_id.to_string())),
-            )
-            .block_task()
-            .await?;
+        self.meta.mark_deleted(agent, session_id);
+        match self.runtime(agent).connection().await {
+            Ok(AgentConnection {
+                connection,
+                capabilities,
+                ..
+            }) if capabilities.session_capabilities.delete.is_some() => {
+                if let Err(err) = connection
+                    .send_request_to(
+                        Agent,
+                        DeleteSessionRequest::new(SessionId::from(session_id.to_string())),
+                    )
+                    .block_task()
+                    .await
+                {
+                    tracing::warn!("ACP session/delete failed for {agent}/{session_id}: {err}");
+                }
+            }
+            Ok(_) => {}
+            Err(err) => {
+                tracing::warn!(
+                    "Skipping ACP session/delete for {agent}/{session_id} (agent unavailable): \
+                     {err}"
+                );
+            }
+        }
+        if let Some(observer) = &self.observer {
+            observer.on_session_deleted(agent, session_id);
+        }
         Ok(())
+    }
+
+    /// Persist `unread` state for a session and broadcast the change to all
+    /// connected devices. Works without loading an ACP actor.
+    pub fn set_session_unread(&self, agent: &str, session_id: &str, unread: bool) {
+        self.meta.set_unread(agent, session_id, unread);
+        if let Some(observer) = &self.observer {
+            observer.on_session_unread(agent, session_id, unread);
+        }
     }
 
     /// Fork a persisted session (`session/fork`) up to and including the agent
@@ -1044,7 +1090,7 @@ impl AgentSessionManager {
         session_id: &str,
         cwd: Option<PathBuf>,
         message_id: &str,
-    ) -> Result<String> {
+    ) -> Result<ForkedSession> {
         let AgentConnection {
             connection,
             capabilities,
@@ -1053,6 +1099,16 @@ impl AgentSessionManager {
         if capabilities.session_capabilities.fork.is_none() {
             anyhow::bail!("{agent} does not support forking sessions");
         }
+        let parent_title = {
+            let key = AgentSessionKey::new(agent, session_id);
+            let live_title = self
+                .sessions
+                .lock()
+                .await
+                .get(&key)
+                .and_then(|session| session.status.borrow().title.clone());
+            live_title.or_else(|| self.meta.get(agent, session_id).title)
+        };
         let request =
             ForkSessionRequest::new(SessionId::from(session_id.to_string()), resolve_cwd(cwd)?)
                 .meta(fork_point_meta(message_id));
@@ -1060,7 +1116,17 @@ impl AgentSessionManager {
             .send_request_to(Agent, request)
             .block_task()
             .await?;
-        Ok(response.session_id.to_string())
+        let forked_id = response.session_id.to_string();
+        let title = parent_title.map(|t| format!("{t} (fork)"));
+        let updated_at = meta::now_iso();
+        let recorded = self
+            .meta
+            .record_created(agent, &forked_id, title.as_deref(), &updated_at);
+        Ok(ForkedSession {
+            session_id: forked_id,
+            title: recorded.title,
+            updated_at: recorded.updated_at.unwrap_or(updated_at),
+        })
     }
 }
 

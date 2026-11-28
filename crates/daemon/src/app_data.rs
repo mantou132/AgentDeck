@@ -73,6 +73,12 @@ impl AppPaths {
         self.root.join("task_runs").join(format!("{task_id}.jsonl"))
     }
 
+    /// Host-side session metadata (`title`, `updatedAt`, soft `deleted`); kept
+    /// by reset.
+    pub fn session_meta_file(&self) -> PathBuf {
+        self.root.join("session_meta.json")
+    }
+
     fn agents_dir(&self) -> PathBuf {
         self.root.join("agents")
     }
@@ -176,6 +182,7 @@ mod tests {
         let preserved = [
             "daemon.json",
             "daemon.lock",
+            "session_meta.json",
             "agents/codex/managed-binary.json",
             "agents/codex/versions/1.0/agent",
         ];

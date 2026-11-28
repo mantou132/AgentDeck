@@ -259,7 +259,7 @@ test('a background turn that finished while disconnected settles cleanly via age
   await tick();
   assert.equal(fixture.app.isTurnRunning('s1'), true);
 
-  // Reconnect after the daemon finished the turn while we were away.
+  // Reconnect after the turn was cancelled/failed while away (not marked unread on daemon).
   fixture.transport.reconnectTransport(true);
   await tick();
   fixture.sockets.at(-1).open();
@@ -267,6 +267,24 @@ test('a background turn that finished while disconnected settles cleanly via age
 
   assert.equal(fixture.app.isTurnRunning('s1'), false);
   assert.equal(fixture.app.runningSessionIds().length, 0);
+  assert.equal(Boolean(fixture.app.getRuntime('s1').unread), false);
+
+  // Reconnect after a turn actually completed on daemon while away, even if agent_session_list
+  // resolves before agent_active_sessions clears the stale local running flag.
+  fixture.app.updateRuntime('s1', { running: true });
+  fixture.host.unreadSessions.add('s1');
+  fixture.heldMethods.add('agent_active_sessions');
+  fixture.transport.reconnectTransport(true);
+  await tick();
+  fixture.sockets.at(-1).open();
+  await fixture.settleHost();
+  fixture.heldMethods.delete('agent_active_sessions');
+  const activeReq = fixture.requests.findLast((r) => r.payload.method === 'agent_active_sessions');
+  fixture.reply(activeReq, { sessions: [], userInputs: [] });
+  await fixture.settleHost();
+
+  assert.equal(fixture.app.isTurnRunning('s1'), false);
+  assert.equal(Boolean(fixture.app.getRuntime('s1').unread), true);
 });
 
 test('sendPrompt and config changes wait until reconnect resync completes (and work again after retry)', async () => {
@@ -501,4 +519,35 @@ test('leaving a session page while openSession is in flight unsubscribes once op
     true,
     'sends agent_session_unsubscribe once daemon subscribed the peer',
   );
+});
+
+test('agent_session_state updates session updatedAt and title from daemon without reverting', async () => {
+  const fixture = documentFixture();
+  await fixture.connect();
+  assert.equal(fixture.app.getSession('s1')?.updatedAt, undefined);
+
+  fixture.emitSessionState({
+    agent: 'codex',
+    sessionId: 's1',
+    cwd: '/tmp',
+    title: 'Updated title',
+    updatedAt: '2026-01-02T12:00:00.000Z',
+    running: true,
+    completed: false,
+  });
+  await tick();
+  assert.equal(fixture.app.getSession('s1')?.title, 'Updated title');
+  assert.equal(fixture.app.getSession('s1')?.updatedAt, '2026-01-02T12:00:00.000Z');
+
+  fixture.emitSessionState({
+    agent: 'codex',
+    sessionId: 's1',
+    cwd: '/tmp',
+    title: 'Updated title',
+    updatedAt: '2026-01-02T12:05:00.000Z',
+    running: false,
+    completed: true,
+  });
+  await tick();
+  assert.equal(fixture.app.getSession('s1')?.updatedAt, '2026-01-02T12:05:00.000Z');
 });

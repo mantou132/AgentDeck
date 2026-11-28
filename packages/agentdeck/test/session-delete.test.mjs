@@ -76,3 +76,23 @@ test('offline deletion sends no request and preserves the session', async () => 
   assert.equal(deleteRequests(f).length, 0);
   assert.ok(f.app.getSession('s1'));
 });
+
+test('agent_session_deleted broadcast removes the session and clears unread state', async () => {
+  const f = documentFixture();
+  await f.connect();
+  await f.openSession('s1');
+  f.app.updateRuntime('s1', { unread: true });
+  assert.equal(Boolean(f.app.getRuntime('s1').unread), true);
+
+  f.deliver({
+    method: 'agent_session_deleted',
+    peerId: 1,
+    params: { agent: 'codex', sessionId: 's1' },
+  });
+  await tick();
+
+  assert.equal(f.app.getSession('s1'), undefined);
+  assert.equal(f.app.sessionsStore.sessions.length, 0);
+  assert.equal(f.app.sessionsStore.sessionGroups.length, 0);
+  assert.equal(Boolean(f.app.getRuntime('s1').unread), false);
+});

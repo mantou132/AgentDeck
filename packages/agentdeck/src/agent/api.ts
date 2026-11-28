@@ -117,6 +117,7 @@ export type RemoteSession = {
   cwd: string;
   title?: string;
   updatedAt?: string;
+  unread?: boolean;
   additionalDirectories?: string[];
   /** Set by the host when `cwd` lies in a linked git worktree; the session is listed with `mainCwd`. */
   worktree?: { mainCwd: string; name: string };
@@ -392,6 +393,16 @@ export class AgentApi {
   setSessionEndedHandler = (handler?: ((params: { agent: string; sessionId: string }) => void) | null) =>
     this.#peer.onNotify('agent_session_ended', (params) => handler?.(params as { agent: string; sessionId: string }));
 
+  setSessionDeletedHandler = (handler?: ((params: { agent: string; sessionId: string }) => void) | null) =>
+    this.#peer.onNotify('agent_session_deleted', (params) => handler?.(params as { agent: string; sessionId: string }));
+
+  setSessionUnreadHandler = (
+    handler?: ((params: { agent: string; sessionId: string; unread: boolean }) => void) | null,
+  ) =>
+    this.#peer.onNotify('agent_session_unread', (params) =>
+      handler?.(params as { agent: string; sessionId: string; unread: boolean }),
+    );
+
   /** Claude's predicted next prompt, sent after a turn to subscribed peers. */
   setPromptSuggestionHandler = (handler?: ((params: PromptSuggestion) => void) | null) =>
     this.#peer.onNotify('agent_prompt_suggestion', (params) => handler?.(params as PromptSuggestion));
@@ -664,7 +675,7 @@ export class AgentApi {
 
   /** Fork up to and including the agent message `messageId`; the new session is loaded like any other. */
   forkSession = ({ agent, sessionId, cwd, messageId }: ForkSessionOptions) =>
-    this.#peer.call<{ sessionId: string }>(
+    this.#peer.call<{ sessionId: string; title?: string; updatedAt?: string }>(
       'agent_session_fork',
       { agent, sessionId, cwd, messageId, timeoutSeconds: sessionTimeoutSeconds },
       undefined,
@@ -754,6 +765,9 @@ export class AgentApi {
       undefined,
       { timeoutMs: 65_000, timeoutMessage: i18n.get('error.deleteSessionTimeout') },
     );
+
+  setSessionUnread = (agent: string, sessionId: string, unread: boolean) =>
+    this.#peer.call<{ ok: boolean }>('agent_session_set_unread', { agent, sessionId, unread });
 
   #taskCall = <T>(method: string, params: Record<string, unknown>) =>
     this.#peer.call<T>(method, params, undefined, {

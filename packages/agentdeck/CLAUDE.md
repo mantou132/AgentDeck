@@ -14,9 +14,9 @@ AgentDeck 客户端前端工程，结合 Tauri 2 提供移动端（Android / iOS
 
 ## 行为约束
 
-- **会话列表**：按 cwd 分组，worktree 会话归入 `mainCwd`，Claude 桌面版的 `…/Claude/scratch-workspaces/…` 合为「这台电脑」。右滑切换未读（运行中与当前打开的会话不提供）。runtime 的 `unread`（含回合完成自动标记）经 `updateRuntime` 写入 `state/session-meta.ts`，启动与换 host 时恢复，删除会话即清除。左滑删除（未连接时按钮禁用）。
+- **会话列表**：按 cwd 分组，worktree 会话归入 `mainCwd`，Claude 桌面版的 `…/Claude/scratch-workspaces/…` 合为「这台电脑」。标题、`updatedAt`、软删除与 `unread` 均由 daemon 持久化（前端不再本地保存会话元数据，启动时清理旧的 `agentdeck.meta.v1`）。右滑切换未读（运行中与当前打开的会话不提供）和页面可见自动标已读均调 `agent_session_set_unread` 并由 `agent_session_unread` 广播多端同步。左滑删除（未连接时按钮禁用），其他设备删除时经 `agent_session_deleted` 同步移除。
 - **会话配置**（`state/config-options.ts`）：select 类型的 `configOptions` 都可选（旧版 `modes` 作为 mode）。修改立即生效，失败回退；按 agent 存到 `CONFIG_DEFAULTS_KEY` 供新会话沿用（create 后或 `openSession` 返回 `freshLoad: true` 时逐项应用，不支持的跳过），settings 重置保留。
-- **会话同步与进行中回合**：回合状态由 daemon 持有，App 不持久化 in-flight。冷启动与切换 host 传 `ackHead: true`；连上 host 时调 `agent_active_sessions` 对账运行中会话与未作答请求，并对当前挂载的会话页（`trackSessionPage`）自动发带 `(sinceEpoch, sinceSeq)` 的 `agent_session_open` 做增量追赶（期间暂存实时 `agent_session_event` 按序合并；离开页面时 `agent_session_unsubscribe` 退订）。发送消息乐观渲染并带 `clientMessageId` 去重；daemon 通过 `agent_session_event` 推送当前订阅会话的流式事件，通过 `agent_session_state` 广播任意会话的回合起止与元数据变化。
+- **会话同步与进行中回合**：回合状态由 daemon 持有，App 不持久化 in-flight。冷启动与切换 host 传 `ackHead: true`；连上 host 时调 `agent_active_sessions` 对账运行中会话与未作答请求，并对当前挂载的会话页（`trackSessionPage`）自动发带 `(sinceEpoch, sinceSeq)` 的 `agent_session_open` 做增量追赶（期间暂存实时 `agent_session_event` 按序合并；离开页面时 `agent_session_unsubscribe` 退订）。发送消息乐观渲染并带 `clientMessageId` 去重；daemon 通过 `agent_session_event` 推送当前订阅会话的流式事件，通过 `agent_session_state` 广播任意会话的回合起止与元数据变化，通过 `agent_session_unread` 与 `agent_session_deleted` 同步已读状态与删除。
 - **等待用户输入**：权限请求与问题由 daemon 广播（按 `requestId` 去重），用 `agent_user_input_respond` 作答，失败时恢复可答；其他设备作答或 host 取消时经 `agent_user_input_resolved` 关闭本地卡片；重连或打开会话由 `agent_active_sessions` / `agent_session_open` 补回。
 - **问题卡片**（`elements/elicitation.ts`）：存 runtime 的 `elicitations`（仅内存），嵌在提问的工具调用之后；跳过为 decline，未答的在回合结束时标为已取消。
 - **下一句建议**：`agent_prompt_suggestion` 存 runtime 的 `suggestion`（回合进行中到达的丢弃，新回合清除），输入为空时作为 placeholder 可直接发送，长按填入输入框。

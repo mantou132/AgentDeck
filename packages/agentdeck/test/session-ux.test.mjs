@@ -110,22 +110,36 @@ for (const outcome of ['failed', 'cancelled', 'ended']) {
   });
 }
 
-test('completion reminders of new sessions are saved locally until read', async () => {
-  const f = documentFixture();
-  await f.connect();
-  const pendingSession = f.app.createPendingSession({ agent: 'codex', cwd: '/tmp' });
-  const creating = f.app.promotePendingSession(pendingSession, 'First task');
-  await f.settleHost();
-  const session = await creating;
-  f.reply(f.requests.at(-1), { ok: true, agent: 'codex', sessionId: session.sessionId });
-  f.emitTurnAnswer(session.sessionId, 'Done', { epoch: 'ep-created' });
+test('unread state persists via daemon across cold restarts and syncs across devices', async () => {
+  const f = await running();
+  f.emitTurnAnswer('s1', 'Done');
   await tick();
-  assert.ok(Boolean(f.app.getRuntime(session.sessionId).unread));
-  f.app.resetRemoteState();
-  assert.ok(Boolean(f.app.getRuntime(session.sessionId).unread));
-  f.app.updateRuntime(session.sessionId, { unread: false });
-  f.app.resetRemoteState();
-  assert.ok(!f.app.getRuntime(session.sessionId).unread);
+  assert.equal(Boolean(f.app.getRuntime('s1').unread), true);
+
+  // Cold restart with ackHead: true restores unread from daemon's agent_session_list.
+  const fresh = documentFixture(f);
+  await fresh.connect();
+  assert.equal(Boolean(fresh.app.getRuntime('s1').unread), true);
+
+  // Marking read sends agent_session_set_unread to daemon and persists across reload.
+  fresh.app.setSessionUnread('s1', false);
+  await fresh.settleHost();
+  const req = fresh.requests.findLast((r) => r.payload.method === 'agent_session_set_unread');
+  assert.deepEqual(req?.payload.params, { agent: 'codex', sessionId: 's1', unread: false });
+  assert.equal(Boolean(fresh.app.getRuntime('s1').unread), false);
+
+  const afterRead = documentFixture(fresh);
+  await afterRead.connect();
+  assert.equal(Boolean(afterRead.app.getRuntime('s1').unread), false);
+
+  // Remote device broadcast updates unread immediately.
+  afterRead.deliver({
+    method: 'agent_session_unread',
+    peerId: 1,
+    params: { agent: 'codex', sessionId: 's1', unread: true },
+  });
+  await tick();
+  assert.equal(Boolean(afterRead.app.getRuntime('s1').unread), true);
 });
 
 test('pending permission requests expose active permission status for session list items', async () => {
@@ -229,4 +243,13 @@ test('an expired agent login shows a sign-in hint instead of the agent error', a
   f.emitEvent('s1', { event: 'turn_ended', error: 'Agent stopped' });
   await tick();
   assert.equal(f.app.getRuntime('s1').error, 'Agent stopped');
+});
+
+test('startApp removes legacy agentdeck.meta.v1 from localStorage', async () => {
+  const seed = documentFixture();
+  seed.localStorage.setItem('agentdeck.meta.v1', JSON.stringify(['s1']));
+
+  const f = documentFixture(seed);
+  await f.connect();
+  assert.equal(f.localStorage.getItem('agentdeck.meta.v1'), null);
 });

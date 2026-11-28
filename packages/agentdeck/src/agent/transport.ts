@@ -47,6 +47,8 @@ export type TransportMessage =
   | { type: 'session_state'; state: SessionStateUpdate }
   | { type: 'user_input_resolved'; agent: string; sessionId: string; requestId: string }
   | { type: 'session_ended'; sessionId: string }
+  | { type: 'session_deleted'; sessionId: string }
+  | { type: 'session_unread'; agent: string; sessionId: string; unread: boolean }
   | { type: 'prompt_suggestion'; sessionId: string; suggestion: string };
 
 type MessageHandler = (message: TransportMessage) => void;
@@ -631,6 +633,12 @@ export const initTransport = (options: InitTransportOptions) => {
     transport.dispatchMessage({ type: 'user_input_resolved', agent, sessionId, requestId }),
   );
   agentApi.setSessionEndedHandler(({ sessionId }) => transport.dispatchMessage({ type: 'session_ended', sessionId }));
+  agentApi.setSessionDeletedHandler(({ sessionId }) =>
+    transport.dispatchMessage({ type: 'session_deleted', sessionId }),
+  );
+  agentApi.setSessionUnreadHandler(({ agent, sessionId, unread }) =>
+    transport.dispatchMessage({ type: 'session_unread', agent, sessionId, unread }),
+  );
   agentApi.setPromptSuggestionHandler(({ sessionId, suggestion }) =>
     transport.dispatchMessage({ type: 'prompt_suggestion', sessionId, suggestion }),
   );

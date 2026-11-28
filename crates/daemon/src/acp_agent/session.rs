@@ -52,6 +52,7 @@ pub(super) async fn run_session_actor(
     epoch: String,
     idle_timeout: Duration,
     observer: Option<Arc<dyn SessionObserver>>,
+    meta: Arc<SessionMetaStore>,
     runtime: AcpRuntime,
     mut rx: mpsc::Receiver<SessionCommand>,
     mut child_rx: mpsc::UnboundedReceiver<ChildUpdate>,
@@ -82,19 +83,38 @@ pub(super) async fn run_session_actor(
             return SessionExit::NotReady;
         }
     };
+    let initial_meta = if loading {
+        meta.merge_metadata(
+            &runtime.agent,
+            &ready.session_id,
+            ready.title.as_deref(),
+            None,
+            ready.updated_at.as_deref(),
+            None,
+        )
+    } else {
+        let updated_at = ready.updated_at.unwrap_or_else(meta::now_iso);
+        meta.record_created(
+            &runtime.agent,
+            &ready.session_id,
+            ready.title.as_deref(),
+            &updated_at,
+        )
+    };
     let mut actor = SessionActor {
         agent: runtime.agent.clone(),
         session_id: ready.session_id.clone(),
         epoch,
         cwd: cwd_str,
-        title: ready.title,
-        updated_at: ready.updated_at,
+        title: initial_meta.title,
+        updated_at: initial_meta.updated_at,
         modes: ready.modes,
         config_options: ready.config_options,
         suggestion: None,
         events: EventLog::default(),
         subscribers: HashMap::new(),
         observer,
+        meta,
         input_timeout,
         auto_approve,
         task_push,
@@ -114,6 +134,7 @@ pub(super) async fn run_session_actor(
         // returns all replayed history cleanly.
         if loading {
             drain_replay(&mut session, &mut child_rx, &mut actor).await?;
+            actor.persist_metadata();
         }
         if let Some(sub) = subscriber {
             actor.subscribers.insert(sub.peer_id, sub);
@@ -163,6 +184,7 @@ pub(super) async fn run_session_actor(
             let was_running = actor.turn.is_some();
             actor.clear_pending_inputs();
             if was_running {
+                actor.touch_updated_at();
                 actor.push_event(AgentEvent::TurnEnded {
                     stop_reason: Some(serde_json::json!("cancelled")),
                     error: None,
@@ -217,6 +239,7 @@ struct SessionActor {
     events: EventLog,
     subscribers: HashMap<u64, SessionSubscriber>,
     observer: Option<Arc<dyn SessionObserver>>,
+    meta: Arc<SessionMetaStore>,
     /// See `SessionContext::input_timeout`.
     input_timeout: Option<Duration>,
     /// See `SessionContext::auto_approve`.
@@ -392,6 +415,7 @@ impl SessionActor {
                             });
                         }
                     }
+                    self.touch_updated_at();
                     self.push_event(AgentEvent::TurnEnded {
                         stop_reason: None,
                         error: Some(message.clone()),
@@ -530,6 +554,10 @@ impl SessionActor {
             self.subscribers.insert(sub.peer_id, sub);
         }
         self.suggestion = None;
+        if self.title.is_none() {
+            self.title = meta::title_from_prompt(&turn.prompt, &turn.attachments);
+        }
+        self.touch_turn_metadata(Some(false));
 
         // Record the turn start and clean user message blocks into the event
         // log (without `VOICE_CHAT_MARKER`) so other subscribers and
@@ -636,6 +664,12 @@ impl SessionActor {
         }
         let update_json = update_to_json(update);
         self.apply_update_state(&update_json, child.is_none());
+        if child.is_none()
+            && self.title.is_none()
+            && let Some(title) = meta::title_from_user_chunk(&update_json)
+        {
+            self.title = Some(title);
+        }
         self.events.push(AgentEvent::SessionUpdate {
             update: update_json,
             child_session_id: child,
@@ -666,6 +700,7 @@ impl SessionActor {
             child_session_id: child,
         });
         if metadata_changed {
+            self.persist_metadata();
             self.publish();
             self.emit_state(self.turn.is_some(), false, None, None);
         }
@@ -687,23 +722,23 @@ impl SessionActor {
         match kind {
             "session_info_update" => {
                 let mut changed = false;
-                if let Some(title) = update
-                    .get("title")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|value| !value.is_empty())
-                    && self.title.as_deref() != Some(title)
+                if let Some(title) =
+                    meta::clean_title(update.get("title").and_then(serde_json::Value::as_str))
+                    && self.title.as_deref() != Some(title.as_str())
                 {
-                    self.title = Some(title.to_string());
+                    self.title = Some(title);
                     changed = true;
                 }
                 if let Some(updated_at) = update
                     .get("updatedAt")
                     .and_then(serde_json::Value::as_str)
                     .filter(|value| !value.is_empty())
-                    && self.updated_at.as_deref() != Some(updated_at)
                 {
-                    self.updated_at = Some(updated_at.to_string());
-                    changed = true;
+                    let next = meta::pick_newer(self.updated_at.as_deref(), Some(updated_at));
+                    if next != self.updated_at {
+                        self.updated_at = next;
+                        changed = true;
+                    }
                 }
                 changed
             }
@@ -848,6 +883,8 @@ impl SessionActor {
             Ok(response) => {
                 let stop_reason = to_json(response.stop_reason);
                 let cancelled = turn.cancelled || stop_reason == "cancelled";
+                let mark_unread = !cancelled && self.task_push.is_none();
+                self.touch_turn_metadata(mark_unread.then_some(true));
                 self.push_event(AgentEvent::TurnEnded {
                     stop_reason: Some(stop_reason),
                     error: None,
@@ -866,6 +903,7 @@ impl SessionActor {
             Err(err) => {
                 let code = acp_error_code(&err).map(str::to_string);
                 let message = err.to_string();
+                self.touch_updated_at();
                 self.push_event(AgentEvent::TurnEnded {
                     stop_reason: None,
                     error: Some(message.clone()),
@@ -882,6 +920,34 @@ impl SessionActor {
                 }
             }
         }
+    }
+
+    fn touch_updated_at(&mut self) {
+        self.touch_turn_metadata(None);
+    }
+
+    fn touch_turn_metadata(&mut self, unread: Option<bool>) {
+        let now = meta::now_iso();
+        self.updated_at = meta::pick_newer(self.updated_at.as_deref(), Some(&now));
+        self.meta.merge_metadata(
+            &self.agent,
+            &self.session_id,
+            self.title.as_deref(),
+            None,
+            self.updated_at.as_deref(),
+            unread,
+        );
+    }
+
+    fn persist_metadata(&self) {
+        self.meta.merge_metadata(
+            &self.agent,
+            &self.session_id,
+            self.title.as_deref(),
+            None,
+            self.updated_at.as_deref(),
+            None,
+        );
     }
 
     /// Cancel the running turn; its pending requests settle cancelled.

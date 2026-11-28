@@ -312,6 +312,8 @@ export function documentFixture(previous, options = {}) {
   const processed = new Set();
   const sessionSeqs = new Map();
   const sessionEpochs = new Map();
+  host.unreadSessions ??= new Set();
+  const { unreadSessions } = host;
   const nextSeq = (sessionId) => {
     const seq = (sessionSeqs.get(sessionId) ?? 0) + 1;
     sessionSeqs.set(sessionId, seq);
@@ -332,6 +334,9 @@ export function documentFixture(previous, options = {}) {
     sessionEpochs.set(sessionId, resolvedEpoch);
     const seq = event.seq ?? nextSeq(sessionId);
     if (seq > (sessionSeqs.get(sessionId) ?? 0)) sessionSeqs.set(sessionId, seq);
+    if (event.event === 'turn_ended' && !event.error && event.stopReason !== 'cancelled') {
+      unreadSessions.add(sessionId);
+    }
     deliver({
       method: 'agent_session_event',
       peerId: 1,
@@ -392,10 +397,13 @@ export function documentFixture(previous, options = {}) {
         }
         const results = {
           peer_attach: { peerId: 1, customAgents: [] },
-          agent_session_list: { sessions: [remoteSession] },
+          agent_session_list: {
+            sessions: [{ ...remoteSession, ...(unreadSessions.has(remoteSession.sessionId) ? { unread: true } : {}) }],
+          },
           agent_active_sessions: { sessions: [], userInputs: [] },
           agent_session_close: { closed: true },
           agent_session_unsubscribe: { ok: true },
+          agent_session_set_unread: { ok: true },
           ...(openResult ? { agent_session_open: openResult } : {}),
           agent_session_create: { sessionId: 'created', agent, epoch: 'ep-created', seq: 0 },
           task_list: { tasks: [] },
@@ -407,6 +415,9 @@ export function documentFixture(previous, options = {}) {
         } else if (method === 'agent_session_create') {
           sessionEpochs.set('created', 'ep-created');
           sessionSeqs.set('created', 0);
+        } else if (method === 'agent_session_set_unread') {
+          if (params?.unread) unreadSessions.add(sessionId);
+          else unreadSessions.delete(sessionId);
         }
         processed.add(request.message_id);
         sockets.at(-1).frame({ type: 'stored', message_id: request.message_id });

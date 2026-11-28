@@ -25,6 +25,8 @@ struct TestObserver {
     inputs: mpsc::UnboundedSender<(String, Value)>,
     resolved: mpsc::UnboundedSender<(String, String, String)>,
     ended: mpsc::UnboundedSender<(String, String)>,
+    deleted: mpsc::UnboundedSender<(String, String)>,
+    unread: mpsc::UnboundedSender<(String, String, bool)>,
 }
 
 struct ObserverRx {
@@ -32,6 +34,8 @@ struct ObserverRx {
     inputs: mpsc::UnboundedReceiver<(String, Value)>,
     resolved: mpsc::UnboundedReceiver<(String, String, String)>,
     ended: mpsc::UnboundedReceiver<(String, String)>,
+    deleted: mpsc::UnboundedReceiver<(String, String)>,
+    unread: mpsc::UnboundedReceiver<(String, String, bool)>,
 }
 
 impl TestObserver {
@@ -40,18 +44,24 @@ impl TestObserver {
         let (inputs, inputs_rx) = mpsc::unbounded_channel();
         let (resolved, resolved_rx) = mpsc::unbounded_channel();
         let (ended, ended_rx) = mpsc::unbounded_channel();
+        let (deleted, deleted_rx) = mpsc::unbounded_channel();
+        let (unread, unread_rx) = mpsc::unbounded_channel();
         (
             Arc::new(Self {
                 states,
                 inputs,
                 resolved,
                 ended,
+                deleted,
+                unread,
             }),
             ObserverRx {
                 states: states_rx,
                 inputs: inputs_rx,
                 resolved: resolved_rx,
                 ended: ended_rx,
+                deleted: deleted_rx,
+                unread: unread_rx,
             },
         )
     }
@@ -83,6 +93,18 @@ impl SessionObserver for TestObserver {
 
     fn on_session_ended(&self, agent: &str, session_id: &str) {
         let _ = self.ended.send((agent.to_string(), session_id.to_string()));
+    }
+
+    fn on_session_deleted(&self, agent: &str, session_id: &str) {
+        let _ = self
+            .deleted
+            .send((agent.to_string(), session_id.to_string()));
+    }
+
+    fn on_session_unread(&self, agent: &str, session_id: &str, unread: bool) {
+        let _ = self
+            .unread
+            .send((agent.to_string(), session_id.to_string(), unread));
     }
 }
 
@@ -941,12 +963,18 @@ async fn unadvertised_session_methods_are_not_sent_to_acp() {
             .to_string()
             .contains("does not support listing")
     );
-    let delete = manager.delete_session("codex-acp", "old").await;
+    // Deleting when ACP does not advertise `delete` soft-deletes in daemon
+    // without sending `session/delete` to the agent.
+    manager.delete_session("codex-acp", "old").await.unwrap();
+    assert_eq!(
+        mock.observer.deleted.try_recv().unwrap(),
+        ("codex-acp".to_string(), "old".to_string())
+    );
     assert!(
-        delete
-            .unwrap_err()
-            .to_string()
-            .contains("does not support deleting")
+        tokio::time::timeout(Duration::from_millis(30), mock.peer.rx.next())
+            .await
+            .is_err(),
+        "unadvertised session/delete must not reach the agent"
     );
 
     mock.create("session").await;
@@ -1832,4 +1860,156 @@ async fn mode_and_config_changes_sync_to_other_subscribers_without_duplicating_a
             .is_err(),
         "must not emit duplicate current_mode_update when ACP already pushed one"
     );
+}
+
+#[tokio::test]
+async fn daemon_tracks_title_updated_at_and_soft_delete_when_acp_omits_them() {
+    let mut mock = MockAcp::with_capabilities(json!({
+        "loadSession": true,
+        "sessionCapabilities": { "list": {} }
+    }))
+    .await;
+
+    // 1. Creating a session whose ACP response has no metadata gets an initial
+    //    updated_at from the daemon and no placeholder title.
+    let creating = {
+        let manager = mock.manager.clone();
+        tokio::spawn(async move {
+            manager
+                .create_session("codex-acp", None, Default::default(), None)
+                .await
+        })
+    };
+    let new_req = mock.next("session/new").await;
+    mock.respond(
+        &new_req,
+        json!({
+            "sessionId": "s1",
+            "_meta": { "title": "Session a1bcdef0" }
+        }),
+    );
+    let created = creating.await.unwrap().unwrap();
+    assert_eq!(created.title, None);
+    let created_at = created.updated_at.expect("initial updated_at on create");
+
+    // 2. Starting and finishing a turn derives the title from the first prompt,
+    //    advances updated_at, and broadcasts both in agent_session_state.
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    let prompt_handle = mock
+        .manager
+        .start_prompt(
+            "codex-acp",
+            "s1",
+            PromptOptions {
+                prompt: "支持 DeepSeek harness 吗".into(),
+                attachments: vec![],
+                voice_chat: false,
+                client_message_id: None,
+                originator_peer_id: None,
+                subscriber: None,
+                timeout_secs: 30,
+            },
+        )
+        .await
+        .unwrap();
+    let prompt_req = mock.next("session/prompt").await;
+    let started_state = mock.observer.states.recv().await.unwrap();
+    assert!(started_state.running);
+    assert_eq!(
+        started_state.title.as_deref(),
+        Some("支持 DeepSeek harness 吗")
+    );
+    let started_at = started_state.updated_at.expect("updated_at on turn start");
+    assert!(started_at > created_at);
+
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    mock.respond(&prompt_req, json!({ "stopReason": "end_turn" }));
+    let _ = prompt_handle.completion.await;
+    let ended_state = mock.observer.states.recv().await.unwrap();
+    assert!(!ended_state.running);
+    let ended_at = ended_state.updated_at.expect("updated_at on turn end");
+    assert!(ended_at >= started_at);
+
+    // 3. Loading a pre-existing session without stored metadata derives its
+    //    title from the first replayed user_message_chunk without inventing a
+    //    new updated_at.
+    let opening = {
+        let manager = mock.manager.clone();
+        tokio::spawn(async move {
+            manager
+                .open_session("codex-acp", "s2", None, Default::default(), None, None, 0)
+                .await
+        })
+    };
+    let load_req = mock.next("session/load").await;
+    mock.peer
+        .tx
+        .unbounded_send(frame(json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "s2",
+                "update": {
+                    "sessionUpdate": "user_message_chunk",
+                    "content": { "type": "text", "text": "旧会话的首条消息" }
+                }
+            }
+        })))
+        .unwrap();
+    mock.respond(&load_req, json!({}));
+    let opened = opening.await.unwrap().unwrap();
+    assert_eq!(opened.title.as_deref(), Some("旧会话的首条消息"));
+    assert_eq!(opened.updated_at, None);
+
+    // 4. Soft-deleting s2 hides it from list_sessions even when ACP still
+    //    returns it, while s1 gets its daemon-tracked title and updatedAt.
+    mock.manager
+        .delete_session("codex-acp", "s2")
+        .await
+        .unwrap();
+    mock.next("session/cancel").await;
+    assert_eq!(
+        mock.observer.deleted.try_recv().unwrap(),
+        ("codex-acp".to_string(), "s2".to_string())
+    );
+
+    let listing = {
+        let manager = mock.manager.clone();
+        tokio::spawn(async move { manager.list_sessions("codex-acp", None, None).await })
+    };
+    let list_req = mock.next("session/list").await;
+    mock.respond(
+        &list_req,
+        json!({
+            "sessions": [
+                { "sessionId": "s1", "cwd": "/repo", "title": "Session a1bcdef0" },
+                { "sessionId": "s2", "cwd": "/repo", "title": "Session b2cdef01" }
+            ]
+        }),
+    );
+    let list = listing.await.unwrap().unwrap();
+    let sessions = list["sessions"].as_array().unwrap();
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0]["sessionId"], "s1");
+    assert_eq!(sessions[0]["title"], "支持 DeepSeek harness 吗");
+    assert_eq!(sessions[0]["updatedAt"], ended_at);
+    assert_eq!(sessions[0]["unread"], true);
+
+    // 5. Explicit mark-read persists and broadcasts to other devices.
+    mock.manager.set_session_unread("codex-acp", "s1", false);
+    assert_eq!(
+        mock.observer.unread.try_recv().unwrap(),
+        ("codex-acp".to_string(), "s1".to_string(), false)
+    );
+    let listing2 = {
+        let manager = mock.manager.clone();
+        tokio::spawn(async move { manager.list_sessions("codex-acp", None, None).await })
+    };
+    let list_req2 = mock.next("session/list").await;
+    mock.respond(
+        &list_req2,
+        json!({ "sessions": [{ "sessionId": "s1", "cwd": "/repo" }] }),
+    );
+    let list2 = listing2.await.unwrap().unwrap();
+    assert!(list2["sessions"][0].get("unread").is_none());
 }

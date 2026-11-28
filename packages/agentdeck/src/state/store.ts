@@ -13,7 +13,6 @@ import {
 import type { Elicitation } from 'src/session/elicitation';
 import { getSortedSessionGroups, type SessionGroup } from 'src/session/groups';
 import type { ChatMessage, DeckSession, SessionOptions, Subagent } from 'src/session/types';
-import { saveSessionMeta, unreadRuntimes } from 'src/state/session-meta';
 
 const initialSettings = readSettings();
 
@@ -72,7 +71,7 @@ export const sessionsStore = createStore({
   sessionsError: '',
   /** Agents the host is installing or starting for a session call. */
   agentStatus: {} as Record<string, AgentStatus>,
-  runtimes: unreadRuntimes() as Record<string, SessionRuntime>,
+  runtimes: {} as Record<string, SessionRuntime>,
 });
 
 /** Messages change with every streamed chunk, so only elements that show them connect to this store. */
@@ -112,9 +111,6 @@ export const getRuntime = (sessionId: string): SessionRuntime => sessionsStore.r
 
 export const updateRuntime = (sessionId: string, patch: Partial<SessionRuntime>) => {
   const nextPatch = patch.running ? { ...patch, unread: false } : patch;
-  if ('unread' in nextPatch && nextPatch.unread !== getRuntime(sessionId).unread) {
-    saveSessionMeta(sessionId, { unread: Boolean(nextPatch.unread) });
-  }
   sessionsStore({ runtimes: { ...sessionsStore.runtimes, [sessionId]: { ...getRuntime(sessionId), ...nextPatch } } });
 };
 

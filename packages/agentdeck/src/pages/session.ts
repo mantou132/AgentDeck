@@ -31,6 +31,7 @@ import {
   promotePendingSession,
   retrySessionLoad,
   sendPrompt,
+  setSessionUnread,
   trackSessionPage,
 } from 'src/state/sessions';
 import { shareStore } from 'src/state/share';
@@ -87,7 +88,7 @@ export class AgentDeckSessionPageElement extends GemElement {
       Stack.inCurrentStack(this) &&
       getRuntime(this.sessionId).unread
     ) {
-      updateRuntime(this.sessionId, { unread: false });
+      setSessionUnread(this.sessionId, false);
     }
   };
 
