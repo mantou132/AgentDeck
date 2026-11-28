@@ -42,7 +42,7 @@ export const RELAY_URL = 'wss://agentdeck.xianqiao.wang/ws';
 export const FEEDBACK_URL = 'https://github.com/mantou132/AgentDeck/issues/new';
 
 /** Raise when the app needs a newer agentdeckd; older hosts get an upgrade toast once per launch. */
-export const MIN_DAEMON_VERSION = '0.8.0';
+export const MIN_DAEMON_VERSION = '1.0.0';
 
 /**
  * Skills in `skills/` this client can use, in settings order; the enabled ones are declared to the host, which mounts
