@@ -1,4 +1,3 @@
-import type { Emitter } from '@mantou/gem/lib/decorators';
 import type { TapPageElement } from '@mantou/tap-ui/elements/page';
 import { blockContainer } from '@mantou/tap-ui/lib/styles';
 import { i18n } from 'src/i18n';
@@ -88,7 +87,6 @@ export class DeckProcessStepElement extends GemElement {
   @property sessionId = '';
   @property groupId = '';
   @property itemId = '';
-  @emitter navigate: Emitter;
 
   #pageRef = createRef<TapPageElement>();
   #contentRef = createRef<HTMLElement>();
@@ -130,7 +128,7 @@ export class DeckProcessStepElement extends GemElement {
   }
 
   #openLink = (event: MouseEvent) => {
-    if (openMessageLink(event, getSession(this.sessionId)?.cwd || '')) this.navigate();
+    openMessageLink(event, getSession(this.sessionId)?.cwd || '');
   };
 
   #renderContent = () => {

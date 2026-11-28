@@ -81,7 +81,7 @@ export class DeckSessionTimelineElement extends GemElement {
   };
 
   #openProcessSheet = (group: ProcessGroup) => {
-    const result = Sheet.open({
+    Sheet.open({
       maskClosable: true,
       hasStack: true,
       // Pulling up scales only the Stack beside the split view sidebar; fit the content instead
@@ -90,7 +90,6 @@ export class DeckSessionTimelineElement extends GemElement {
         <deck-process-detail
           .sessionId=${this.sessionKey}
           .groupId=${group.id}
-          @navigate=${() => result.sheet.close(null)}
         ></deck-process-detail>
       `,
     });
